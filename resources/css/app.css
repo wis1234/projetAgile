@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors;
+}
+input, select, textarea {
+  @apply rounded border-gray-300 dark:border-gray-700 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:bg-gray-800 dark:text-gray-100;
+}
+.btn {
+  @apply px-4 py-2 rounded font-semibold shadow transition bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300;
+}
+.btn-secondary {
+  @apply bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
+}
+.input {
+  @apply border px-3 py-2 rounded w-full;
+}
+.text-error {
+  @apply text-red-600 dark:text-red-400;
+}

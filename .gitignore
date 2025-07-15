@@ -1,0 +1,49 @@
+/node_modules
+/public/hot
+/public/storage
+/storage/*.key
+/vendor
+
+.env
+.env.backup
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Laravel specific
+/bootstrap/cache/*.php
+/storage/app/public/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*.log
+
+# Vite
+/public/build
+
+# Composer
+composer.phar
+
+# PHPUnit
+.phpunit.result.cache
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+*.stackdump
+
+# Editor files
+*.sublime-project
+*.sublime-workspace
+*.bak
+*.swp
+*.swo
