@@ -147,20 +147,40 @@ export default function AdminLayout({ children }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [sidebarOpen]);
+
   const avatarUrl = auth?.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth?.user?.name || 'User')}&background=0D8ABC&color=fff`;
 
   return (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-colors">
       {globalLoading && <Loader fullscreen />}
       {/* Sidebar */}
-      <aside className="z-40 fixed top-0 left-0 h-screen w-64 bg-white dark:bg-gray-800 flex flex-col py-6 px-4 space-y-6 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300">
+      <aside className={`z-40 fixed top-0 left-0 h-screen w-64 bg-white dark:bg-gray-800 flex flex-col py-6 px-4 space-y-6 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        {/* Bouton croix toujours visible sur mobile quand menu ouvert */}
+        {sidebarOpen && (
+          <button
+            className="md:hidden fixed top-4 left-60 z-50 text-3xl bg-white dark:bg-gray-800 rounded-full shadow p-2 border border-gray-200 dark:border-gray-700"
+            style={{transform: 'translateX(-50%)'}}
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fermer le menu"
+          >&times;</button>
+        )}
         <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 mb-8 flex items-center justify-between">
           Admin
-          <button className="md:hidden text-2xl" onClick={() => setSidebarOpen(false)}>&times;</button>
+          {/* Ancien bouton croix, masqué sur mobile car doublon */}
+          <span className="md:hidden text-2xl opacity-0 pointer-events-none">&times;</span>
         </div>
-        <nav className="flex-1 space-y-2">
+        <nav className="flex-1 space-y-2 overflow-y-auto">
           {navLinks.map(link => (
-            <Link key={link.href} href={link.href} className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-800 dark:hover:text-blue-200 font-medium transition">
+            <Link key={link.href} href={link.href} className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-800 dark:hover:text-blue-200 font-medium transition" onClick={() => setSidebarOpen(false)}>
               {link.icon}
               {link.label}
             </Link>
