@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
+import { FaFileAlt } from 'react-icons/fa';
 
 function Create({ projects, users, tasks = [], kanbans = [] }) {
   const { errors = {}, flash = {} } = usePage().props;
@@ -54,12 +55,12 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
 
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="max-w-xl w-full mx-auto">
+      <div className="max-w-5xl mx-auto bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8 mt-8 mb-8">
+        <h1 className="text-2xl font-bold mb-6 flex items-center gap-2 text-blue-700 dark:text-blue-200"><FaFileAlt /> Nouveau fichier</h1>
         {notification && (
           <div className={`mb-4 px-4 py-2 rounded text-white ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
         )}
-        <h1 className="text-2xl font-bold mb-4">Créer un fichier</h1>
-        <form onSubmit={handleSubmit} className="space-y-4" encType="multipart/form-data">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block font-semibold mb-1">Nom du fichier</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)} className="input" required />
@@ -104,9 +105,9 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
             <textarea value={description} onChange={e => setDescription(e.target.value)} className="input" rows={2} />
             {errors.description && <div className="text-error text-sm">{errors.description}</div>}
           </div>
-          <div className="flex gap-2 mt-4">
-            <button type="submit" className="btn" disabled={loading}>{loading ? 'Création...' : 'Créer'}</button>
-            <Link href="/files" className="btn btn-secondary">Retour à la liste</Link>
+          <div className="md:col-span-2 flex gap-2 mt-4">
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded font-semibold shadow flex items-center gap-2">Créer</button>
+            <Link href={route('files.index')} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-2 rounded font-semibold shadow flex items-center gap-2">Annuler</Link>
           </div>
         </form>
       </div>

@@ -108,7 +108,7 @@ export default function AdminLayout({ children }) {
   return (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-colors">
       {/* Sidebar */}
-      <aside className="z-40 fixed top-0 left-0 h-screen w-64 bg-white dark:bg-gray-800 flex flex-col py-6 px-4 space-y-6 transition-transform duration-300">
+      <aside className="z-40 fixed top-0 left-0 h-screen w-64 bg-white dark:bg-gray-800 flex flex-col py-6 px-4 space-y-6 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300">
         <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 mb-8 flex items-center justify-between">
           Admin
           <button className="md:hidden text-2xl" onClick={() => setSidebarOpen(false)}>&times;</button>
@@ -131,7 +131,7 @@ export default function AdminLayout({ children }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
         {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow flex items-center justify-between px-6 py-4 sticky top-0 z-20">
+        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6 z-40 transition-all duration-300">
           <button className="md:hidden text-2xl mr-2" onClick={() => setSidebarOpen(true)}>&#9776;</button>
           <div className="text-xl font-bold text-blue-700 dark:text-blue-200">Dashboard</div>
           <div className="flex items-center gap-4">
@@ -211,7 +211,7 @@ export default function AdminLayout({ children }) {
         <Notification message={flash.error} type="error" />
         <Notification message={flash.info} type="info" />
         {/* Page content */}
-        <main className="flex-1 w-full h-full transition-colors p-4 md:p-8">
+        <main className="flex-1 w-full h-full transition-colors p-4 md:p-8 pb-24 mt-16">
           {children}
         </main>
       </div>

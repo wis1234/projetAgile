@@ -24,7 +24,7 @@ export default function Index({ files, filters }) {
     }, [flash.success]);
 
     return (
-        <div className="flex flex-col h-full w-full">
+        <div className="flex flex-col h-full w-full max-w-5xl mx-auto">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-2 md:gap-0">
                 <h1 className="text-3xl font-extrabold flex items-center gap-3 text-blue-700 dark:text-blue-200 tracking-tight drop-shadow"><FaFileAlt /> Fichiers</h1>
                 <Link href="/files/create">
@@ -50,19 +50,19 @@ export default function Index({ files, filters }) {
                 </div>
             )}
             {flash.success && <div className="alert alert-success mb-4">{flash.success}</div>}
-            <div className="overflow-x-auto rounded-lg shadow bg-white dark:bg-gray-800">
+            <div className="overflow-x-auto md:overflow-x-visible rounded-lg shadow bg-white dark:bg-gray-800">
                 <table className="min-w-full text-sm">
                     <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-100 to-blue-300 dark:from-blue-900 dark:to-blue-700 shadow">
                         <tr>
-                            <th className="p-4 text-left font-bold">Type</th>
-                            <th className="p-4 text-left font-bold">Nom</th>
-                            <th className="p-4 text-left font-bold">Projet</th>
-                            <th className="p-4 text-left font-bold">Tâche</th>
-                            <th className="p-4 text-left font-bold">Utilisateur</th>
-                            <th className="p-4 text-left font-bold">Taille</th>
-                            <th className="p-4 text-left font-bold">Statut</th>
-                            <th className="p-4 text-left font-bold">Date</th>
-                            <th className="p-4 text-left font-bold">Actions</th>
+                            <th className="p-2 md:p-3 text-left font-bold">Type</th>
+                            <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Nom</th>
+                            <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Projet</th>
+                            <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Tâche</th>
+                            <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Utilisateur</th>
+                            <th className="p-2 md:p-3 text-left font-bold">Taille</th>
+                            <th className="p-2 md:p-3 text-left font-bold">Statut</th>
+                            <th className="p-2 md:p-3 text-left font-bold">Date</th>
+                            <th className="p-2 md:p-3 text-left font-bold">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -83,15 +83,15 @@ export default function Index({ files, filters }) {
                             if (file.status === 'rejected') statusBadge = <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-100 text-red-800"><FaTimesCircle /> Rejeté</span>;
                             return (
                                 <tr key={file.id} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900'}>
-                                    <td className="p-4 align-middle">{icon}</td>
-                                    <td className="p-4 align-middle font-semibold text-blue-800 dark:text-blue-200">{file.name}</td>
-                                    <td className="p-4 align-middle">{file.project?.name || '-'}</td>
-                                    <td className="p-4 align-middle">{file.task?.title || '-'}</td>
-                                    <td className="p-4 align-middle">{file.user?.name || '-'}</td>
-                                    <td className="p-4 align-middle"><span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></td>
-                                    <td className="p-4 align-middle">{statusBadge}</td>
-                                    <td className="p-4 align-middle"><span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></td>
-                                    <td className="p-4 align-middle flex gap-2">
+                                    <td className="p-2 md:p-3 align-middle">{icon}</td>
+                                    <td className="p-2 md:p-3 align-middle font-semibold text-blue-800 dark:text-blue-200 max-w-[120px] truncate">{file.name}</td>
+                                    <td className="p-2 md:p-3 align-middle max-w-[120px] truncate">{file.project?.name || '-'}</td>
+                                    <td className="p-2 md:p-3 align-middle max-w-[120px] truncate">{file.task?.title || '-'}</td>
+                                    <td className="p-2 md:p-3 align-middle max-w-[120px] truncate">{file.user?.name || '-'}</td>
+                                    <td className="p-2 md:p-3 align-middle"><span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></td>
+                                    <td className="p-2 md:p-3 align-middle">{statusBadge}</td>
+                                    <td className="p-2 md:p-3 align-middle"><span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></td>
+                                    <td className="p-2 md:p-3 align-middle flex gap-2 flex-wrap">
                                         <Link href={route('files.show', file.id)}>
                                             <ActionButton variant="info" size="sm">Voir</ActionButton>
                                         </Link>

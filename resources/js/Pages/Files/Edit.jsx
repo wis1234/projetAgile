@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
+import { FaFileAlt } from 'react-icons/fa';
 
 export default function Edit({ file, projects, users, tasks = [], kanbans = [] }) {
     const { errors, flash = {} } = usePage().props;
@@ -45,12 +46,12 @@ export default function Edit({ file, projects, users, tasks = [], kanbans = [] }
     return (
         <AdminLayout>
             <div className="flex flex-col h-full w-full">
-                <div className="max-w-xl w-full mx-auto">
-                    <h1 className="text-2xl font-bold mb-4 text-blue-700 dark:text-blue-200">Éditer le fichier</h1>
+                <div className="max-w-5xl mx-auto bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8 mt-8 mb-8">
+                    <h1 className="text-2xl font-bold mb-6 flex items-center gap-2 text-yellow-700 dark:text-yellow-200"><FaFileAlt /> Modifier le fichier</h1>
                     {notification && (
                         <div className={`mb-4 px-4 py-2 rounded text-white ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
                     )}
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block font-semibold mb-1">Nom du fichier</label>
                             <input type="text" name="name" value={values.name} onChange={handleChange} className="input" required />
@@ -64,6 +65,15 @@ export default function Edit({ file, projects, users, tasks = [], kanbans = [] }
                                 ))}
                             </select>
                             {errors.project_id && <div className="text-error text-sm">{errors.project_id}</div>}
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Utilisateur</label>
+                            <select name="user_id" value={values.user_id} onChange={handleChange} className="input" required>
+                                {users.map(user => (
+                                    <option key={user.id} value={user.id}>{user.name}</option>
+                                ))}
+                            </select>
+                            {errors.user_id && <div className="text-error text-sm">{errors.user_id}</div>}
                         </div>
                         <div>
                             <label className="block font-semibold mb-1">Tâche liée (optionnel)</label>
@@ -106,9 +116,9 @@ export default function Edit({ file, projects, users, tasks = [], kanbans = [] }
                                 {errors.rejection_reason && <div className="text-error text-sm">{errors.rejection_reason}</div>}
                             </div>
                         )}
-                        <div className="flex gap-2 mt-4">
-                            <button type="submit" className="btn" disabled={submitting}>{submitting ? 'Mise à jour...' : 'Mettre à jour'}</button>
-                            <Link href="/files" className="btn btn-secondary">Retour à la liste</Link>
+                        <div className="md:col-span-2 flex gap-2 mt-4">
+                            <button type="submit" className="bg-yellow-600 hover:bg-yellow-700 text-white px-5 py-2 rounded font-semibold shadow flex items-center gap-2">Enregistrer</button>
+                            <Link href={route('files.index')} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-2 rounded font-semibold shadow flex items-center gap-2">Annuler</Link>
                         </div>
                     </form>
                 </div>
