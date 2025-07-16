@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { router, usePage, Link } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaFlagCheckered, FaPlus, FaEdit, FaTrash, FaEye } from 'react-icons/fa';
+import { FaFlagCheckered, FaPlus, FaEdit, FaTrash, FaEye, FaSearch } from 'react-icons/fa';
 import ActionButton from '../../Components/ActionButton';
 
 function Index({ sprints, filters }) {
@@ -10,30 +10,9 @@ function Index({ sprints, filters }) {
   const [notificationType, setNotificationType] = useState('success');
   const [search, setSearch] = useState(filters?.search || '');
 
-  useEffect(() => {
-    if (window.Echo) {
-      const channel = window.Echo.channel('sprints');
-      channel.listen('SprintUpdated', (e) => {
-        setNotification('Un sprint a été modifié (ou ajouté/supprimé)');
-        setNotificationType('success');
-        router.reload({ only: ['sprints'] });
-      });
-      return () => {
-        channel.stopListening('SprintUpdated');
-      };
-    }
-  }, []);
-
-  useEffect(() => {
-    if (flash.success) {
-      setNotification(flash.success);
-      setNotificationType('success');
-    }
-  }, [flash.success]);
-
-  const handleSearch = (e) => {
-    setSearch(e.target.value);
-    router.get('/sprints', { search: e.target.value }, { preserveState: true, replace: true });
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    router.get('/sprints', { search }, { preserveState: true, replace: true });
   };
 
   const handleDelete = (id) => {
@@ -65,13 +44,18 @@ function Index({ sprints, filters }) {
             <ActionButton variant="primary">Nouveau sprint</ActionButton>
           </Link>
         </div>
-        <input
-          type="text"
-          value={search}
-          onChange={handleSearch}
-          placeholder="Rechercher..."
-          className="border px-3 py-2 rounded w-full md:w-64"
-        />
+        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Rechercher..."
+            className="border px-3 py-2 rounded w-full md:w-64 mb-0"
+          />
+          <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
+            <FaSearch />
+          </button>
+        </form>
       </div>
       <ul className="space-y-3">
         {sprints.data.length === 0 && <li className="text-gray-500">Aucun sprint trouvé.</li>}

@@ -3,12 +3,11 @@ import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
-import { FaUser, FaUsers, FaPlus, FaEdit, FaEye, FaProjectDiagram } from 'react-icons/fa';
+import { FaUser, FaUsers, FaPlus, FaEdit, FaEye, FaProjectDiagram, FaSearch } from 'react-icons/fa';
 
 export default function Index({ users, filters }) {
     const { flash = {} } = usePage().props;
-    const [search, setSearch] = useState(filters.search || '');
-    const [debouncedSearch, setDebouncedSearch] = useState(search);
+    const [search, setSearch] = useState(filters?.search || '');
     const [notification, setNotification] = useState(flash.success || '');
     const [notificationType, setNotificationType] = useState('success');
     const [selectedUserId, setSelectedUserId] = useState(null);
@@ -22,17 +21,9 @@ export default function Index({ users, filters }) {
         }
     }, [flash.success]);
 
-    useEffect(() => {
-        const handler = setTimeout(() => setDebouncedSearch(search), 400);
-        return () => clearTimeout(handler);
-    }, [search]);
-
-    useEffect(() => {
-        Inertia.get('/users', { search: debouncedSearch }, { preserveState: true, replace: true });
-    }, [debouncedSearch]);
-
-    const handleSearch = (e) => {
-        setSearch(e.target.value);
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        Inertia.get('/users', { search }, { preserveState: true, replace: true });
     };
 
     const handleSelectUser = async (userId) => {
@@ -57,13 +48,18 @@ export default function Index({ users, filters }) {
                     <Link href="/users/create" className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-semibold shadow flex items-center gap-2 transition"><FaPlus /> Nouvel utilisateur</Link>
                 </div>
                 <div className="p-4">
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={handleSearch}
-                        placeholder="Rechercher..."
-                        className="border px-3 py-2 rounded w-full mb-4 focus:ring-2 focus:ring-blue-400"
-                    />
+                    <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Rechercher..."
+                            className="border px-3 py-2 rounded w-full mb-0 focus:ring-2 focus:ring-blue-400"
+                        />
+                        <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
+                            <FaSearch />
+                        </button>
+                    </form>
                     <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                         {users.data.map(user => (
                             <li key={user.id} className={`py-3 px-2 flex items-center gap-3 hover:bg-blue-100 dark:hover:bg-blue-900 rounded cursor-pointer transition ${selectedUserId === user.id ? 'bg-blue-200 dark:bg-blue-800' : ''}`}

@@ -4,6 +4,7 @@ import Notification from '../../Components/Notification';
 import TaskModal from '../../Components/TaskModal';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
+import { FaSearch } from 'react-icons/fa';
 
 // Icônes Heroicons SVG inline
 const EditIcon = () => (
@@ -67,9 +68,9 @@ function Index({ tasks, filters }) {
     }
   };
 
-  const handleSearch = (e) => {
-    setSearch(e.target.value);
-    router.get('/tasks', { search: e.target.value, created_from: createdFrom, created_to: createdTo }, { preserveState: true, replace: true });
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    router.get('/tasks', { search, created_from: createdFrom, created_to: createdTo }, { preserveState: true, replace: true });
   };
 
   const handleDateFilter = (from, to) => {
@@ -117,13 +118,18 @@ function Index({ tasks, filters }) {
               <KanbanIcon /> Kanban
             </Link>
           </div>
-          <input
-            type="text"
-            value={search}
-            onChange={handleSearch}
-            placeholder="Rechercher..."
-            className="border px-3 py-2 rounded w-full md:w-64"
-          />
+          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher..."
+              className="border px-3 py-2 rounded w-full md:w-64 mb-0"
+            />
+            <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
+              <FaSearch />
+            </button>
+          </form>
           <div className="flex gap-2 items-center">
             <input
               type="date"

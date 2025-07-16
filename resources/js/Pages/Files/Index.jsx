@@ -2,25 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaFileAlt, FaPlus, FaUser, FaProjectDiagram, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf } from 'react-icons/fa';
+import { FaFileAlt, FaPlus, FaUser, FaProjectDiagram, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSearch } from 'react-icons/fa';
 import ActionButton from '../../Components/ActionButton';
 
 export default function Index({ files, filters }) {
     const { flash = {} } = usePage().props;
-    const [search, setSearch] = useState(filters.search || '');
+    const [search, setSearch] = useState(filters?.search || '');
     const [notification, setNotification] = React.useState(flash.success || '');
     const [notificationType, setNotificationType] = React.useState('success');
 
-    // Synchroniser search si filters.search change (ex: navigation, pagination)
-    useEffect(() => {
-        setSearch(filters.search || '');
-    }, [filters.search]);
-
-    // Déclencher la recherche à chaque frappe
-    const handleSearch = (e) => {
-        const value = e.target.value;
-        setSearch(value);
-        Inertia.get('/files', { search: value }, { preserveState: true, replace: true });
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        Inertia.get('/files', { search }, { preserveState: true, replace: true });
     };
 
     React.useEffect(() => {
@@ -37,13 +30,18 @@ export default function Index({ files, filters }) {
                 <Link href="/files/create">
                     <ActionButton variant="primary" className="flex items-center gap-2"><FaPlus /> Nouveau fichier</ActionButton>
                 </Link>
-                <input
-                    type="text"
-                    value={search}
-                    onChange={handleSearch}
-                    placeholder="Rechercher..."
-                    className="border px-3 py-2 rounded w-full md:w-64 focus:ring-2 focus:ring-blue-400"
-                />
+                <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Rechercher..."
+                        className="border px-3 py-2 rounded w-full md:w-64 mb-0 focus:ring-2 focus:ring-blue-400"
+                    />
+                    <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
+                        <FaSearch />
+                    </button>
+                </form>
             </div>
             {notification && (
                 <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>

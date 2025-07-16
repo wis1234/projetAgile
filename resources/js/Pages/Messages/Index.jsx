@@ -2,12 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
+import { FaSearch } from 'react-icons/fa';
 
 export default function Index({ messages, filters }) {
     const { flash = {} } = usePage().props;
-    const [search, setSearch] = React.useState(filters.search || '');
+    const [search, setSearch] = React.useState(filters?.search || '');
     const [notification, setNotification] = useState(flash.success || '');
     const [notificationType, setNotificationType] = useState('success');
+
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        Inertia.get(route('messages.index'), { search }, { preserveState: true, replace: true });
+    };
 
     useEffect(() => {
         if (window.Echo) {
@@ -30,11 +36,6 @@ export default function Index({ messages, filters }) {
         }
     }, [flash.success]);
 
-    const handleSearch = (e) => {
-        setSearch(e.target.value);
-        Inertia.get(route('messages.index'), { search: e.target.value }, { preserveState: true, replace: true });
-    };
-
     return (
         <div className="flex flex-col h-full w-full">
             {/* Notification toast temps réel */}
@@ -49,13 +50,18 @@ export default function Index({ messages, filters }) {
                 <Link href={route('messages.create')}>
                     <ActionButton variant="primary">Nouveau message</ActionButton>
                 </Link>
-                <input
-                    type="text"
-                    value={search}
-                    onChange={handleSearch}
-                    placeholder="Rechercher..."
-                    className="border px-3 py-2 rounded w-full md:w-64"
-                />
+                <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Rechercher..."
+                        className="border px-3 py-2 rounded w-full md:w-64 mb-0"
+                    />
+                    <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
+                        <FaSearch />
+                    </button>
+                </form>
             </div>
             {flash.success && <div className="alert alert-success mb-4">{flash.success}</div>}
             <div className="overflow-x-auto">
