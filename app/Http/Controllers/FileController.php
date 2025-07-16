@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Notifications\InternalNotification;
 use App\Notifications\UserActionMailNotification;
+use Illuminate\Support\Facades\Storage;
+use ZipArchive;
 
 class FileController extends Controller
 {
@@ -235,5 +237,39 @@ class FileController extends Controller
             abort(404, 'Fichier non trouvé');
         }
         return response()->download(storage_path('app/public/' . $file->file_path), $file->name);
+    }
+
+    /**
+     * Télécharger plusieurs fichiers en ZIP
+     */
+    public function downloadMultiple(Request $request)
+    {
+        $ids = $request->input('ids', []);
+        if (!is_array($ids) || empty($ids)) {
+            return abort(400, 'Aucun fichier sélectionné');
+        }
+        $files = File::whereIn('id', $ids)->get();
+        if ($files->isEmpty()) {
+            return abort(404, 'Aucun fichier trouvé');
+        }
+        $zip = new ZipArchive();
+        $zipFileName = 'fichiers_' . date('Ymd_His') . '.zip';
+        $tmpPath = storage_path('app/tmp/' . $zipFileName);
+        if (!file_exists(storage_path('app/tmp'))) {
+            mkdir(storage_path('app/tmp'), 0777, true);
+        }
+        if ($zip->open($tmpPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            return abort(500, 'Impossible de créer l\'archive ZIP');
+        }
+        foreach ($files as $file) {
+            if ($file->file_path && Storage::disk('public')->exists($file->file_path)) {
+                $zip->addFile(storage_path('app/public/' . $file->file_path), $file->name);
+            }
+        }
+        $zip->close();
+        if (!file_exists($tmpPath)) {
+            return abort(500, 'Erreur lors de la création du ZIP');
+        }
+        return response()->download($tmpPath, $zipFileName)->deleteFileAfterSend(true);
     }
 }

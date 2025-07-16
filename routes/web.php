@@ -31,6 +31,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('audit-logs', App\Http\Controllers\AuditLogController::class);
     Route::resource('project-users', App\Http\Controllers\ProjectUserController::class);
     Route::get('files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])->name('files.download');
+    Route::post('files/download-multiple', [App\Http\Controllers\FileController::class, 'downloadMultiple'])->name('files.downloadMultiple');
     Route::get('/notifications', function () {
         return auth()->user()->notifications()->orderBy('created_at', 'desc')->limit(20)->get();
     });

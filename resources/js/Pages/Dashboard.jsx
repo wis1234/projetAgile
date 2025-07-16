@@ -1,9 +1,9 @@
 import React from 'react';
 import AdminLayout from '../Layouts/AdminLayout';
 import { Link, usePage } from '@inertiajs/react';
-import { Line, Bar } from 'react-chartjs-2';
-import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from 'chart.js';
-Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
+import { Line, Bar, Pie } from 'react-chartjs-2';
+import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
+Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler);
 
 function Dashboard({ stats = {}, activityByDay = [], topUsers = [], recentActivities = [] }) {
   // Préparation des données pour les graphiques
@@ -11,6 +11,10 @@ function Dashboard({ stats = {}, activityByDay = [], topUsers = [], recentActivi
   const activityCounts = activityByDay.map(a => a.count);
   const topUserLabels = topUsers.map(u => u.name);
   const topUserCounts = topUsers.map(u => u.count);
+
+  // Simulation de stats par statut et par type si non fournis
+  const tasksByStatus = stats.tasksByStatus || { todo: 12, in_progress: 7, done: 21 };
+  const filesByType = stats.filesByType || { image: 8, pdf: 5, doc: 3, excel: 2, autre: 6 };
 
   return (
     <>
@@ -39,7 +43,7 @@ function Dashboard({ stats = {}, activityByDay = [], topUsers = [], recentActivi
               borderColor: 'rgba(59,130,246,1)',
               tension: 0.3,
             }],
-          }} options={{ responsive: true, plugins: { legend: { display: false } } }} height={120} />
+          }} options={{ responsive: true, plugins: { legend: { display: false }, tooltip: { enabled: true } } }} height={120} />
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -52,8 +56,41 @@ function Dashboard({ stats = {}, activityByDay = [], topUsers = [], recentActivi
               data: topUserCounts,
               backgroundColor: 'rgba(16,185,129,0.7)',
             }],
-          }} options={{ responsive: true, plugins: { legend: { display: false } } }} height={120} />
+          }} options={{ responsive: true, plugins: { legend: { display: false }, tooltip: { enabled: true } } }} height={120} />
         </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex flex-col gap-4">
+          <h2 className="text-xl font-bold mb-2 text-blue-700 dark:text-blue-200">Répartition des tâches par statut</h2>
+          <Pie data={{
+            labels: ['À faire', 'En cours', 'Terminées'],
+            datasets: [{
+              data: [tasksByStatus.todo, tasksByStatus.in_progress, tasksByStatus.done],
+              backgroundColor: ['#60a5fa', '#fbbf24', '#22c55e'],
+              borderWidth: 1,
+            }],
+          }} options={{ responsive: true, plugins: { legend: { position: 'bottom' }, tooltip: { enabled: true } } }} />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex flex-col gap-4">
+          <h2 className="text-xl font-bold mb-2 text-blue-700 dark:text-blue-200">Fichiers par type</h2>
+          <Bar data={{
+            labels: Object.keys(filesByType),
+            datasets: [{
+              label: 'Fichiers',
+              data: Object.values(filesByType),
+              backgroundColor: ['#f472b6', '#f87171', '#60a5fa', '#34d399', '#a78bfa'],
+            }],
+          }} options={{ responsive: true, plugins: { legend: { display: false }, tooltip: { enabled: true } } }} height={120} />
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex flex-col gap-4 items-center justify-center">
+          <h2 className="text-xl font-bold mb-2 text-blue-700 dark:text-blue-200">Rapports</h2>
+          <div className="flex gap-4">
+            <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded font-semibold shadow flex items-center gap-2" onClick={() => alert('Export PDF à venir !')}>Exporter PDF</button>
+            <a href="/activities/export" target="_blank" rel="noopener noreferrer" className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded font-semibold shadow flex items-center gap-2">Exporter Excel</a>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex flex-col gap-4">
           <h2 className="text-xl font-bold mb-2 text-blue-700 dark:text-blue-200">Activités récentes</h2>
           <ul className="divide-y divide-gray-200 dark:divide-gray-700">

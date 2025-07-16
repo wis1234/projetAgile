@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import Notification from '../Components/Notification';
 import { router } from '@inertiajs/react';
+import Loader from '../Components/Loader';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: (
@@ -46,6 +47,7 @@ export default function AdminLayout({ children }) {
   const [notifCount, setNotifCount] = useState(0);
   const [selectedNotif, setSelectedNotif] = useState(null);
   const profileRef = useRef();
+  const [globalLoading, setGlobalLoading] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -103,10 +105,53 @@ export default function AdminLayout({ children }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const onStart = () => setGlobalLoading(true);
+    const onFinish = () => setGlobalLoading(false);
+    const onError = () => setGlobalLoading(false);
+    if (window.Inertia) {
+      window.Inertia.on('start', onStart);
+      window.Inertia.on('finish', onFinish);
+      window.Inertia.on('error', onError);
+    }
+    if (window.router) {
+      if (typeof window.router.on === 'function') {
+        window.router.on('start', onStart);
+        window.router.on('finish', onFinish);
+        window.router.on('error', onError);
+      }
+    }
+    if (router && typeof router.on === 'function') {
+      router.on('start', onStart);
+      router.on('finish', onFinish);
+      router.on('error', onError);
+    }
+    return () => {
+      if (window.Inertia) {
+        window.Inertia.off('start', onStart);
+        window.Inertia.off('finish', onFinish);
+        window.Inertia.off('error', onError);
+      }
+      if (window.router) {
+        if (typeof window.router.off === 'function') {
+          window.router.off('start', onStart);
+          window.router.off('finish', onFinish);
+          window.router.off('error', onError);
+        }
+      }
+      if (router && typeof router.off === 'function') {
+        router.off('start', onStart);
+        router.off('finish', onFinish);
+        router.off('error', onError);
+      }
+    };
+  }, []);
+
   const avatarUrl = auth?.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth?.user?.name || 'User')}&background=0D8ABC&color=fff`;
 
   return (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-colors">
+      {globalLoading && <Loader fullscreen />}
       {/* Sidebar */}
       <aside className="z-40 fixed top-0 left-0 h-screen w-64 bg-white dark:bg-gray-800 flex flex-col py-6 px-4 space-y-6 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300">
         <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 mb-8 flex items-center justify-between">

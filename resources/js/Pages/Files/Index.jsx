@@ -2,18 +2,55 @@ import React, { useEffect, useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaFileAlt, FaPlus, FaUser, FaProjectDiagram, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSearch } from 'react-icons/fa';
+import { FaFileAlt, FaPlus, FaUser, FaProjectDiagram, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSearch, FaDownload } from 'react-icons/fa';
 import ActionButton from '../../Components/ActionButton';
+import axios from 'axios';
 
 export default function Index({ files, filters }) {
     const { flash = {} } = usePage().props;
     const [search, setSearch] = useState(filters?.search || '');
     const [notification, setNotification] = React.useState(flash.success || '');
     const [notificationType, setNotificationType] = React.useState('success');
+    const [selectedFiles, setSelectedFiles] = useState([]);
+    const allChecked = files.data.length > 0 && selectedFiles.length === files.data.length;
+    const isIndeterminate = selectedFiles.length > 0 && selectedFiles.length < files.data.length;
 
     const handleSearchSubmit = (e) => {
         e.preventDefault();
         Inertia.get('/files', { search }, { preserveState: true, replace: true });
+    };
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedFiles(files.data.map(f => f.id));
+        } else {
+            setSelectedFiles([]);
+        }
+    };
+    const handleSelectFile = (id) => {
+        setSelectedFiles(prev => prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]);
+    };
+    const handleBulkDownload = async () => {
+        if (selectedFiles.length === 0) return;
+        try {
+            const response = await axios.post(route('files.downloadMultiple'), { ids: selectedFiles }, {
+                responseType: 'blob',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const blob = new Blob([response.data], { type: 'application/zip' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'fichiers_selectionnes.zip';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }, 100);
+        } catch (e) {
+            alert('Erreur lors du téléchargement groupé');
+        }
     };
 
     React.useEffect(() => {
@@ -27,9 +64,19 @@ export default function Index({ files, filters }) {
         <div className="flex flex-col h-full w-full max-w-5xl mx-auto">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-2 md:gap-0">
                 <h1 className="text-3xl font-extrabold flex items-center gap-3 text-blue-700 dark:text-blue-200 tracking-tight drop-shadow"><FaFileAlt /> Fichiers</h1>
-                <Link href="/files/create">
-                    <ActionButton variant="primary" className="flex items-center gap-2"><FaPlus /> Nouveau fichier</ActionButton>
-                </Link>
+                <div className="flex gap-2">
+                    <Link href="/files/create">
+                        <ActionButton variant="primary" className="flex items-center gap-2"><FaPlus /> Nouveau fichier</ActionButton>
+                    </Link>
+                    <button
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold disabled:opacity-50"
+                        disabled={selectedFiles.length === 0}
+                        onClick={handleBulkDownload}
+                        type="button"
+                    >
+                        <FaDownload /> Télécharger{selectedFiles.length > 1 ? ' (' + selectedFiles.length + ')' : ''}
+                    </button>
+                </div>
                 <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
                     <input
                         type="text"
@@ -54,10 +101,18 @@ export default function Index({ files, filters }) {
                 <table className="min-w-full text-sm">
                     <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-100 to-blue-300 dark:from-blue-900 dark:to-blue-700 shadow">
                         <tr>
+                            <th className="p-2 md:p-3 text-center">
+                                <input
+                                    type="checkbox"
+                                    checked={allChecked}
+                                    ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                                    onChange={handleSelectAll}
+                                    aria-label="Tout sélectionner"
+                                />
+                            </th>
                             <th className="p-2 md:p-3 text-left font-bold">Type</th>
                             <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Nom</th>
                             <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Projet</th>
-                            <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Tâche</th>
                             <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Utilisateur</th>
                             <th className="p-2 md:p-3 text-left font-bold">Taille</th>
                             <th className="p-2 md:p-3 text-left font-bold">Statut</th>
@@ -83,10 +138,17 @@ export default function Index({ files, filters }) {
                             if (file.status === 'rejected') statusBadge = <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-100 text-red-800"><FaTimesCircle /> Rejeté</span>;
                             return (
                                 <tr key={file.id} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900'}>
+                                    <td className="p-2 md:p-3 align-middle text-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedFiles.includes(file.id)}
+                                            onChange={() => handleSelectFile(file.id)}
+                                            aria-label={`Sélectionner ${file.name}`}
+                                        />
+                                    </td>
                                     <td className="p-2 md:p-3 align-middle">{icon}</td>
                                     <td className="p-2 md:p-3 align-middle font-semibold text-blue-800 dark:text-blue-200 max-w-[120px] truncate">{file.name}</td>
                                     <td className="p-2 md:p-3 align-middle max-w-[120px] truncate">{file.project?.name || '-'}</td>
-                                    <td className="p-2 md:p-3 align-middle max-w-[120px] truncate">{file.task?.title || '-'}</td>
                                     <td className="p-2 md:p-3 align-middle max-w-[120px] truncate">{file.user?.name || '-'}</td>
                                     <td className="p-2 md:p-3 align-middle"><span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></td>
                                     <td className="p-2 md:p-3 align-middle">{statusBadge}</td>
@@ -99,6 +161,13 @@ export default function Index({ files, filters }) {
                                             <ActionButton variant="warning" size="sm">Éditer</ActionButton>
                                         </Link>
                                         <ActionButton variant="danger" size="sm" onClick={() => Inertia.delete(route('files.destroy', file.id))}>Supprimer</ActionButton>
+                                        <a
+                                            href={route('files.download', file.id)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            <ActionButton variant="primary" size="sm"><FaDownload /> Télécharger</ActionButton>
+                                        </a>
                                     </td>
                                 </tr>
                             );
