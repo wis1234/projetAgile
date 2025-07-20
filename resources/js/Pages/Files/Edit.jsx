@@ -3,6 +3,7 @@ import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { FaFileAlt } from 'react-icons/fa';
+import { useRef } from 'react';
 
 export default function Edit({ file, projects, users, tasks = [], kanbans = [] }) {
     const { errors, flash = {} } = usePage().props;
@@ -19,6 +20,7 @@ export default function Edit({ file, projects, users, tasks = [], kanbans = [] }
     const [submitting, setSubmitting] = useState(false);
     const [notification, setNotification] = useState(flash.success || flash.error || '');
     const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
+    const fileInputRef = useRef();
 
     const handleChange = e => {
         setValues({ ...values, [e.target.name]: e.target.value });
@@ -27,7 +29,21 @@ export default function Edit({ file, projects, users, tasks = [], kanbans = [] }
     const handleSubmit = (e) => {
         e.preventDefault();
         setSubmitting(true);
-        Inertia.put(route('files.update', file.id), values, {
+        const formData = new FormData();
+        formData.append('name', values.name);
+        formData.append('project_id', values.project_id);
+        formData.append('user_id', values.user_id);
+        formData.append('task_id', values.task_id);
+        formData.append('kanban_id', values.kanban_id);
+        formData.append('description', values.description);
+        formData.append('status', values.status);
+        formData.append('rejection_reason', values.rejection_reason);
+        if (fileInputRef.current && fileInputRef.current.files[0]) {
+            formData.append('file', fileInputRef.current.files[0]);
+        }
+        formData.append('_method', 'put');
+        Inertia.post(route('files.update', file.id), formData, {
+            forceFormData: true,
             onSuccess: () => {
                 setNotification('Fichier mis à jour avec succès');
                 setNotificationType('success');
@@ -55,10 +71,27 @@ export default function Edit({ file, projects, users, tasks = [], kanbans = [] }
                         <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Modifier le fichier</h1>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-2xl mx-auto w-full">
+                        {/* Affichage du fichier actuel */}
+                        <div className="mb-6 flex flex-col gap-2">
+                            <div>
+                                <span className="font-semibold">Fichier actuel :</span>{' '}
+                                <a href={`/storage/${file.file_path}`} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline font-semibold">Télécharger</a>
+                            </div>
+                            {file.type && file.type.startsWith('image/') && (
+                                <div className="mt-2">
+                                    <img src={`/storage/${file.file_path}`} alt={file.name} className="max-w-xs rounded shadow" />
+                                </div>
+                            )}
+                        </div>
                         {notification && (
                             <div className={`mb-6 px-4 py-3 rounded-lg text-white font-semibold ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
                         )}
-                        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6" encType="multipart/form-data">
+                            <div className="md:col-span-2">
+                                <label className="block font-semibold mb-1">Remplacer le fichier (optionnel)</label>
+                                <input type="file" name="file" ref={fileInputRef} className="input" accept="*/*" />
+                                {errors.file && <div className="text-error text-sm">{errors.file}</div>}
+                            </div>
                             <div>
                                 <label className="block font-semibold mb-1">Nom du fichier</label>
                                 <input type="text" name="name" value={values.name} onChange={handleChange} className="input" required />
@@ -137,4 +170,5 @@ export default function Edit({ file, projects, users, tasks = [], kanbans = [] }
             </main>
         </div>
     );
-} 
+}
+Edit.layout = page => <AdminLayout children={page} />; 

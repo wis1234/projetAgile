@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
-import { FaFileAlt, FaClock, FaCommentDots } from 'react-icons/fa';
+import { FaFileAlt, FaClock, FaCommentDots, FaTrash } from 'react-icons/fa';
 
 export default function Show({ file, canUpdateStatus, statuses }) {
     const { flash = {} } = usePage().props;
@@ -114,6 +114,22 @@ export default function Show({ file, canUpdateStatus, statuses }) {
             setComments(comments.map(c => c.id === updated.id ? updated : c));
             setEditingId(null);
             setEditContent('');
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!window.confirm('Supprimer ce fichier ? Cette action est irréversible.')) return;
+        try {
+            await fetch(`/files/${file.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                },
+            });
+            window.location.href = '/files';
+        } catch (e) {
+            alert('Erreur lors de la suppression');
         }
     };
 
@@ -237,6 +253,9 @@ export default function Show({ file, canUpdateStatus, statuses }) {
                         <Link href={route('files.edit', file.id)}>
                           <ActionButton variant="warning">Éditer</ActionButton>
                         </Link>
+                        <ActionButton variant="danger" onClick={handleDelete} className="flex items-center gap-2">
+                          <FaTrash /> Supprimer
+                        </ActionButton>
                         <Link href={route('files.index')}>
                           <ActionButton variant="default">Retour</ActionButton>
                         </Link>
