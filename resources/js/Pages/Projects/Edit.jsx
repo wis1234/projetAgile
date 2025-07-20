@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
-import { FaEdit, FaProjectDiagram } from 'react-icons/fa';
+import { FaEdit, FaProjectDiagram, FaArrowLeft, FaSave } from 'react-icons/fa';
 
 function Edit({ project }) {
   const { errors = {}, flash = {} } = usePage().props;
   const [name, setName] = useState(project.name || '');
+  const [description, setDescription] = useState(project.description || '');
   const [notification, setNotification] = useState(flash.success || flash.error || '');
   const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
   const [loading, setLoading] = useState(false);
@@ -14,7 +15,7 @@ function Edit({ project }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    router.put(`/projects/${project.id}`, { name }, {
+    router.put(`/projects/${project.id}`, { name, description }, {
       onSuccess: () => {
         setNotification('Projet mis à jour avec succès');
         setNotificationType('success');
@@ -30,25 +31,92 @@ function Edit({ project }) {
   };
 
   return (
-    <div className="flex flex-col h-full w-full p-6">
-      <div className="max-w-xl w-full mx-auto bg-white dark:bg-gray-800 rounded shadow p-8">
-        {notification && (
-          <div className={`mb-4 px-4 py-2 rounded text-white ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
-        )}
-        <h1 className="text-2xl font-bold mb-6 flex items-center gap-2 text-blue-700 dark:text-blue-200"><FaEdit /> Éditer le projet</h1>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block font-semibold mb-1">Nom du projet</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="border px-3 py-2 rounded w-full focus:ring-2 focus:ring-blue-400" required />
-            {errors.name && <div className="text-error text-sm mt-1">{errors.name}</div>}
+    <>
+      <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+        {/* Contenu principal */}
+        <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
+          <div className="flex flex-col h-full w-full max-w-4xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+            {/* Header section */}
+            <div className="flex items-center gap-3 mb-8">
+              <Link href="/projects" className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-100 transition">
+                <FaArrowLeft className="text-xl" />
+              </Link>
+              <FaProjectDiagram className="text-3xl text-blue-600" />
+              <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Modifier le projet</h1>
+            </div>
+
+            {/* Formulaire */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-2xl mx-auto w-full">
+              {notification && (
+                <div className={`mb-6 px-4 py-3 rounded-lg text-white font-semibold ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+                  {notification}
+                </div>
+              )}
+              
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                    Nom du projet *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={name} 
+                    onChange={e => setName(e.target.value)} 
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" 
+                    placeholder="Entrez le nom du projet"
+                    required 
+                  />
+                  {errors.name && (
+                    <div className="text-red-600 text-sm mt-2 font-medium">{errors.name}</div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                    Description
+                  </label>
+                  <textarea 
+                    value={description} 
+                    onChange={e => setDescription(e.target.value)} 
+                    rows="4"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition resize-none" 
+                    placeholder="Décrivez brièvement le projet (optionnel)"
+                  />
+                  {errors.description && (
+                    <div className="text-red-600 text-sm mt-2 font-medium">{errors.description}</div>
+                  )}
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="submit" 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" 
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Mise à jour...
+                      </>
+                    ) : (
+                      <>
+                        <FaSave /> Sauvegarder
+                      </>
+                    )}
+                  </button>
+                  <Link 
+                    href="/projects" 
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                  >
+                    <FaArrowLeft /> Annuler
+                  </Link>
+                </div>
+              </form>
+            </div>
           </div>
-          <div className="flex gap-2 mt-4">
-            <button type="submit" className="bg-blue-700 hover:bg-blue-800 text-white px-5 py-2 rounded font-semibold shadow flex items-center gap-2" disabled={loading}>{loading ? 'Mise à jour...' : <><FaEdit /> Mettre à jour</>}</button>
-            <Link href="/projects" className="bg-gray-100 hover:bg-blue-100 text-blue-700 px-5 py-2 rounded font-semibold flex items-center gap-2"><FaProjectDiagram /> Retour à la liste</Link>
-          </div>
-        </form>
+        </main>
       </div>
-    </div>
+    </>
   );
 }
 

@@ -156,7 +156,9 @@ export default function AdminLayout({ children }) {
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
 
-  const avatarUrl = auth?.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth?.user?.name || 'User')}&background=0D8ABC&color=fff`;
+  // Correction : fallback si auth n'a pas de clé user
+  const user = auth?.user || auth;
+  const avatarUrl = user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=0D8ABC&color=fff`;
 
   return (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-colors">
@@ -196,7 +198,7 @@ export default function AdminLayout({ children }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
         {/* Header */}
-        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6 z-40 transition-all duration-300">
+        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6 z-40 transition-all duration-300 mb-2">
           <button className="md:hidden text-2xl mr-2" onClick={() => setSidebarOpen(true)}>&#9776;</button>
           <div className="text-xl font-bold text-blue-700 dark:text-blue-200">Dashboard</div>
           <div className="flex items-center gap-4">
@@ -258,7 +260,7 @@ export default function AdminLayout({ children }) {
             <div className="relative" ref={profileRef}>
               <button className="flex items-center gap-2 focus:outline-none" onClick={() => setProfileDropdown(d => !d)}>
                 <img src={avatarUrl} alt="avatar" className="w-9 h-9 rounded-full border-2 border-blue-400 shadow" />
-                <span className="text-gray-600 dark:text-gray-200 font-medium">{auth?.user?.name}</span>
+                <span className="text-gray-600 dark:text-gray-200 font-medium">{user?.name}</span>
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
               </button>
               {profileDropdown && (
@@ -276,7 +278,7 @@ export default function AdminLayout({ children }) {
         <Notification message={flash.error} type="error" />
         <Notification message={flash.info} type="info" />
         {/* Page content */}
-        <main className="flex-1 w-full h-full transition-colors p-4 md:p-8 pb-24 mt-16">
+        <main className="flex-1 w-full h-full transition-colors">
           {children}
         </main>
       </div>

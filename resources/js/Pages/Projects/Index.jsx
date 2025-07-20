@@ -3,16 +3,13 @@ import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
-import { FaProjectDiagram, FaPlus, FaUser, FaUsers, FaTasks, FaEdit, FaEye, FaSearch } from 'react-icons/fa';
+import { FaProjectDiagram, FaPlus, FaUser, FaUsers, FaTasks, FaEdit, FaEye, FaSearch, FaCalendarAlt, FaUserFriends } from 'react-icons/fa';
 
 export default function Index({ projects, filters }) {
     const { flash = {} } = usePage().props;
     const [search, setSearch] = useState(filters?.search || '');
     const [notification, setNotification] = useState(flash.success || '');
     const [notificationType, setNotificationType] = useState('success');
-    const [selectedProjectId, setSelectedProjectId] = useState(null);
-    const [selectedProject, setSelectedProject] = useState(null);
-    const [loadingDetail, setLoadingDetail] = useState(false);
 
     useEffect(() => {
         if (window.Echo) {
@@ -40,128 +37,163 @@ export default function Index({ projects, filters }) {
         Inertia.get('/projects', { search }, { preserveState: true, replace: true });
     };
 
-    const handleSelectProject = async (projectId) => {
-        setSelectedProjectId(projectId);
-        setLoadingDetail(true);
-        try {
-            const res = await fetch(`/api/projects/${projectId}`);
-            const data = await res.json();
-            setSelectedProject(data);
-        } catch (e) {
-            setSelectedProject(null);
+    // Helpers pour labels et badges
+    const getStatusLabel = (status) => {
+        switch (status) {
+            case 'todo': return 'À faire';
+            case 'in_progress': return 'En cours';
+            case 'done': return 'Terminée';
+            default: return status;
         }
-        setLoadingDetail(false);
+    };
+    const getStatusBadge = (status) => {
+        let color = 'bg-gray-200 text-gray-800';
+        if (status === 'in_progress') color = 'bg-yellow-100 text-yellow-800';
+        if (status === 'done') color = 'bg-green-100 text-green-800';
+        if (status === 'todo') color = 'bg-blue-100 text-blue-800';
+        return <span className={`px-2 py-1 rounded text-xs font-bold capitalize ${color}`}>{getStatusLabel(status)}</span>;
+    };
+    const getPriorityLabel = (priority) => {
+        switch (priority) {
+            case 'high': return 'Haute';
+            case 'medium': return 'Moyenne';
+            case 'low': return 'Basse';
+            default: return priority;
+        }
+    };
+    const getPriorityBadge = (priority) => {
+        let color = 'bg-gray-100 text-gray-700';
+        if (priority === 'high') color = 'bg-red-100 text-red-800';
+        if (priority === 'medium') color = 'bg-orange-100 text-orange-800';
+        if (priority === 'low') color = 'bg-blue-100 text-blue-800';
+        return <span className={`px-2 py-1 rounded text-xs font-bold capitalize ${color}`}>{getPriorityLabel(priority)}</span>;
     };
 
     return (
-        <div className="flex h-[80vh] bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden">
-            {/* Colonne projets */}
-            <section className={`w-full md:w-[400px] border-r bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900 dark:to-gray-900 flex flex-col ${selectedProjectId ? 'hidden md:flex' : ''}`}>
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center p-4 gap-2 md:gap-0 border-b sticky top-0 z-20 bg-white dark:bg-gray-900">
-                    <h1 className="text-3xl font-extrabold flex items-center gap-3 text-blue-700 dark:text-blue-200 tracking-tight drop-shadow"><FaProjectDiagram /> Projets</h1>
-                    <Link href="/projects/create" className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-semibold shadow flex items-center gap-2 transition"><FaPlus /> Nouveau projet</Link>
-                </div>
-                <div className="p-4">
-                    <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Rechercher..."
-                            className="border px-3 py-2 rounded w-full mb-0 focus:ring-2 focus:ring-blue-400"
-                        />
-                        <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
-                            <FaSearch />
-                        </button>
-                    </form>
-                    <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {projects.data.map(project => (
-                            <li key={project.id} className={`py-3 px-2 flex flex-col gap-1 hover:bg-blue-100 dark:hover:bg-blue-900 rounded cursor-pointer transition ${selectedProjectId === project.id ? 'bg-blue-200 dark:bg-blue-800' : ''}`}
-                                onClick={() => handleSelectProject(project.id)}
-                            >
-                                <span className="font-semibold text-blue-800 dark:text-blue-200 text-lg flex items-center gap-2"><FaProjectDiagram /> {project.name}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-                <div className="mt-auto flex justify-center p-4">
-                    {projects.links && projects.links.map((link, i) => (
-                        <button
-                            key={i}
-                            className={`btn btn-sm mx-1 ${link.active ? 'btn-primary' : 'btn-ghost'}`}
-                            disabled={!link.url}
-                            onClick={() => link.url && Inertia.get(link.url)}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
-                </div>
-            </section>
-            {/* Détail du projet sélectionné */}
-            <section className={`flex-1 bg-white dark:bg-gray-900 ${selectedProjectId ? 'flex flex-col' : 'hidden md:flex items-center justify-center'}`}>
-                {notification && (
-                    <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
-                )}
-                {loadingDetail && (
-                    <div className="flex-1 flex items-center justify-center text-gray-400 text-lg">Chargement...</div>
-                )}
-                {!loadingDetail && selectedProject && (
-                    <div className="p-8 max-w-3xl mx-auto bg-white dark:bg-gray-800 rounded shadow h-full overflow-y-auto">
-                        <h1 className="text-2xl font-bold mb-6 text-blue-700 dark:text-blue-200 flex items-center gap-2"><FaProjectDiagram /> Détail du projet</h1>
-                        <div className="mb-6">
-                            <div className="mb-2"><span className="font-semibold">Nom :</span> {selectedProject.name}</div>
-                            <div className="mb-2"><span className="font-semibold">Membres :</span> {selectedProject.users && selectedProject.users.length > 0 ? (
-                                <div className="flex flex-wrap gap-3 mt-1">
-                                    {selectedProject.users.map(user => (
-                                        <span key={user.id} className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium">
-                                            <img src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} alt={user.name} className="w-6 h-6 rounded-full border-2 border-blue-200" />
-                                            {user.name}
-                                        </span>
-                                    ))}
-                                </div>
-                            ) : (
-                                <span className="text-gray-400">Aucun membre</span>
-                            )}
+        <>
+            <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+                {/* Contenu principal */}
+                <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
+                    <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+                        {/* Header section */}
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+                            <div className="flex items-center gap-3">
+                                <FaProjectDiagram className="text-3xl text-blue-600" />
+                                <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Projets</h1>
+                            </div>
+                            <div className="flex gap-2 w-full md:w-auto">
+                                <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full md:w-auto">
+                                    <input
+                                        type="text"
+                                        value={search}
+                                        onChange={e => setSearch(e.target.value)}
+                                        placeholder="Rechercher un projet..."
+                                        className="border px-3 py-2 rounded w-full md:w-64 mb-0 focus:ring-2 focus:ring-blue-400"
+                                    />
+                                    <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
+                                        <FaSearch />
+                                    </button>
+                                </form>
+                                <Link href="/projects/create" className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow whitespace-nowrap">
+                                    <FaPlus /> Créer
+                                </Link>
                             </div>
                         </div>
-                        <div className="mb-8">
-                            <h2 className="text-xl font-bold mb-2 text-blue-600 dark:text-blue-300 flex items-center gap-2"><FaTasks /> Tâches rattachées</h2>
-                            {selectedProject.tasks && selectedProject.tasks.length === 0 ? (
-                                <div className="text-gray-400">Aucune tâche pour ce projet.</div>
-                            ) : (
-                                <ul className="space-y-2">
-                                    {selectedProject.tasks && selectedProject.tasks.map(task => (
-                                        <li key={task.id} className="border rounded p-3 bg-gray-50 dark:bg-gray-900 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                                            <div className="flex-1">
-                                                <Link href={`/tasks/${task.id}`} className="font-semibold text-blue-700 dark:text-blue-200 hover:underline flex items-center gap-2"><FaEye /> {task.title}</Link>
-                                                {task.status && <span className="ml-2 px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs capitalize">{task.status}</span>}
-                                                {task.priority && <span className="ml-2 px-2 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 text-xs capitalize">{task.priority}</span>}
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    Assignée à : {task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">Non assignée</span>}
-                                                    {task.sprint && (
-                                                        <span> | Sprint : <Link href={`/sprints/${task.sprint.id}`} className="underline text-green-700 dark:text-green-300">{task.sprint.name}</Link></span>
-                                                    )}
+
+                        {/* Tableau projets */}
+                        <div className="overflow-x-auto rounded-lg shadow bg-white dark:bg-gray-800 mb-8">
+                            <table className="min-w-full text-sm">
+                                <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-100 to-blue-300 dark:from-blue-900 dark:to-blue-700 shadow">
+                                    <tr>
+                                        <th className="p-3 text-left font-bold">Projet</th>
+                                        <th className="p-3 text-left font-bold">Description</th>
+                                        <th className="p-3 text-left font-bold">Membres</th>
+                                        <th className="p-3 text-left font-bold">Tâches</th>
+                                        <th className="p-3 text-left font-bold">Date création</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {projects.data.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="text-center py-8 text-gray-400 dark:text-gray-500 text-lg font-semibold">
+                                                Aucun projet trouvé pour cette recherche.
+                                            </td>
+                                        </tr>
+                                    ) : projects.data.map(project => (
+                                        <tr 
+                                            key={project.id} 
+                                            className="hover:bg-blue-50 dark:hover:bg-blue-900 transition group cursor-pointer"
+                                            onClick={() => window.location.href = `/projects/${project.id}`}
+                                            tabIndex={0}
+                                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') window.location.href = `/projects/${project.id}`; }}
+                                        >
+                                            <td className="p-3 align-middle">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                                                        <FaProjectDiagram className="text-blue-600 dark:text-blue-200" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-semibold text-blue-800 dark:text-blue-200">{project.name}</div>
+                                                        <div className="text-xs text-gray-500">{project.id}</div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex gap-2 mt-2 md:mt-0">
-                                                <Link href={`/tasks/${task.id}`} className="bg-gray-100 hover:bg-blue-100 text-blue-700 px-3 py-1 rounded transition text-xs font-semibold flex items-center gap-1"><FaEye /> Voir</Link>
-                                                <Link href={`/tasks/${task.id}/edit`} className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-3 py-1 rounded transition text-xs font-semibold flex items-center gap-1"><FaEdit /> Éditer</Link>
-                                            </div>
-                                        </li>
+                                            </td>
+                                            <td className="p-3 align-middle text-gray-600 dark:text-gray-300">
+                                                <div className="max-w-xs truncate" title={project.description}>
+                                                    {project.description || 'Aucune description'}
+                                                </div>
+                                            </td>
+                                            <td className="p-3 align-middle">
+                                                <div className="flex items-center gap-1">
+                                                    <FaUserFriends className="text-gray-400 text-sm" />
+                                                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                                                        {project.users_count || 0} membre{project.users_count !== 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="p-3 align-middle">
+                                                <div className="flex items-center gap-1">
+                                                    <FaTasks className="text-gray-400 text-sm" />
+                                                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                                                        {project.tasks_count || 0} tâche{project.tasks_count !== 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="p-3 align-middle text-xs text-gray-400">
+                                                <div className="flex items-center gap-1">
+                                                    <FaCalendarAlt className="text-gray-400" />
+                                                    {new Date(project.created_at).toLocaleDateString()}
+                                                </div>
+                                            </td>
+                                        </tr>
                                     ))}
-                                </ul>
-                            )}
+                                </tbody>
+                            </table>
                         </div>
-                        <div className="flex gap-2 mt-4">
-                            <Link href={route('projects.edit', selectedProject.id)} className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-5 py-2 rounded font-semibold flex items-center gap-2"><FaEdit /> Éditer</Link>
-                            <ActionButton variant="default" onClick={() => { setSelectedProjectId(null); setSelectedProject(null); }}>Retour à la liste</ActionButton>
+
+                        {/* Pagination */}
+                        <div className="flex justify-center gap-2 mb-8">
+                            {projects.links && projects.links.map((link, i) => (
+                                <button
+                                    key={i}
+                                    className={`btn btn-sm rounded-full px-4 py-2 font-semibold shadow ${link.active ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-blue-700 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-800'}`}
+                                    disabled={!link.url}
+                                    onClick={() => link.url && Inertia.get(link.url)}
+                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                />
+                            ))}
                         </div>
                     </div>
-                )}
-                {!loadingDetail && !selectedProject && (
-                    <div className="text-gray-400 text-lg flex-1 flex items-center justify-center">Sélectionnez un projet pour voir le détail</div>
-                )}
-            </section>
-        </div>
+                </main>
+            </div>
+
+            {/* Notification */}
+            {notification && (
+                <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+                    {notification}
+                </div>
+            )}
+        </>
     );
 }
 

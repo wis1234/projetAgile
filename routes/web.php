@@ -52,6 +52,7 @@ Route::middleware(['auth'])->group(function () {
     // Liste et détail accessibles à tous les utilisateurs connectés
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
+    Route::post('/users/{user}/assign-role', [\App\Http\Controllers\UserController::class, 'assignRole'])->name('users.assignRole');
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -59,6 +60,27 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/activities/export', [ActivityController::class, 'export'])->name('activities.export');
     Route::get('/activities/{activity}', [ActivityController::class, 'show'])->name('activities.show');
     Route::get('/api/activities/notifications', [ActivityController::class, 'notifications']);
+});
+
+// Commentaires sur les tâches
+Route::middleware(['auth'])->group(function () {
+    Route::get('/api/tasks/{task}/comments', [\App\Http\Controllers\TaskCommentController::class, 'index']);
+    Route::post('/api/tasks/{task}/comments', [\App\Http\Controllers\TaskCommentController::class, 'store']);
+    Route::delete('/api/tasks/{task}/comments/{comment}', [\App\Http\Controllers\TaskCommentController::class, 'destroy']);
+    Route::put('/api/tasks/{task}/comments/{comment}', [\App\Http\Controllers\TaskCommentController::class, 'update']);
+});
+
+// Commentaires sur les fichiers
+Route::middleware(['auth'])->group(function () {
+    Route::get('/api/files/{file}/comments', [\App\Http\Controllers\FileCommentController::class, 'index']);
+    Route::post('/api/files/{file}/comments', [\App\Http\Controllers\FileCommentController::class, 'store']);
+    Route::delete('/api/files/{file}/comments/{comment}', [\App\Http\Controllers\FileCommentController::class, 'destroy']);
+    Route::put('/api/files/{file}/comments/{comment}', [\App\Http\Controllers\FileCommentController::class, 'update']);
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/roles/create', [\App\Http\Controllers\UserController::class, 'createRole'])->name('roles.create');
+    Route::delete('/roles/{id}/delete', [\App\Http\Controllers\UserController::class, 'destroyRole'])->name('roles.destroy');
 });
 
 require __DIR__.'/auth.php';

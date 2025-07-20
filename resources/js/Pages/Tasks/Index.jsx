@@ -151,16 +151,15 @@ function Index({ tasks, filters }) {
         <ul className="space-y-3">
           {tasks.data.length === 0 && <li className="text-gray-500">Aucune tâche trouvée.</li>}
           {tasks.data.map(task => (
-            <li key={task.id} className="border p-4 rounded flex flex-col md:flex-row md:justify-between md:items-center bg-white shadow-sm hover:shadow-lg transition group">
+            <li key={task.id} className="border p-4 rounded flex flex-col md:flex-row md:justify-between md:items-center bg-white shadow-sm hover:shadow-lg transition group cursor-pointer"
+              onClick={() => router.get(`/tasks/${task.id}`)}
+            >
               <div className="flex-1 flex flex-col md:flex-row md:items-center gap-2">
                 <span className="font-medium text-lg text-blue-800 dark:text-blue-200 group-hover:underline">{task.title}</span>
                 {task.status && <span className="ml-2 px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs capitalize">{task.status}</span>}
                 {task.priority && <span className="ml-2 px-2 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 text-xs capitalize">{task.priority}</span>}
               </div>
               <div className="flex gap-2 mt-2 md:mt-0">
-                <Link href={`/tasks/${task.id}`} title="Voir la tâche">
-                  <ActionButton variant="info" size="sm" className="flex items-center"><EyeIcon /> Voir</ActionButton>
-                </Link>
                 <Link href={`/tasks/${task.id}/edit`} title="Modifier la tâche">
                   <ActionButton variant="warning" size="sm" className="flex items-center"><EditIcon /> Modifier</ActionButton>
                 </Link>

@@ -13,6 +13,17 @@ class Task extends Model
         'title', 'description', 'status', 'due_date', 'priority', 'assigned_to', 'project_id', 'sprint_id', 'position'
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Suppression en cascade lors de la suppression d'une tâche
+        static::deleting(function ($task) {
+            // Supprimer tous les commentaires de la tâche
+            $task->comments()->delete();
+        });
+    }
+
     public function assignedUser() {
         return $this->belongsTo(User::class, 'assigned_to');
     }
@@ -21,5 +32,9 @@ class Task extends Model
     }
     public function sprint() {
         return $this->belongsTo(Sprint::class);
+    }
+
+    public function comments() {
+        return $this->hasMany(\App\Models\TaskComment::class);
     }
 }

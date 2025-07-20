@@ -1,18 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
 import { FaUser, FaUsers, FaPlus, FaEdit, FaEye, FaProjectDiagram, FaSearch } from 'react-icons/fa';
+import Modal from '../../Components/Modal';
 
-export default function Index({ users, filters }) {
-    const { flash = {} } = usePage().props;
+export default function Index({ users, filters, roles = [], auth }) {
+    // Correction : on récupère bien l'utilisateur connecté
+    const { flash = {}, auth: currentAuth } = usePage().props;
+    const userAuth = auth?.user || auth;
     const [search, setSearch] = useState(filters?.search || '');
     const [notification, setNotification] = useState(flash.success || '');
     const [notificationType, setNotificationType] = useState('success');
-    const [selectedUserId, setSelectedUserId] = useState(null);
-    const [selectedUser, setSelectedUser] = useState(null);
-    const [loadingDetail, setLoadingDetail] = useState(false);
+    // Suppression de selectedUserId, selectedUser, loadingDetail
+    const canAssignRole = auth && auth.email === 'ronaldoagbohou@gmail.com';
+    const [roleLoading, setRoleLoading] = useState({});
+    const [roleSuccess, setRoleSuccess] = useState({});
+    const [roleError, setRoleError] = useState({});
+    const [newRole, setNewRole] = useState('');
+    const [newRoleLoading, setNewRoleLoading] = useState(false);
+    const [newRoleSuccess, setNewRoleSuccess] = useState('');
+    const [newRoleError, setNewRoleError] = useState('');
+    const [roleToDelete, setRoleToDelete] = useState(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     useEffect(() => {
         if (flash.success) {
@@ -23,109 +35,228 @@ export default function Index({ users, filters }) {
 
     const handleSearchSubmit = (e) => {
         e.preventDefault();
-        Inertia.get('/users', { search }, { preserveState: true, replace: true });
+        router.get('/users', { search }, { preserveState: true, replace: true });
     };
 
-    const handleSelectUser = async (userId) => {
-        setSelectedUserId(userId);
-        setLoadingDetail(true);
+    const handleRoleChange = async (userId, newRole) => {
+        setRoleLoading(prev => ({ ...prev, [userId]: true }));
+        setRoleSuccess(prev => ({ ...prev, [userId]: '' }));
+        setRoleError(prev => ({ ...prev, [userId]: '' }));
         try {
-            const res = await fetch(`/api/users/${userId}`);
-            const data = await res.json();
-            setSelectedUser(data);
+            const res = await fetch(`/users/${userId}/assign-role`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                },
+                body: JSON.stringify({ role: newRole })
+            });
+            if (res.ok) {
+                setRoleSuccess(prev => ({ ...prev, [userId]: 'Rôle mis à jour !' }));
+            } else {
+                const data = await res.json();
+                setRoleError(prev => ({ ...prev, [userId]: data.message || 'Erreur lors de la mise à jour' }));
+            }
         } catch (e) {
-            setSelectedUser(null);
+            setRoleError(prev => ({ ...prev, [userId]: 'Erreur lors de la mise à jour' }));
         }
-        setLoadingDetail(false);
+        setRoleLoading(prev => ({ ...prev, [userId]: false }));
+    };
+
+    const handleCreateRole = async (e) => {
+        e.preventDefault();
+        setNewRoleLoading(true);
+        setNewRoleSuccess('');
+        setNewRoleError('');
+        try {
+            const res = await fetch('/roles/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                },
+                body: JSON.stringify({ role: newRole })
+            });
+            if (res.ok) {
+                setNewRoleSuccess('Rôle créé !');
+                setNewRole('');
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                const data = await res.json();
+                setNewRoleError(data.message || 'Erreur lors de la création');
+            }
+        } catch (e) {
+            setNewRoleError('Erreur lors de la création');
+        }
+        setNewRoleLoading(false);
+    };
+
+    const handleDeleteRole = async () => {
+        if (!roleToDelete) return;
+        setDeleteLoading(true);
+        try {
+            await fetch(`/roles/${roleToDelete.id}/delete`, {
+                method: 'DELETE',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                },
+            });
+            setRoleToDelete(null);
+            window.location.reload();
+        } catch (e) {
+            setDeleteLoading(false);
+        }
     };
 
     return (
-        <div className="flex h-[80vh] bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden">
-            {/* Colonne membres */}
-            <section className={`w-full md:w-[400px] border-r bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900 dark:to-gray-900 flex flex-col ${selectedUserId ? 'hidden md:flex' : ''}`}>
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center p-4 gap-2 md:gap-0 border-b sticky top-0 z-20 bg-white dark:bg-gray-900">
-                    <h1 className="text-3xl font-extrabold flex items-center gap-3 text-blue-700 dark:text-blue-200 tracking-tight drop-shadow"><FaUsers /> Membres</h1>
-                    <Link href="/users/create" className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-semibold shadow flex items-center gap-2 transition"><FaPlus /> Nouvel utilisateur</Link>
-                </div>
-                <div className="p-4">
-                    <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Rechercher..."
-                            className="border px-3 py-2 rounded w-full mb-0 focus:ring-2 focus:ring-blue-400"
-                        />
-                        <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
-                            <FaSearch />
-                        </button>
-                    </form>
-                    <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {users.data.map(user => (
-                            <li key={user.id} className={`py-3 px-2 flex items-center gap-3 hover:bg-blue-100 dark:hover:bg-blue-900 rounded cursor-pointer transition ${selectedUserId === user.id ? 'bg-blue-200 dark:bg-blue-800' : ''}`}
-                                onClick={() => handleSelectUser(user.id)}
-                            >
-                                <img src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} alt={user.name} className="w-8 h-8 rounded-full border-2 border-blue-200" />
-                                <div className="flex flex-col">
-                                    <span className="font-semibold text-blue-800 dark:text-blue-200">{user.name}</span>
-                                    <span className="text-sm text-gray-500">{user.email}</span>
+        <>
+        <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+            {/* Contenu principal */}
+            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
+                <div className="flex flex-col md:flex-row gap-8 h-full w-full max-w-5xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900 rounded-xl shadow-lg">
+                    {/* Bloc rôles à droite sur desktop, en dessous sur mobile */}
+                    <aside className="w-full md:w-1/3 order-2 md:order-1 flex-shrink-0">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6 md:mb-0">
+                            <h2 className="text-xl font-bold text-blue-700 dark:text-blue-200 mb-2 flex items-center gap-2"><FaUsers /> Gestion des rôles</h2>
+                            <ul className="mb-4">
+                                {roles.map(role => (
+                                    <li key={role.id} className="flex items-center justify-between py-2 px-3 bg-blue-50 dark:bg-blue-900 rounded mb-2 shadow-sm">
+                                        <span className="font-semibold text-blue-800 dark:text-blue-200 text-sm">{role.name}</span>
+                                        {canAssignRole && !['admin','user'].includes(role.name) && (
+                                            <button
+                                                className="text-red-600 hover:text-red-800 text-xs font-bold"
+                                                title="Supprimer le rôle"
+                                                onClick={() => setRoleToDelete(role)}
+                                            >Supprimer</button>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                            {canAssignRole && (
+                                <div className="bg-blue-50 dark:bg-blue-900 p-4 rounded shadow flex flex-col gap-2">
+                                    <h3 className="text-base font-bold text-blue-700 dark:text-blue-200">Créer un nouveau rôle</h3>
+                                    <form onSubmit={handleCreateRole} className="flex gap-2 items-center mt-2">
+                                        <input
+                                            type="text"
+                                            value={newRole}
+                                            onChange={e => setNewRole(e.target.value)}
+                                            placeholder="Nouveau rôle (ex: coach)"
+                                            className="border rounded p-2 text-sm w-full"
+                                            required
+                                            minLength={2}
+                                            maxLength={50}
+                                        />
+                                        <button type="submit" className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold" disabled={newRoleLoading}>{newRoleLoading ? 'Création...' : 'Créer'}</button>
+                                    </form>
+                                    {newRoleSuccess && <span className="text-green-600 text-xs ml-2">{newRoleSuccess}</span>}
+                                    {newRoleError && <span className="text-red-600 text-xs ml-2">{newRoleError}</span>}
                                 </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-                <div className="mt-auto flex justify-center p-4">
-                    {users.links && users.links.map((link, i) => (
-                        <button
-                            key={i}
-                            className={`btn btn-sm mx-1 ${link.active ? 'btn-primary' : 'btn-ghost'}`}
-                            disabled={!link.url}
-                            onClick={() => link.url && Inertia.get(link.url)}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                    ))}
-                </div>
-            </section>
-            {/* Fiche membre */}
-            <section className={`flex-1 bg-white dark:bg-gray-900 ${selectedUserId ? 'flex flex-col' : 'hidden md:flex items-center justify-center'}`}>
-                {notification && (
-                    <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
-                )}
-                {loadingDetail && (
-                    <div className="flex-1 flex items-center justify-center text-gray-400 text-lg">Chargement...</div>
-                )}
-                {!loadingDetail && selectedUser && (
-                    <div className="p-8 max-w-3xl mx-auto bg-white dark:bg-gray-800 rounded shadow h-full overflow-y-auto">
-                        <div className="flex items-center gap-4 mb-6">
-                            <img src={selectedUser.profile_photo_url || (selectedUser.profile_photo_path ? `/storage/${selectedUser.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name)}`)} alt={selectedUser.name} className="w-16 h-16 rounded-full border-4 border-blue-200 shadow" />
-                            <div>
-                                <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-200 flex items-center gap-2"><FaUser /> {selectedUser.name}</h1>
-                                <div className="text-gray-500 dark:text-gray-400">{selectedUser.email}</div>
-                            </div>
-                        </div>
-                        <div className="mb-6">
-                            <div className="mb-2"><span className="font-semibold">Projets :</span> {selectedUser.projects && selectedUser.projects.length > 0 ? (
-                                <div className="flex flex-wrap gap-2 mt-1">
-                                    {selectedUser.projects.map(project => (
-                                        <Link href={`/projects/${project.id}`} key={project.id} className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium hover:underline"><FaProjectDiagram /> {project.name}</Link>
-                                    ))}
-                                </div>
-                            ) : (
-                                <span className="text-gray-400">Aucun projet</span>
                             )}
+                        </div>
+                    </aside>
+                    {/* Bloc utilisateurs */}
+                    <main className="flex-1 order-1 md:order-2 flex flex-col w-full">
+                        {/* Header section */}
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                            <div className="flex items-center gap-3">
+                                <FaUsers className="text-3xl text-blue-600" />
+                                <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Utilisateurs</h1>
+                            </div>
+                            <div className="flex gap-2 w-full md:w-auto">
+                                <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full md:w-auto">
+                                    <input
+                                        type="text"
+                                        value={search}
+                                        onChange={e => setSearch(e.target.value)}
+                                        placeholder="Rechercher..."
+                                        className="border px-3 py-2 rounded w-full md:w-64 mb-0 focus:ring-2 focus:ring-blue-400"
+                                    />
+                                    <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
+                                        <FaSearch />
+                                    </button>
+                                </form>
+                                {auth && auth.role === 'admin' && (
+                                    <Link href="/users/create" className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow whitespace-nowrap">
+                                        <FaPlus /> Créer
+                                    </Link>
+                                )}
                             </div>
                         </div>
-                        <div className="flex gap-2 mt-4">
-                            <Link href={route('users.edit', selectedUser.id)} className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-5 py-2 rounded font-semibold flex items-center gap-2"><FaEdit /> Éditer</Link>
-                            <button onClick={() => { setSelectedUserId(null); setSelectedUser(null); }} className="bg-gray-100 hover:bg-blue-100 text-blue-700 px-5 py-2 rounded font-semibold flex items-center gap-2"><FaUsers /> Retour à la liste</button>
+                        {/* Tableau utilisateurs */}
+                        <div className="overflow-x-auto rounded-lg shadow bg-white dark:bg-gray-800">
+                            <table className="min-w-full text-sm">
+                                <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-100 to-blue-300 dark:from-blue-900 dark:to-blue-700 shadow">
+                                    <tr>
+                                        <th className="p-3 text-left font-bold">Avatar</th>
+                                        <th className="p-3 text-left font-bold">Nom</th>
+                                        <th className="p-3 text-left font-bold">Email</th>
+                                        <th className="p-3 text-left font-bold">Rôle</th>
+                                        <th className="p-3 text-left font-bold">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {users.data.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="text-center py-8 text-gray-400 dark:text-gray-500 text-lg font-semibold">
+                                                Aucun utilisateur trouvé pour cette recherche.
+                                            </td>
+                                        </tr>
+                                    ) : users.data.map(user => (
+                                        <tr key={user.id} className="hover:bg-blue-50 dark:hover:bg-blue-900 cursor-pointer transition group"
+                                            onClick={() => router.get(`/users/${user.id}`)}
+                                            tabIndex={0}
+                                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.get(`/users/${user.id}`); }}
+                                        >
+                                            <td className="p-3 align-middle">
+                                                <img src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} alt={user.name} className="w-10 h-10 rounded-full border-2 border-blue-200 shadow-sm group-hover:scale-105 transition-transform" />
+                                            </td>
+                                            <td className="p-3 align-middle font-semibold text-blue-800 dark:text-blue-200">{user.name}</td>
+                                            <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{user.email}</td>
+                                            <td className="p-3 align-middle"><span className="inline-block bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium">{user.role}</span></td>
+                                            <td className="p-3 align-middle text-xs text-gray-400">{new Date(user.created_at).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
-                )}
-                {!loadingDetail && !selectedUser && (
-                    <div className="text-gray-400 text-lg flex-1 flex items-center justify-center">Sélectionnez un membre pour voir le détail</div>
-                )}
-            </section>
+                        {/* Pagination */}
+                        <div className="mt-6 flex justify-center gap-2">
+                            {users.links && users.links.map((link, i) => (
+                                <button
+                                    key={i}
+                                    className={`btn btn-sm rounded-full px-4 py-2 font-semibold shadow ${link.active ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-blue-700 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-800'}`}
+                                    disabled={!link.url}
+                                    onClick={() => link.url && router.get(link.url)}
+                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                />
+                            ))}
+                        </div>
+                    </main>
+                </div>
+            </main>
         </div>
+        <Modal show={!!roleToDelete} onClose={() => setRoleToDelete(null)} maxWidth="sm">
+            <div className="p-6">
+                <h2 className="text-lg font-bold mb-4 text-red-700">Confirmer la suppression</h2>
+                <p className="mb-6">Voulez-vous vraiment supprimer le rôle <span className="font-semibold text-blue-700">{roleToDelete?.name}</span> ? Cette action est irréversible.</p>
+                <div className="flex justify-end gap-3">
+                    <button
+                        className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold"
+                        onClick={() => setRoleToDelete(null)}
+                        disabled={deleteLoading}
+                    >Annuler</button>
+                    <button
+                        className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
+                        onClick={handleDeleteRole}
+                        disabled={deleteLoading}
+                    >{deleteLoading ? 'Suppression...' : 'Supprimer'}</button>
+                </div>
+            </div>
+        </Modal>
+        </>
     );
 }
 

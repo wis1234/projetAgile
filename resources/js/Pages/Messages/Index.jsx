@@ -77,15 +77,14 @@ export default function Index({ messages, filters }) {
                     </thead>
                     <tbody>
                         {messages.data.map(message => (
-                            <tr key={message.id}>
+                            <tr key={message.id} className="cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900 transition"
+                                onClick={() => Inertia.get(`/messages/${message.id}`)}
+                            >
                                 <td>{message.content}</td>
                                 <td>{message.project?.name || '-'}</td>
                                 <td>{message.user?.name || '-'}</td>
                                 <td>{new Date(message.created_at).toLocaleDateString()}</td>
-                                <td className="flex gap-2">
-                                    <Link href={route('messages.show', message.id)}>
-                                        <ActionButton variant="info" size="sm">Voir</ActionButton>
-                                    </Link>
+                                <td className="flex gap-2" onClick={e => e.stopPropagation()}>
                                     <Link href={route('messages.edit', message.id)}>
                                         <ActionButton variant="warning" size="sm">Éditer</ActionButton>
                                     </Link>

@@ -7,6 +7,7 @@ use App\Models\User;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
@@ -19,12 +20,19 @@ class UserController extends Controller
         $this->authorize('viewAny', User::class);
         $query = User::query();
         if ($request->search) {
-            $query->where('name', 'like', '%'.$request->search.'%');
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                  ->orWhere('email', 'like', "%$search%");
+            });
         }
         $users = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
+        $roles = Role::orderBy('name')->get();
         return Inertia::render('Users/Index', [
             'users' => $users,
             'filters' => $request->only('search'),
+            'auth' => Auth::user(),
+            'roles' => $roles,
         ]);
     }
 
@@ -64,6 +72,7 @@ class UserController extends Controller
         $this->authorize('view', $user);
         return Inertia::render('Users/Show', [
             'user' => $user,
+            'auth' => Auth::user(),
         ]);
     }
 
@@ -118,5 +127,55 @@ class UserController extends Controller
     {
         $user = User::with('projects')->findOrFail($id);
         return response()->json($user);
+    }
+
+    public function assignRole(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+        $current = $request->user();
+        if (!$current || $current->email !== 'ronaldoagbohou@gmail.com') {
+            abort(403, 'Unauthorized');
+        }
+        $validated = $request->validate([
+            'role' => 'required|in:admin,manager,member,user',
+        ]);
+        $user->syncRoles([$validated['role']]);
+        $user->role = $validated['role'];
+        $user->save();
+        return back()->with('success', 'Rôle mis à jour !');
+    }
+
+    public function createRole(Request $request)
+    {
+        $current = $request->user();
+        if (!$current || $current->email !== 'ronaldoagbohou@gmail.com') {
+            abort(403, 'Unauthorized');
+        }
+        $validated = $request->validate([
+            'role' => 'required|string|min:2|max:50|regex:/^[a-zA-Z0-9_\-]+$/',
+        ]);
+        $role = Role::firstOrCreate(['name' => $validated['role']]);
+        return response()->json(['success' => true, 'role' => $role->name]);
+    }
+
+    /**
+     * Supprime un rôle Spatie (sauf admin/user)
+     */
+    public function destroyRole(Request $request, $id)
+    {
+        $current = $request->user();
+        if (!$current || $current->email !== 'ronaldoagbohou@gmail.com') {
+            abort(403, 'Non autorisé');
+        }
+        $role = Role::findOrFail($id);
+        if (in_array($role->name, ['admin', 'user'])) {
+            return response()->json(['error' => 'Impossible de supprimer ce rôle système.'], 403);
+        }
+        // Vérifie si des utilisateurs ont ce rôle
+        if ($role->users()->count() > 0) {
+            return response()->json(['error' => 'Ce rôle est encore attribué à des utilisateurs.'], 409);
+        }
+        $role->delete();
+        return response()->json(['success' => true]);
     }
 }

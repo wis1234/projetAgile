@@ -60,16 +60,15 @@ function Index({ sprints, filters }) {
       <ul className="space-y-3">
         {sprints.data.length === 0 && <li className="text-gray-500">Aucun sprint trouvé.</li>}
         {sprints.data.map(sprint => (
-          <li key={sprint.id} className="border p-4 rounded flex justify-between items-center bg-white shadow-sm hover:shadow-md transition">
+          <li key={sprint.id} className="border p-4 rounded flex justify-between items-center bg-white shadow-sm hover:shadow-md transition cursor-pointer"
+            onClick={() => router.get(`/sprints/${sprint.id}`)}
+          >
             <div>
               <span className="font-medium text-lg flex items-center gap-2 text-green-700"><FaFlagCheckered /> {sprint.name}</span>
               <div className="text-sm text-gray-500">Projet : {sprint.project?.name || '-'}</div>
               <div className="text-xs text-gray-400">Du {sprint.start_date} au {sprint.end_date}</div>
             </div>
             <div className="flex gap-2">
-              <Link href={route('sprints.show', sprint.id)}>
-                <ActionButton variant="info" size="sm" className="flex items-center"><FaEye className="mr-1" /> Voir</ActionButton>
-              </Link>
               <Link href={route('sprints.edit', sprint.id)}>
                 <ActionButton variant="warning" size="sm" className="flex items-center"><FaEdit className="mr-1" /> Modifier</ActionButton>
               </Link>

@@ -18,7 +18,10 @@ class ProjectController extends Controller
         if ($request->search) {
             $query->where('name', 'like', '%'.$request->search.'%');
         }
-        $projects = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
+        $projects = $query->withCount(['tasks', 'users'])
+                         ->orderBy('created_at', 'desc')
+                         ->paginate(10)
+                         ->withQueryString();
         return Inertia::render('Projects/Index', [
             'projects' => $projects,
             'filters' => $request->only('search'),

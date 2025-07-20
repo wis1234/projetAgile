@@ -137,13 +137,16 @@ export default function Index({ files, filters }) {
                             if (file.status === 'validated') statusBadge = <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-green-100 text-green-800"><FaCheckCircle /> Validé</span>;
                             if (file.status === 'rejected') statusBadge = <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-100 text-red-800"><FaTimesCircle /> Rejeté</span>;
                             return (
-                                <tr key={file.id} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900'}>
+                                <tr key={file.id} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-800 cursor-pointer' : 'bg-blue-50 dark:bg-blue-900 cursor-pointer'}
+                                    onClick={() => Inertia.get(`/files/${file.id}`)}
+                                >
                                     <td className="p-2 md:p-3 align-middle text-center">
                                         <input
                                             type="checkbox"
                                             checked={selectedFiles.includes(file.id)}
                                             onChange={() => handleSelectFile(file.id)}
                                             aria-label={`Sélectionner ${file.name}`}
+                                            onClick={e => e.stopPropagation()}
                                         />
                                     </td>
                                     <td className="p-2 md:p-3 align-middle">{icon}</td>
@@ -153,10 +156,7 @@ export default function Index({ files, filters }) {
                                     <td className="p-2 md:p-3 align-middle"><span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></td>
                                     <td className="p-2 md:p-3 align-middle">{statusBadge}</td>
                                     <td className="p-2 md:p-3 align-middle"><span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></td>
-                                    <td className="p-2 md:p-3 align-middle flex gap-2 flex-wrap">
-                                        <Link href={route('files.show', file.id)}>
-                                            <ActionButton variant="info" size="sm">Voir</ActionButton>
-                                        </Link>
+                                    <td className="p-2 md:p-3 align-middle flex gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
                                         <Link href={route('files.edit', file.id)}>
                                             <ActionButton variant="warning" size="sm">Éditer</ActionButton>
                                         </Link>
