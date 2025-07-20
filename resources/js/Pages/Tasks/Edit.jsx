@@ -55,85 +55,96 @@ function Edit({ task, projects = [], sprints = [] }) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <div className="flex items-center gap-3 mb-8">
-        <FaTasks className="text-3xl text-blue-700 dark:text-blue-200" />
-        <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight drop-shadow">Éditer la tâche</h1>
-      </div>
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
-        {notification && (
-          <div className={`mb-4 px-4 py-2 rounded font-semibold ${notificationType === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{notification}</div>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block font-semibold mb-1">Titre</label>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="border px-3 py-2 rounded w-full" required />
-            {errors.title && <div className="text-error text-sm">{errors.title}</div>}
+    <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
+        <div className="flex flex-col h-full w-full max-w-4xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+          <div className="flex items-center gap-3 mb-8">
+            <Link href="/tasks" className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-100 transition">
+              <FaArrowLeft className="text-xl" />
+            </Link>
+            <FaTasks className="text-3xl text-blue-600" />
+            <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Éditer la tâche</h1>
           </div>
-          <div>
-            <label className="block font-semibold mb-1">Description</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} className="border px-3 py-2 rounded w-full" rows={3} />
-            {errors.description && <div className="text-error text-sm">{errors.description}</div>}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-2xl mx-auto w-full">
+            {notification && (
+              <div className={`mb-6 px-4 py-3 rounded-lg text-white font-semibold ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Titre *</label>
+                <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" required />
+                {errors.title && <div className="text-red-600 text-sm mt-2 font-medium">{errors.title}</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Description</label>
+                <textarea value={description} onChange={e => setDescription(e.target.value)} rows="4" className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition resize-none" placeholder="Décrivez brièvement la tâche (optionnel)" />
+                {errors.description && <div className="text-red-600 text-sm mt-2 font-medium">{errors.description}</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Projet</label>
+                <select value={projectId} onChange={handleProjectChange} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" required>
+                  {projects.map(project => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))}
+                </select>
+                {errors.project_id && <div className="text-red-600 text-sm mt-2 font-medium">{errors.project_id}</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Sprint</label>
+                <select value={sprintId} onChange={e => setSprintId(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" required>
+                  {sprints.map(sprint => (
+                    <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
+                  ))}
+                </select>
+                {errors.sprint_id && <div className="text-red-600 text-sm mt-2 font-medium">{errors.sprint_id}</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Assigné à</label>
+                <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" required disabled={projectUsers.length === 0}>
+                  {projectUsers.length === 0 && <option value="">Aucun membre</option>}
+                  {projectUsers.map(user => (
+                    <option key={user.id} value={user.id}>{user.name}</option>
+                  ))}
+                </select>
+                {errors.assigned_to && <div className="text-red-600 text-sm mt-2 font-medium">{errors.assigned_to}</div>}
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Statut</label>
+                  <select value={status} onChange={e => setStatus(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition">
+                    <option value="todo">À faire</option>
+                    <option value="in_progress">En cours</option>
+                    <option value="done">Terminé</option>
+                  </select>
+                  {errors.status && <div className="text-red-600 text-sm mt-2 font-medium">{errors.status}</div>}
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Priorité</label>
+                  <select value={priority} onChange={e => setPriority(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition">
+                    <option value="low">Basse</option>
+                    <option value="medium">Moyenne</option>
+                    <option value="high">Haute</option>
+                  </select>
+                  {errors.priority && <div className="text-red-600 text-sm mt-2 font-medium">{errors.priority}</div>}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Échéance</label>
+                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" />
+                {errors.due_date && <div className="text-red-600 text-sm mt-2 font-medium">{errors.due_date}</div>}
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
+                  {loading ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Mise à jour...</>) : (<><FaTasks /> Mettre à jour</>)}
+                </button>
+                <Link href="/tasks" className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2">
+                  <FaArrowLeft /> Annuler
+                </Link>
+              </div>
+            </form>
           </div>
-          <div>
-            <label className="block font-semibold mb-1">Projet</label>
-            <select value={projectId} onChange={handleProjectChange} className="border px-3 py-2 rounded w-full">
-              {projects.map(project => (
-                <option key={project.id} value={project.id}>{project.name}</option>
-              ))}
-            </select>
-            {errors.project_id && <div className="text-error text-sm">{errors.project_id}</div>}
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Sprint</label>
-            <select value={sprintId} onChange={e => setSprintId(e.target.value)} className="border px-3 py-2 rounded w-full">
-              {sprints.map(sprint => (
-                <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
-              ))}
-            </select>
-            {errors.sprint_id && <div className="text-error text-sm">{errors.sprint_id}</div>}
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Assigné à</label>
-            <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="border px-3 py-2 rounded w-full">
-              {projectUsers.length === 0 && <option value="">Aucun membre</option>}
-              {projectUsers.map(user => (
-                <option key={user.id} value={user.id}>{user.name}</option>
-              ))}
-            </select>
-            {errors.assigned_to && <div className="text-error text-sm">{errors.assigned_to}</div>}
-          </div>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="block font-semibold mb-1">Statut</label>
-              <select value={status} onChange={e => setStatus(e.target.value)} className="border px-3 py-2 rounded w-full">
-                <option value="todo">À faire</option>
-                <option value="in_progress">En cours</option>
-                <option value="done">Terminé</option>
-              </select>
-              {errors.status && <div className="text-error text-sm">{errors.status}</div>}
-            </div>
-            <div className="flex-1">
-              <label className="block font-semibold mb-1">Priorité</label>
-              <select value={priority} onChange={e => setPriority(e.target.value)} className="border px-3 py-2 rounded w-full">
-                <option value="low">Basse</option>
-                <option value="medium">Moyenne</option>
-                <option value="high">Haute</option>
-              </select>
-              {errors.priority && <div className="text-error text-sm">{errors.priority}</div>}
-            </div>
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Échéance</label>
-            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="border px-3 py-2 rounded w-full" />
-            {errors.due_date && <div className="text-error text-sm">{errors.due_date}</div>}
-          </div>
-          <div className="flex gap-2 mt-4">
-            <button type="submit" className="bg-blue-700 hover:bg-blue-800 text-white px-5 py-2 rounded font-semibold shadow flex items-center gap-2 transition" disabled={loading}>{loading ? 'Mise à jour...' : 'Mettre à jour'}</button>
-            <Link href="/tasks" className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-5 py-2 rounded font-semibold flex items-center gap-2 transition"><FaArrowLeft /> Retour à la liste</Link>
-          </div>
-        </form>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

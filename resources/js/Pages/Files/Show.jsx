@@ -128,44 +128,48 @@ export default function Show({ file, canUpdateStatus, statuses }) {
     );
 
     return (
-        <AdminLayout>
-            <div className="flex flex-col h-full w-full">
-                <div className="max-w-2xl mx-auto bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8 mt-8 mb-8">
-                    <h1 className="text-2xl font-bold mb-6 flex items-center gap-2 text-blue-700 dark:text-blue-200"><FaFileAlt /> Détail du fichier</h1>
-                    {flash.success && <div className="alert alert-success mb-4">{flash.success}</div>}
-                    <div className="mb-4 flex flex-col gap-2">
-                        <div><span className="font-semibold">Nom :</span> <span className="text-blue-800 dark:text-blue-200">{file.name}</span></div>
-                        <div><span className="font-semibold">Projet :</span> {file.project?.name || <span className="text-gray-400">-</span>}</div>
-                        <div><span className="font-semibold">Tâche :</span> {file.task?.title || <span className="text-gray-400">-</span>}</div>
-                        <div><span className="font-semibold">Utilisateur :</span> {file.user?.name || <span className="text-gray-400">-</span>}</div>
-                        <div><span className="font-semibold">Taille :</span> <span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></div>
-                        <div><span className="font-semibold">Statut :</span> {statusBadge}</div>
-                        <div><span className="font-semibold">Date :</span> <span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></div>
-                        {file.description && <div><span className="font-semibold">Description :</span> <span className="italic text-gray-600 dark:text-gray-300">{file.description}</span></div>}
+        <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
+                <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+                    <div className="flex items-center gap-3 mb-8">
+                        <FaFileAlt className="text-3xl text-blue-600" />
+                        <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail du fichier</h1>
                     </div>
-                    {canUpdateStatus && (
-                        <form onSubmit={handleSubmit} className="mb-4 p-4 bg-gray-50 dark:bg-gray-900 rounded shadow">
-                            <div className="mb-2">
-                                <label className="font-semibold">Changer le statut :</label>
-                                <select value={status} onChange={handleStatusChange} className="ml-2 px-2 py-1 rounded border">
-                                    {statuses.map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {status === 'rejected' && (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
+                        <div className="mb-4 flex flex-col gap-2">
+                            <div><span className="font-semibold">Nom :</span> <span className="text-blue-800 dark:text-blue-200">{file.name}</span></div>
+                            <div><span className="font-semibold">Projet :</span> {file.project?.name || <span className="text-gray-400">-</span>}</div>
+                            <div><span className="font-semibold">Tâche :</span> {file.task?.title || <span className="text-gray-400">-</span>}</div>
+                            <div><span className="font-semibold">Utilisateur :</span> {file.user?.name || <span className="text-gray-400">-</span>}</div>
+                            <div><span className="font-semibold">Taille :</span> <span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></div>
+                            <div><span className="font-semibold">Statut :</span> {statusBadge}</div>
+                            <div><span className="font-semibold">Date :</span> <span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></div>
+                            {file.description && <div><span className="font-semibold">Description :</span> <span className="italic text-gray-600 dark:text-gray-300">{file.description}</span></div>}
+                        </div>
+                        {canUpdateStatus && (
+                            <form onSubmit={handleSubmit} className="mb-4 p-4 bg-gray-50 dark:bg-gray-900 rounded shadow">
                                 <div className="mb-2">
-                                    <label className="font-semibold">Motif du rejet :</label>
-                                    <input type="text" value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} className="ml-2 px-2 py-1 rounded border w-2/3" required={status === 'rejected'} />
+                                    <label className="font-semibold">Changer le statut :</label>
+                                    <select value={status} onChange={handleStatusChange} className="ml-2 px-2 py-1 rounded border">
+                                        {statuses.map(s => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
                                 </div>
-                            )}
-                            <button type="submit" className="mt-2" disabled={loading}>
-                              <ActionButton variant="primary" type="submit" disabled={loading}>{loading ? 'Enregistrement...' : 'Enregistrer'}</ActionButton>
-                            </button>
-                        </form>
-                    )}
+                                {status === 'rejected' && (
+                                    <div className="mb-2">
+                                        <label className="font-semibold">Motif du rejet :</label>
+                                        <input type="text" value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} className="ml-2 px-2 py-1 rounded border w-2/3" required={status === 'rejected'} />
+                                    </div>
+                                )}
+                                <button type="submit" className="mt-2" disabled={loading}>
+                                  <ActionButton variant="primary" type="submit" disabled={loading}>{loading ? 'Enregistrement...' : 'Enregistrer'}</ActionButton>
+                                </button>
+                            </form>
+                        )}
+                    </div>
                     {/* Section Commentaires */}
-                    <div className="mt-10">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
                         <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-blue-700 dark:text-blue-200"><FaCommentDots /> Commentaires</h2>
                         {loadingComments ? (
                             <div className="text-gray-400">Chargement des commentaires...</div>
@@ -243,7 +247,8 @@ export default function Show({ file, canUpdateStatus, statuses }) {
                       </div>
                     )}
                 </div>
-            </div>
-        </AdminLayout>
+            </main>
+        </div>
     );
-} 
+}
+Show.layout = page => <AdminLayout children={page} />; 

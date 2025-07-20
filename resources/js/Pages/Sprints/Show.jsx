@@ -1,38 +1,93 @@
 import React from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaFlagCheckered, FaEdit, FaProjectDiagram } from 'react-icons/fa';
+import { FaFlagCheckered, FaEdit, FaProjectDiagram, FaArrowLeft } from 'react-icons/fa';
 import ActionButton from '../../Components/ActionButton';
 
 function Show({ sprint }) {
   const { flash = {} } = usePage().props;
   return (
-    <div className="flex flex-col h-full w-full p-6">
-      <div className="max-w-xl w-full mx-auto bg-white dark:bg-gray-800 rounded shadow p-8">
-        {flash.success && <div className="mb-4 px-4 py-3 rounded bg-green-100 text-green-800 font-semibold shadow">{flash.success}</div>}
-        <h1 className="text-3xl font-extrabold mb-6 flex items-center gap-3 text-blue-700 dark:text-blue-200"><FaFlagCheckered className="text-green-600" /> Détail du sprint</h1>
-        <div className="mb-6">
-          <div className="mb-2"><span className="font-semibold">Nom :</span> <span className="text-black dark:text-blue-100">{sprint.name}</span></div>
-          <div className="mb-2 flex items-center gap-2"><span className="font-semibold">Projet :</span> <FaProjectDiagram className="text-blue-400" /> <span className="text-black dark:text-blue-100">{sprint.project?.name || '-'}</span></div>
-          <div className="mb-2"><span className="font-semibold">Description :</span> <span className="text-gray-700 dark:text-gray-300">{sprint.description || '-'}</span></div>
-          <div className="mb-2"><span className="font-semibold">Début :</span> <span className="text-black dark:text-blue-100">{sprint.start_date}</span></div>
-          <div className="mb-2"><span className="font-semibold">Fin :</span> <span className="text-black dark:text-blue-100">{sprint.end_date}</span></div>
-          <div className="mb-2"><span className="font-semibold">Tâches :</span> {sprint.tasks && sprint.tasks.length > 0 ? (
-            <ul className="list-disc ml-6 mt-1">
-              {sprint.tasks.map(task => (
-                <li key={task.id} className="text-black dark:text-blue-100">{task.title}</li>
-              ))}
-            </ul>
-          ) : (
-            <span className="text-gray-400">Aucune tâche</span>
+    <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
+        <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+          <div className="flex items-center gap-3 mb-8">
+            <FaFlagCheckered className="text-3xl text-green-600" />
+            <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail du sprint</h1>
+          </div>
+          {flash.success && (
+            <div className="mb-6 px-4 py-3 rounded-lg bg-green-100 text-green-800 font-semibold">
+              {flash.success}
+            </div>
           )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Carte principale du sprint */}
+            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                  <FaFlagCheckered className="text-green-600 dark:text-green-200 text-xl" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-blue-700 dark:text-blue-200">{sprint.name}</h2>
+                </div>
+              </div>
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  Projet lié
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg flex items-center gap-2">
+                  <FaProjectDiagram className="text-blue-400" /> {sprint.project?.name || '-'}
+                </p>
+              </div>
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Description</h3>
+                <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">{sprint.description || '-'}</p>
+              </div>
+              <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex items-center gap-1">
+                  Début : <span className="ml-1 text-black dark:text-blue-100">{sprint.start_date}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  Fin : <span className="ml-1 text-black dark:text-blue-100">{sprint.end_date}</span>
+                </div>
+              </div>
+            </div>
+            {/* Carte des tâches du sprint */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <h3 className="text-lg font-bold text-blue-700 dark:text-blue-200 mb-4 flex items-center gap-2">
+                Tâches ({sprint.tasks?.length || 0})
+              </h3>
+              {sprint.tasks && sprint.tasks.length > 0 ? (
+                <div className="space-y-3">
+                  {sprint.tasks.map(task => (
+                    <div key={task.id} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <span className="font-semibold text-blue-700 dark:text-blue-200 text-sm">{task.title}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-400 text-center py-4">Aucune tâche</div>
+              )}
+            </div>
+          </div>
+          {/* Actions */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link
+                href={route('sprints.edit', sprint.id)}
+                className="w-full sm:w-auto bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
+              >
+                <FaEdit /> Modifier le sprint
+              </Link>
+              <Link
+                href="/sprints"
+                className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
+              >
+                <FaArrowLeft /> Retour à la liste
+              </Link>
+            </div>
           </div>
         </div>
-        <div className="flex gap-2 mt-4">
-          <Link href={route('sprints.edit', sprint.id)} className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-5 py-2 rounded font-semibold flex items-center gap-2"><FaEdit /> Éditer</Link>
-          <Link href="/sprints" className="bg-gray-100 hover:bg-blue-100 text-blue-700 px-5 py-2 rounded font-semibold flex items-center gap-2">Retour à la liste</Link>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

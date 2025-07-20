@@ -31,63 +31,84 @@ function Index({ sprints, filters }) {
   };
 
   return (
-    <div className="flex flex-col h-full w-full">
-      {notification && (
-        <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
-          {notification}
-          <button onClick={() => setNotification('')} className="ml-4 text-white font-bold">&times;</button>
-        </div>
-      )}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-2 md:gap-0">
-        <div className="flex gap-2 mb-4">
-          <Link href="/sprints/create">
-            <ActionButton variant="primary">Nouveau sprint</ActionButton>
-          </Link>
-        </div>
-        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher..."
-            className="border px-3 py-2 rounded w-full md:w-64 mb-0"
-          />
-          <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
-            <FaSearch />
-          </button>
-        </form>
-      </div>
-      <ul className="space-y-3">
-        {sprints.data.length === 0 && <li className="text-gray-500">Aucun sprint trouvé.</li>}
-        {sprints.data.map(sprint => (
-          <li key={sprint.id} className="border p-4 rounded flex justify-between items-center bg-white shadow-sm hover:shadow-md transition cursor-pointer"
-            onClick={() => router.get(`/sprints/${sprint.id}`)}
-          >
-            <div>
-              <span className="font-medium text-lg flex items-center gap-2 text-green-700"><FaFlagCheckered /> {sprint.name}</span>
-              <div className="text-sm text-gray-500">Projet : {sprint.project?.name || '-'}</div>
-              <div className="text-xs text-gray-400">Du {sprint.start_date} au {sprint.end_date}</div>
+    <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
+        <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+          {notification && (
+            <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
+          )}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <div className="flex items-center gap-3">
+              <FaFlagCheckered className="text-3xl text-green-600" />
+              <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Sprints</h1>
             </div>
-            <div className="flex gap-2">
-              <Link href={route('sprints.edit', sprint.id)}>
-                <ActionButton variant="warning" size="sm" className="flex items-center"><FaEdit className="mr-1" /> Modifier</ActionButton>
+            <div className="flex gap-2 w-full md:w-auto">
+              <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full md:w-auto">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Rechercher un sprint..."
+                  className="border px-3 py-2 rounded w-full md:w-64 mb-0 focus:ring-2 focus:ring-blue-400"
+                />
+                <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
+                  <FaSearch />
+                </button>
+              </form>
+              <Link href="/sprints/create" className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded font-semibold shadow whitespace-nowrap">
+                <FaPlus /> Nouveau sprint
               </Link>
-              <ActionButton variant="danger" size="sm" className="flex items-center" onClick={() => handleDelete(sprint.id)}><FaTrash className="mr-1" /> Supprimer</ActionButton>
             </div>
-          </li>
-        ))}
-      </ul>
-      <div className="flex justify-center mt-6 space-x-2">
-        {sprints.links && sprints.links.map((link, i) => (
-          <button
-            key={i}
-            disabled={!link.url}
-            onClick={() => link.url && router.get(link.url, { search }, { preserveState: true, replace: true })}
-            className={`px-3 py-1 rounded ${link.active ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'} ${!link.url ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-100'}`}
-            dangerouslySetInnerHTML={{ __html: link.label }}
-          />
-        ))}
-      </div>
+          </div>
+          <div className="overflow-x-auto rounded-lg shadow bg-white dark:bg-gray-800 mb-8">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-gradient-to-r from-green-100 to-green-300 dark:from-green-900 dark:to-green-700 shadow">
+                <tr>
+                  <th className="p-3 text-left font-bold">Sprint</th>
+                  <th className="p-3 text-left font-bold">Projet</th>
+                  <th className="p-3 text-left font-bold">Début</th>
+                  <th className="p-3 text-left font-bold">Fin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sprints.data.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="text-center py-8 text-gray-400 dark:text-gray-500 text-lg font-semibold">
+                      Aucun sprint trouvé pour cette recherche.
+                    </td>
+                  </tr>
+                ) : sprints.data.map(sprint => (
+                  <tr
+                    key={sprint.id}
+                    className="hover:bg-green-50 dark:hover:bg-green-900 transition group cursor-pointer"
+                    onClick={() => window.location.href = `/sprints/${sprint.id}`}
+                    tabIndex={0}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') window.location.href = `/sprints/${sprint.id}`; }}
+                  >
+                    <td className="p-3 align-middle font-semibold text-green-700 dark:text-green-200 flex items-center gap-2 group-hover:text-green-800 dark:group-hover:text-green-100">
+                      <FaFlagCheckered /> {sprint.name}
+                    </td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{sprint.project?.name || '-'}</td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{sprint.start_date}</td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{sprint.end_date}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-center gap-2 mb-8">
+            {sprints.links && sprints.links.map((link, i) => (
+              <button
+                key={i}
+                className={`btn btn-sm rounded-full px-4 py-2 font-semibold shadow ${link.active ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-green-700 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-800'}`}
+                disabled={!link.url}
+                onClick={() => link.url && router.get(link.url)}
+                dangerouslySetInnerHTML={{ __html: link.label }}
+              />
+            ))}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

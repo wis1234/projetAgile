@@ -5,6 +5,7 @@ import TaskModal from '../../Components/TaskModal';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
 import { FaSearch } from 'react-icons/fa';
+import { FaTasks } from 'react-icons/fa';
 
 // Icônes Heroicons SVG inline
 const EditIcon = () => (
@@ -100,103 +101,89 @@ function Index({ tasks, filters }) {
   };
 
   return (
-    <div className="flex flex-col h-full w-full">
-      {notification && (
-        <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
-          {notification}
-          <button onClick={() => setNotification('')} className="ml-4 text-white font-bold">&times;</button>
-        </div>
-      )}
-      <TaskModal show={showModal} onClose={handleModalClose} task={modalTask} mode={modalMode} />
-      <div className="max-w-5xl w-full mx-auto">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-2 md:gap-0">
-          <div className="flex gap-2 items-center mb-2 md:mb-0">
-            <Link href="/tasks/create">
-              <ActionButton variant="primary" className="flex items-center"><span className="text-xl mr-2">+</span> Nouvelle tâche</ActionButton>
-            </Link>
-            <Link href="/kanban" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow flex items-center font-semibold">
-              <KanbanIcon /> Kanban
-            </Link>
+    <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
+        <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+          {notification && (
+            <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
+          )}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <div className="flex items-center gap-3">
+              <FaTasks className="text-3xl text-blue-600" />
+              <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Tâches</h1>
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+              <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full md:w-auto">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Rechercher une tâche..."
+                  className="border px-3 py-2 rounded w-full md:w-64 mb-0 focus:ring-2 focus:ring-blue-400"
+                />
+                <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
+                  <FaSearch />
+                </button>
+              </form>
+              <Link href="/tasks/create" className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow whitespace-nowrap">
+                <span className="text-xl">+</span> Nouvelle tâche
+              </Link>
+              <Link href="/kanban" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow flex items-center font-semibold">
+                <KanbanIcon /> Kanban
+              </Link>
+            </div>
           </div>
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Rechercher..."
-              className="border px-3 py-2 rounded w-full md:w-64 mb-0"
-            />
-            <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
-              <FaSearch />
-            </button>
-          </form>
-          <div className="flex gap-2 items-center">
-            <input
-              type="date"
-              value={createdFrom}
-              onChange={e => handleDateFilter(e.target.value, createdTo)}
-              className="border px-2 py-1 rounded"
-              placeholder="Du"
-            />
-            <span className="mx-1">-</span>
-            <input
-              type="date"
-              value={createdTo}
-              onChange={e => handleDateFilter(createdFrom, e.target.value)}
-              className="border px-2 py-1 rounded"
-              placeholder="Au"
-            />
-          </div>
-        </div>
-        <ul className="space-y-3">
-          {tasks.data.length === 0 && <li className="text-gray-500">Aucune tâche trouvée.</li>}
-          {tasks.data.map(task => (
-            <li key={task.id} className="border p-4 rounded flex flex-col md:flex-row md:justify-between md:items-center bg-white shadow-sm hover:shadow-lg transition group cursor-pointer"
-              onClick={() => router.get(`/tasks/${task.id}`)}
-            >
-              <div className="flex-1 flex flex-col md:flex-row md:items-center gap-2">
-                <span className="font-medium text-lg text-blue-800 dark:text-blue-200 group-hover:underline">{task.title}</span>
-                {task.status && <span className="ml-2 px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs capitalize">{task.status}</span>}
-                {task.priority && <span className="ml-2 px-2 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 text-xs capitalize">{task.priority}</span>}
-              </div>
-              <div className="flex gap-2 mt-2 md:mt-0">
-                <Link href={`/tasks/${task.id}/edit`} title="Modifier la tâche">
-                  <ActionButton variant="warning" size="sm" className="flex items-center"><EditIcon /> Modifier</ActionButton>
-                </Link>
-                <ActionButton variant="danger" size="sm" className="flex items-center" title="Supprimer la tâche" onClick={() => handleDelete(task.id)}><TrashIcon /> Supprimer</ActionButton>
-                {(auth?.user?.id === task.assigned_to || auth?.user?.id === task.assignedUser?.id) && (
-                  <Link
-                    href={`/files/create?task_id=${task.id}&project_id=${task.project_id || task.project?.id}`}
-                    className="text-green-700 hover:bg-green-100 hover:text-green-800 px-3 py-1 rounded transition flex items-center font-semibold"
-                    title="Ajouter un fichier à cette tâche"
+          <div className="overflow-x-auto rounded-lg shadow bg-white dark:bg-gray-800 mb-8">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-100 to-blue-300 dark:from-blue-900 dark:to-blue-700 shadow">
+                <tr>
+                  <th className="p-3 text-left font-bold">Titre</th>
+                  <th className="p-3 text-left font-bold">Projet</th>
+                  <th className="p-3 text-left font-bold">Sprint</th>
+                  <th className="p-3 text-left font-bold">Statut</th>
+                  <th className="p-3 text-left font-bold">Priorité</th>
+                  <th className="p-3 text-left font-bold">Assigné à</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.data.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-8 text-gray-400 dark:text-gray-500 text-lg font-semibold">
+                      Aucune tâche trouvée pour cette recherche.
+                    </td>
+                  </tr>
+                ) : tasks.data.map(task => (
+                  <tr
+                    key={task.id}
+                    className="hover:bg-blue-50 dark:hover:bg-blue-900 transition group cursor-pointer"
+                    onClick={() => window.location.href = `/tasks/${task.id}`}
+                    tabIndex={0}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') window.location.href = `/tasks/${task.id}`; }}
                   >
-                    + Fichier
-                  </Link>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-        <div className="flex justify-center mt-6 space-x-2">
-          {tasks.links.map((link, i) => (
-            <button
-              key={i}
-              disabled={!link.url}
-              onClick={() => link.url && router.get(link.url, { search, created_from: createdFrom, created_to: createdTo }, { preserveState: true, replace: true })}
-              className={`px-3 py-1 rounded ${link.active ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'} ${!link.url ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-100'}`}
-              dangerouslySetInnerHTML={{ __html: link.label }}
-            />
-          ))}
+                    <td className="p-3 align-middle font-semibold text-blue-700 dark:text-blue-200 group-hover:underline">{task.title}</td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.project?.name || '-'}</td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.sprint?.name || '-'}</td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.status}</td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.priority}</td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.assigned_user?.name || task.assignedUser?.name || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-center gap-2 mb-8">
+            {tasks.links && tasks.links.map((link, i) => (
+              <button
+                key={i}
+                className={`btn btn-sm rounded-full px-4 py-2 font-semibold shadow ${link.active ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-blue-700 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-800'}`}
+                disabled={!link.url}
+                onClick={() => link.url && router.get(link.url)}
+                dangerouslySetInnerHTML={{ __html: link.label }}
+              />
+            ))}
+          </div>
         </div>
-        {/* Bouton flottant pour mobile */}
-        <button
-          onClick={() => router.visit('/tasks/create')}
-          className="fixed bottom-8 right-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg text-3xl md:hidden z-50"
-          title="Ajouter une tâche"
-        >
-          +
-        </button>
-      </div>
+      </main>
     </div>
   );
 }
