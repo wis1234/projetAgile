@@ -38,7 +38,7 @@ const navLinks = [
 ];
 
 export default function AdminLayout({ children }) {
-  const { auth, flash = {} } = usePage().props;
+  const { auth, flash = {}, appName } = usePage().props;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [notifDropdown, setNotifDropdown] = useState(false);
@@ -176,7 +176,7 @@ export default function AdminLayout({ children }) {
           >&times;</button>
         )}
         <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 mb-8 flex items-center justify-between">
-          Admin
+          {appName || 'Admin'}
           {/* Ancien bouton croix, masqué sur mobile car doublon */}
           <span className="md:hidden text-2xl opacity-0 pointer-events-none">&times;</span>
         </div>
@@ -198,7 +198,7 @@ export default function AdminLayout({ children }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
         {/* Header */}
-        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6 z-40 transition-all duration-300 mb-2">
+        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gamma-700 flex items-center justify-between px-4 sm:px-6 z-40 transition-all duration-300">
           <button className="md:hidden text-2xl mr-2" onClick={() => setSidebarOpen(true)}>&#9776;</button>
           <div className="text-xl font-bold text-blue-700 dark:text-blue-200">Dashboard</div>
           <div className="flex items-center gap-4">
@@ -278,7 +278,7 @@ export default function AdminLayout({ children }) {
         <Notification message={flash.error} type="error" />
         <Notification message={flash.info} type="info" />
         {/* Page content */}
-        <main className="flex-1 w-full h-full transition-colors">
+        <main className="flex-1 w-full h-full transition-colors pt-16">
           {children}
         </main>
       </div>

@@ -7,14 +7,21 @@ use App\Models\Sprint;
 use App\Models\Project;
 use Inertia\Inertia;
 use App\Events\SprintUpdated;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class SprintController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
+        try {
+            $this->authorize('viewAny', Sprint::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $query = Sprint::with('project');
         if ($request->search) {
             $query->where('name', 'like', '%'.$request->search.'%');
@@ -31,6 +38,11 @@ class SprintController extends Controller
      */
     public function create()
     {
+        try {
+            $this->authorize('create', Sprint::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $projects = Project::all(['id', 'name']);
         return Inertia::render('Sprints/Create', [
             'projects' => $projects,
@@ -42,6 +54,11 @@ class SprintController extends Controller
      */
     public function store(Request $request)
     {
+        try {
+            $this->authorize('create', Sprint::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -60,6 +77,11 @@ class SprintController extends Controller
     public function show(string $id)
     {
         $sprint = Sprint::with(['project', 'tasks'])->findOrFail($id);
+        try {
+            $this->authorize('view', $sprint);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         return Inertia::render('Sprints/Show', [
             'sprint' => $sprint,
         ]);
@@ -71,6 +93,11 @@ class SprintController extends Controller
     public function edit(string $id)
     {
         $sprint = Sprint::findOrFail($id);
+        try {
+            $this->authorize('update', $sprint);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $projects = Project::all(['id', 'name']);
         return Inertia::render('Sprints/Edit', [
             'sprint' => $sprint,
@@ -84,6 +111,11 @@ class SprintController extends Controller
     public function update(Request $request, string $id)
     {
         $sprint = Sprint::findOrFail($id);
+        try {
+            $this->authorize('update', $sprint);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -102,6 +134,11 @@ class SprintController extends Controller
     public function destroy(string $id)
     {
         $sprint = Sprint::findOrFail($id);
+        try {
+            $this->authorize('delete', $sprint);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $sprint->delete();
         event(new SprintUpdated($sprint));
         return redirect()->route('sprints.index');

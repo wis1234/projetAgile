@@ -29,8 +29,17 @@ function Kanban({ tasks }) {
     moved.status = destination.droppableId;
     destCol.splice(destination.index, 0, moved);
     setColumns({ ...columns, [source.droppableId]: sourceCol, [destination.droppableId]: destCol });
-    // Appel backend pour MAJ statut
-    router.put(`/tasks/${draggableId}`, { status: destination.droppableId }, { preserveState: true });
+    
+    // Appel backend pour MAJ statut, maintenant protégé par la policy
+    router.put(`/tasks/${draggableId}`, { status: destination.droppableId }, { 
+        preserveState: true,
+        onError: () => {
+            // Revert state on authorization error
+            sourceCol.splice(source.index, 0, moved);
+            setColumns({ ...columns, [source.droppableId]: sourceCol, [destination.droppableId]: destCol });
+            alert("Vous n'êtes pas autorisé à modifier cette tâche.");
+        }
+    });
   };
 
   return (

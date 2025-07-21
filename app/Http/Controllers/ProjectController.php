@@ -56,6 +56,9 @@ class ProjectController extends Controller
     public function show(string $id)
     {
         $project = Project::with('users')->findOrFail($id);
+        if (!$project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $tasks = $project->tasks()->with(['assignedUser', 'sprint'])->orderBy('created_at', 'desc')->get();
         return Inertia::render('Projects/Show', [
             'project' => $project,
@@ -69,6 +72,9 @@ class ProjectController extends Controller
     public function edit(string $id)
     {
         $project = Project::findOrFail($id);
+        if (!$project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         return Inertia::render('Projects/Edit', [
             'project' => $project,
         ]);
@@ -80,6 +86,9 @@ class ProjectController extends Controller
     public function update(Request $request, string $id)
     {
         $project = Project::findOrFail($id);
+        if (!$project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
         ]);
@@ -95,6 +104,9 @@ class ProjectController extends Controller
     public function destroy(string $id)
     {
         $project = Project::findOrFail($id);
+        if (!$project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $project->delete();
         event(new ProjectUpdated($project));
         activity_log('delete', 'Suppression projet', $project);
@@ -114,5 +126,12 @@ class ProjectController extends Controller
             'users' => $project->users,
             'tasks' => $tasks,
         ]);
+    }
+
+    public function manageMembers($id)
+    {
+        $project = Project::findOrFail($id);
+        $this->authorize('manageMembers', $project);
+        // ... logique pour gérer les membres ...
     }
 }

@@ -52,7 +52,7 @@ class UserActionMailNotification extends Notification
                 return $mail->action($this->actionText, $this->actionUrl);
             })
             ->line('Regards,')
-            ->line('Agile');
+            ->line('ProjA');
         if ($this->actionUrl && $this->actionText) {
             $mail->line('If you\'re having trouble clicking the "' . $this->actionText . '" button, copy and paste the URL below into your web browser:')
                 ->line($this->actionUrl);

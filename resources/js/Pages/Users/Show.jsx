@@ -62,9 +62,6 @@ function Show({ user, auth }) {
             )}
           </div>
           <div className="flex gap-3 mt-2 justify-center md:justify-start">
-            {canEdit && (
-              <Link href={route('users.edit', user.id)} className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-5 py-3 rounded font-semibold flex items-center gap-2"><FaEdit /> Éditer</Link>
-            )}
             <Link href="/users" className="bg-gray-100 hover:bg-blue-100 text-blue-700 px-5 py-3 rounded font-semibold flex items-center gap-2"><FaUsers /> Retour à la liste</Link>
           </div>
         </div>

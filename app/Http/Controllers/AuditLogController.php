@@ -7,9 +7,11 @@ use App\Models\Project;
 use App\Models\User;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class AuditLogController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display a listing of the resource.
      */

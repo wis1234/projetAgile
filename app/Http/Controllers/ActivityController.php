@@ -8,9 +8,12 @@ use App\Exports\ActivitiesExport;
 use App\Models\Activity;
 use App\Models\User;
 use Inertia\Inertia;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ActivityController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request)
     {
         $query = Activity::with('user');

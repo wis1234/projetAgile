@@ -5,59 +5,50 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Task;
 use Inertia\Inertia;
-use App\Models\User;
 use App\Models\Project;
 use App\Models\Sprint;
 use App\Events\TaskUpdated;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class TaskController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    use AuthorizesRequests;
+
     public function index(Request $request)
     {
-        $query = Task::with(['assignedUser', 'project']);
+        try {
+            $this->authorize('viewAny', Task::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
+        $query = Task::with(['assignedUser', 'project'])->whereHas('project', function ($q) {
+            $q->whereHas('users', function ($q2) {
+                $q2->where('user_id', auth()->id());
+            });
+        });
+
         if ($request->search) {
-            $query->where('title', 'like', '%'.$request->search.'%');
-        }
-        if ($request->created_from) {
-            $query->whereDate('created_at', '>=', $request->created_from);
-        }
-        if ($request->created_to) {
-            $query->whereDate('created_at', '<=', $request->created_to);
+            $query->where('title', 'like', '%' . $request->search . '%');
         }
         $tasks = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
+
         return Inertia::render('Tasks/Index', [
             'tasks' => $tasks,
-            'filters' => $request->only('search', 'created_from', 'created_to'),
+            'filters' => $request->only('search'),
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
-        $projects = Project::with('users:id,name')->get(['id', 'name'])->map(function($project) {
-            return [
-                'id' => $project->id,
-                'name' => $project->name,
-                'users' => $project->users->map(function($user) {
-                    return [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                    ];
-                })->values(),
-            ];
-        })->values();
-
-        $sprints = Sprint::all(['id', 'name'])->map(function($sprint) {
-            return [
-                'id' => $sprint->id,
-                'name' => $sprint->name,
-            ];
-        })->values();
+        try {
+            $this->authorize('create', Task::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
+        $projects = Project::whereHas('users', function ($q) {
+            $q->where('user_id', auth()->id())->whereIn('role', ['admin', 'manager']);
+        })->get();
+        $sprints = Sprint::whereIn('project_id', $projects->pluck('id'))->get();
 
         return Inertia::render('Tasks/Create', [
             'projects' => $projects,
@@ -65,44 +56,46 @@ class TaskController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
+        try {
+            $this->authorize('create', Task::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
             'project_id' => 'required|exists:projects,id',
             'sprint_id' => 'required|exists:sprints,id',
             'assigned_to' => 'required|exists:users,id',
             'status' => 'required|in:todo,in_progress,done',
-            'priority' => 'nullable|string',
-            'due_date' => 'nullable|date',
         ]);
         $task = Task::create($validated);
-        activity_log('create', 'Création tâche', $task);
-        event(new TaskUpdated($task));
-        return redirect()->route('tasks.index')->with('success', 'Tâche créée avec succès');
+        return redirect()->route('tasks.index');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show(Task $task)
     {
-        $task = Task::with(['project', 'sprint', 'assignedUser'])->findOrFail($id);
+        try {
+            $this->authorize('view', $task);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         return Inertia::render('Tasks/Show', ['task' => $task]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function edit(Task $task)
     {
-        $task = Task::findOrFail($id);
-        $projects = Project::with('users:id,name')->get(['id', 'name']);
-        $sprints = Sprint::all(['id', 'name']);
+        try {
+            $this->authorize('update', $task);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
+        $projects = Project::whereHas('users', function ($q) {
+            $q->where('user_id', auth()->id())->whereIn('role', ['admin', 'manager']);
+        })->get();
+        $sprints = Sprint::whereIn('project_id', $projects->pluck('id'))->get();
+
         return Inertia::render('Tasks/Edit', [
             'task' => $task,
             'projects' => $projects,
@@ -110,45 +103,65 @@ class TaskController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Task $task)
     {
-        $task = Task::findOrFail($id);
-
+        try {
+            $this->authorize('update', $task);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $validated = $request->validate([
-            'title' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'status' => 'sometimes|required|in:todo,in_progress,done',
-            'position' => 'nullable|integer',
-            // autres champs si besoin
+            'title' => 'required|string|max:255',
+            'status' => 'required|in:todo,in_progress,done',
         ]);
-
         $task->update($validated);
-        activity_log('update', 'Modification tâche', $task);
-        event(new TaskUpdated($task));
-
-        return redirect()->route('tasks.index')->with('success', 'Tâche mise à jour avec succès');
+        return redirect()->route('tasks.index');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Task $task)
     {
-        $task = Task::findOrFail($id);
+        try {
+            $this->authorize('delete', $task);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $task->delete();
-        activity_log('delete', 'Suppression tâche', $task);
-        event(new TaskUpdated($task));
         return redirect()->route('tasks.index');
     }
 
     public function kanban()
     {
-        $tasks = Task::orderBy('position')->get()->groupBy('status');
-        return Inertia::render('Tasks/Kanban', [
-            'tasks' => $tasks,
-        ]);
+        try {
+            $this->authorize('viewAny', Task::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
+        $tasks = Task::whereHas('project', function ($q) {
+            $q->whereHas('users', function ($q2) {
+                $q2->where('user_id', auth()->id());
+            });
+        })->get()->groupBy('status');
+
+        return Inertia::render('Tasks/Kanban', ['tasks' => $tasks]);
+    }
+
+    public function comment(Request $request, Task $task)
+    {
+        try {
+            $this->authorize('comment', $task);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
+        // ...
+    }
+
+    public function uploadFile(Request $request, Task $task)
+    {
+        try {
+            $this->authorize('uploadFile', $task);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
+        // ...
     }
 }

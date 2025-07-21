@@ -17,7 +17,11 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        $this->authorize('viewAny', User::class);
+        try {
+            $this->authorize('viewAny', User::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $query = User::query();
         if ($request->search) {
             $search = $request->search;
@@ -41,7 +45,11 @@ class UserController extends Controller
      */
     public function create()
     {
-        $this->authorize('create', User::class);
+        try {
+            $this->authorize('create', User::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         return Inertia::render('Users/Create');
     }
 
@@ -50,7 +58,11 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        $this->authorize('create', User::class);
+        try {
+            $this->authorize('create', User::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -69,7 +81,11 @@ class UserController extends Controller
     public function show(string $id)
     {
         $user = User::with('projects')->findOrFail($id);
-        $this->authorize('view', $user);
+        try {
+            $this->authorize('view', $user);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         return Inertia::render('Users/Show', [
             'user' => $user,
             'auth' => Auth::user(),
@@ -82,7 +98,11 @@ class UserController extends Controller
     public function edit(string $id)
     {
         $user = User::findOrFail($id);
-        $this->authorize('update', $user);
+        try {
+            $this->authorize('update', $user);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         return Inertia::render('Users/Edit', [
             'user' => $user,
         ]);
@@ -94,7 +114,11 @@ class UserController extends Controller
     public function update(Request $request, string $id)
     {
         $user = User::findOrFail($id);
-        $this->authorize('update', $user);
+        try {
+            $this->authorize('update', $user);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,'.$id,
@@ -114,7 +138,11 @@ class UserController extends Controller
     public function destroy(string $id)
     {
         $user = User::findOrFail($id);
-        $this->authorize('delete', $user);
+        try {
+            $this->authorize('delete', $user);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $user->delete();
         activity_log('delete', 'Suppression utilisateur', $user);
         return redirect()->route('users.index')->with('success', 'Utilisateur supprimé avec succès');
@@ -134,7 +162,7 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $current = $request->user();
         if (!$current || $current->email !== 'ronaldoagbohou@gmail.com') {
-            abort(403, 'Unauthorized');
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
         $validated = $request->validate([
             'role' => 'required|in:admin,manager,member,user',
@@ -149,7 +177,7 @@ class UserController extends Controller
     {
         $current = $request->user();
         if (!$current || $current->email !== 'ronaldoagbohou@gmail.com') {
-            abort(403, 'Unauthorized');
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
         $validated = $request->validate([
             'role' => 'required|string|min:2|max:50|regex:/^[a-zA-Z0-9_\-]+$/',
@@ -165,7 +193,7 @@ class UserController extends Controller
     {
         $current = $request->user();
         if (!$current || $current->email !== 'ronaldoagbohou@gmail.com') {
-            abort(403, 'Non autorisé');
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
         $role = Role::findOrFail($id);
         if (in_array($role->name, ['admin', 'user'])) {

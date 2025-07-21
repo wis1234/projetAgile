@@ -27,7 +27,7 @@
                     <p class="text-lg text-gray-700 dark:text-gray-300 mb-6">Vous n'avez pas les droits nécessaires pour accéder à cette page.<br>Si vous pensez qu'il s'agit d'une erreur, contactez un administrateur.</p>
                     <a href="/" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold shadow hover:bg-blue-700 transition">Retour à l'accueil</a>
                 </div>
-                <div class="mt-8 text-gray-400 text-sm">&copy; {{ date('Y') }} ProJA - Agile Manager</div>
+                <div class="mt-8 text-gray-400 text-sm">&copy; {{ date('Y') }} ProJA</div>
             </div>
         @endif
     </body>

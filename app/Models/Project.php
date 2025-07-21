@@ -55,4 +55,9 @@ class Project extends Model
     public function auditLogs() {
         return $this->hasMany(AuditLog::class);
     }
+
+    public function isMember($user)
+    {
+        return $this->users()->where('user_id', $user->id)->exists();
+    }
 }

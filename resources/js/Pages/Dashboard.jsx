@@ -19,14 +19,14 @@ function Dashboard({ stats = {}, activityByDay = [], topUsers = [], recentActivi
 
   return (
     <>
-      <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+      <div className="flex flex-col w-full h-full bg-white dark:bg-gray-900 rounded-none shadow-none p-0 m-0">
         {/* Contenu principal */}
-        <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-          <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+        <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0">
+          <div className="flex flex-col h-full w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white dark:bg-gray-900">
             {/* Header section */}
             <div className="flex items-center gap-3 mb-8">
               <FaChartLine className="text-3xl text-blue-600" />
-              <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Tableau de bord</h1>
+              <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">ProjA - Tableau de bord</h1>
             </div>
 
             {/* Widgets statistiques */}

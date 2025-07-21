@@ -11,14 +11,21 @@ use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ProfileController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display the user's profile form.
      */
     public function edit(Request $request): Response
     {
+        try {
+            $this->authorize('view', $request->user());
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
@@ -30,6 +37,11 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request)
     {
+        try {
+            $this->authorize('update', $request->user());
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $user = $request->user();
         $data = $request->validated();
 
@@ -56,6 +68,11 @@ class ProfileController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        try {
+            $this->authorize('delete', $request->user());
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $request->validate([
             'password' => ['required', 'current_password'],
         ]);
@@ -69,6 +86,6 @@ class ProfileController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return Redirect::to('/');
+        return Redirect::route('home');
     }
 }

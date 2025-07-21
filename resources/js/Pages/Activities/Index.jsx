@@ -38,9 +38,9 @@ export default function Index({ activities, users, filters = {}, types = [], fla
 
   return (
     <>
-      <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-        <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-          <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+      <div className="flex flex-col w-full h-full bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
+        <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+          <div className="flex flex-col h-full w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white dark:bg-gray-900">
             {/* Header section */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
               <div className="flex items-center gap-3">

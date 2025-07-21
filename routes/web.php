@@ -83,4 +83,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/roles/{id}/delete', [\App\Http\Controllers\UserController::class, 'destroyRole'])->name('roles.destroy');
 });
 
+Route::get('/error/403', function () {
+    return Inertia::render('Error403');
+});
+
+Route::get('/error/404', function () {
+    return Inertia::render('Error404');
+});
+Route::get('/error/500', function () {
+    return Inertia::render('Error500');
+});
+
 require __DIR__.'/auth.php';

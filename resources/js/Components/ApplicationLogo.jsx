@@ -1,4 +1,7 @@
+import { usePage } from "@inertiajs/react";
+
 export default function ApplicationLogo(props) {
+    const { appName } = usePage().props;
     return (
         <span
             {...props}
@@ -8,7 +11,7 @@ export default function ApplicationLogo(props) {
             }
             style={{ letterSpacing: '0.05em', ...props.style }}
         >
-            Pro<span className="text-orange-500">J</span>A
+            {appName || 'ProJ'}
         </span>
     );
 }

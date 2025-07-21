@@ -12,9 +12,11 @@ use App\Notifications\InternalNotification;
 use App\Notifications\UserActionMailNotification;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class FileController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display a listing of the resource.
      */
@@ -128,7 +130,10 @@ class FileController extends Controller
     public function show(File $file)
     {
         $file->load(['project', 'user']);
-        $user = Auth::user();
+        $user = auth()->user();
+        if (!$file->project || !$file->project->isMember($user)) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $canUpdateStatus = false;
         $statuses = ['pending', 'validated', 'rejected'];
         if ($file->project && $user) {
@@ -149,6 +154,10 @@ class FileController extends Controller
      */
     public function edit(File $file)
     {
+        $file->load(['project']);
+        if (!$file->project || !$file->project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $projects = Project::all(['id', 'name']);
         $users = User::all(['id', 'name']);
         $tasks = \App\Models\Task::all(['id', 'title']);
@@ -167,6 +176,10 @@ class FileController extends Controller
      */
     public function update(Request $request, File $file)
     {
+        $file->load(['project']);
+        if (!$file->project || !$file->project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'project_id' => 'required|exists:projects,id',
@@ -222,6 +235,10 @@ class FileController extends Controller
      */
     public function destroy(File $file)
     {
+        $file->load(['project']);
+        if (!$file->project || !$file->project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         // Supprimer le fichier physique
         if ($file->file_path && \Storage::disk('public')->exists($file->file_path)) {
             \Storage::disk('public')->delete($file->file_path);

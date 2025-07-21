@@ -8,9 +8,11 @@ use App\Models\Project;
 use App\Models\User;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class MessageController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display a listing of the resource.
      */
@@ -62,6 +64,9 @@ class MessageController extends Controller
     public function show(Message $message)
     {
         $message->load(['project', 'user']);
+        if ($message->project && !$message->project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         return Inertia::render('Messages/Show', [
             'message' => $message,
         ]);
@@ -72,6 +77,10 @@ class MessageController extends Controller
      */
     public function edit(Message $message)
     {
+        $message->load(['project', 'user']);
+        if ($message->project && !$message->project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $projects = Project::all(['id', 'name']);
         $users = User::all(['id', 'name']);
         return Inertia::render('Messages/Edit', [
@@ -86,6 +95,10 @@ class MessageController extends Controller
      */
     public function update(Request $request, Message $message)
     {
+        $message->load(['project', 'user']);
+        if ($message->project && !$message->project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $validated = $request->validate([
             'content' => 'required|string',
             'project_id' => 'required|exists:projects,id',
@@ -102,6 +115,10 @@ class MessageController extends Controller
      */
     public function destroy(Message $message)
     {
+        $message->load(['project', 'user']);
+        if ($message->project && !$message->project->isMember(auth()->user())) {
+            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
         $message->delete();
         activity_log('delete', 'Suppression message', $message);
         event(new MessageUpdated($message));
