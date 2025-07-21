@@ -18,6 +18,9 @@ export default function Show({ file, canUpdateStatus, statuses }) {
     const [posting, setPosting] = useState(false);
     const [error, setError] = useState('');
     const { auth } = usePage().props;
+    const userAuth = auth?.user || auth;
+    const isAdmin = userAuth && userAuth.role === 'admin';
+    const isProjectMember = isAdmin || (file.project && file.project.users && file.project.users.some(u => u.id === userAuth.id));
 
     useEffect(() => {
         fetch(`/api/files/${file.id}/comments`)
@@ -185,62 +188,64 @@ export default function Show({ file, canUpdateStatus, statuses }) {
                         )}
                     </div>
                     {/* Section Commentaires */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
-                        <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-blue-700 dark:text-blue-200"><FaCommentDots /> Commentaires</h2>
-                        {loadingComments ? (
-                            <div className="text-gray-400">Chargement des commentaires...</div>
-                        ) : (
-                            <div>
-                                {comments.length === 0 ? (
-                                    <div className="text-gray-400 italic">Aucun commentaire pour l'instant.</div>
-                                ) : (
-                                    <ul className="space-y-4 mb-6">
-                                        {comments.map(comment => (
-                                            <li key={comment.id} className="bg-blue-50 dark:bg-blue-900 rounded p-3 shadow flex gap-3">
-                                                <img src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}`} alt={comment.user?.name} className="w-8 h-8 rounded-full border-2 border-blue-200" />
-                                                <div className="flex-1">
-                                                    <div className="font-semibold text-blue-800 dark:text-blue-200">{comment.user?.name}</div>
-                                                    <div className="text-gray-600 dark:text-gray-300 text-sm mb-1">{new Date(comment.created_at).toLocaleString()}</div>
-                                                    {editingId === comment.id ? (
-                                                        <form onSubmit={handleUpdateComment} className="flex flex-col gap-2">
-                                                            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400" required maxLength={2000} />
-                                                            <div className="flex gap-2">
-                                                                <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">Enregistrer</button>
-                                                                <button type="button" className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded" onClick={() => setEditingId(null)}>Annuler</button>
-                                                            </div>
-                                                        </form>
-                                                    ) : (
-                                                        <div className="text-gray-900 dark:text-gray-100">{comment.content}</div>
-                                                    )}
-                                                </div>
-                                                {comment.user?.id === auth.user.id && editingId !== comment.id && (
-                                                    <div className="flex flex-col gap-1 ml-2">
-                                                        <button onClick={() => handleEditComment(comment)} className="text-xs text-yellow-700 hover:underline">Éditer</button>
-                                                        <button onClick={() => handleDeleteComment(comment.id)} className="text-xs text-red-600 hover:underline">Supprimer</button>
-                                                    </div>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                                <form onSubmit={handleCommentSubmit} className="flex flex-col gap-2">
-                                    <textarea
-                                        value={commentContent}
-                                        onChange={e => setCommentContent(e.target.value)}
-                                        placeholder="Ajouter un commentaire..."
-                                        className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400"
-                                        disabled={posting}
-                                        required
-                                        maxLength={2000}
-                                    />
-                                    {error && <div className="text-red-500 text-sm">{error}</div>}
-                                    <button type="submit" className="self-end bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow flex items-center gap-2" disabled={posting || !commentContent.trim()}>
-                                        {posting ? 'Envoi...' : 'Commenter'}
-                                    </button>
-                                </form>
-                            </div>
-                        )}
-                    </div>
+                    {isProjectMember && (
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
+                          <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-blue-700 dark:text-blue-200"><FaCommentDots /> Commentaires</h2>
+                          {loadingComments ? (
+                              <div className="text-gray-400">Chargement des commentaires...</div>
+                          ) : (
+                              <div>
+                                  {comments.length === 0 ? (
+                                      <div className="text-gray-400 italic">Aucun commentaire pour l'instant.</div>
+                                  ) : (
+                                      <ul className="space-y-4 mb-6">
+                                          {comments.map(comment => (
+                                              <li key={comment.id} className="bg-blue-50 dark:bg-blue-900 rounded p-3 shadow flex gap-3">
+                                                  <img src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}`} alt={comment.user?.name} className="w-8 h-8 rounded-full border-2 border-blue-200" />
+                                                  <div className="flex-1">
+                                                      <div className="font-semibold text-blue-800 dark:text-blue-200">{comment.user?.name}</div>
+                                                      <div className="text-gray-600 dark:text-gray-300 text-sm mb-1">{new Date(comment.created_at).toLocaleString()}</div>
+                                                      {editingId === comment.id ? (
+                                                          <form onSubmit={handleUpdateComment} className="flex flex-col gap-2">
+                                                              <textarea value={editContent} onChange={e => setEditContent(e.target.value)} className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400" required maxLength={2000} />
+                                                              <div className="flex gap-2">
+                                                                  <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">Enregistrer</button>
+                                                                  <button type="button" className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded" onClick={() => setEditingId(null)}>Annuler</button>
+                                                              </div>
+                                                          </form>
+                                                      ) : (
+                                                          <div className="text-gray-900 dark:text-gray-100">{comment.content}</div>
+                                                      )}
+                                                  </div>
+                                                  {comment.user?.id === auth.user.id && editingId !== comment.id && (
+                                                      <div className="flex flex-col gap-1 ml-2">
+                                                          <button onClick={() => handleEditComment(comment)} className="text-xs text-yellow-700 hover:underline">Éditer</button>
+                                                          <button onClick={() => handleDeleteComment(comment.id)} className="text-xs text-red-600 hover:underline">Supprimer</button>
+                                                      </div>
+                                                  )}
+                                              </li>
+                                          ))}
+                                      </ul>
+                                  )}
+                                  <form onSubmit={handleCommentSubmit} className="flex flex-col gap-2">
+                                      <textarea
+                                          value={commentContent}
+                                          onChange={e => setCommentContent(e.target.value)}
+                                          placeholder="Ajouter un commentaire..."
+                                          className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400"
+                                          disabled={posting}
+                                          required
+                                          maxLength={2000}
+                                      />
+                                      {error && <div className="text-red-500 text-sm">{error}</div>}
+                                      <button type="submit" className="self-end bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow flex items-center gap-2" disabled={posting || !commentContent.trim()}>
+                                          {posting ? 'Envoi...' : 'Commenter'}
+                                      </button>
+                                  </form>
+                              </div>
+                          )}
+                      </div>
+                    )}
                     <div className="flex gap-2 mt-6">
                         <Link href={route('files.download', file.id)} target="_blank" rel="noopener noreferrer">
                           <ActionButton variant="primary">Télécharger</ActionButton>

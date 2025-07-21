@@ -6,9 +6,9 @@ import { FaUsers, FaUserEdit, FaArrowLeft } from 'react-icons/fa';
 export default function Show({ project }) {
     const { flash = {} } = usePage().props;
     return (
-        <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-                <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+        <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+                <div className="flex flex-col w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
                     <div className="flex items-center gap-3 mb-8">
                         <FaUsers className="text-3xl text-blue-600" />
                         <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail des membres du projet</h1>

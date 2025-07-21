@@ -29,7 +29,7 @@ class ProjectPolicy
 
     public function delete(User $user, Project $project)
     {
-        return $user->hasRole('admin') || $project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists();
+        return $user->hasRole('admin');
     }
 
     public function manageMembers(User $user, Project $project)

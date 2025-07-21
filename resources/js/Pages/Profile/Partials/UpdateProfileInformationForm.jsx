@@ -1,47 +1,33 @@
+import { useRef, useState } from 'react';
+import { useForm, usePage, Link } from '@inertiajs/react';
+import { Transition } from '@headlessui/react';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
-import { Transition } from '@headlessui/react';
-import { Link, useForm, usePage } from '@inertiajs/react';
-import { useRef, useState } from 'react';
-import Notification from '@/Components/Notification';
 
-export default function UpdateProfileInformation({
-    mustVerifyEmail,
-    status,
-    className = '',
-}) {
+export default function UpdateProfileInformation({ mustVerifyEmail, status, className = '' }) {
     const user = usePage().props.auth.user;
     const [preview, setPreview] = useState(user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=0D8ABC&color=fff`);
     const fileInput = useRef();
     const [globalSuccess, setGlobalSuccess] = useState('');
-
-    const { data, setData, patch, errors, processing, recentlySuccessful } =
-        useForm({
-            name: user.name,
-            email: user.email,
-            profile_photo: null,
-            phone: user.phone || '',
-            bio: user.bio || '',
-            job_title: user.job_title || '',
-            company: user.company || '',
-        });
+    const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
+        name: user.name,
+        email: user.email,
+        profile_photo: null,
+        phone: user.phone || '',
+        bio: user.bio || '',
+        job_title: user.job_title || '',
+        company: user.company || '',
+    });
 
     const submit = (e) => {
         e.preventDefault();
-        console.log('Données envoyées:', data);
         patch(route('profile.update'), {
             forceFormData: true,
             onSuccess: (page) => {
-                if (page.props?.success) {
-                    setGlobalSuccess(page.props.success);
-                }
-                // Rafraîchir le user dans usePage().props.auth.user si possible
-                if (page.props?.user) {
-                    // Méthode simple : recharger la page pour tout synchroniser
-                    window.location.reload();
-                }
+                if (page.props?.success) setGlobalSuccess(page.props.success);
+                if (page.props?.user) window.location.reload();
             },
         });
     };
@@ -57,32 +43,37 @@ export default function UpdateProfileInformation({
     };
 
     return (
-        <section className={className}>
-            <Notification message={globalSuccess} type="success" />
-            <header>
-                <h2 className="text-lg font-medium text-gray-900">Mon profil</h2>
-                <p className="mt-1 text-sm text-gray-600">Modifiez vos informations personnelles et votre photo de profil.</p>
-            </header>
-            <form onSubmit={submit} className="mt-6 space-y-6">
-                <div className="flex items-center gap-6">
-                    <img src={preview} alt="avatar" className="w-20 h-20 rounded-full border-2 border-blue-400 shadow" />
-                    <div>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            ref={fileInput}
-                            onChange={handlePhotoChange}
-                        />
-                        <button type="button" className="btn btn-secondary" onClick={() => fileInput.current.click()}>
-                            Changer la photo
-                        </button>
-                        {data.profile_photo && (
-                            <span className="ml-2 text-xs text-gray-500">{data.profile_photo.name}</span>
-                        )}
-                        <InputError className="mt-2" message={errors.profile_photo} />
+        <section className={`w-full max-w-2xl mx-auto flex flex-col items-center ${className}`}>
+            {globalSuccess && (
+                <div className="mb-6 px-4 py-3 rounded-lg bg-green-100 text-green-800 font-semibold text-center w-full">
+                    {globalSuccess}
+                </div>
+            )}
+            <div className="flex flex-col items-center mb-8 w-full">
+                <div className="relative group mb-4">
+                    <img
+                        src={preview}
+                        alt="avatar"
+                        className="w-32 h-32 rounded-full border-4 border-blue-400 object-cover cursor-pointer hover:opacity-80 transition"
+                        onClick={() => fileInput.current.click()}
+                    />
+                    <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        ref={fileInput}
+                        onChange={handlePhotoChange}
+                    />
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                        Changer la photo
                     </div>
                 </div>
+                {data.profile_photo && (
+                    <span className="text-xs text-gray-500">{data.profile_photo.name}</span>
+                )}
+                <InputError className="mt-2" message={errors.profile_photo} />
+            </div>
+            <form onSubmit={submit} className="w-full grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <InputLabel htmlFor="name" value="Nom" />
                     <TextInput
@@ -145,11 +136,11 @@ export default function UpdateProfileInformation({
                     />
                     <InputError className="mt-2" message={errors.company} />
                 </div>
-                <div>
+                <div className="md:col-span-2">
                     <InputLabel htmlFor="bio" value="Bio" />
                     <textarea
                         id="bio"
-                        className="mt-1 block w-full rounded border-gray-300 dark:bg-gray-800 dark:text-white"
+                        className="mt-1 block w-full rounded border-gray-300 dark:bg-gray-800 dark:text-white min-h-[80px]"
                         value={data.bio}
                         onChange={(e) => setData('bio', e.target.value)}
                         rows={3}
@@ -157,14 +148,14 @@ export default function UpdateProfileInformation({
                     <InputError className="mt-2" message={errors.bio} />
                 </div>
                 {mustVerifyEmail && user.email_verified_at === null && (
-                    <div>
+                    <div className="md:col-span-2">
                         <p className="mt-2 text-sm text-gray-800">
                             Votre adresse email n'est pas vérifiée.
                             <Link
                                 href={route('verification.send')}
                                 method="post"
                                 as="button"
-                                className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                             >
                                 Cliquez ici pour renvoyer l'email de vérification.
                             </Link>
@@ -176,8 +167,14 @@ export default function UpdateProfileInformation({
                         )}
                     </div>
                 )}
-                <div className="flex items-center gap-4">
-                    <PrimaryButton disabled={processing}>Enregistrer</PrimaryButton>
+                <div className="md:col-span-2 flex flex-col items-center mt-4">
+                    <button
+                        type="submit"
+                        disabled={processing}
+                        className="w-full max-w-xs rounded-full bg-blue-600 hover:bg-blue-700 text-white text-base font-semibold py-3 shadow-sm transition disabled:opacity-50"
+                    >
+                        {processing ? 'Enregistrement...' : 'Enregistrer'}
+                    </button>
                     <Transition
                         show={recentlySuccessful}
                         enter="transition ease-in-out"
@@ -185,7 +182,7 @@ export default function UpdateProfileInformation({
                         leave="transition ease-in-out"
                         leaveTo="opacity-0"
                     >
-                        <p className="text-sm text-gray-600">Enregistré.</p>
+                        <p className="text-sm text-green-600 mt-2">Enregistré.</p>
                     </Transition>
                 </div>
             </form>

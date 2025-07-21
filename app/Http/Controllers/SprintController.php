@@ -43,7 +43,10 @@ class SprintController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
-        $projects = Project::all(['id', 'name']);
+        $currentUser = auth()->user();
+        $projects = $currentUser->hasRole('admin')
+            ? Project::all(['id', 'name'])
+            : $currentUser->projects()->wherePivot('role', 'manager')->get(['projects.id', 'projects.name']);
         return Inertia::render('Sprints/Create', [
             'projects' => $projects,
         ]);

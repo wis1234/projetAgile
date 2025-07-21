@@ -101,9 +101,9 @@ function Index({ tasks, filters }) {
   };
 
   return (
-    <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-        <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+    <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+        <div className="flex flex-col w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
           {notification && (
             <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
           )}
@@ -139,7 +139,6 @@ function Index({ tasks, filters }) {
                 <tr>
                   <th className="p-3 text-left font-bold">Titre</th>
                   <th className="p-3 text-left font-bold">Projet</th>
-                  <th className="p-3 text-left font-bold">Sprint</th>
                   <th className="p-3 text-left font-bold">Statut</th>
                   <th className="p-3 text-left font-bold">Priorité</th>
                   <th className="p-3 text-left font-bold">Assigné à</th>
@@ -161,11 +160,15 @@ function Index({ tasks, filters }) {
                     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') window.location.href = `/tasks/${task.id}`; }}
                   >
                     <td className="p-3 align-middle font-semibold text-blue-700 dark:text-blue-200 group-hover:underline">{task.title}</td>
-                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.project?.name || '-'}</td>
-                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.sprint?.name || '-'}</td>
-                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.status}</td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.project?.name || <span className="italic text-gray-400">Aucun</span>}</td>
+                    <td className="p-3 align-middle">
+                      {task.status === 'todo' && <span className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">À faire</span>}
+                      {task.status === 'in_progress' && <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">En cours</span>}
+                      {task.status === 'done' && <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">Terminé</span>}
+                      {!['todo','in_progress','done'].includes(task.status) && <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-500 text-xs font-bold">{task.status}</span>}
+                    </td>
                     <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.priority}</td>
-                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.assigned_user?.name || task.assignedUser?.name || '-'}</td>
+                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">Aucun</span>}</td>
                   </tr>
                 ))}
               </tbody>

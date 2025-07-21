@@ -94,9 +94,9 @@ export default function Show({ task }) {
   };
 
   return (
-    <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-        <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+    <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+        <div className="flex flex-col w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
           <div className="flex items-center gap-3 mb-8">
             <FaTasks className="text-3xl text-blue-600" />
             <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail de la tâche</h1>
@@ -104,20 +104,49 @@ export default function Show({ task }) {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
             <div className="flex flex-col md:flex-row md:items-center gap-6 mb-6">
               <div className="flex items-center gap-3">
-                {task.assigned_user || task.assignedUser ? (
-                  <img src={(task.assigned_user?.profile_photo_url || task.assignedUser?.profile_photo_url) || (task.assigned_user?.profile_photo_path ? `/storage/${task.assigned_user.profile_photo_path}` : task.assignedUser?.profile_photo_path ? `/storage/${task.assignedUser.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_user?.name || task.assignedUser?.name || '')}`)} alt={task.assigned_user?.name || task.assignedUser?.name} className="w-16 h-16 rounded-full shadow border-2 border-blue-200" />
+                {Array.isArray(task.assigned_users) && task.assigned_users.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    <span className="font-semibold">Assigné à :</span>
+                    <ul>
+                      {task.assigned_users.map(u => (
+                        <li key={u.id} className="flex items-center gap-2">
+                          <img src={u.profile_photo_url || (u.profile_photo_path ? `/storage/${u.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`)} alt={u.name} className="w-8 h-8 rounded-full border-2 border-blue-200" />
+                          <span className="font-bold text-blue-700 dark:text-blue-200">{u.name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : (
-                  <FaUserCircle className="w-16 h-16 text-gray-400" />
+                  <>
+                    {task.assigned_user || task.assignedUser ? (
+                      <img src={(task.assigned_user?.profile_photo_url || task.assignedUser?.profile_photo_url) || (task.assigned_user?.profile_photo_path ? `/storage/${task.assigned_user.profile_photo_path}` : task.assignedUser?.profile_photo_path ? `/storage/${task.assignedUser.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_user?.name || task.assignedUser?.name || '')}`)} alt={task.assigned_user?.name || task.assignedUser?.name} className="w-16 h-16 rounded-full shadow border-2 border-blue-200" />
+                    ) : (
+                      <FaUserCircle className="w-16 h-16 text-gray-400" />
+                    )}
+                    <div>
+                      <div className="font-bold text-lg text-black dark:text-blue-100">{task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">Non assigné</span>}</div>
+                    </div>
+                  </>
                 )}
-                <div>
-                  <div className="font-bold text-lg text-black dark:text-blue-100">{task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">Non assigné</span>}</div>
-                </div>
               </div>
               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><span className="font-semibold">Titre :</span> {task.title}</div>
-                <div><span className="font-semibold">Projet :</span> <span className="inline-flex items-center gap-1"><FaProjectDiagram className="text-blue-500" /> {task.project?.name || <span className="italic text-gray-400">Aucun</span>}</span></div>
-                <div><span className="font-semibold">Sprint :</span> <span className="inline-flex items-center gap-1"><FaFlagCheckered className="text-green-600" /> {task.sprint?.name || <span className="italic text-gray-400">Aucun</span>}</span></div>
-                <div><span className="font-semibold">Statut :</span> {getStatusBadge(task.status)}</div>
+                <div><span className="font-semibold">Projet :</span> <span className="inline-flex items-center gap-1"><FaProjectDiagram className="text-blue-500" /> {task.project ? <Link href={`/projects/${task.project.id}`} className="underline hover:text-blue-800">{task.project.name}</Link> : <span className="italic text-gray-400">Aucun</span>}</span></div>
+                <div><span className="font-semibold">Sprint :</span> <span className="inline-flex items-center gap-1"><FaFlagCheckered className="text-blue-600" /> {
+                  task.sprint ? (
+                    <Link href={`/sprints/${task.sprint.id}`} className="underline hover:text-blue-800">{task.sprint.name}</Link>
+                  ) : task.sprint_id ? (
+                    <Link href={`/sprints/${task.sprint_id}`} className="underline hover:text-blue-800">Sprint #{task.sprint_id}</Link>
+                  ) : (
+                    <span className="italic text-gray-400">Aucun</span>
+                  )
+                }</span></div>
+                <div><span className="font-semibold">Statut :</span> {
+                  task.status === 'todo' ? <span className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">À faire</span> :
+                  task.status === 'in_progress' ? <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">En cours</span> :
+                  task.status === 'done' ? <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">Terminé</span> :
+                  <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-500 text-xs font-bold">{task.status}</span>
+                }</div>
                 <div><span className="font-semibold">Priorité :</span> {getPriorityBadge(task.priority)}</div>
                 <div><span className="font-semibold">Date d'échéance :</span> {task.due_date ? new Date(task.due_date).toLocaleDateString() : <span className="italic text-gray-400">Non définie</span>}</div>
                 <div><span className="font-semibold">Créée le :</span> {task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A'}</div>

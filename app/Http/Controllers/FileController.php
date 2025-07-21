@@ -23,15 +23,17 @@ class FileController extends Controller
     public function index(Request $request)
     {
         $query = File::with(['project', 'user', 'task']);
+        $currentUser = auth()->user();
+        if (!$currentUser->hasRole('admin')) {
+            $projectIds = $currentUser->projects()->pluck('projects.id');
+            $query->whereIn('project_id', $projectIds);
+        }
         if ($request->search) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%$search%")
                   ->orWhere('description', 'like', "%$search%")
                   ->orWhereHas('project', function($q2) use ($search) {
-                      $q2->where('name', 'like', "%$search%");
-                  })
-                  ->orWhereHas('user', function($q2) use ($search) {
                       $q2->where('name', 'like', "%$search%");
                   });
             });
@@ -48,7 +50,10 @@ class FileController extends Controller
      */
     public function create()
     {
-        $projects = Project::all(['id', 'name']);
+        $currentUser = auth()->user();
+        $projects = $currentUser->hasRole('admin')
+            ? Project::all(['id', 'name'])
+            : $currentUser->projects()->get(['projects.id', 'projects.name']);
         $users = User::all(['id', 'name']);
         $tasks = \App\Models\Task::all(['id', 'title']);
         $kanbans = \App\Models\Sprint::all(['id', 'name']);
@@ -65,6 +70,11 @@ class FileController extends Controller
      */
     public function store(Request $request)
     {
+        $currentUser = auth()->user();
+        $project = Project::findOrFail($request->project_id);
+        if (!$currentUser->hasRole('admin') && !$project->users()->where('user_id', $currentUser->id)->exists()) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'file' => 'required|file|max:10240', // 10 Mo max
@@ -154,9 +164,9 @@ class FileController extends Controller
      */
     public function edit(File $file)
     {
-        $file->load(['project']);
-        if (!$file->project || !$file->project->isMember(auth()->user())) {
-            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        $currentUser = auth()->user();
+        if (!$currentUser->hasRole('admin') && (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
         $projects = Project::all(['id', 'name']);
         $users = User::all(['id', 'name']);
@@ -176,9 +186,9 @@ class FileController extends Controller
      */
     public function update(Request $request, File $file)
     {
-        $file->load(['project']);
-        if (!$file->project || !$file->project->isMember(auth()->user())) {
-            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        $currentUser = auth()->user();
+        if (!$currentUser->hasRole('admin') && (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -250,7 +260,11 @@ class FileController extends Controller
 
     public function download(File $file)
     {
-        if (!$file->file_path || !\Storage::disk('public')->exists($file->file_path)) {
+        $currentUser = auth()->user();
+        if (!$currentUser->hasRole('admin') && (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())) {
+            abort(403, 'Vous n\'êtes pas autorisé à télécharger ce fichier.');
+        }
+        if (!$file->file_path || \Storage::disk('public')->exists($file->file_path) === false) {
             abort(404, 'Fichier non trouvé');
         }
         return response()->download(storage_path('app/public/' . $file->file_path), $file->name);

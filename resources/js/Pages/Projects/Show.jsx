@@ -1,13 +1,45 @@
 import React from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaProjectDiagram, FaUsers, FaTasks, FaEdit, FaEye, FaArrowLeft, FaCalendarAlt, FaUserFriends, FaClipboardList, FaTrash } from 'react-icons/fa';
+import { FaProjectDiagram, FaUsers, FaTasks, FaEdit, FaEye, FaArrowLeft, FaCalendarAlt, FaUserFriends, FaClipboardList, FaTrash, FaChartLine, FaFileAlt, FaCommentDots, FaCheckCircle } from 'react-icons/fa';
+import { Bar } from 'react-chartjs-2';
+import { Chart, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
+Chart.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 import Modal from '../../Components/Modal';
 
-function Show({ project, tasks = [] }) {
+function Show({ project, tasks = [], auth, stats = {} }) {
   const { flash = {} } = usePage().props;
+  const isAdmin = auth?.role === 'admin' || auth?.roles?.includes?.('admin');
+  const isManager = auth?.role === 'manager' || auth?.roles?.includes?.('manager');
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [deleteLoading, setDeleteLoading] = React.useState(false);
+
+  // Préparation des données pour le graphique de tendance
+  const doneTasksByWeek = stats.doneTasksByWeek || [];
+  const weekLabels = doneTasksByWeek.map(w => w.yearweek);
+  const weekData = doneTasksByWeek.map(w => w.count);
+  const chartData = {
+    labels: weekLabels,
+    datasets: [
+      {
+        label: 'Tâches terminées',
+        data: weekData,
+        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+        borderRadius: 6,
+      },
+    ],
+  };
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { enabled: true },
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: { beginAtZero: true, grid: { color: '#e5e7eb' } },
+    },
+  };
 
   // Helpers pour badges
   const getStatusBadge = (status) => {
@@ -64,15 +96,68 @@ function Show({ project, tasks = [] }) {
 
   return (
     <>
-      <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-        {/* Contenu principal */}
-        <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-          <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
-            {/* Header section */}
-            <div className="flex items-center gap-3 mb-8">
-              <FaProjectDiagram className="text-3xl text-blue-600" />
-              <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail du projet</h1>
+      <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 overflow-x-hidden">
+        {/* Header sticky */}
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800 shadow">
+          <div className="max-w-7xl mx-auto flex items-center gap-3 py-4 px-4">
+            <FaProjectDiagram className="text-3xl text-blue-600" />
+            <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail du projet</h1>
+          </div>
+        </header>
+        <main className="w-full flex flex-col items-center px-2 md:px-0">
+          {/* Actions en haut */}
+          <div className="w-full max-w-7xl mt-8 mb-8">
+            <div className="bg-white dark:bg-gray-800 shadow p-6 border border-blue-100 dark:border-gray-800 mb-8">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center items-center">
+                {(isAdmin || isManager) && (
+                  <Link
+                    href={`/project-users/${project.id}/edit`}
+                    className="w-full sm:w-auto bg-blue-100 hover:bg-blue-200 text-blue-800 px-6 py-3 font-semibold transition flex items-center justify-center gap-2 border border-blue-200 dark:border-blue-800"
+                  >
+                    <FaUsers /> Ajouter un membre
+                  </Link>
+                )}
+                {(isAdmin || isManager) && (
+                  <Link
+                    href={`/tasks/create?project_id=${project.id}`}
+                    className="w-full sm:w-auto bg-green-100 hover:bg-green-200 text-green-800 px-6 py-3 font-semibold transition flex items-center justify-center gap-2 border border-green-200 dark:border-green-800"
+                  >
+                    <FaTasks /> Créer une tâche
+                  </Link>
+                )}
+                {(isAdmin || isManager) && (
+                  <Link
+                    href={`/sprints/create?project_id=${project.id}`}
+                    className="w-full sm:w-auto bg-purple-100 hover:bg-purple-200 text-purple-800 px-6 py-3 font-semibold transition flex items-center justify-center gap-2 border border-purple-200 dark:border-purple-800"
+                  >
+                    <FaClipboardList /> Créer un sprint
+                  </Link>
+                )}
+                <Link
+                  href={`/projects/${project.id}/edit`}
+                  className="w-full sm:w-auto bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-6 py-3 font-semibold transition flex items-center justify-center gap-2 border border-yellow-200 dark:border-yellow-800"
+                >
+                  <FaEdit /> Modifier le projet
+                </Link>
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowDeleteModal(true)}
+                    className="w-full sm:w-auto bg-red-100 hover:bg-red-200 text-red-800 px-6 py-3 font-semibold transition flex items-center justify-center gap-2 border border-red-200 dark:border-red-800"
+                  >
+                    <FaTrash /> Supprimer le projet
+                  </button>
+                )}
+                <Link
+                  href="/projects"
+                  className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 font-semibold transition flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700"
+                >
+                  <FaArrowLeft /> Retour à la liste
+                </Link>
+              </div>
             </div>
+          </div>
+          <div className="w-full max-w-7xl">
+            {/* Header section supprimé (doublon) */}
 
             {flash.success && (
               <div className="mb-6 px-4 py-3 rounded-lg bg-green-100 text-green-800 font-semibold">
@@ -81,9 +166,9 @@ function Show({ project, tasks = [] }) {
             )}
 
             {/* Informations du projet */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
               {/* Carte principale du projet */}
-              <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <div className="lg:col-span-2 bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
                     <FaProjectDiagram className="text-blue-600 dark:text-blue-200 text-xl" />
@@ -113,7 +198,7 @@ function Show({ project, tasks = [] }) {
               </div>
 
               {/* Carte des membres */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-blue-100 dark:border-gray-800">
                 <h3 className="text-lg font-bold text-blue-700 dark:text-blue-200 mb-4 flex items-center gap-2">
                   <FaUserFriends /> Membres ({project.users?.length || 0})
                 </h3>
@@ -140,7 +225,7 @@ function Show({ project, tasks = [] }) {
             </div>
 
             {/* Tâches du projet */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+            <div className="bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800 mb-10">
               <h3 className="text-xl font-bold text-blue-700 dark:text-blue-200 mb-6 flex items-center gap-2">
                 <FaTasks /> Tâches rattachées ({tasks.length})
               </h3>
@@ -204,32 +289,103 @@ function Show({ project, tasks = [] }) {
                 </div>
               )}
             </div>
-
-            {/* Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                <Link 
-                  href={`/projects/${project.id}/edit`}
-                  className="w-full sm:w-auto bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
-                >
-                  <FaEdit /> Modifier le projet
-                </Link>
-                <button
-                  onClick={() => setShowDeleteModal(true)}
-                  className="w-full sm:w-auto bg-red-100 hover:bg-red-200 text-red-800 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
-                >
-                  <FaTrash /> Supprimer le projet
-                </button>
-                <Link 
-                  href="/projects"
-                  className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
-                >
-                  <FaArrowLeft /> Retour à la liste
-                </Link>
-              </div>
-            </div>
           </div>
         </main>
+      </div>
+
+      {/* Statistiques et graphique */}
+      <div className="max-w-7xl mx-auto mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+          <div className="bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800 flex flex-col items-center">
+            <FaCheckCircle className="text-green-500 text-3xl mb-2" />
+            <div className="text-2xl font-bold">{stats.doneTasksCount ?? 0}</div>
+            <div className="text-gray-500 text-sm">Tâches terminées</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800 flex flex-col items-center">
+            <FaFileAlt className="text-blue-500 text-3xl mb-2" />
+            <div className="text-2xl font-bold">{stats.filesCount ?? 0}</div>
+            <div className="text-gray-500 text-sm">Fichiers</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800 flex flex-col items-center">
+            <FaCommentDots className="text-purple-500 text-3xl mb-2" />
+            <div className="text-2xl font-bold">{stats.commentsCount ?? 0}</div>
+            <div className="text-gray-500 text-sm">Commentaires</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800 flex flex-col items-center">
+            <FaUsers className="text-yellow-500 text-3xl mb-2" />
+            <div className="text-2xl font-bold">{project.users?.length ?? 0}</div>
+            <div className="text-gray-500 text-sm">Membres</div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800 mb-10">
+          <h3 className="text-lg font-bold text-blue-700 dark:text-blue-200 mb-4 flex items-center gap-2">
+            <FaChartLine /> Tendance des tâches terminées
+          </h3>
+          <div className="w-full h-64">
+            <Bar data={chartData} options={chartOptions} height={250} />
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800 mb-10">
+          <h3 className="text-lg font-bold text-blue-700 dark:text-blue-200 mb-4 flex items-center gap-2">
+            <FaUsers /> Tâches terminées par membre
+          </h3>
+          <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+            {project.users?.map(user => {
+              const userDoneTasks = tasks.filter(t => t.status === 'done' && t.assigned_to === user.id);
+              return (
+                <li key={user.id} className="flex flex-col md:flex-row md:items-center justify-between py-2 gap-2">
+                  <span className="flex items-center gap-2 min-w-[180px]">
+                    <img src={user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`} alt={user.name} className="w-7 h-7 rounded-full border" />
+                    <span className="font-semibold text-gray-700 dark:text-gray-200">{user.name}</span>
+                  </span>
+                  <span className="flex-1 flex flex-wrap gap-2 items-center">
+                    {userDoneTasks.length > 0 ? userDoneTasks.map(t => (
+                      <span key={t.id} className="inline-flex items-center px-2 py-1 bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 text-xs rounded border border-green-200 dark:border-green-700">
+                        <FaCheckCircle className="mr-1 text-green-500" /> {t.title}
+                      </span>
+                    )) : <span className="text-gray-400 text-xs">Aucune tâche</span>}
+                  </span>
+                  <span className="text-blue-600 font-bold text-lg min-w-[32px] text-right">{stats.doneTasksByUser?.[user.id] ?? 0}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        <div className="bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800 mb-10">
+          <h3 className="text-lg font-bold text-blue-700 dark:text-blue-200 mb-4 flex items-center gap-2">
+            <FaUsers /> Activités par utilisateur
+          </h3>
+          <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+            {stats.activitiesByUser?.length > 0 ? stats.activitiesByUser.map(a => {
+              const user = project.users?.find(u => u.id === a.user_id);
+              return user ? (
+                <li key={user.id} className="flex items-center justify-between py-2">
+                  <span className="flex items-center gap-2">
+                    <img src={user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`} alt={user.name} className="w-7 h-7 rounded-full border" />
+                    <span className="font-semibold text-gray-700 dark:text-gray-200">{user.name}</span>
+                  </span>
+                  <span className="text-green-600 font-bold text-lg">{a.count}</span>
+                </li>
+              ) : null;
+            }) : <li className="text-gray-400">Aucune activité enregistrée</li>}
+          </ul>
+        </div>
+        <div className="bg-white dark:bg-gray-800 shadow p-8 border border-blue-100 dark:border-gray-800 mb-10">
+          <h3 className="text-lg font-bold text-blue-700 dark:text-blue-200 mb-4 flex items-center gap-2">
+            <FaCheckCircle /> Liste des tâches terminées
+          </h3>
+          <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+            {tasks.filter(t => t.status === 'done').length === 0 && (
+              <li className="text-gray-400">Aucune tâche terminée</li>
+            )}
+            {tasks.filter(t => t.status === 'done').map(t => (
+              <li key={t.id} className="py-2 flex items-center gap-2">
+                <FaCheckCircle className="text-green-500" />
+                <span className="font-semibold text-gray-700 dark:text-gray-200">{t.title}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
       {/* Modal de confirmation de suppression */}

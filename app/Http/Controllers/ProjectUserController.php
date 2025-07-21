@@ -8,6 +8,8 @@ use App\Models\User;
 use Inertia\Inertia;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Notifications\UserActionMailNotification;
+use Illuminate\Support\Facades\Notification;
 
 class ProjectUserController extends Controller
 {
@@ -63,7 +65,35 @@ class ProjectUserController extends Controller
         $project = Project::findOrFail($validated['project_id']);
         $this->authorize('manageMembers', $project);
         $project->users()->attach($validated['user_id'], ['role' => $validated['role']]);
-        return redirect()->route('project-users.index');
+
+        // Notifier le membre ajouté et les autres membres en arrière-plan
+        $addedUser = User::find($validated['user_id']);
+        $subject = 'Vous avez été ajouté au projet : ' . $project->name;
+        $message = 'Bonjour ' . $addedUser->name . ',<br>Vous avez été ajouté au projet <b>' . $project->name . '</b> en tant que <b>' . $validated['role'] . '</b>.';
+        $actionUrl = url('/projects/' . $project->id);
+        $actionText = 'Voir le projet';
+        $addedUserNotif = new UserActionMailNotification($subject, $message, $actionUrl, $actionText, [
+            'project_id' => $project->id,
+        ]);
+        $otherMembers = $project->users()->where('users.id', '!=', $addedUser->id)->get();
+        $otherNotifs = [];
+        foreach ($otherMembers as $member) {
+            $subject = 'Nouveau membre ajouté au projet : ' . $project->name;
+            $message = 'Bonjour ' . $member->name . ',<br>Le membre <b>' . $addedUser->name . '</b> a été ajouté au projet <b>' . $project->name . '</b>.';
+            $otherNotifs[] = [
+                'user' => $member,
+                'notif' => new UserActionMailNotification($subject, $message, $actionUrl, $actionText, [
+                    'project_id' => $project->id,
+                ])
+            ];
+        }
+        // Envoi en file d'attente
+        Notification::send($addedUser, $addedUserNotif);
+        foreach ($otherNotifs as $n) {
+            Notification::send($n['user'], $n['notif']);
+        }
+
+        return redirect()->route('project-users.index')->with('success', 'Membre ajouté et notifications envoyées.');
     }
 
     /**

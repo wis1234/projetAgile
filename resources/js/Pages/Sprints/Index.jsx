@@ -39,7 +39,7 @@ function Index({ sprints, filters }) {
           )}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
-              <FaFlagCheckered className="text-3xl text-green-600" />
+              <FaFlagCheckered className="text-3xl text-blue-600" />
               <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Sprints</h1>
             </div>
             <div className="flex gap-2 w-full md:w-auto">
@@ -55,14 +55,14 @@ function Index({ sprints, filters }) {
                   <FaSearch />
                 </button>
               </form>
-              <Link href="/sprints/create" className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded font-semibold shadow whitespace-nowrap">
+              <Link href="/sprints/create" className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow whitespace-nowrap">
                 <FaPlus /> Nouveau sprint
               </Link>
             </div>
           </div>
           <div className="overflow-x-auto rounded-lg shadow bg-white dark:bg-gray-800 mb-8">
             <table className="min-w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-gradient-to-r from-green-100 to-green-300 dark:from-green-900 dark:to-green-700 shadow">
+              <thead className="sticky top-0 z-10 bg-white dark:bg-gray-800 shadow">
                 <tr>
                   <th className="p-3 text-left font-bold">Sprint</th>
                   <th className="p-3 text-left font-bold">Projet</th>
@@ -80,12 +80,12 @@ function Index({ sprints, filters }) {
                 ) : sprints.data.map(sprint => (
                   <tr
                     key={sprint.id}
-                    className="hover:bg-green-50 dark:hover:bg-green-900 transition group cursor-pointer"
+                    className="hover:bg-blue-50 dark:hover:bg-blue-900 transition group cursor-pointer"
                     onClick={() => window.location.href = `/sprints/${sprint.id}`}
                     tabIndex={0}
                     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') window.location.href = `/sprints/${sprint.id}`; }}
                   >
-                    <td className="p-3 align-middle font-semibold text-green-700 dark:text-green-200 flex items-center gap-2 group-hover:text-green-800 dark:group-hover:text-green-100">
+                    <td className="p-3 align-middle font-semibold text-blue-700 dark:text-blue-200 flex items-center gap-2 group-hover:text-blue-800 dark:group-hover:text-blue-100">
                       <FaFlagCheckered /> {sprint.name}
                     </td>
                     <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{sprint.project?.name || '-'}</td>

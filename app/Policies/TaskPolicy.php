@@ -36,6 +36,11 @@ class TaskPolicy
             || $task->assigned_to == $user->id;
     }
 
+    public function create(User $user)
+    {
+        return $user !== null;
+    }
+
     public function uploadFile(User $user, Task $task)
     {
         return $this->comment($user, $task);

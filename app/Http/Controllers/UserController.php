@@ -8,6 +8,7 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -22,7 +23,15 @@ class UserController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
+        $currentUser = Auth::user();
         $query = User::query();
+        if (!$currentUser->hasRole('admin')) {
+            $projectIds = $currentUser->projects()->pluck('projects.id');
+            $userIds = DB::table('project_user')
+                ->whereIn('project_id', $projectIds)
+                ->pluck('user_id');
+            $query->whereIn('id', $userIds);
+        }
         if ($request->search) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -35,7 +44,7 @@ class UserController extends Controller
         return Inertia::render('Users/Index', [
             'users' => $users,
             'filters' => $request->only('search'),
-            'auth' => Auth::user(),
+            'auth' => $currentUser,
             'roles' => $roles,
         ]);
     }

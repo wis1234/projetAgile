@@ -7,6 +7,7 @@ function Show({ user, auth }) {
   // Correction : on récupère bien l'utilisateur connecté
   const { flash = {}, auth: currentAuth } = usePage().props;
   const userAuth = auth?.user || auth;
+  const isAdmin = userAuth && userAuth.role === 'admin';
   const canEdit = userAuth && (userAuth.role === 'admin' || userAuth.id === user.id);
   const canAssignRole = userAuth && userAuth.email === 'ronaldoagbohou@gmail.com';
   const [role, setRole] = React.useState(user.role || 'user');
@@ -48,7 +49,9 @@ function Show({ user, auth }) {
           {flash.success && <div className="mb-6 px-4 py-3 rounded bg-green-100 text-green-800 font-semibold shadow w-full text-center">{flash.success}</div>}
           <img src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} alt={user.name} className="w-24 h-24 rounded-full border-4 border-blue-200 shadow mb-4" />
           <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 flex items-center gap-2 mb-1"><FaUser /> {user.name}</h1>
-          <div className="text-gray-500 dark:text-gray-400 text-lg mb-4">{user.email}</div>
+          {isAdmin && (
+            <div className="text-gray-500 dark:text-gray-400 text-lg mb-4">{user.email}</div>
+          )}
           <div className="mb-6 w-full flex flex-col items-center md:items-start">
             <span className="font-semibold">Projets :</span>
             {user.projects && user.projects.length > 0 ? (
