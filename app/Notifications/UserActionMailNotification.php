@@ -44,19 +44,15 @@ class UserActionMailNotification extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $main = '<div style="font-size:1.1rem;color:#334155;margin-bottom:24px;">' . $this->message . '</div>';
+        if ($this->actionUrl && $this->actionText) {
+            $main .= '<div style="text-align:center;margin:32px 0;">
+                <a href="' . $this->actionUrl . '" style="display:inline-block;padding:12px 32px;background:#2563eb;color:#fff;border-radius:8px;font-weight:bold;text-decoration:none;font-size:1rem;">' . $this->actionText . '</a>
+            </div>';
+        }
         $mail = (new MailMessage)
             ->subject($this->subject)
-            ->greeting('Hello!')
-            ->line(new \Illuminate\Support\HtmlString($this->message))
-            ->when($this->actionUrl && $this->actionText, function($mail) {
-                return $mail->action($this->actionText, $this->actionUrl);
-            })
-            ->line('Regards,')
-            ->line('ProjA');
-        if ($this->actionUrl && $this->actionText) {
-            $mail->line('If you\'re having trouble clicking the "' . $this->actionText . '" button, copy and paste the URL below into your web browser:')
-                ->line($this->actionUrl);
-        }
+            ->line(new \Illuminate\Support\HtmlString($main));
         return $mail;
     }
 
