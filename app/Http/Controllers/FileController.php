@@ -267,7 +267,13 @@ class FileController extends Controller
         if (!$file->file_path || \Storage::disk('public')->exists($file->file_path) === false) {
             abort(404, 'Fichier non trouvé');
         }
-        return response()->download(storage_path('app/public/' . $file->file_path), $file->name);
+        // Ensure the download filename has the correct extension
+        $extension = pathinfo($file->file_path, PATHINFO_EXTENSION);
+        $filename = $file->name;
+        if ($extension && !str_ends_with($filename, '.' . $extension)) {
+            $filename .= '.' . $extension;
+        }
+        return response()->download(storage_path('app/public/' . $file->file_path), $filename);
     }
 
     /**

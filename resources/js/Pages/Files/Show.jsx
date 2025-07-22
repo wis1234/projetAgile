@@ -3,6 +3,7 @@ import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
 import { FaFileAlt, FaClock, FaCommentDots, FaTrash } from 'react-icons/fa';
+import { route } from 'ziggy-js';
 
 export default function Show({ file, canUpdateStatus, statuses }) {
     const { flash = {} } = usePage().props;
@@ -247,9 +248,9 @@ export default function Show({ file, canUpdateStatus, statuses }) {
                       </div>
                     )}
                     <div className="flex gap-2 mt-6">
-                        <Link href={route('files.download', file.id)} target="_blank" rel="noopener noreferrer">
+                        <a href={route('files.download', file.id)}>
                           <ActionButton variant="primary">Télécharger</ActionButton>
-                        </Link>
+                        </a>
                         {file.type && file.type.startsWith('image/') && (
                           <a href={fileUrl} target="_blank" rel="noopener noreferrer">
                             <ActionButton variant="info">Prévisualiser</ActionButton>

@@ -70,7 +70,14 @@ class TaskController extends Controller
             'sprint_id' => 'required|exists:sprints,id',
             'assigned_to' => 'required|exists:users,id',
             'status' => 'required|in:todo,in_progress,done',
+            'description' => 'nullable|string',
+            'due_date' => 'nullable|date',
+            'priority' => 'nullable|string',
         ]);
+        // Valeurs par défaut si non renseignées
+        $validated['description'] = $request->input('description', '');
+        $validated['due_date'] = $request->input('due_date', null);
+        $validated['priority'] = $request->input('priority', '');
         $task = Task::create($validated);
 
         // Notifier l'utilisateur assigné

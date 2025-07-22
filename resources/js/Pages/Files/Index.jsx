@@ -118,6 +118,7 @@ export default function Index({ files, filters }) {
                                     <th className="p-2 md:p-3 text-left font-bold">Taille</th>
                                     <th className="p-2 md:p-3 text-left font-bold">Statut</th>
                                     <th className="p-2 md:p-3 text-left font-bold">Date</th>
+                                    <th className="p-2 md:p-3 text-left font-bold">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -159,6 +160,15 @@ export default function Index({ files, filters }) {
                                             <td className="p-2 md:p-3 align-middle"><span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></td>
                                             <td className="p-2 md:p-3 align-middle">{statusBadge}</td>
                                             <td className="p-2 md:p-3 align-middle"><span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></td>
+                                            <td className="p-2 md:p-3 align-middle text-center" onClick={e => e.stopPropagation()}>
+                                                <a
+                                                    href={route('files.download', { file: file.id })}
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                    title="Télécharger le fichier"
+                                                >
+                                                    <FaDownload />
+                                                </a>
+                                            </td>
                                         </tr>
                                     );
                                 })}
