@@ -148,106 +148,14 @@ export default function Show({ file, canUpdateStatus, statuses }) {
     );
 
     return (
-        <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-                <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
-                    <div className="flex items-center gap-3 mb-8">
+        <div className="flex flex-col w-full bg-white dark:bg-gray-900 p-0 m-0">
+            <div className="flex flex-col h-full w-full max-w-7xl mx-auto pt-4 bg-white dark:bg-gray-900">
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
                         <FaFileAlt className="text-3xl text-blue-600" />
                         <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail du fichier</h1>
                     </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
-                        <div className="mb-4 flex flex-col gap-2">
-                            <div><span className="font-semibold">Nom :</span> <span className="text-blue-800 dark:text-blue-200">{file.name}</span></div>
-                            <div><span className="font-semibold">Projet :</span> {file.project?.name || <span className="text-gray-400">-</span>}</div>
-                            <div><span className="font-semibold">Tâche :</span> {file.task?.title || <span className="text-gray-400">-</span>}</div>
-                            <div><span className="font-semibold">Utilisateur :</span> {file.user?.name || <span className="text-gray-400">-</span>}</div>
-                            <div><span className="font-semibold">Taille :</span> <span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></div>
-                            <div><span className="font-semibold">Statut :</span> {statusBadge}</div>
-                            <div><span className="font-semibold">Date :</span> <span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></div>
-                            {file.description && <div><span className="font-semibold">Description :</span> <span className="italic text-gray-600 dark:text-gray-300">{file.description}</span></div>}
-                        </div>
-                        {canUpdateStatus && (
-                            <form onSubmit={handleSubmit} className="mb-4 p-4 bg-gray-50 dark:bg-gray-900 rounded shadow">
-                                <div className="mb-2">
-                                    <label className="font-semibold">Changer le statut :</label>
-                                    <select value={status} onChange={handleStatusChange} className="ml-2 px-2 py-1 rounded border">
-                                        {statuses.map(s => (
-                                            <option key={s} value={s}>{s}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                {status === 'rejected' && (
-                                    <div className="mb-2">
-                                        <label className="font-semibold">Motif du rejet :</label>
-                                        <input type="text" value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} className="ml-2 px-2 py-1 rounded border w-2/3" required={status === 'rejected'} />
-                                    </div>
-                                )}
-                                <button type="submit" className="mt-2" disabled={loading}>
-                                  <ActionButton variant="primary" type="submit" disabled={loading}>{loading ? 'Enregistrement...' : 'Enregistrer'}</ActionButton>
-                                </button>
-                            </form>
-                        )}
-                    </div>
-                    {/* Section Commentaires */}
-                    {isProjectMember && (
-                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
-                          <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-blue-700 dark:text-blue-200"><FaCommentDots /> Commentaires</h2>
-                          {loadingComments ? (
-                              <div className="text-gray-400">Chargement des commentaires...</div>
-                          ) : (
-                              <div>
-                                  {comments.length === 0 ? (
-                                      <div className="text-gray-400 italic">Aucun commentaire pour l'instant.</div>
-                                  ) : (
-                                      <ul className="space-y-4 mb-6">
-                                          {comments.map(comment => (
-                                              <li key={comment.id} className="bg-blue-50 dark:bg-blue-900 rounded p-3 shadow flex gap-3">
-                                                  <img src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}`} alt={comment.user?.name} className="w-8 h-8 rounded-full border-2 border-blue-200" />
-                                                  <div className="flex-1">
-                                                      <div className="font-semibold text-blue-800 dark:text-blue-200">{comment.user?.name}</div>
-                                                      <div className="text-gray-600 dark:text-gray-300 text-sm mb-1">{new Date(comment.created_at).toLocaleString()}</div>
-                                                      {editingId === comment.id ? (
-                                                          <form onSubmit={handleUpdateComment} className="flex flex-col gap-2">
-                                                              <textarea value={editContent} onChange={e => setEditContent(e.target.value)} className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400" required maxLength={2000} />
-                                                              <div className="flex gap-2">
-                                                                  <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">Enregistrer</button>
-                                                                  <button type="button" className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded" onClick={() => setEditingId(null)}>Annuler</button>
-                                                              </div>
-                                                          </form>
-                                                      ) : (
-                                                          <div className="text-gray-900 dark:text-gray-100">{comment.content}</div>
-                                                      )}
-                                                  </div>
-                                                  {comment.user?.id === auth.user.id && editingId !== comment.id && (
-                                                      <div className="flex flex-col gap-1 ml-2">
-                                                          <button onClick={() => handleEditComment(comment)} className="text-xs text-yellow-700 hover:underline">Éditer</button>
-                                                          <button onClick={() => handleDeleteComment(comment.id)} className="text-xs text-red-600 hover:underline">Supprimer</button>
-                                                      </div>
-                                                  )}
-                                              </li>
-                                          ))}
-                                      </ul>
-                                  )}
-                                  <form onSubmit={handleCommentSubmit} className="flex flex-col gap-2">
-                                      <textarea
-                                          value={commentContent}
-                                          onChange={e => setCommentContent(e.target.value)}
-                                          placeholder="Ajouter un commentaire..."
-                                          className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400"
-                                          disabled={posting}
-                                          required
-                                          maxLength={2000}
-                                      />
-                                      {error && <div className="text-red-500 text-sm">{error}</div>}
-                                      <button type="submit" className="self-end bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow flex items-center gap-2" disabled={posting || !commentContent.trim()}>
-                                          {posting ? 'Envoi...' : 'Commenter'}
-                                      </button>
-                                  </form>
-                              </div>
-                          )}
-                      </div>
-                    )}
-                    <div className="flex gap-2 mt-6">
+                    <div className="flex gap-2">
                         <a href={route('files.download', file.id)}>
                           <ActionButton variant="primary">Télécharger</ActionButton>
                         </a>
@@ -266,13 +174,106 @@ export default function Show({ file, canUpdateStatus, statuses }) {
                           <ActionButton variant="default">Retour</ActionButton>
                         </Link>
                     </div>
-                    {file.type && file.type.startsWith('image/') && (
-                      <div className="mt-6">
-                        <img src={fileUrl} alt={file.name} className="max-w-full rounded shadow" />
-                      </div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
+                    <div className="mb-4 flex flex-col gap-2">
+                        <div><span className="font-semibold">Nom :</span> <span className="text-blue-800 dark:text-blue-200">{file.name}</span></div>
+                        <div><span className="font-semibold">Projet :</span> {file.project?.name || <span className="text-gray-400">-</span>}</div>
+                        <div><span className="font-semibold">Tâche :</span> {file.task?.title || <span className="text-gray-400">-</span>}</div>
+                        <div><span className="font-semibold">Utilisateur :</span> {file.user?.name || <span className="text-gray-400">-</span>}</div>
+                        <div><span className="font-semibold">Taille :</span> <span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></div>
+                        <div><span className="font-semibold">Statut :</span> {statusBadge}</div>
+                        <div><span className="font-semibold">Date :</span> <span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></div>
+                        {file.description && <div><span className="font-semibold">Description :</span> <span className="italic text-gray-600 dark:text-gray-300">{file.description}</span></div>}
+                    </div>
+                    {canUpdateStatus && (
+                        <form onSubmit={handleSubmit} className="mb-4 p-4 bg-gray-50 dark:bg-gray-900 rounded shadow">
+                            <div className="mb-2">
+                                <label className="font-semibold">Changer le statut :</label>
+                                <select value={status} onChange={handleStatusChange} className="ml-2 px-2 py-1 rounded border">
+                                    {statuses.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {status === 'rejected' && (
+                                <div className="mb-2">
+                                    <label className="font-semibold">Motif du rejet :</label>
+                                    <input type="text" value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} className="ml-2 px-2 py-1 rounded border w-2/3" required={status === 'rejected'} />
+                                </div>
+                            )}
+                            <button type="submit" className="mt-2" disabled={loading}>
+                              <ActionButton variant="primary" type="submit" disabled={loading}>{loading ? 'Enregistrement...' : 'Enregistrer'}</ActionButton>
+                            </button>
+                        </form>
                     )}
                 </div>
-            </main>
+                {/* Section Commentaires */}
+                {isProjectMember && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
+                      <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-blue-700 dark:text-blue-200"><FaCommentDots /> Commentaires</h2>
+                      {loadingComments ? (
+                          <div className="text-gray-400">Chargement des commentaires...</div>
+                      ) : (
+                          <div>
+                              {comments.length === 0 ? (
+                                  <div className="text-gray-400 italic">Aucun commentaire pour l'instant.</div>
+                              ) : (
+                                  <ul className="space-y-4 mb-6">
+                                      {comments.map(comment => (
+                                          <li key={comment.id} className="bg-blue-50 dark:bg-blue-900 rounded p-3 shadow flex gap-3">
+                                              <img src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}`} alt={comment.user?.name} className="w-8 h-8 rounded-full border-2 border-blue-200" />
+                                              <div className="flex-1">
+                                                  <div className="font-semibold text-blue-800 dark:text-blue-200">{comment.user?.name}</div>
+                                                  <div className="text-gray-600 dark:text-gray-300 text-sm mb-1">{new Date(comment.created_at).toLocaleString()}</div>
+                                                  {editingId === comment.id ? (
+                                                      <form onSubmit={handleUpdateComment} className="flex flex-col gap-2">
+                                                          <textarea value={editContent} onChange={e => setEditContent(e.target.value)} className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400" required maxLength={2000} />
+                                                          <div className="flex gap-2">
+                                                              <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">Enregistrer</button>
+                                                              <button type="button" className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded" onClick={() => setEditingId(null)}>Annuler</button>
+                                                          </div>
+                                                      </form>
+                                                  ) : (
+                                                      <div className="text-gray-900 dark:text-gray-100">{comment.content}</div>
+                                                  )}
+                                              </div>
+                                              {comment.user?.id === auth.user.id && editingId !== comment.id && (
+                                                  <div className="flex flex-col gap-1 ml-2">
+                                                      <button onClick={() => handleEditComment(comment)} className="text-xs text-yellow-700 hover:underline">Éditer</button>
+                                                      <button onClick={() => handleDeleteComment(comment.id)} className="text-xs text-red-600 hover:underline">Supprimer</button>
+                                                  </div>
+                                              )}
+                                          </li>
+                                      ))}
+                                  </ul>
+                              )}
+                              <form onSubmit={handleCommentSubmit} className="flex flex-col gap-2">
+                                  <textarea
+                                      value={commentContent}
+                                      onChange={e => setCommentContent(e.target.value)}
+                                      placeholder="Ajouter un commentaire..."
+                                      className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400"
+                                      disabled={posting}
+                                      required
+                                      maxLength={2000}
+                                  />
+                                  {error && <div className="text-red-500 text-sm">{error}</div>}
+                                  <button type="submit" className="self-end bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow flex items-center gap-2" disabled={posting || !commentContent.trim()}>
+                                      {posting ? 'Envoi...' : 'Commenter'}
+                                  </button>
+                              </form>
+                          </div>
+                      )}
+                  </div>
+                )}
+                
+                {file.type && file.type.startsWith('image/') && (
+                  <div className="mt-6">
+                    <img src={fileUrl} alt={file.name} className="max-w-full rounded shadow" />
+                  </div>
+                )}
+            </div>
         </div>
     );
 }
