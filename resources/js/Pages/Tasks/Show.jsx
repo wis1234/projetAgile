@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload } from 'react-icons/fa';
+
 
 export default function Show({ task }) {
   const { auth } = usePage().props;
@@ -94,9 +95,8 @@ export default function Show({ task }) {
   };
 
   return (
-    <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
-      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
-        <div className="flex flex-col w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
+    <div className="flex flex-col w-full bg-white dark:bg-gray-900 p-0 m-0">
+        <div className="flex flex-col w-full max-w-7xl mx-auto pt-4 bg-white dark:bg-gray-900">
           <div className="flex items-center gap-3 mb-8">
             <FaTasks className="text-3xl text-blue-600" />
             <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail de la tâche</h1>
@@ -132,21 +132,8 @@ export default function Show({ task }) {
               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><span className="font-semibold">Titre :</span> {task.title}</div>
                 <div><span className="font-semibold">Projet :</span> <span className="inline-flex items-center gap-1"><FaProjectDiagram className="text-blue-500" /> {task.project ? <Link href={`/projects/${task.project.id}`} className="underline hover:text-blue-800">{task.project.name}</Link> : <span className="italic text-gray-400">Aucun</span>}</span></div>
-                <div><span className="font-semibold">Sprint :</span> <span className="inline-flex items-center gap-1"><FaFlagCheckered className="text-blue-600" /> {
-                  task.sprint ? (
-                    <Link href={`/sprints/${task.sprint.id}`} className="underline hover:text-blue-800">{task.sprint.name}</Link>
-                  ) : task.sprint_id ? (
-                    <Link href={`/sprints/${task.sprint_id}`} className="underline hover:text-blue-800">Sprint #{task.sprint_id}</Link>
-                  ) : (
-                    <span className="italic text-gray-400">Aucun</span>
-                  )
-                }</span></div>
-                <div><span className="font-semibold">Statut :</span> {
-                  task.status === 'todo' ? <span className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">À faire</span> :
-                  task.status === 'in_progress' ? <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">En cours</span> :
-                  task.status === 'done' ? <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">Terminé</span> :
-                  <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-500 text-xs font-bold">{task.status}</span>
-                }</div>
+                <div><span className="font-semibold">Sprint :</span> <span className="inline-flex items-center gap-1"><FaFlagCheckered className="text-blue-600" /> {task.sprint ? <Link href={`/sprints/${task.sprint.id}`} className="underline hover:text-blue-800">{task.sprint.name}</Link> : <span className="italic text-gray-400">Aucun</span>}</span></div>
+                <div><span className="font-semibold">Statut :</span> {getStatusBadge(task.status)}</div>
                 <div><span className="font-semibold">Priorité :</span> {getPriorityBadge(task.priority)}</div>
                 <div><span className="font-semibold">Date d'échéance :</span> {task.due_date ? new Date(task.due_date).toLocaleDateString() : <span className="italic text-gray-400">Non définie</span>}</div>
                 <div><span className="font-semibold">Créée le :</span> {task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A'}</div>
@@ -160,6 +147,36 @@ export default function Show({ task }) {
               )}
               <Link href="/tasks" className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-5 py-3 rounded font-semibold flex items-center gap-2 transition"><FaArrowLeft /> Retour à la liste</Link>
             </div>
+          </div>
+
+          {/* Section Ressources */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
+            <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-blue-700 dark:text-blue-200"><FaFileUpload /> Ressources</h2>
+                {task.files && task.files.length > 0 ? (
+                  <ul className="space-y-3">
+                    {task.files.map(file => (
+                      <li key={file.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 p-3 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition" onClick={() => window.location.href = `/files/${file.id}`}>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-semibold text-blue-600">{file.name}</div>
+                            {file.user && (file.user.role === 'manager' || file.user.role === 'admin') ? (
+                              <span className="inline-block bg-green-200 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full">Manager/Admin</span>
+                            ) : (
+                              <span className="inline-block bg-blue-200 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">Membre</span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500">{file.description || <span className="italic text-gray-400">Aucune description</span>}</div>
+                          <div className="text-sm text-gray-500">{file.size} bytes</div>
+                        </div>
+                        <a href={`/files/${file.id}/download`} onClick={e => e.stopPropagation()} className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-100 transition">
+                          <FaDownload />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+              <p className="text-gray-500 italic">Aucun fichier rattaché à cette tâche.</p>
+            )}
           </div>
           {/* Section Commentaires */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
@@ -219,7 +236,6 @@ export default function Show({ task }) {
             )}
           </div>
         </div>
-      </main>
     </div>
   );
 }

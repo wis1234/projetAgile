@@ -62,6 +62,9 @@ class FileController extends Controller
             'users' => $users,
             'tasks' => $tasks,
             'kanbans' => $kanbans,
+            'auth' => [
+                'user' => $currentUser->only('id', 'name')
+            ]
         ]);
     }
 
@@ -139,7 +142,7 @@ class FileController extends Controller
      */
     public function show(File $file)
     {
-        $file->load(['project', 'user']);
+        $file->load(['project', 'user', 'task']);
         $user = auth()->user();
         if (!$file->project || !$file->project->isMember($user)) {
             return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);

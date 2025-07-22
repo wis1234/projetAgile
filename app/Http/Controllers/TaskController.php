@@ -113,7 +113,7 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
-        $task->load(['project', 'sprint', 'assignedUser']);
+        $task->load(['project', 'sprint', 'assignedUser', 'files']);
         return Inertia::render('Tasks/Show', ['task' => $task]);
     }
 
