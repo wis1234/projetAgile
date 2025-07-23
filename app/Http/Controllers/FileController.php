@@ -143,12 +143,10 @@ class FileController extends Controller
     public function show(File $file)
     {
         $file->load(['project', 'user', 'task']);
-        $user = auth()->user();
-        if (!$file->project || !$file->project->isMember($user)) {
-            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
-        }
         $canUpdateStatus = false;
         $statuses = ['pending', 'validated', 'rejected'];
+        // L'accès est public, mais seuls les managers connectés peuvent mettre à jour le statut
+        $user = auth()->user();
         if ($file->project && $user) {
             $pivot = $file->project->users()->where('user_id', $user->id)->first();
             if ($pivot && $pivot->pivot->role === 'manager') {

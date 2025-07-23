@@ -30,6 +30,31 @@ class FileCommentController extends Controller
             'content' => $request->content,
         ]);
         $comment->load('user');
+
+        // Send email notification to project members except the comment author
+        $file = File::with('project.users')->findOrFail($fileId);
+        $projectUsers = $file->project->users ?? collect();
+        $commentAuthorId = Auth::id();
+        $subject = 'Nouveau commentaire sur un fichier';
+        $message = "Un nouveau commentaire a été ajouté au fichier '{$file->name}' par {$comment->user->name} :\n\n\"{$comment->content}\"";
+        $actionUrl = route('files.show', $file->id);
+        $actionText = 'Voir le commentaire';
+
+        foreach ($projectUsers as $user) {
+            if ($user->id !== $commentAuthorId) {
+                $user->notify(new \App\Notifications\UserActionMailNotification(
+                    $subject,
+                    $message,
+                    $actionUrl,
+                    $actionText,
+                    [
+                        'file_id' => $file->id,
+                        'comment_id' => $comment->id,
+                    ]
+                ));
+            }
+        }
+
         return response()->json($comment, 201);
     }
 

@@ -30,6 +30,31 @@ class TaskCommentController extends Controller
             'content' => $request->content,
         ]);
         $comment->load('user');
+
+        // Send email notification to project members except the comment author
+        $task = \App\Models\Task::with('project.users')->findOrFail($taskId);
+        $projectUsers = $task->project->users ?? collect();
+        $commentAuthorId = Auth::id();
+        $subject = 'Nouveau commentaire sur une tâche';
+        $message = "Un nouveau commentaire a été ajouté à la tâche '{$task->title}' par {$comment->user->name} :\n\n\"{$comment->content}\"";
+        $actionUrl = route('tasks.show', $task->id);
+        $actionText = 'Voir le commentaire';
+
+        foreach ($projectUsers as $user) {
+            if ($user->id !== $commentAuthorId) {
+                $user->notify(new \App\Notifications\UserActionMailNotification(
+                    $subject,
+                    $message,
+                    $actionUrl,
+                    $actionText,
+                    [
+                        'task_id' => $task->id,
+                        'comment_id' => $comment->id,
+                    ]
+                ));
+            }
+        }
+
         return response()->json($comment, 201);
     }
 
