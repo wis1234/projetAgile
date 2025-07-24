@@ -96,4 +96,4 @@ Route::get('/error/500', function () {
 
 require __DIR__.'/auth.php';
 
-Route::get('files/{file}', [App\Http\Controllers\FileController::class, 'show'])->name('files.show.public');
+Route::get('files/{file}', [App\Http\Controllers\FileController::class, 'show'])->name('files.show');

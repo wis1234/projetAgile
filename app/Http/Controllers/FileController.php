@@ -145,14 +145,16 @@ class FileController extends Controller
         $file->load(['project', 'user', 'task']);
         $canUpdateStatus = false;
         $statuses = ['pending', 'validated', 'rejected'];
-        // L'accès est public, mais seuls les managers connectés peuvent mettre à jour le statut
         $user = auth()->user();
+        // Suppression de toute restriction d'accès à la prévisualisation :
+        // Tous les membres du projet peuvent prévisualiser le fichier
         if ($file->project && $user) {
             $pivot = $file->project->users()->where('user_id', $user->id)->first();
             if ($pivot && $pivot->pivot->role === 'manager') {
                 $canUpdateStatus = true;
             }
         }
+        // On ne retourne plus d'erreur 403 pour la prévisualisation
         return Inertia::render('Files/Show', [
             'file' => $file,
             'canUpdateStatus' => $canUpdateStatus,
