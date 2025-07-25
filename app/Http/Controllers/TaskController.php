@@ -114,7 +114,55 @@ class TaskController extends Controller
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
         $task->load(['project', 'sprint', 'assignedUser', 'files']);
-        return Inertia::render('Tasks/Show', ['task' => $task]);
+        $payment = \App\Models\TaskPayment::where('task_id', $task->id)
+            ->where('user_id', auth()->id())
+            ->first();
+        return Inertia::render('Tasks/Show', ['task' => $task, 'payment' => $payment]);
+    }
+
+    public function savePaymentInfo(Request $request, Task $task)
+    {
+        try {
+            $this->authorize('update', $task);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        $validated = $request->validate([
+            'payment_method' => 'required|in:mtn,moov,celtis',
+            'phone_number' => 'required|string|max:20',
+        ]);
+        $payment = \App\Models\TaskPayment::updateOrCreate(
+            ['task_id' => $task->id, 'user_id' => auth()->id()],
+            ['payment_method' => $validated['payment_method'], 'phone_number' => $validated['phone_number'], 'status' => 'pending']
+        );
+        return response()->json($payment);
+    }
+
+    public function validatePayment(Task $task)
+    {
+        try {
+            $this->authorize('admin-only');
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        $payment = \App\Models\TaskPayment::where('task_id', $task->id)->first();
+        if (!$payment) {
+            return response()->json(['message' => 'Payment info not found'], 404);
+        }
+        $payment->status = 'validated';
+        $payment->save();
+
+        // Send notification email to user
+        $user = $payment->user;
+        $subject = 'Paiement validé pour la tâche: ' . $task->title;
+        $message = 'Bonjour ' . $user->name . ',<br>Votre paiement pour la tâche <b>' . $task->title . '</b> a été validé.';
+        $actionUrl = url('/tasks/' . $task->id);
+        $actionText = 'Voir la tâche';
+        $user->notify(new UserActionMailNotification($subject, $message, $actionUrl, $actionText, [
+            'task_id' => $task->id,
+        ]));
+
+        return response()->json(['message' => 'Payment validated']);
     }
 
     public function edit(Task $task)

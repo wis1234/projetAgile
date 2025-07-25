@@ -23,6 +23,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::resource('tasks', App\Http\Controllers\TaskController::class);
+    Route::post('/tasks/{task}/payment', [App\Http\Controllers\TaskController::class, 'savePaymentInfo'])->name('tasks.payment.save');
+    Route::post('/tasks/{task}/payment/validate', [App\Http\Controllers\TaskController::class, 'validatePayment'])->name('tasks.payment.validate');
     Route::get('/kanban', [App\Http\Controllers\KanbanController::class, 'index'])->name('kanban.index');
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
@@ -35,12 +37,27 @@ Route::middleware('auth')->group(function () {
     Route::get('/notifications', function () {
         return auth()->user()->notifications()->orderBy('created_at', 'desc')->limit(20)->get();
     });
-    Route::get('/api/projects/{id}', [\App\Http\Controllers\ProjectController::class, 'apiShow']);
-    Route::get('/api/users/{id}', [\App\Http\Controllers\UserController::class, 'apiShow']);
+    // API endpoints
+    Route::prefix('api')->group(function () {
+        Route::get('/projects/{id}', [\App\Http\Controllers\ProjectController::class, 'apiShow']);
+        Route::get('/users/{id}', [\App\Http\Controllers\UserController::class, 'apiShow']);
+        // Task comments
+        Route::get('/tasks/{task}/comments', [\App\Http\Controllers\TaskCommentController::class, 'index']);
+        Route::post('/tasks/{task}/comments', [\App\Http\Controllers\TaskCommentController::class, 'store']);
+        Route::put('/tasks/{task}/comments/{comment}', [\App\Http\Controllers\TaskCommentController::class, 'update']);
+        Route::delete('/tasks/{task}/comments/{comment}', [\App\Http\Controllers\TaskCommentController::class, 'destroy']);
+        // File comments
+        Route::get('/files/{file}/comments', [\App\Http\Controllers\FileCommentController::class, 'index']);
+        Route::post('/files/{file}/comments', [\App\Http\Controllers\FileCommentController::class, 'store']);
+        Route::put('/files/{file}/comments/{comment}', [\App\Http\Controllers\FileCommentController::class, 'update']);
+        Route::delete('/files/{file}/comments/{comment}', [\App\Http\Controllers\FileCommentController::class, 'destroy']);
+        // Activities notifications
+        Route::get('/activities/notifications', [ActivityController::class, 'notifications']);
+    });
 });
 
+// Utilisateurs (admin only pour création/édition/suppression)
 Route::middleware(['auth'])->group(function () {
-    // Actions réservées aux admins
     Route::middleware('can:admin-only')->group(function () {
         Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
         Route::post('/users', [UserController::class, 'store'])->name('users.store');
@@ -48,45 +65,32 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
     });
-
     // Liste et détail accessibles à tous les utilisateurs connectés
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
     Route::post('/users/{user}/assign-role', [\App\Http\Controllers\UserController::class, 'assignRole'])->name('users.assignRole');
 });
 
+// Activités
 Route::middleware(['auth'])->group(function () {
     Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
     Route::get('/activities/export', [ActivityController::class, 'export'])->name('activities.export');
     Route::get('/activities/{activity}', [ActivityController::class, 'show'])->name('activities.show');
-    Route::get('/api/activities/notifications', [ActivityController::class, 'notifications']);
 });
 
-// Commentaires sur les tâches
-Route::middleware(['auth'])->group(function () {
-    Route::get('/api/tasks/{task}/comments', [\App\Http\Controllers\TaskCommentController::class, 'index']);
-    Route::post('/api/tasks/{task}/comments', [\App\Http\Controllers\TaskCommentController::class, 'store']);
-    Route::delete('/api/tasks/{task}/comments/{comment}', [\App\Http\Controllers\TaskCommentController::class, 'destroy']);
-    Route::put('/api/tasks/{task}/comments/{comment}', [\App\Http\Controllers\TaskCommentController::class, 'update']);
-});
-
-// Commentaires sur les fichiers
-Route::middleware(['auth'])->group(function () {
-    Route::get('/api/files/{file}/comments', [\App\Http\Controllers\FileCommentController::class, 'index']);
-    Route::post('/api/files/{file}/comments', [\App\Http\Controllers\FileCommentController::class, 'store']);
-    Route::delete('/api/files/{file}/comments/{comment}', [\App\Http\Controllers\FileCommentController::class, 'destroy']);
-    Route::put('/api/files/{file}/comments/{comment}', [\App\Http\Controllers\FileCommentController::class, 'update']);
-});
-
+// Rôles (création/suppression)
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/roles/create', [\App\Http\Controllers\UserController::class, 'createRole'])->name('roles.create');
     Route::delete('/roles/{id}/delete', [\App\Http\Controllers\UserController::class, 'destroyRole'])->name('roles.destroy');
 });
 
+// Fichiers : accès direct à la vue
+Route::get('files/{file}', [App\Http\Controllers\FileController::class, 'show'])->name('files.show');
+
+// Pages d'erreur personnalisées
 Route::get('/error/403', function () {
     return Inertia::render('Error403');
 });
-
 Route::get('/error/404', function () {
     return Inertia::render('Error404');
 });
@@ -95,5 +99,3 @@ Route::get('/error/500', function () {
 });
 
 require __DIR__.'/auth.php';
-
-Route::get('files/{file}', [App\Http\Controllers\FileController::class, 'show'])->name('files.show');

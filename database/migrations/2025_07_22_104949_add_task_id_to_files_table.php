@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('files', function (Blueprint $table) {
-            $table->foreignId('task_id')->nullable()->constrained()->onDelete('cascade');
+            if (!Schema::hasColumn('files', 'task_id')) {
+                $table->foreignId('task_id')->nullable()->constrained()->onDelete('cascade');
+            }
         });
     }
 

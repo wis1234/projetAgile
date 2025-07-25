@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
+import Notification from '../../Components/Notification'; // Import the Notification component
 import { FaFileAlt, FaClock, FaCommentDots, FaTrash } from 'react-icons/fa';
 import { route } from 'ziggy-js';
 
@@ -121,19 +122,18 @@ export default function Show({ file, canUpdateStatus, statuses }) {
         }
     };
 
-    const handleDelete = async () => {
-        if (!window.confirm('Supprimer ce fichier ? Cette action est irréversible.')) return;
-        try {
-            await fetch(`/files/${file.id}`, {
-                method: 'DELETE',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+    const handleDelete = () => {
+        if (window.confirm('Supprimer ce fichier ? Cette action est irréversible.')) {
+            router.delete(route('files.destroy', file.id), {
+                onSuccess: () => {
+                    // Optionally, display a success flash message if not handled by backend
+                    // and redirect is handled by Inertia automatically
                 },
+                onError: (errors) => {
+                    console.error('Error deleting file:', errors);
+                    alert('Erreur lors de la suppression du fichier.');
+                }
             });
-            window.location.href = '/files';
-        } catch (e) {
-            alert('Erreur lors de la suppression');
         }
     };
 
@@ -149,6 +149,8 @@ export default function Show({ file, canUpdateStatus, statuses }) {
 
     return (
         <div className="flex flex-col w-full bg-white dark:bg-gray-900 p-0 m-0">
+            {flash.success && <Notification message={flash.success} type="success" />}
+            {flash.error && <Notification message={flash.error} type="error" />}
             <div className="flex flex-col h-full w-full max-w-7xl mx-auto pt-4 bg-white dark:bg-gray-900">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">

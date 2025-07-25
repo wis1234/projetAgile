@@ -198,27 +198,27 @@ export default function Index({ users, filters, roles = [], auth }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {users.data.length === 0 ? (
-                                        <tr>
-                                            <td colSpan="5" className="text-center py-8 text-gray-400 dark:text-gray-500 text-lg font-semibold">
-                                                Aucun utilisateur trouvé pour cette recherche.
-                                            </td>
-                                        </tr>
-                                    ) : users.data.map(user => (
-                                        <tr key={user.id} className="hover:bg-blue-50 dark:hover:bg-blue-900 cursor-pointer transition group"
-                                            onClick={() => router.get(`/users/${user.id}`)}
-                                            tabIndex={0}
-                                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.get(`/users/${user.id}`); }}
-                                        >
-                                            <td className="p-3 align-middle">
-                                                <img src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} alt={user.name} className="w-10 h-10 rounded-full border-2 border-blue-200 shadow-sm group-hover:scale-105 transition-transform" />
-                                            </td>
-                                            <td className="p-3 align-middle font-semibold text-blue-800 dark:text-blue-200">{user.name}</td>
-                                            <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{user.email}</td>
-                                            <td className="p-3 align-middle"><span className="inline-block bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium">{user.role}</span></td>
-                                            <td className="p-3 align-middle text-xs text-gray-400">{new Date(user.created_at).toLocaleDateString()}</td>
-                                        </tr>
-                                    ))}
+                                        {users.data.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="5" className="text-center py-8 text-gray-400 dark:text-gray-500 text-lg font-semibold">
+                                                    Aucun utilisateur trouvé pour cette recherche.
+                                                </td>
+                                            </tr>
+                                        ) : users.data.map((user, idx) => (
+                                            <tr key={user.id} className={`${idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900'} cursor-pointer transition group`
+                                                } onClick={() => router.get(`/users/${user.id}`)}
+                                                tabIndex={0}
+                                                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.get(`/users/${user.id}`); }}
+                                            >
+                                                <td className="p-3 align-middle border-r border-gray-200 dark:border-gray-700">
+                                                    <img src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} alt={user.name} className="w-10 h-10 rounded-full border-2 border-blue-200 shadow-sm group-hover:scale-105 transition-transform" />
+                                                </td>
+                                                <td className="p-3 align-middle font-semibold text-blue-800 dark:text-blue-200 border-r border-gray-200 dark:border-gray-700">{user.name}</td>
+                                                <td className="p-3 align-middle text-gray-600 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">{user.email}</td>
+                                                <td className="p-3 align-middle border-r border-gray-200 dark:border-gray-700"><span className="inline-block bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium">{user.role}</span></td>
+                                                <td className="p-3 align-middle text-xs text-gray-400">{new Date(user.created_at).toLocaleDateString()}</td>
+                                            </tr>
+                                        ))}
                                 </tbody>
                             </table>
                         </div>
