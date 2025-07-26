@@ -24,7 +24,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::resource('tasks', App\Http\Controllers\TaskController::class);
     Route::post('/tasks/{task}/payment', [App\Http\Controllers\TaskController::class, 'savePaymentInfo'])->name('tasks.payment.save');
-    Route::post('/tasks/{task}/payment/validate', [App\Http\Controllers\TaskController::class, 'validatePayment'])->name('tasks.payment.validate');
+    Route::post('/tasks/{task}/payment/validate/{taskPayment}', [App\Http\Controllers\TaskController::class, 'validatePayment'])->name('tasks.payment.validate');
     Route::get('/kanban', [App\Http\Controllers\KanbanController::class, 'index'])->name('kanban.index');
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);

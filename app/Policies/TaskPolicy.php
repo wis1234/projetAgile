@@ -45,4 +45,10 @@ class TaskPolicy
     {
         return $this->comment($user, $task);
     }
+
+    public function validatePayment(User $user, Task $task)
+    {
+        return $user->hasRole('admin')
+            || ($task->project && $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists());
+    }
 } 

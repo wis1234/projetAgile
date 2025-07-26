@@ -41,4 +41,9 @@ class Task extends Model
     public function files() {
         return $this->hasMany(File::class);
     }
+
+    public function payments()
+    {
+        return $this->hasMany(TaskPayment::class);
+    }
 }

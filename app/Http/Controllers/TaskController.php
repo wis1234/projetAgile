@@ -114,38 +114,65 @@ class TaskController extends Controller
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
         $task->load(['project', 'sprint', 'assignedUser', 'files']);
-        $payment = \App\Models\TaskPayment::where('task_id', $task->id)
-            ->where('user_id', auth()->id())
-            ->first();
-        return Inertia::render('Tasks/Show', ['task' => $task, 'payment' => $payment]);
+        
+        $user = auth()->user();
+        $payments = collect(); 
+
+        if ($user->hasRole('admin') || $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists()) {
+            // Admin or project manager: retrieve all payments for the task
+            $payments = $task->payments()->with('user')->get();
+        } else {
+            // Regular member: retrieve only their own payment for the task
+            $payment = $task->payments()->where('user_id', $user->id)->first();
+            if ($payment) {
+                $payments->push($payment->load('user'));
+            }
+        }
+
+        $projectMembers = $task->project->users()->get(['users.id', 'users.name']);
+
+        return Inertia::render('Tasks/Show', ['task' => $task, 'payments' => $payments, 'projectMembers' => $projectMembers]);
     }
 
     public function savePaymentInfo(Request $request, Task $task)
     {
-        try {
-            $this->authorize('update', $task);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        $user = auth()->user();
+
+        // Check if the authenticated user is part of the project associated with the task
+        $isProjectMember = $task->project->users()->where('user_id', $user->id)->exists();
+
+        if (!$isProjectMember) {
+            return response()->json(['message' => 'Unauthorized to save payment information for this task' . $task->id], 403);
         }
+        
         $validated = $request->validate([
             'payment_method' => 'required|in:mtn,moov,celtis',
             'phone_number' => 'required|string|max:20',
+            'user_id' => 'nullable|exists:users,id', // Add user_id validation
         ]);
+
+        $targetUserId = $user->id; // Default to current authenticated user
+
+        // If an admin or project manager is saving for another user
+        if (($user->hasRole('admin') || $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists()) && $request->has('user_id')) {
+            $targetUserId = $validated['user_id'];
+        }
+
         $payment = \App\Models\TaskPayment::updateOrCreate(
-            ['task_id' => $task->id, 'user_id' => auth()->id()],
+            ['task_id' => $task->id, 'user_id' => $targetUserId],
             ['payment_method' => $validated['payment_method'], 'phone_number' => $validated['phone_number'], 'status' => 'pending']
         );
         return response()->json($payment);
     }
 
-    public function validatePayment(Task $task)
+    public function validatePayment(Task $task, \App\Models\TaskPayment $taskPayment)
     {
         try {
-            $this->authorize('admin-only');
+            $this->authorize('validatePayment', $task);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        $payment = \App\Models\TaskPayment::where('task_id', $task->id)->first();
+        $payment = $taskPayment; // Use the injected TaskPayment instance
         if (!$payment) {
             return response()->json(['message' => 'Payment info not found'], 404);
         }
@@ -172,9 +199,10 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
-        $projects = Project::whereHas('users', function ($q) {
-            $q->where('user_id', auth()->id())->whereIn('role', ['admin', 'manager']);
-        })->get();
+        $currentUser = auth()->user();
+        $projects = $currentUser->hasRole('admin')
+            ? Project::with(['users:id,name'])->get(['id', 'name'])
+            : $currentUser->projects()->with(['users:id,name'])->wherePivot('role', 'manager')->get(['projects.id', 'projects.name']);
         $sprints = Sprint::whereIn('project_id', $projects->pluck('id'))->get();
 
         return Inertia::render('Tasks/Edit', [
@@ -193,7 +221,13 @@ class TaskController extends Controller
         }
         $validated = $request->validate([
             'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
             'status' => 'required|in:todo,in_progress,done',
+            'due_date' => 'nullable|date',
+            'priority' => 'nullable|string',
+            'assigned_to' => 'required|exists:users,id',
+            'project_id' => 'required|exists:projects,id',
+            'sprint_id' => 'required|exists:sprints,id',
         ]);
         $task->update($validated);
         return redirect()->route('tasks.index');

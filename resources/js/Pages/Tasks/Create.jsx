@@ -4,8 +4,6 @@ import AdminLayout from '../../Layouts/AdminLayout';
 import { FaTasks, FaArrowLeft, FaUserCircle } from 'react-icons/fa';
 
 function Create({ projects = [], sprints = [] }) {
-  console.log('projects:', projects);
-  console.log('sprints:', sprints);
   const { errors = {}, flash = {} } = usePage().props;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -28,7 +26,8 @@ function Create({ projects = [], sprints = [] }) {
   // Mettre à jour assignedTo quand le projet change
   const handleProjectChange = (e) => {
     setProjectId(e.target.value);
-    setAssignedTo(''); // On vide le champ assigné à lors du changement de projet
+    const proj = projects.find(p => p.id == e.target.value);
+    setAssignedTo(proj?.users[0]?.id || ''); // Assign the first user of the newly selected project
   };
 
   const handleSubmit = (e) => {
@@ -47,7 +46,7 @@ function Create({ projects = [], sprints = [] }) {
       onSuccess: () => {
         setNotification('Tâche créée avec succès');
         setNotificationType('success');
-        setTitle(''); setDescription(''); setDueDate('');
+        setTitle(''); setDescription(''); setDueDate(''); setAssignedTo(''); setProjectId(projects[0]?.id || ''); setSprintId(sprints[0]?.id || ''); setStatus('todo'); setPriority('medium');
         setLoading(false);
         setTimeout(() => router.visit('/tasks'), 1200);
       },
@@ -60,101 +59,108 @@ function Create({ projects = [], sprints = [] }) {
   };
 
   return (
-    <div className="flex flex-col w-full bg-white dark:bg-gray-900 p-0 m-0">
-        <div className="flex flex-col h-full w-full max-w-4xl mx-auto pt-4 bg-white dark:bg-gray-900">
-          <div className="flex items-center gap-3 mb-8">
-            <Link href="/tasks" className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-100 transition">
-              <FaArrowLeft className="text-xl" />
-            </Link>
-            <FaTasks className="text-3xl text-blue-600" />
-            <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Créer une tâche</h1>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-2xl mx-auto w-full">
-            {notification && (
-              <div className={`mb-6 px-4 py-3 rounded-lg text-white font-semibold ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
-            )}
-            {!hasProjects && (
-              <div className="mb-6 px-4 py-3 rounded-lg bg-yellow-100 text-yellow-800 font-semibold text-center">
-                Vous n'êtes manager d'aucun projet. Veuillez demander à un administrateur de vous rattacher à un projet pour pouvoir créer une tâche.
-              </div>
-            )}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Titre *</label>
-                <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" required disabled={!hasProjects} />
-                {errors.title && <div className="text-red-600 text-sm mt-2 font-medium">{errors.title}</div>}
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Description</label>
-                <textarea value={description} onChange={e => setDescription(e.target.value)} rows="4" className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition resize-none" placeholder="Décrivez brièvement la tâche (optionnel)" disabled={!hasProjects} />
-                {errors.description && <div className="text-red-600 text-sm mt-2 font-medium">{errors.description}</div>}
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Projet</label>
-                <select value={projectId} onChange={handleProjectChange} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" required disabled={!hasProjects}>
-                  {projects.map(project => (
-                    <option key={project.id} value={project.id}>{project.name}</option>
-                  ))}
-                </select>
-                {errors.project_id && <div className="text-red-600 text-sm mt-2 font-medium">{errors.project_id}</div>}
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Sprint</label>
-                <select value={sprintId} onChange={e => setSprintId(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" required disabled={!hasProjects}>
-                  {sprints.map(sprint => (
-                    <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
-                  ))}
-                </select>
-                {errors.sprint_id && <div className="text-red-600 text-sm mt-2 font-medium">{errors.sprint_id}</div>}
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Assigné à</label>
-                <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" required disabled={projectUsers.length === 0 || !hasProjects}>
-                  <option value="" disabled>Sélectionnez un membre</option>
-                  {projectUsers.length === 0 && <option value="">Aucun membre</option>}
-                  {projectUsers.map(user => (
-                    <option key={user.id} value={user.id}>{user.name}</option>
-                  ))}
-                </select>
-                {projectUsers.length === 0 && <div className="text-red-600 text-sm mt-2 font-medium">Aucun membre disponible pour ce projet.</div>}
-                {errors.assigned_to && <div className="text-red-600 text-sm mt-2 font-medium">{errors.assigned_to}</div>}
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Statut</label>
-                  <select value={status} onChange={e => setStatus(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" disabled={!hasProjects}>
-                    <option value="todo">À faire</option>
-                    <option value="in_progress">En cours</option>
-                    <option value="done">Terminé</option>
-                  </select>
-                  {errors.status && <div className="text-red-600 text-sm mt-2 font-medium">{errors.status}</div>}
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Priorité</label>
-                  <select value={priority} onChange={e => setPriority(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" disabled={!hasProjects}>
-                    <option value="low">Basse</option>
-                    <option value="medium">Moyenne</option>
-                    <option value="high">Haute</option>
-                  </select>
-                  {errors.priority && <div className="text-red-600 text-sm mt-2 font-medium">{errors.priority}</div>}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Échéance</label>
-                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" disabled={!hasProjects} />
-                {errors.due_date && <div className="text-red-600 text-sm mt-2 font-medium">{errors.due_date}</div>}
-              </div>
-              <div className="flex gap-4 pt-4">
-                <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading || !isFormValid || projectUsers.length === 0 || !hasProjects}>
-                  {loading ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Création...</>) : (<><FaTasks /> Créer la tâche</>)}
-                </button>
-                <Link href="/tasks" className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2">
-                  <FaArrowLeft /> Annuler
-                </Link>
-              </div>
-            </form>
-          </div>
+    <div className="flex flex-col w-full bg-white dark:bg-gray-950 p-0 m-0 min-h-screen">
+      <div className="flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/tasks" className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 p-3 rounded-lg transition duration-200 hover:shadow-sm">
+            <FaArrowLeft className="text-xl" />
+          </Link>
+          <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" />
+          <h1 className="text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">Créer une tâche</h1>
         </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+          {notification && (
+            <div className={`mb-6 px-4 py-3 rounded-lg text-white font-semibold ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
+          )}
+          {!hasProjects && (
+            <div className="mb-6 px-4 py-3 rounded-lg bg-yellow-100 text-yellow-800 font-semibold text-center">
+              Vous n'êtes manager d'aucun projet. Veuillez demander à un administrateur de vous rattacher à un projet pour pouvoir créer une tâche.
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Titre <span className="text-red-500">*</span></label>
+              <input type="text" id="title" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" required disabled={!hasProjects} />
+              {errors.title && <div className="text-red-600 text-sm mt-2 font-medium">{errors.title}</div>}
+            </div>
+
+            <div>
+              <label htmlFor="project" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Projet <span className="text-red-500">*</span></label>
+              <select id="project" value={projectId} onChange={handleProjectChange} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" required disabled={!hasProjects}>
+                {projects.map(project => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+              {errors.project_id && <div className="text-red-600 text-sm mt-2 font-medium">{errors.project_id}</div>}
+            </div>
+
+            <div>
+              <label htmlFor="sprint" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Sprint <span className="text-red-500">*</span></label>
+              <select id="sprint" value={sprintId} onChange={e => setSprintId(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" required disabled={!hasProjects}>
+                {sprints.filter(s => s.project_id == projectId).map(sprint => (
+                  <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
+                ))}
+              </select>
+              {errors.srint_id && <div className="text-red-600 text-sm mt-2 font-medium">{errors.sprint_id}</div>}
+            </div>
+
+            <div>
+              <label htmlFor="assigned_to" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Assigné à <span className="text-red-500">*</span></label>
+              <select id="assigned_to" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" required disabled={projectUsers.length === 0 || !hasProjects}>
+                <option value="" disabled>Sélectionnez un membre</option>
+                {projectUsers.length === 0 && <option value="">Aucun membre disponible</option>}
+                {projectUsers.map(user => (
+                  <option key={user.id} value={user.id}>{user.name}</option>
+                ))}
+              </select>
+              {projectUsers.length === 0 && <div className="text-red-600 text-sm mt-2 font-medium">Aucun membre disponible pour ce projet.</div>}
+              {errors.assigned_to && <div className="text-red-600 text-sm mt-2 font-medium">{errors.assigned_to}</div>}
+            </div>
+
+            <div>
+              <label htmlFor="status" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Statut</label>
+              <select id="status" value={status} onChange={e => setStatus(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" disabled={!hasProjects}>
+                <option value="todo">À faire</option>
+                <option value="in_progress">En cours</option>
+                <option value="done">Terminé</option>
+              </select>
+              {errors.status && <div className="text-red-600 text-sm mt-2 font-medium">{errors.status}</div>}
+            </div>
+
+            <div>
+              <label htmlFor="priority" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priorité</label>
+              <select id="priority" value={priority} onChange={e => setPriority(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" disabled={!hasProjects}>
+                <option value="low">Faible</option>
+                <option value="medium">Moyenne</option>
+                <option value="high">Élevée</option>
+              </select>
+              {errors.priority && <div className="text-red-600 text-sm mt-2 font-medium">{errors.priority}</div>}
+            </div>
+
+            <div>
+              <label htmlFor="due_date" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Date d'échéance</label>
+              <input type="date" id="due_date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" disabled={!hasProjects} />
+              {errors.due_date && <div className="text-red-600 text-sm mt-2 font-medium">{errors.due_date}</div>}
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="description" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Description</label>
+              <textarea id="description" value={description} onChange={e => setDescription(e.target.value)} rows="4" className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200 resize-y" placeholder="Décrivez brièvement la tâche (optionnel)" disabled={!hasProjects} />
+              {errors.description && <div className="text-red-600 text-sm mt-2 font-medium">{errors.description}</div>}
+            </div>
+
+            <div className="md:col-span-2 flex justify-end gap-4 mt-6">
+              <button type="submit" className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-md transition duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading || !isFormValid || projectUsers.length === 0 || !hasProjects}>
+                {loading ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Création...</>) : (<><FaTasks /> Créer la tâche</>)}
+              </button>
+              <Link href="/tasks" className="flex-1 md:flex-none bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center justify-center gap-2 hover:shadow-sm">
+                <FaArrowLeft /> Annuler
+              </Link>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
