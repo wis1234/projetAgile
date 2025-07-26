@@ -55,7 +55,7 @@ function Edit({ task, projects = [], sprints = [] }) {
   };
 
   return (
-    <div className="flex flex-col w-full bg-gray-100 dark:bg-gray-950 p-0 m-0 min-h-screen">
+    <div className="flex flex-col w-full bg-white p-0 m-0 min-h-screen">
       <div className="flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/tasks" className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 p-3 rounded-lg transition duration-200 hover:shadow-sm">

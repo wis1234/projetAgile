@@ -9,7 +9,69 @@ class Project extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'description'];
+    protected $fillable = ['name', 'description', 'status'];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    // Constantes pour les statuts disponibles
+    public const STATUS_NOUVEAU = 'nouveau';
+    public const STATUS_DEMARRAGE = 'demarrage';
+    public const STATUS_EN_COURS = 'en_cours';
+    public const STATUS_AVANCE = 'avance';
+    public const STATUS_TERMINE = 'termine';
+    public const STATUS_SUSPENDU = 'suspendu';
+
+    // Méthode pour obtenir tous les statuts disponibles
+    public static function getAvailableStatuses()
+    {
+        return [
+            self::STATUS_NOUVEAU => 'Nouveau',
+            self::STATUS_DEMARRAGE => 'Démarrage',
+            self::STATUS_EN_COURS => 'En cours',
+            self::STATUS_AVANCE => 'Avancé',
+            self::STATUS_TERMINE => 'Terminé',
+            self::STATUS_SUSPENDU => 'Suspendu',
+        ];
+    }
+
+    // Méthode pour obtenir le libellé du statut
+    public function getStatusLabelAttribute()
+    {
+        $statuses = self::getAvailableStatuses();
+        return $statuses[$this->status] ?? 'Inconnu';
+    }
+
+    // Méthode pour obtenir la couleur du statut (pour les badges)
+    public function getStatusColorAttribute()
+    {
+        return match($this->status) {
+            self::STATUS_NOUVEAU => 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+            self::STATUS_DEMARRAGE => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+            self::STATUS_EN_COURS => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+            self::STATUS_AVANCE => 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+            self::STATUS_TERMINE => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+            self::STATUS_SUSPENDU => 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+            default => 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+        };
+    }
+
+    // Méthode pour vérifier si le projet peut changer de statut
+    public function canChangeStatusTo($newStatus)
+    {
+        $allowedTransitions = [
+            self::STATUS_NOUVEAU => [self::STATUS_DEMARRAGE, self::STATUS_SUSPENDU],
+            self::STATUS_DEMARRAGE => [self::STATUS_EN_COURS, self::STATUS_SUSPENDU],
+            self::STATUS_EN_COURS => [self::STATUS_AVANCE, self::STATUS_SUSPENDU],
+            self::STATUS_AVANCE => [self::STATUS_TERMINE, self::STATUS_SUSPENDU],
+            self::STATUS_TERMINE => [self::STATUS_EN_COURS], // Réouverture possible
+            self::STATUS_SUSPENDU => [self::STATUS_DEMARRAGE, self::STATUS_EN_COURS, self::STATUS_AVANCE],
+        ];
+
+        return in_array($newStatus, $allowedTransitions[$this->status] ?? []);
+    }
 
     protected static function boot()
     {

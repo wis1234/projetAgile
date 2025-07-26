@@ -28,6 +28,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/kanban', [App\Http\Controllers\KanbanController::class, 'index'])->name('kanban.index');
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
+    Route::patch('/projects/{id}/status', [App\Http\Controllers\ProjectController::class, 'changeStatus'])->name('projects.change-status');
     Route::resource('files', App\Http\Controllers\FileController::class);
     Route::resource('messages', App\Http\Controllers\MessageController::class);
     Route::resource('audit-logs', App\Http\Controllers\AuditLogController::class);

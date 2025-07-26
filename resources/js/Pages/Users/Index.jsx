@@ -4,17 +4,16 @@ import { Link, usePage } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
-import { FaUser, FaUsers, FaPlus, FaEdit, FaEye, FaProjectDiagram, FaSearch } from 'react-icons/fa';
+import { FaUser, FaUsers, FaPlus, FaEdit, FaEye, FaProjectDiagram, FaSearch, FaEnvelope, FaCalendarAlt, FaUserShield, FaTrash, FaCrown, FaUserTie, FaTh, FaList } from 'react-icons/fa';
 import Modal from '../../Components/Modal';
 
 export default function Index({ users, filters, roles = [], auth }) {
-    // Correction : on récupère bien l'utilisateur connecté
     const { flash = {}, auth: currentAuth } = usePage().props;
     const userAuth = auth?.user || auth;
     const [search, setSearch] = useState(filters?.search || '');
     const [notification, setNotification] = useState(flash.success || '');
     const [notificationType, setNotificationType] = useState('success');
-    // Suppression de selectedUserId, selectedUser, loadingDetail
+    const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
     const canAssignRole = auth && auth.email === 'ronaldoagbohou@gmail.com';
     const [roleLoading, setRoleLoading] = useState({});
     const [roleSuccess, setRoleSuccess] = useState({});
@@ -94,150 +93,371 @@ export default function Index({ users, filters, roles = [], auth }) {
     };
 
     const handleDeleteRole = async () => {
-        if (!roleToDelete) return;
         setDeleteLoading(true);
         try {
-            await fetch(`/roles/${roleToDelete.id}/delete`, {
+            const res = await fetch(`/roles/${roleToDelete.id}/delete`, {
                 method: 'DELETE',
                 headers: {
+                    'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                 },
             });
-            setRoleToDelete(null);
-            window.location.reload();
+            if (res.ok) {
+                setNotification('Rôle supprimé avec succès !');
+                setNotificationType('success');
+                setRoleToDelete(null);
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                const data = await res.json();
+                setNotification(data.message || 'Erreur lors de la suppression');
+                setNotificationType('error');
+            }
         } catch (e) {
-            setDeleteLoading(false);
+            setNotification('Erreur lors de la suppression');
+            setNotificationType('error');
+        }
+        setDeleteLoading(false);
+    };
+
+    const getRoleIcon = (role) => {
+        switch (role?.toLowerCase()) {
+            case 'admin':
+            case 'administrator':
+                return <FaCrown className="text-yellow-500" />;
+            case 'manager':
+            case 'chef de projet':
+                return <FaUserTie className="text-purple-500" />;
+            case 'developer':
+            case 'développeur':
+                return <FaUser className="text-blue-500" />;
+            default:
+                return <FaUserShield className="text-gray-500" />;
+        }
+    };
+
+    const getRoleBadgeColor = (role) => {
+        switch (role?.toLowerCase()) {
+            case 'admin':
+            case 'administrator':
+                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            case 'manager':
+            case 'chef de projet':
+                return 'bg-purple-100 text-purple-800 border-purple-200';
+            case 'developer':
+            case 'développeur':
+                return 'bg-blue-100 text-blue-800 border-blue-200';
+            default:
+                return 'bg-gray-100 text-gray-800 border-gray-200';
         }
     };
 
     return (
         <>
-        <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-            {/* Contenu principal */}
-            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-                <div className="flex flex-col md:flex-row gap-8 h-full w-full max-w-5xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900 rounded-xl shadow-lg">
-                    {/* Bloc rôles à droite sur desktop, en dessous sur mobile */}
-                    <aside className="w-full md:w-1/3 order-2 md:order-1 flex-shrink-0">
-                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6 md:mb-0">
-                            <h2 className="text-xl font-bold text-blue-700 dark:text-blue-200 mb-2 flex items-center gap-2"><FaUsers /> Gestion des rôles</h2>
-                            <ul className="mb-4">
-                                {roles.map(role => (
-                                    <li key={role.id} className="flex items-center justify-between py-2 px-3 bg-blue-50 dark:bg-blue-900 rounded mb-2 shadow-sm">
-                                        <span className="font-semibold text-blue-800 dark:text-blue-200 text-sm">{role.name}</span>
-                                        {canAssignRole && !['admin','user'].includes(role.name) && (
-                                            <button
-                                                className="text-red-600 hover:text-red-800 text-xs font-bold"
-                                                title="Supprimer le rôle"
-                                                onClick={() => setRoleToDelete(role)}
-                                            >Supprimer</button>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                            {canAssignRole && (
-                                <div className="bg-blue-50 dark:bg-blue-900 p-4 rounded shadow flex flex-col gap-2">
-                                    <h3 className="text-base font-bold text-blue-700 dark:text-blue-200">Créer un nouveau rôle</h3>
-                                    <form onSubmit={handleCreateRole} className="flex gap-2 items-center mt-2">
-                                        <input
-                                            type="text"
-                                            value={newRole}
-                                            onChange={e => setNewRole(e.target.value)}
-                                            placeholder="Nouveau rôle (ex: coach)"
-                                            className="border rounded p-2 text-sm w-full"
-                                            required
-                                            minLength={2}
-                                            maxLength={50}
-                                        />
-                                        <button type="submit" className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold" disabled={newRoleLoading}>{newRoleLoading ? 'Création...' : 'Créer'}</button>
-                                    </form>
-                                    {newRoleSuccess && <span className="text-green-600 text-xs ml-2">{newRoleSuccess}</span>}
-                                    {newRoleError && <span className="text-red-600 text-xs ml-2">{newRoleError}</span>}
-                                </div>
-                            )}
+        <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-950 p-0 m-0">
+            <main className="flex-1 flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
+                {/* Notification */}
+                {notification && (
+                    <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-lg shadow-xl text-white transition-all ${notificationType === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+                        {notification}
+                    </div>
+                )}
+
+                {/* Header section */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
+                    <div className="flex items-center gap-4">
+                        <FaUsers className="text-4xl text-blue-600 dark:text-blue-400" />
+                        <h1 className="text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">Gestion des Membres</h1>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
+                        {/* View Toggle */}
+                        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition duration-200 ${
+                                    viewMode === 'table' 
+                                        ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+                                        : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                                }`}
+                            >
+                                <FaList className="text-xs" />
+                                Tableau
+                            </button>
+                            <button
+                                onClick={() => setViewMode('cards')}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition duration-200 ${
+                                    viewMode === 'cards' 
+                                        ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+                                        : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                                }`}
+                            >
+                                <FaTh className="text-xs" />
+                                Cartes
+                            </button>
                         </div>
-                    </aside>
-                    {/* Bloc utilisateurs */}
-                    <main className="flex-1 order-1 md:order-2 flex flex-col w-full">
-                        {/* Header section */}
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                            <div className="flex items-center gap-3">
-                                <FaUsers className="text-3xl text-blue-600" />
-                                <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Utilisateurs</h1>
-                            </div>
-                            <div className="flex gap-2 w-full md:w-auto">
-                                <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full md:w-auto">
-                                    <input
-                                        type="text"
-                                        value={search}
-                                        onChange={e => setSearch(e.target.value)}
-                                        placeholder="Rechercher..."
-                                        className="border px-3 py-2 rounded w-full md:w-64 mb-0 focus:ring-2 focus:ring-blue-400"
-                                    />
-                                    <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
-                                        <FaSearch />
-                                    </button>
-                                </form>
-                                {auth && auth.role === 'admin' && (
-                                    <Link href="/users/create" className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow whitespace-nowrap">
-                                        <FaPlus /> Créer
-                                    </Link>
-                                )}
+                        {/* <Link href="/users/create" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap">
+                            <FaPlus className="text-lg" /> Nouveau membre
+                        </Link> */}
+                    </div>
+                </div>
+
+                {/* Search and Filters Section */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+                    <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="md:col-span-3">
+                            <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recherche par nom ou email</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    id="search-input"
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="Rechercher un membre..."
+                                    className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200"
+                                />
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             </div>
                         </div>
-                        {/* Tableau utilisateurs */}
-                        <div className="overflow-x-auto rounded-lg shadow bg-white dark:bg-gray-800">
-                            <table className="min-w-full text-sm">
-                                <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-100 to-blue-300 dark:from-blue-900 dark:to-blue-700 shadow">
+                        <button type="submit" className="md:col-span-1 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md">
+                            <FaSearch /> Rechercher
+                        </button>
+                    </form>
+                </div>
+
+                {/* Table View */}
+                {viewMode === 'table' && (
+                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg mb-8 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
+                                <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
                                     <tr>
-                                        <th className="p-3 text-left font-bold">Avatar</th>
-                                        <th className="p-3 text-left font-bold">Nom</th>
-                                        <th className="p-3 text-left font-bold">Email</th>
-                                        <th className="p-3 text-left font-bold">Rôle</th>
-                                        <th className="p-3 text-left font-bold">Date</th>
+                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Avatar</th>
+                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Nom</th>
+                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Email</th>
+                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Rôle</th>
+                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Date création</th>
+                                        {canAssignRole && <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Gestion rôle</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                        {users.data.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="5" className="text-center py-8 text-gray-400 dark:text-gray-500 text-lg font-semibold">
-                                                    Aucun utilisateur trouvé pour cette recherche.
+                                    {users?.data?.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={canAssignRole ? "6" : "5"} className="text-center py-10 text-gray-500 dark:text-gray-400 text-lg">
+                                                Aucun membre trouvé pour cette recherche.
+                                            </td>
+                                        </tr>
+                                    ) : users?.data?.map(user => (
+                                        <tr 
+                                            key={user.id} 
+                                            className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
+                                            onClick={() => router.get(`/users/${user.id}`)}
+                                        >
+                                            <td className="p-4 align-middle">
+                                                <div className="relative">
+                                                    <img 
+                                                        src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3B82F6&color=ffffff&size=64`)} 
+                                                        alt={user.name} 
+                                                        className="w-12 h-12 rounded-full border-2 border-blue-200 dark:border-blue-600 shadow-sm group-hover:border-blue-400 transition-colors duration-200" 
+                                                    />
+                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
+                                                        <div className="text-xs">
+                                                            {getRoleIcon(user.role)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 align-middle">
+                                                <div className="font-semibold text-gray-800 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                                                    {user.name}
+                                                </div>
+                                            </td>
+                                            <td className="p-4 align-middle text-gray-600 dark:text-gray-300">
+                                                <div className="flex items-center gap-1">
+                                                    <FaEnvelope className="text-xs text-gray-400" />
+                                                    <span>{user.email}</span>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 align-middle">
+                                                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getRoleBadgeColor(user.role)}`}>
+                                                    {getRoleIcon(user.role)}
+                                                    {user.role || 'Utilisateur'}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 align-middle text-xs text-gray-400 dark:text-gray-500">
+                                                <div className="flex items-center gap-1">
+                                                    <FaCalendarAlt className="text-gray-400" />
+                                                    {new Date(user.created_at).toLocaleDateString('fr-FR')}
+                                                </div>
+                                            </td>
+                                            {canAssignRole && (
+                                                <td className="p-4 align-middle" onClick={(e) => e.stopPropagation()}>
+                                                    <select
+                                                        value={user.role || ''}
+                                                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                                                        disabled={roleLoading[user.id]}
+                                                        className="text-xs border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                                    >
+                                                        <option value="">Sélectionner un rôle</option>
+                                                        {roles.map(role => (
+                                                            <option key={role.id} value={role.name}>{role.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    {roleLoading[user.id] && <p className="text-xs text-blue-600 mt-1">Mise à jour...</p>}
+                                                    {roleSuccess[user.id] && <p className="text-xs text-green-600 mt-1">{roleSuccess[user.id]}</p>}
+                                                    {roleError[user.id] && <p className="text-xs text-red-600 mt-1">{roleError[user.id]}</p>}
                                                 </td>
-                                            </tr>
-                                        ) : users.data.map((user, idx) => (
-                                            <tr key={user.id} className={`${idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900'} cursor-pointer transition group`
-                                                } onClick={() => router.get(`/users/${user.id}`)}
-                                                tabIndex={0}
-                                                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.get(`/users/${user.id}`); }}
-                                            >
-                                                <td className="p-3 align-middle border-r border-gray-200 dark:border-gray-700">
-                                                    <img src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} alt={user.name} className="w-10 h-10 rounded-full border-2 border-blue-200 shadow-sm group-hover:scale-105 transition-transform" />
-                                                </td>
-                                                <td className="p-3 align-middle font-semibold text-blue-800 dark:text-blue-200 border-r border-gray-200 dark:border-gray-700">{user.name}</td>
-                                                <td className="p-3 align-middle text-gray-600 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">{user.email}</td>
-                                                <td className="p-3 align-middle border-r border-gray-200 dark:border-gray-700"><span className="inline-block bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium">{user.role}</span></td>
-                                                <td className="p-3 align-middle text-xs text-gray-400">{new Date(user.created_at).toLocaleDateString()}</td>
-                                            </tr>
-                                        ))}
+                                            )}
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
-                        {/* Pagination */}
-                        <div className="mt-6 flex justify-center gap-2">
-                            {users.links && users.links.map((link, i) => (
-                                <button
-                                    key={i}
-                                    className={`btn btn-sm rounded-full px-4 py-2 font-semibold shadow ${link.active ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-blue-700 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-800'}`}
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                    </div>
+                )}
+
+                {/* Cards View */}
+                {viewMode === 'cards' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+                        {users?.data?.length === 0 ? (
+                            <div className="col-span-full text-center py-16">
+                                <FaUsers className="mx-auto text-6xl text-gray-300 dark:text-gray-600 mb-4" />
+                                <p className="text-xl text-gray-500 dark:text-gray-400">Aucun membre trouvé</p>
+                            </div>
+                        ) : users?.data?.map(user => (
+                            <div
+                                key={user.id}
+                                className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 hover:shadow-xl hover:scale-105 cursor-pointer group"
+                                onClick={() => router.get(`/users/${user.id}`)}
+                            >
+                                {/* User Avatar and Basic Info */}
+                                <div className="flex flex-col items-center text-center mb-4">
+                                    <div className="relative mb-4">
+                                        <img 
+                                            src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3B82F6&color=ffffff&size=128`)} 
+                                            alt={user.name} 
+                                            className="w-20 h-20 rounded-full border-4 border-blue-200 dark:border-blue-600 shadow-lg group-hover:border-blue-400 transition-colors duration-200" 
+                                        />
+                                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
+                                            {getRoleIcon(user.role)}
+                                        </div>
+                                    </div>
+                                    
+                                    <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                                        {user.name}
+                                    </h3>
+                                    
+                                    <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mb-3">
+                                        <FaEnvelope className="text-xs" />
+                                        <span className="truncate max-w-[200px]">{user.email}</span>
+                                    </div>
+                                </div>
+
+                                {/* Role Badge */}
+                                <div className="flex justify-center mb-4">
+                                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getRoleBadgeColor(user.role)}`}>
+                                        {getRoleIcon(user.role)}
+                                        {user.role || 'Utilisateur'}
+                                    </span>
+                                </div>
+
+                                {/* Member Since */}
+                                <div className="flex items-center justify-center gap-1 text-xs text-gray-400 dark:text-gray-500 mb-4">
+                                    <FaCalendarAlt />
+                                    <span>Membre depuis {new Date(user.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+                                </div>
+
+                                {/* Role Management for Admin */}
+                                {canAssignRole && (
+                                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                                        <select
+                                            value={user.role || ''}
+                                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                                            disabled={roleLoading[user.id]}
+                                            className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <option value="">Sélectionner un rôle</option>
+                                            {roles.map(role => (
+                                                <option key={role.id} value={role.name}>{role.name}</option>
+                                            ))}
+                                        </select>
+                                        {roleLoading[user.id] && <p className="text-xs text-blue-600 mt-1">Mise à jour...</p>}
+                                        {roleSuccess[user.id] && <p className="text-xs text-green-600 mt-1">{roleSuccess[user.id]}</p>}
+                                        {roleError[user.id] && <p className="text-xs text-red-600 mt-1">{roleError[user.id]}</p>}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Pagination */}
+                <div className="flex justify-center gap-3 mb-8">
+                    {users?.links && users.links.map((link, i) => (
+                        <button
+                            key={i}
+                            className={`px-4 py-2 text-sm font-semibold rounded-lg transition duration-200 
+                                ${link.active ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-600 hover:text-blue-800 dark:hover:text-white hover:shadow-sm'}
+                                ${!link.url ? 'opacity-50 cursor-not-allowed' : ''}
+                            `}
+                            disabled={!link.url}
+                            onClick={() => link.url && router.get(link.url)}
+                            dangerouslySetInnerHTML={{ __html: link.label }}
+                        />
+                    ))}
+                </div>
+
+                {/* Role Management Section for Admin */}
+                {canAssignRole && (
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                            <FaUserShield className="text-blue-600 dark:text-blue-400" />
+                            Gestion des Rôles
+                        </h2>
+                        
+                        {/* Create New Role */}
+                        <form onSubmit={handleCreateRole} className="mb-6">
+                            <div className="flex gap-3">
+                                <input
+                                    type="text"
+                                    value={newRole}
+                                    onChange={(e) => setNewRole(e.target.value)}
+                                    placeholder="Nom du nouveau rôle"
+                                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                    required
                                 />
+                                <button
+                                    type="submit"
+                                    disabled={newRoleLoading}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition duration-200 disabled:opacity-50"
+                                >
+                                    {newRoleLoading ? 'Création...' : 'Créer'}
+                                </button>
+                            </div>
+                            {newRoleSuccess && <p className="text-green-600 text-sm mt-2">{newRoleSuccess}</p>}
+                            {newRoleError && <p className="text-red-600 text-sm mt-2">{newRoleError}</p>}
+                        </form>
+
+                        {/* Existing Roles */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {roles.map(role => (
+                                <div key={role.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2">
+                                    <span className="text-gray-700 dark:text-gray-300 font-medium">{role.name}</span>
+                                    <button
+                                        onClick={() => setRoleToDelete(role)}
+                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition duration-150 p-1 rounded hover:bg-red-100 dark:hover:bg-red-800"
+                                    >
+                                        <FaTrash className="text-xs" />
+                                    </button>
+                                </div>
                             ))}
                         </div>
-                    </main>
-                </div>
+                    </div>
+                )}
             </main>
         </div>
+
+        {/* Delete Role Modal */}
         <Modal show={!!roleToDelete} onClose={() => setRoleToDelete(null)} maxWidth="sm">
             <div className="p-6">
                 <h2 className="text-lg font-bold mb-4 text-red-700">Confirmer la suppression</h2>
@@ -247,12 +467,16 @@ export default function Index({ users, filters, roles = [], auth }) {
                         className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold"
                         onClick={() => setRoleToDelete(null)}
                         disabled={deleteLoading}
-                    >Annuler</button>
+                    >
+                        Annuler
+                    </button>
                     <button
                         className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
                         onClick={handleDeleteRole}
                         disabled={deleteLoading}
-                    >{deleteLoading ? 'Suppression...' : 'Supprimer'}</button>
+                    >
+                        {deleteLoading ? 'Suppression...' : 'Supprimer'}
+                    </button>
                 </div>
             </div>
         </Modal>

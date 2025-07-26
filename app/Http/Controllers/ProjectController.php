@@ -16,7 +16,8 @@ class ProjectController extends Controller
     {
         $query = Project::query();
         if ($request->search) {
-            $query->where('name', 'like', '%'.$request->search.'%');
+            $query->where('name', 'like', '%'.$request->search.'%')
+                  ->orWhere('description', 'like', '%'.$request->search.'%');
         }
         $projects = $query->withCount(['tasks', 'users'])
                          ->orderBy('created_at', 'desc')
@@ -33,7 +34,9 @@ class ProjectController extends Controller
      */
     public function create()
     {
-        return Inertia::render('Projects/Create');
+        return Inertia::render('Projects/Create', [
+            'availableStatuses' => Project::getAvailableStatuses(),
+        ]);
     }
 
     /**
@@ -43,11 +46,20 @@ class ProjectController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:2000',
+            'status' => 'nullable|string|in:' . implode(',', array_keys(Project::getAvailableStatuses())),
         ]);
+        
+        // Si aucun statut n'est fourni, utiliser le statut par défaut
+        if (!isset($validated['status'])) {
+            $validated['status'] = Project::STATUS_NOUVEAU;
+        }
+        
         $project = Project::create($validated);
         event(new ProjectUpdated($project));
         activity_log('create', 'Création projet', $project);
-        return redirect()->route('projects.index');
+        
+        return redirect()->route('projects.index')->with('success', 'Projet créé avec succès !');
     }
 
     /**
@@ -96,6 +108,7 @@ class ProjectController extends Controller
             'project' => $project,
             'tasks' => $tasks,
             'auth' => $auth,
+            'availableStatuses' => Project::getAvailableStatuses(),
             'stats' => [
                 'activitiesByUser' => $activitiesByUser,
                 'commentsCount' => $commentsCount,
@@ -118,6 +131,7 @@ class ProjectController extends Controller
         }
         return Inertia::render('Projects/Edit', [
             'project' => $project,
+            'availableStatuses' => Project::getAvailableStatuses(),
         ]);
     }
 
@@ -132,11 +146,63 @@ class ProjectController extends Controller
         }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:2000',
+            'status' => 'nullable|string|in:' . implode(',', array_keys(Project::getAvailableStatuses())),
         ]);
+        
         $project->update($validated);
         event(new ProjectUpdated($project));
         activity_log('update', 'Modification projet', $project);
-        return redirect()->route('projects.index');
+        
+        return redirect()->route('projects.index')->with('success', 'Projet modifié avec succès !');
+    }
+
+    /**
+     * Change project status - Professional status management
+     */
+    public function changeStatus(Request $request, string $id)
+    {
+        $project = Project::findOrFail($id);
+        
+        // Vérifier les permissions
+        if (!$project->isMember(auth()->user())) {
+            return response()->json(['error' => 'Accès refusé'], 403);
+        }
+        
+        $validated = $request->validate([
+            'status' => 'required|string|in:' . implode(',', array_keys(Project::getAvailableStatuses())),
+        ]);
+        
+        $newStatus = $validated['status'];
+        
+        // Vérifier si la transition de statut est autorisée
+        if (!$project->canChangeStatusTo($newStatus)) {
+            return response()->json([
+                'error' => 'Transition de statut non autorisée',
+                'current_status' => $project->status,
+                'requested_status' => $newStatus
+            ], 422);
+        }
+        
+        $oldStatus = $project->status;
+        $project->update(['status' => $newStatus]);
+        
+        // Log de l'activité
+        activity_log('update', "Changement de statut de '{$project->status_label}' vers '{$project->status_label}'", $project);
+        
+        // Déclencher l'événement
+        event(new ProjectUpdated($project));
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Statut du projet modifié avec succès',
+            'project' => [
+                'id' => $project->id,
+                'status' => $project->status,
+                'status_label' => $project->status_label,
+                'status_color' => $project->status_color,
+            ]
+        ]);
     }
 
     /**
@@ -151,7 +217,8 @@ class ProjectController extends Controller
         $project->delete();
         event(new ProjectUpdated($project));
         activity_log('delete', 'Suppression projet', $project);
-        return redirect()->route('projects.index');
+        
+        return redirect()->route('projects.index')->with('success', 'Projet supprimé avec succès !');
     }
 
     /**
@@ -164,6 +231,10 @@ class ProjectController extends Controller
         return response()->json([
             'id' => $project->id,
             'name' => $project->name,
+            'description' => $project->description,
+            'status' => $project->status,
+            'status_label' => $project->status_label,
+            'status_color' => $project->status_color,
             'users' => $project->users,
             'tasks' => $tasks,
         ]);

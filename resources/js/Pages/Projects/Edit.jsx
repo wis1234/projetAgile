@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
-import { FaEdit, FaProjectDiagram, FaArrowLeft, FaSave } from 'react-icons/fa';
+import { FaEdit, FaProjectDiagram, FaArrowLeft, FaSave, FaChartLine, FaInfoCircle, FaHistory } from 'react-icons/fa';
 
 function Edit({ project }) {
-  const { errors = {}, flash = {} } = usePage().props;
+  const { errors = {}, flash = {}, availableStatuses = {} } = usePage().props;
   const [name, setName] = useState(project.name || '');
   const [description, setDescription] = useState(project.description || '');
+  const [status, setStatus] = useState(project.status || 'nouveau');
   const [notification, setNotification] = useState(flash.success || flash.error || '');
   const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
   const [loading, setLoading] = useState(false);
@@ -15,7 +16,7 @@ function Edit({ project }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    router.put(`/projects/${project.id}`, { name, description }, {
+    router.put(`/projects/${project.id}`, { name, description, status }, {
       onSuccess: () => {
         setNotification('Projet mis à jour avec succès');
         setNotificationType('success');
@@ -30,30 +31,86 @@ function Edit({ project }) {
     });
   };
 
+  // Fonction pour obtenir la couleur du badge de statut
+  const getStatusColor = (statusKey) => {
+    const colors = {
+      'nouveau': 'bg-gray-100 text-gray-800 border-gray-300',
+      'demarrage': 'bg-green-100 text-green-800 border-green-300',
+      'en_cours': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      'avance': 'bg-blue-100 text-blue-800 border-blue-300',
+      'termine': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      'suspendu': 'bg-red-100 text-red-800 border-red-300',
+    };
+    return colors[statusKey] || colors['nouveau'];
+  };
+
+  // Fonction pour obtenir les statuts autorisés pour la transition
+  const getAllowedTransitions = (currentStatus) => {
+    const transitions = {
+      'nouveau': ['demarrage', 'suspendu', 'termine'],
+      'demarrage': ['en_cours', 'suspendu', 'termine'],
+      'en_cours': ['avance', 'suspendu', 'termine'],
+      'avance': ['termine', 'suspendu'],
+      'termine': ['en_cours'],
+      'suspendu': ['demarrage', 'en_cours', 'avance', 'termine'],
+    };
+    return transitions[currentStatus] || [];
+  };
+
+  const allowedStatuses = getAllowedTransitions(project.status || 'nouveau');
+  const canChangeStatus = allowedStatuses.length > 0;
+
   return (
     <>
       <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
         {/* Contenu principal */}
         <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-          <div className="flex flex-col h-full w-full max-w-4xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
-            {/* Header section */}
-            <div className="flex items-center gap-3 mb-8">
-              <Link href="/projects" className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-100 transition">
-                <FaArrowLeft className="text-xl" />
+          <div className="flex flex-col h-full w-full max-w-5xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900 px-4 sm:px-6 lg:px-8">
+            {/* Header section - Responsive */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+              <Link href="/projects" className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-100 transition flex-shrink-0">
+                <FaArrowLeft className="text-lg sm:text-xl" />
               </Link>
-              <FaProjectDiagram className="text-3xl text-blue-600" />
-              <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Modifier le projet</h1>
+              <div className="flex items-center gap-3">
+                <FaProjectDiagram className="text-2xl sm:text-3xl text-blue-600 flex-shrink-0" />
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Modifier le projet</h1>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{project.name}</p>
+                </div>
+              </div>
             </div>
 
-            {/* Formulaire */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-2xl mx-auto w-full">
+            {/* Statut actuel - Badge informatif */}
+            <div className="mb-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <FaHistory className="text-blue-500 text-lg flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Statut actuel du projet :</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(project.status || 'nouveau')}`}>
+                        <FaChartLine className="text-xs" />
+                        {availableStatuses[project.status] || 'Nouveau'}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Créé le {new Date(project.created_at).toLocaleDateString('fr-FR')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Formulaire - Responsive */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 sm:p-8 max-w-3xl mx-auto w-full border border-gray-200 dark:border-gray-700">
               {notification && (
-                <div className={`mb-6 px-4 py-3 rounded-lg text-white font-semibold ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+                <div className={`mb-6 px-4 py-3 rounded-lg text-white font-semibold text-sm sm:text-base ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
                   {notification}
                 </div>
               )}
               
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Nom du projet */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                     Nom du projet *
@@ -71,6 +128,7 @@ function Edit({ project }) {
                   )}
                 </div>
 
+                {/* Description */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                     Description
@@ -87,10 +145,79 @@ function Edit({ project }) {
                   )}
                 </div>
 
-                <div className="flex gap-4 pt-4">
+                {/* Statut du projet */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                    <div className="flex items-center gap-2">
+                      <FaChartLine className="text-blue-500" />
+                      Statut du projet
+                    </div>
+                  </label>
+                  <div className="space-y-3">
+                    <select 
+                      value={status} 
+                      onChange={e => setStatus(e.target.value)} 
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition"
+                    >
+                      {/* Statut actuel toujours disponible */}
+                      <option value={project.status || 'nouveau'}>
+                        {availableStatuses[project.status] || 'Nouveau'} (actuel)
+                      </option>
+                      
+                      {/* Statuts autorisés pour la transition */}
+                      {canChangeStatus && allowedStatuses.map(statusKey => (
+                        <option key={statusKey} value={statusKey}>
+                          {availableStatuses[statusKey]}
+                        </option>
+                      ))}
+                    </select>
+                    
+                    {/* Aperçu du statut sélectionné */}
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Aperçu :</span>
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(status)}`}>
+                        <FaChartLine className="text-xs" />
+                        {availableStatuses[status] || 'Nouveau'}
+                      </span>
+                      {status !== (project.status || 'nouveau') && (
+                        <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                          ⚠️ Changement de statut
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {errors.status && (
+                    <div className="text-red-600 text-sm mt-2 font-medium">{errors.status}</div>
+                  )}
+                </div>
+
+                {/* Aide contextuelle pour les transitions */}
+                {canChangeStatus && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <FaInfoCircle className="text-yellow-500 text-lg flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-yellow-700 dark:text-yellow-300">
+                        <p className="font-semibold mb-2">Transitions de statut autorisées :</p>
+                        <ul className="space-y-1 list-disc list-inside">
+                          {allowedStatuses.map(statusKey => (
+                            <li key={statusKey}>
+                              Passer à : <strong>{availableStatuses[statusKey]}</strong>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-2 text-xs">
+                          Les transitions de statut suivent la logique métier du projet pour assurer une progression cohérente.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Boutons d'action - Responsive */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
                   <button 
                     type="submit" 
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base" 
                     disabled={loading}
                   >
                     {loading ? (
@@ -100,13 +227,13 @@ function Edit({ project }) {
                       </>
                     ) : (
                       <>
-                        <FaSave /> Sauvegarder
+                        <FaSave /> Sauvegarder les modifications
                       </>
                     )}
                   </button>
                   <Link 
                     href="/projects" 
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 text-sm sm:text-base"
                   >
                     <FaArrowLeft /> Annuler
                   </Link>
@@ -121,4 +248,4 @@ function Edit({ project }) {
 }
 
 Edit.layout = page => <AdminLayout children={page} />;
-export default Edit; 
+export default Edit;

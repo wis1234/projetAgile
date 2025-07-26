@@ -55,7 +55,7 @@ export default function AdminLayout({ children }) {
   }, [darkMode]);
 
   useEffect(() => {
-    if (auth?.user) {
+    if (auth?.user || auth?.id) {
       fetch('/api/activities/notifications')
         .then(res => res.json())
         .then(data => {
@@ -63,37 +63,17 @@ export default function AdminLayout({ children }) {
           setNotifCount(data.length);
         });
     }
-  }, [auth?.user]);
+  }, [auth]);
 
-  // Notifications temps réel (journal d'activité)
   useEffect(() => {
     if (window.Echo) {
-      const channel = window.Echo.channel('activities');
-      channel.listen('ActivityCreated', () => {
-        fetch('/api/activities/notifications')
-          .then(res => res.json())
-          .then(data => {
-            setNotifications(data);
-            setNotifCount(data.length);
-          });
-      });
-      return () => {
-        channel.stopListening('ActivityCreated');
-      };
-    }
-  }, []);
-
-  // Marquer toutes les notifications comme lues quand on ouvre le dropdown
-  useEffect(() => {
-    if (notifDropdown && notifCount > 0) {
-      fetch('/api/activities/notifications/mark-read', { method: 'POST' })
-        .then(() => {
-          setNotifCount(0);
-          setNotifications(notifications.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
+      window.Echo.channel('activities')
+        .listen('ActivityLogged', (e) => {
+          setNotifications(prev => [e.activity, ...prev.slice(0, 9)]);
+          setNotifCount(prev => prev + 1);
         });
     }
-    // eslint-disable-next-line
-  }, [notifDropdown]);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -109,41 +89,13 @@ export default function AdminLayout({ children }) {
     const onStart = () => setGlobalLoading(true);
     const onFinish = () => setGlobalLoading(false);
     const onError = () => setGlobalLoading(false);
-    if (window.Inertia) {
-      window.Inertia.on('start', onStart);
-      window.Inertia.on('finish', onFinish);
-      window.Inertia.on('error', onError);
-    }
-    if (window.router) {
-      if (typeof window.router.on === 'function') {
-        window.router.on('start', onStart);
-        window.router.on('finish', onFinish);
-        window.router.on('error', onError);
-      }
-    }
-    if (router && typeof router.on === 'function') {
-      router.on('start', onStart);
-      router.on('finish', onFinish);
-      router.on('error', onError);
-    }
+    router.on('start', onStart);
+    router.on('finish', onFinish);
+    router.on('error', onError);
     return () => {
-      if (window.Inertia) {
-        window.Inertia.off('start', onStart);
-        window.Inertia.off('finish', onFinish);
-        window.Inertia.off('error', onError);
-      }
-      if (window.router) {
-        if (typeof window.router.off === 'function') {
-          window.router.off('start', onStart);
-          window.router.off('finish', onFinish);
-          window.router.off('error', onError);
-        }
-      }
-      if (router && typeof router.off === 'function') {
-        router.off('start', onStart);
-        router.off('finish', onFinish);
-        router.off('error', onError);
-      }
+      router.off('start', onStart);
+      router.off('finish', onFinish);
+      router.off('error', onError);
     };
   }, []);
 
@@ -156,15 +108,15 @@ export default function AdminLayout({ children }) {
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
 
-  // Correction : fallback si auth n'a pas de clé user
   const user = auth?.user || auth;
-  const avatarUrl = user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=0D8ABC&color=fff`;
+  const userName = user?.name || 'Utilisateur';
+  const avatarUrl = user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0D8ABC&color=fff`;
 
   return (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-colors">
       {globalLoading && <Loader fullscreen />}
       {/* Sidebar */}
-      <aside className={`z-40 fixed top-0 left-0 h-screen w-64 bg-white dark:bg-gray-800 flex flex-col py-6 px-4 space-y-6 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300
+      <aside className={`z-40 fixed top-0 left-0 h-screen w-64 bg-white dark:bg-gray-800 flex flex-col py-6 px-4 space-y-6 border-r border-gray-200 dark:border-gamma-700 transition-transform duration-300
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         {/* Bouton croix toujours visible sur mobile quand menu ouvert */}
         {sidebarOpen && (
@@ -190,7 +142,7 @@ export default function AdminLayout({ children }) {
         </nav>
         <div className="mt-auto flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0 1 12 15c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" /></svg>
-          {auth?.user?.name || 'Admin'}
+          {userName}
         </div>
       </aside>
       {/* Overlay for mobile */}
@@ -260,7 +212,7 @@ export default function AdminLayout({ children }) {
             <div className="relative" ref={profileRef}>
               <button className="flex items-center gap-2 focus:outline-none" onClick={() => setProfileDropdown(d => !d)}>
                 <img src={avatarUrl} alt="avatar" className="w-9 h-9 rounded-full border-2 border-blue-400 shadow" />
-                <span className="text-gray-600 dark:text-gray-200 font-medium">{user?.name}</span>
+                <span className="text-gray-600 dark:text-gray-200 font-medium">{userName}</span>
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
               </button>
               {profileDropdown && (
@@ -284,4 +236,4 @@ export default function AdminLayout({ children }) {
       </div>
     </div>
   );
-} 
+}

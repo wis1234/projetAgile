@@ -9,6 +9,8 @@ use App\Models\Task;
 use App\Policies\TaskPolicy;
 use App\Models\Sprint;
 use App\Policies\SprintPolicy;
+use App\Models\User;
+use App\Policies\UserPolicy;
 
 class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
 {
@@ -21,6 +23,7 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
         Project::class => ProjectPolicy::class,
         Task::class => TaskPolicy::class,
         Sprint::class => SprintPolicy::class,
+        User::class => UserPolicy::class,
     ];
 
     /**
@@ -36,4 +39,4 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
             return $user->email === 'ronaldoagbohou@gmail.com';
         });
     }
-} 
+}

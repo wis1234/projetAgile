@@ -128,16 +128,35 @@ class UserController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
+        
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,'.$id,
-            'role' => 'required|in:admin,manager,member,user',
+            'role' => 'required|in:admin,manager,member,user,developer',
+            'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
+
+        // Handle profile photo upload
+        if ($request->hasFile('profile_photo')) {
+            // Delete old photo if exists
+            if ($user->profile_photo_path) {
+                \Storage::disk('public')->delete($user->profile_photo_path);
+            }
+            
+            $profilePhotoPath = $request->file('profile_photo')->store('profile-photos', 'public');
+            $validated['profile_photo_path'] = $profilePhotoPath;
+        }
+        
+        // Remove the file from the data array
+        unset($validated['profile_photo']);
+        
         $user->update($validated);
         if ($user->hasRole($validated['role']) === false) {
             $user->syncRoles([$validated['role']]); // Met à jour le rôle spatie
         }
+        
         activity_log('update', 'Modification utilisateur', $user);
+        
         return redirect()->route('users.index')->with('success', 'Utilisateur mis à jour avec succès');
     }
 

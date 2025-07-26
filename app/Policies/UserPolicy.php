@@ -28,7 +28,25 @@ class UserPolicy
      */
     public function create(User $user): bool
     {
-        return $user->role === 'admin';
+        // Debug: Log user data and role checks
+        \Log::info('UserPolicy::create called', [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_role_field' => $user->role,
+            'user_email' => $user->email,
+            'has_admin_role' => method_exists($user, 'hasRole') ? $user->hasRole('admin') : 'method_not_exists',
+            'has_manager_role' => method_exists($user, 'hasRole') ? $user->hasRole('manager') : 'method_not_exists',
+        ]);
+        
+        // Support both database role field and Spatie Permission
+        $canCreate = $user->role === 'admin' || 
+                    $user->role === 'manager' || 
+                    (method_exists($user, 'hasRole') && $user->hasRole('admin')) || 
+                    (method_exists($user, 'hasRole') && $user->hasRole('manager'));
+        
+        \Log::info('UserPolicy::create result', ['can_create' => $canCreate]);
+        
+        return $canCreate;
     }
 
     /**
@@ -36,7 +54,12 @@ class UserPolicy
      */
     public function update(User $user, User $model): bool
     {
-        return $user->role === 'admin' || $user->id === $model->id;
+        // Support both database role field and Spatie Permission
+        return $user->role === 'admin' || 
+               $user->role === 'manager' || 
+               $user->hasRole('admin') || 
+               $user->hasRole('manager') || 
+               $user->id === $model->id;
     }
 
     /**
@@ -44,7 +67,11 @@ class UserPolicy
      */
     public function delete(User $user, User $model): bool
     {
-        return $user->role === 'admin' || $user->id === $model->id;
+        // Support both database role field and Spatie Permission
+        return $user->role === 'admin' || 
+               ($user->role === 'manager' && $user->id !== $model->id) ||
+               $user->hasRole('admin') || 
+               ($user->hasRole('manager') && $user->id !== $model->id);
     }
 
     /**
@@ -52,7 +79,11 @@ class UserPolicy
      */
     public function restore(User $user, User $model): bool
     {
-        return $user->role === 'admin' || $user->id === $model->id;
+        // Support both database role field and Spatie Permission
+        return $user->role === 'admin' || 
+               $user->role === 'manager' || 
+               $user->hasRole('admin') || 
+               $user->hasRole('manager');
     }
 
     /**
@@ -60,6 +91,7 @@ class UserPolicy
      */
     public function forceDelete(User $user, User $model): bool
     {
-        return $user->role === 'admin' || $user->id === $model->id;
+        // Support both database role field and Spatie Permission
+        return $user->role === 'admin' || $user->hasRole('admin');
     }
 }
