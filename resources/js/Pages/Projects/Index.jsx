@@ -98,7 +98,7 @@ export default function Index({ projects, filters }) {
                                 <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Membres</th>
                                 <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Tâches</th>
                                 <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Date création</th>
-                                <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Actions</th>
+                                {/* Removed Actions column header */}
                             </tr>
                         </thead>
                         <tbody>
@@ -111,7 +111,16 @@ export default function Index({ projects, filters }) {
                             ) : projects.data.map(project => (
                                 <tr 
                                     key={project.id} 
-                                    className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group hover:shadow-md"
+                                    className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group hover:shadow-md cursor-pointer"
+                                    onClick={() => router.get(`/projects/${project.id}`)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            router.get(`/projects/${project.id}`);
+                                        }
+                                    }}
                                 >
                                     <td className="p-4 align-middle">
                                         <div className="flex items-center gap-3">
@@ -151,19 +160,7 @@ export default function Index({ projects, filters }) {
                                             {new Date(project.created_at).toLocaleDateString()}
                                         </div>
                                     </td>
-                                    <td className="p-4 align-middle text-right whitespace-nowrap">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <Link href={`/projects/${project.id}`} className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition duration-150 p-2 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800">
-                                                <FaEye />
-                                            </Link>
-                                            <Link href={`/projects/${project.id}/edit`} className="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300 transition duration-150 p-2 rounded-full hover:bg-yellow-100 dark:hover:bg-yellow-800">
-                                                <FaEdit />
-                                            </Link>
-                                            <button onClick={() => handleDelete(project.id)} className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition duration-150 p-2 rounded-full hover:bg-red-100 dark:hover:bg-red-800">
-                                                <FaTrash />
-                                            </button>
-                                        </div>
-                                    </td>
+                                    {/* Removed Actions buttons column */}
                                 </tr>
                             ))}
                         </tbody>
