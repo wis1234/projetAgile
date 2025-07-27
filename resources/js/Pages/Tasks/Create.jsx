@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { router, usePage, Link } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaTasks, FaArrowLeft, FaUserCircle } from 'react-icons/fa';
+import { FaTasks, FaArrowLeft, FaUserCircle, FaDollarSign, FaInfoCircle } from 'react-icons/fa';
 
-function Create({ projects = [], sprints = [] }) {
+function Create({ projects = [], sprints = [], users = [] }) {
   const { errors = {}, flash = {} } = usePage().props;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -12,16 +12,20 @@ function Create({ projects = [], sprints = [] }) {
   const [priority, setPriority] = useState('medium');
   const [projectId, setProjectId] = useState(projects[0]?.id || '');
   const [sprintId, setSprintId] = useState(sprints[0]?.id || '');
-  // Trouver les membres du projet sélectionné
-  const selectedProject = projects.find(p => p.id == projectId);
-  const projectUsers = selectedProject?.users || [];
   const [assignedTo, setAssignedTo] = useState('');
+  const [isPaid, setIsPaid] = useState(false);
+  const [paymentReason, setPaymentReason] = useState('');
+  const [amount, setAmount] = useState('');
   const [notification, setNotification] = useState(flash.success || flash.error || '');
   const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
   const [loading, setLoading] = useState(false);
   const hasProjects = projects.length > 0;
 
   const isFormValid = title && projectId && sprintId && assignedTo && status;
+
+  // Trouver les membres du projet sélectionné
+  const selectedProject = projects.find(p => p.id == projectId);
+  const projectUsers = selectedProject?.users || [];
 
   // Mettre à jour assignedTo quand le projet change
   const handleProjectChange = (e) => {
@@ -42,11 +46,14 @@ function Create({ projects = [], sprints = [] }) {
       assigned_to: assignedTo,
       project_id: projectId,
       sprint_id: sprintId,
+      is_paid: isPaid,
+      payment_reason: paymentReason,
+      amount: amount,
     }, {
       onSuccess: () => {
         setNotification('Tâche créée avec succès');
         setNotificationType('success');
-        setTitle(''); setDescription(''); setDueDate(''); setAssignedTo(''); setProjectId(projects[0]?.id || ''); setSprintId(sprints[0]?.id || ''); setStatus('todo'); setPriority('medium');
+        setTitle(''); setDescription(''); setDueDate(''); setAssignedTo(''); setProjectId(projects[0]?.id || ''); setSprintId(sprints[0]?.id || ''); setStatus('todo'); setPriority('medium'); setIsPaid(false); setPaymentReason(''); setAmount('');
         setLoading(false);
         setTimeout(() => router.visit('/tasks'), 1200);
       },
@@ -102,13 +109,13 @@ function Create({ projects = [], sprints = [] }) {
                   <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
                 ))}
               </select>
-              {errors.srint_id && <div className="text-red-600 text-sm mt-2 font-medium">{errors.sprint_id}</div>}
+              {errors.sprint_id && <div className="text-red-600 text-sm mt-2 font-medium">{errors.sprint_id}</div>}
             </div>
 
             <div>
               <label htmlFor="assigned_to" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Assigné à <span className="text-red-500">*</span></label>
               <select id="assigned_to" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" required disabled={projectUsers.length === 0 || !hasProjects}>
-                <option value="" disabled>Sélectionnez un membre</option>
+                <option value="">Sélectionnez un membre</option>
                 {projectUsers.length === 0 && <option value="">Aucun membre disponible</option>}
                 {projectUsers.map(user => (
                   <option key={user.id} value={user.id}>{user.name}</option>
@@ -150,6 +157,76 @@ function Create({ projects = [], sprints = [] }) {
               {errors.description && <div className="text-red-600 text-sm mt-2 font-medium">{errors.description}</div>}
             </div>
 
+            <div className="md:col-span-2">
+              <div className="flex items-center mb-2">
+                <FaDollarSign className="text-gray-500 mr-2" />
+                <h3 className="text-lg font-medium text-gray-900">Rémunération</h3>
+              </div>
+              <div className="flex items-center mb-4">
+                <input
+                  id="is_paid"
+                  type="checkbox"
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  checked={isPaid}
+                  onChange={(e) => {
+                    setIsPaid(e.target.checked);
+                    if (!e.target.checked) {
+                      setAmount('');
+                    } else {
+                      setPaymentReason('');
+                    }
+                  }}
+                />
+                <label htmlFor="is_paid" className="ml-2 block text-sm text-gray-700">
+                  Cette tâche est rémunérée
+                </label>
+              </div>
+
+              {isPaid ? (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="amount" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Montant (FCFA)</label>
+                    <div className="mt-1 relative rounded-md shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-gray-500 sm:text-sm">FCFA</span>
+                      </div>
+                      <input
+                        type="number"
+                        id="amount"
+                        className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-16 pr-12 sm:text-sm border-gray-300 rounded-md"
+                        placeholder="0.00"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    {errors.amount && <div className="text-red-600 text-sm mt-2 font-medium">{errors.amount}</div>}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="payment_reason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Raison de la non-rémunération</label>
+                  <select
+                    id="payment_reason"
+                    className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                    value={paymentReason}
+                    onChange={(e) => setPaymentReason(e.target.value)}
+                  >
+                    <option value="">Sélectionner une raison</option>
+                    <option value="volunteer">Bénévolat</option>
+                    <option value="academic">Projet académique</option>
+                    <option value="other">Autre raison</option>
+                  </select>
+                  {errors.payment_reason && <div className="text-red-600 text-sm mt-2 font-medium">{errors.payment_reason}</div>}
+                  <p className="mt-2 text-sm text-gray-500 flex items-start">
+                    <FaInfoCircle className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400 mt-0.5" />
+                    Cette information nous aide à mieux comprendre la nature de la tâche.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="md:col-span-2 flex justify-end gap-4 mt-6">
               <button type="submit" className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-md transition duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading || !isFormValid || projectUsers.length === 0 || !hasProjects}>
                 {loading ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Création...</>) : (<><FaTasks /> Créer la tâche</>)}
@@ -166,4 +243,4 @@ function Create({ projects = [], sprints = [] }) {
 }
 
 Create.layout = page => <AdminLayout children={page} />;
-export default Create; 
+export default Create;

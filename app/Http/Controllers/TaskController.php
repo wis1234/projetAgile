@@ -10,6 +10,8 @@ use App\Models\Sprint;
 use App\Events\TaskUpdated;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Notifications\UserActionMailNotification;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Str;
 
 class TaskController extends Controller
 {
@@ -66,18 +68,26 @@ class TaskController extends Controller
         }
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'project_id' => 'required|exists:projects,id',
-            'sprint_id' => 'required|exists:sprints,id',
-            'assigned_to' => 'required|exists:users,id',
-            'status' => 'required|in:todo,in_progress,done',
             'description' => 'nullable|string',
+            'status' => 'required|string|in:todo,in_progress,done',
+            'priority' => 'required|string|in:low,medium,high',
             'due_date' => 'nullable|date',
-            'priority' => 'nullable|string',
+            'project_id' => 'required|exists:projects,id',
+            'assigned_to' => 'nullable|exists:users,id',
+            'is_paid' => 'boolean',
+            'payment_reason' => 'required_if:is_paid,false|nullable|string|in:' . implode(',', [
+                \App\Models\Task::REASON_VOLUNTEER,
+                \App\Models\Task::REASON_ACADEMIC,
+                \App\Models\Task::REASON_OTHER,
+            ]),
+            'amount' => 'required_if:is_paid,true|nullable|numeric|min:0',
         ]);
-        // Valeurs par défaut si non renseignées
-        $validated['description'] = $request->input('description', '');
-        $validated['due_date'] = $request->input('due_date', null);
-        $validated['priority'] = $request->input('priority', '');
+
+        $validated['created_by'] = auth()->id();
+        $validated['payment_status'] = $validated['is_paid'] ? 
+            \App\Models\Task::PAYMENT_STATUS_UNPAID : 
+            null;
+
         $task = Task::create($validated);
 
         // Notifier l'utilisateur assigné
@@ -103,7 +113,8 @@ class TaskController extends Controller
             ]));
         }
 
-        return redirect()->route('tasks.index');
+        return redirect()->route('tasks.show', $task)
+            ->with('success', 'Tâche créée avec succès.');
     }
 
     public function show(Task $task)
@@ -222,15 +233,37 @@ class TaskController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'required|in:todo,in_progress,done',
+            'status' => 'required|string|in:todo,in_progress,done',
+            'priority' => 'required|string|in:low,medium,high',
             'due_date' => 'nullable|date',
-            'priority' => 'nullable|string',
-            'assigned_to' => 'required|exists:users,id',
             'project_id' => 'required|exists:projects,id',
-            'sprint_id' => 'required|exists:sprints,id',
+            'assigned_to' => 'nullable|exists:users,id',
+            'is_paid' => 'boolean',
+            'payment_reason' => 'required_if:is_paid,false|nullable|string|in:' . implode(',', [
+                \App\Models\Task::REASON_VOLUNTEER,
+                \App\Models\Task::REASON_ACADEMIC,
+                \App\Models\Task::REASON_OTHER,
+            ]),
+            'amount' => 'required_if:is_paid,true|nullable|numeric|min:0',
+            'payment_status' => 'sometimes|string|in:' . implode(',', [
+                \App\Models\Task::PAYMENT_STATUS_UNPAID,
+                \App\Models\Task::PAYMENT_STATUS_PENDING,
+                \App\Models\Task::PAYMENT_STATUS_PAID,
+                \App\Models\Task::PAYMENT_STATUS_FAILED,
+            ]),
         ]);
+
+        // Update payment status timestamp if status changed to paid
+        if (isset($validated['payment_status']) && 
+            $validated['payment_status'] === \App\Models\Task::PAYMENT_STATUS_PAID && 
+            $task->payment_status !== \App\Models\Task::PAYMENT_STATUS_PAID) {
+            $validated['paid_at'] = now();
+        }
+
         $task->update($validated);
-        return redirect()->route('tasks.index');
+
+        return redirect()->route('tasks.show', $task)
+            ->with('success', 'Tâche mise à jour avec succès.');
     }
 
     public function destroy(Task $task)
@@ -278,5 +311,57 @@ class TaskController extends Controller
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
         // ...
+    }
+
+    /**
+     * Generate and download a receipt for a paid task
+     *
+     * @param Task $task
+     * @return \Illuminate\Http\Response
+     */
+    public function downloadReceipt(Task $task)
+    {
+        // Charger les relations nécessaires
+        $task->load([
+            'payments.user',
+            'project.users' => function($query) {
+                $query->wherePivot('role', 'manager');
+            },
+            'project.users.roles'
+        ]);
+        
+        // Vérifier s'il y a des paiements
+        if ($task->payments->isEmpty()) {
+            abort(404, 'Aucun paiement trouvé pour cette tâche');
+        }
+
+        // Récupérer le paiement pour l'utilisateur actuel ou spécifié
+        $userId = request()->query('user_id', auth()->id());
+        $payment = $task->payments->where('user_id', $userId)->first();
+
+        if (!$payment || !$payment->user) {
+            abort(404, 'Aucun paiement valide trouvé pour cet utilisateur');
+        }
+
+        // Récupérer l'utilisateur du paiement
+        $user = $payment->user;
+        
+        // Récupérer le premier gestionnaire du projet
+        $projectManager = $task->project->users->first();
+
+        // Générer le PDF
+        $pdf = \PDF::loadView('receipts.task_payment', [
+            'task' => $task,
+            'payment' => $payment,
+            'user' => $user,
+            'projectManager' => $projectManager
+        ]);
+
+        // Définir la taille et l'orientation de la page
+        $pdf->setPaper('A4', 'portrait');
+
+        // Télécharger le PDF avec un nom de fichier personnalisé
+        $filename = 'recu-paiement-' . $task->id . '-' . $user->id . '.pdf';
+        return $pdf->download($filename);
     }
 }

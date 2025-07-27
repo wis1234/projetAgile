@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 
 export default function Show({ task, payments, projectMembers }) {
@@ -238,6 +238,43 @@ export default function Show({ task, payments, projectMembers }) {
     }
   };
 
+  const getPaymentStatusBadge = (status) => {
+    const statusMap = {
+      'unpaid': { text: 'Non payé', color: 'bg-yellow-100 text-yellow-800' },
+      'pending': { text: 'En attente', color: 'bg-blue-100 text-blue-800' },
+      'paid': { text: 'Payé', color: 'bg-green-100 text-green-800' },
+      'failed': { text: 'Échoué', color: 'bg-red-100 text-red-800' },
+    };
+    
+    const statusInfo = statusMap[status] || { text: 'Inconnu', color: 'bg-gray-100 text-gray-800' };
+    
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
+        {statusInfo.text}
+      </span>
+    );
+  };
+
+  const getPaymentReasonLabel = (reason) => {
+    const reasonMap = {
+      'volunteer': 'Bénévolat',
+      'academic': 'Projet académique',
+      'other': 'Autre raison',
+    };
+    
+    return reasonMap[reason] || 'Non spécifiée';
+  };
+
+  const getPaymentReasonDescription = (reason) => {
+    const descriptionMap = {
+      'volunteer': 'Cette tâche est effectuée dans le cadre d\'une mission bénévole.',
+      'academic': 'Cette tâche fait partie d\'un projet académique ou éducatif.',
+      'other': 'Cette tâche est effectuée sans rémunération pour d\'autres raisons.',
+    };
+    
+    return descriptionMap[reason] || 'Cette tâche est effectuée sans rémunération.';
+  };
+
   return (
     <div className="flex flex-col w-full bg-white dark:bg-gray-950 p-0 m-0 min-h-screen">
       <div className="flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
@@ -275,7 +312,7 @@ export default function Show({ task, payments, projectMembers }) {
                   ) : (
                     <FaUserCircle className="w-10 h-10 text-gray-400 dark:text-gray-500" />
                   )}
-                    <div className="font-bold text-lg text-black dark:text-blue-100">{task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">Non assigné</span>}</div>
+                  <div className="font-bold text-lg text-black dark:text-blue-100">{task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">Non assigné</span>}</div>
                 </div>
               )}
             </div>
@@ -363,9 +400,10 @@ export default function Show({ task, payments, projectMembers }) {
           </div>
         </div>
 
+
         {/* Payment Section - Current User's Payment */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-          <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">💳 Votre Moyen de Paiement Mobile</h2>
+          <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">💳Rémunération</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Formulaire ou informations en lecture seule pour l'utilisateur courant */}
@@ -443,31 +481,61 @@ export default function Show({ task, payments, projectMembers }) {
                 </div>
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600 transition duration-200 hover:shadow-sm">
-                  <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Vos informations de paiement</h3>
+                  <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Informations de paiement</h3>
                   {displayedPayment ? (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-5 border border-gray-200 dark:border-gray-600">
-                      <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center">
-                        <strong className="mr-2">Moyen de paiement :</strong> 
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                          {displayedPayment.payment_method.toUpperCase()}
-                        </span>
-                      </p>
-                      <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center">
-                        <strong className="mr-2">Numéro de téléphone :</strong> 
-                        <span className="font-mono text-gray-800 dark:text-gray-200 text-base">{displayedPayment.phone_number}</span>
-                      </p>
-                      <p className="text-gray-600 dark:text-gray-300 flex items-center">
-                        <strong className="mr-2">Statut du paiement :</strong> 
-                        {displayedPayment.status === 'validated' ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            ✅ Validé
+                    <div className="space-y-4">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-sm">
+                        <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center justify-between">
+                          <span className="font-medium">Type:</span>
+                          <span className="text-gray-800 dark:text-white font-medium">Tâche rémunérée</span>
+                        </p>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-sm">
+                        <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center justify-between">
+                          <span className="font-medium">Montant:</span>
+                          <span className="text-gray-800 dark:text-white font-medium">{task.amount?.toLocaleString('fr-FR')} FCFA</span>
+                        </p>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-sm">
+                        <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center justify-between">
+                          <span className="font-medium">Statut:</span>
+                          {displayedPayment.status === 'validated' ? (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              Payé
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                              En attente
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-sm">
+                        <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center justify-between">
+                          <span className="font-medium">Date de paiement</span>
+                          <span className="text-gray-800 dark:text-white font-medium">
+                            {new Date(displayedPayment.updated_at).toLocaleDateString('fr-FR', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                            ⏳ En attente
-                          </span>
-                        )}
-                      </p>
+                        </p>
+                      </div>
+                      
+                      {displayedPayment.status === 'validated' && (
+                        <a 
+                          href={route('tasks.receipt.download', task.id) + (selectedMemberId !== auth.user.id ? `?user_id=${selectedMemberId}` : '')}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200 hover:shadow-md mt-4"
+                        >
+                          <FaDownload className="text-lg" />
+                          <span>Télécharger le reçu</span>
+                        </a>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3">
@@ -489,7 +557,7 @@ export default function Show({ task, payments, projectMembers }) {
                         <span className="text-white text-2xl">💳</span>
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-blue-800 dark:text-blue-200">Résumé de votre paiement</h3>
+                        <h3 className="text-xl font-bold text-blue-800 dark:text-blue-200">Détails de paiement</h3>
                         <p className="text-blue-600 dark:text-blue-300 text-sm">Détails enregistrés</p>
                       </div>
                     </div>
@@ -526,10 +594,14 @@ export default function Show({ task, payments, projectMembers }) {
                     </div>
                     
                     {displayedPayment.status === 'validated' && (
-                      <div className="mt-5 p-4 bg-green-100 dark:bg-green-900 rounded-lg border border-green-300 dark:border-green-700">
-                        <p className="text-green-800 dark:text-green-200 text-sm font-medium text-center flex items-center justify-center gap-2">
-                          <span className="text-lg">🎉</span> Paiement confirmé et validé
-                        </p>
+                      <div className="mt-5 space-y-4">
+                        <div className="p-4 bg-green-100 dark:bg-green-900 rounded-lg border border-green-300 dark:border-green-700">
+                          <p className="text-green-800 dark:text-green-200 text-sm font-medium text-center flex items-center justify-center gap-2">
+                            <span className="text-lg">✓</span> Ce moyen de paiement a été validé.
+                          </p>
+                        </div>
+                        
+
                       </div>
                     )}
                   </div>
@@ -598,6 +670,17 @@ export default function Show({ task, payments, projectMembers }) {
                         </>
                       )}
                     </button>
+                  )}
+                  {p.status === 'validated' && (
+                    <a 
+                      href={route('tasks.receipt.download', task.id) + `?user_id=${p.user_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition duration-200 hover:shadow-lg"
+                    >
+                      <FaDownload className="text-sm" />
+                      <span>Télécharger le reçu</span>
+                    </a>
                   )}
                 </div>
               ))}
@@ -714,47 +797,46 @@ export default function Show({ task, payments, projectMembers }) {
           )}
         </div>
 
+        {/* Confirmation Modal */}
+        <Modal show={showConfirmValidationModal} onClose={() => setShowConfirmValidationModal(false)} maxWidth="md">
+          <div className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+              Confirmer la validation du paiement
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Êtes-vous sûr de vouloir valider ce paiement ? Cette action est irréversible.
+            </p>
+            <div className="mt-6 flex justify-end">
+              <button onClick={() => setShowConfirmValidationModal(false)} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                Annuler
+              </button>
+              <button onClick={confirmPaymentValidation} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" disabled={validationLoading}>
+                {validationLoading ? 'Validation...' : 'Confirmer'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal show={showConfirmDeleteModal} onClose={() => setShowConfirmDeleteModal(false)} maxWidth="sm">
+          <div className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+              Confirmer la suppression de la tâche
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Êtes-vous sûr de vouloir supprimer cette tâche ? Cette action est irréversible.
+            </p>
+            <div className="mt-6 flex justify-end">
+              <button onClick={() => setShowConfirmDeleteModal(false)} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                Annuler
+              </button>
+              <button onClick={confirmDeleteTask} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
-
-      {/* Confirmation Modal */}
-      <Modal show={showConfirmValidationModal} onClose={() => setShowConfirmValidationModal(false)} maxWidth="md">
-        <div className="p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-            Confirmer la validation du paiement
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            Êtes-vous sûr de vouloir valider ce paiement ? Cette action est irréversible.
-          </p>
-          <div className="mt-6 flex justify-end">
-            <button onClick={() => setShowConfirmValidationModal(false)} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-              Annuler
-            </button>
-            <button onClick={confirmPaymentValidation} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" disabled={validationLoading}>
-              {validationLoading ? 'Validation...' : 'Confirmer'}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Delete Confirmation Modal */}
-      <Modal show={showConfirmDeleteModal} onClose={() => setShowConfirmDeleteModal(false)} maxWidth="sm">
-        <div className="p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-            Confirmer la suppression de la tâche
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            Êtes-vous sûr de vouloir supprimer cette tâche ? Cette action est irréversible.
-          </p>
-          <div className="mt-6 flex justify-end">
-            <button onClick={() => setShowConfirmDeleteModal(false)} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-              Annuler
-            </button>
-            <button onClick={confirmDeleteTask} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-              Supprimer
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

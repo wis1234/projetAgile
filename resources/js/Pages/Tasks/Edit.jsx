@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { router, usePage, Link } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaTasks, FaArrowLeft, FaUserCircle } from 'react-icons/fa';
+import { FaTasks, FaArrowLeft, FaUserCircle, FaDollarSign, FaInfoCircle } from 'react-icons/fa';
 
-function Edit({ task, projects = [], sprints = [] }) {
+function Edit({ task, projects = [], sprints = [], users = [] }) {
   const { errors = {}, flash = {} } = usePage().props;
   const [title, setTitle] = useState(task.title || '');
   const [description, setDescription] = useState(task.description || '');
@@ -12,13 +12,18 @@ function Edit({ task, projects = [], sprints = [] }) {
   const [priority, setPriority] = useState(task.priority || 'medium');
   const [projectId, setProjectId] = useState(task.project_id || projects[0]?.id || '');
   const [sprintId, setSprintId] = useState(task.sprint_id || sprints[0]?.id || '');
-  // Trouver les membres du projet sélectionné
-  const selectedProject = projects.find(p => p.id == projectId);
-  const projectUsers = selectedProject?.users || [];
-  const [assignedTo, setAssignedTo] = useState(task.assigned_to || projectUsers[0]?.id || '');
+  const [assignedTo, setAssignedTo] = useState(task.assigned_to || users[0]?.id || '');
+  const [isPaid, setIsPaid] = useState(task.is_paid || false);
+  const [amount, setAmount] = useState(task.amount || '');
+  const [paymentStatus, setPaymentStatus] = useState(task.payment_status || 'unpaid');
+  const [paymentReason, setPaymentReason] = useState(task.payment_reason || '');
   const [notification, setNotification] = useState(flash.success || flash.error || '');
   const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
   const [loading, setLoading] = useState(false);
+
+  // Trouver les membres du projet sélectionné
+  const selectedProject = projects.find(p => p.id == projectId);
+  const projectUsers = selectedProject?.users || [];
 
   // Mettre à jour assignedTo quand le projet change
   const handleProjectChange = (e) => {
@@ -39,6 +44,10 @@ function Edit({ task, projects = [], sprints = [] }) {
       assigned_to: assignedTo,
       project_id: projectId,
       sprint_id: sprintId,
+      is_paid: isPaid,
+      amount,
+      payment_status: paymentStatus,
+      payment_reason: paymentReason,
     }, {
       onSuccess: () => {
         setNotification('Tâche mise à jour avec succès');
@@ -139,6 +148,54 @@ function Edit({ task, projects = [], sprints = [] }) {
               {errors.due_date && <div className="text-red-600 text-sm mt-2 font-medium">{errors.due_date}</div>}
             </div>
 
+            <div>
+              <label htmlFor="is_paid" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Cette tâche est rémunérée</label>
+              <input type="checkbox" id="is_paid" checked={isPaid} onChange={e => setIsPaid(e.target.checked)} className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" />
+            </div>
+
+            {isPaid && (
+              <div>
+                <label htmlFor="amount" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Montant (FCFA)</label>
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 sm:text-sm">FCFA</span>
+                  </div>
+                  <input type="number" id="amount" value={amount} onChange={e => setAmount(e.target.value)} className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-16 pr-12 sm:text-sm border-gray-300 rounded-md" placeholder="0.00" min="0" step="0.01" />
+                </div>
+                {errors.amount && <div className="text-red-600 text-sm mt-2 font-medium">{errors.amount}</div>}
+              </div>
+            )}
+
+            {isPaid && (
+              <div>
+                <label htmlFor="payment_status" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Statut du paiement</label>
+                <select id="payment_status" value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200">
+                  <option value="unpaid">Non payé</option>
+                  <option value="pending">En attente</option>
+                  <option value="paid">Payé</option>
+                  <option value="failed">Échoué</option>
+                </select>
+                {errors.payment_status && <div className="text-red-600 text-sm mt-2 font-medium">{errors.payment_status}</div>}
+              </div>
+            )}
+
+            {!isPaid && (
+              <div>
+                <label htmlFor="payment_reason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Raison de la non-rémunération</label>
+                <select id="payment_reason" value={paymentReason} onChange={e => setPaymentReason(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200">
+                  <option value="">Sélectionner une raison</option>
+                  <option value="volunteer">Bénévolat</option>
+                  <option value="academic">Projet académique</option>
+                  <option value="other">Autre raison</option>
+                </select>
+                {errors.payment_reason && <div className="text-red-600 text-sm mt-2 font-medium">{errors.payment_reason}</div>}
+                <p className="mt-2 text-sm text-gray-500 flex items-start">
+                  <FaInfoCircle className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400 mt-0.5" />
+                  Cette information nous aide à mieux comprendre la nature de la tâche.
+                </p>
+              </div>
+            )}
+
             <div className="md:col-span-2 flex justify-end gap-4 mt-6">
               <button type="submit" className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-md transition duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
                 {loading ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Mise à jour...</>) : (<><FaTasks /> Mettre à jour</>)}
@@ -155,4 +212,4 @@ function Edit({ task, projects = [], sprints = [] }) {
 }
 
 Edit.layout = page => <AdminLayout children={page} />;
-export default Edit; 
+export default Edit;
