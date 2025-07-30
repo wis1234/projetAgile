@@ -11,6 +11,8 @@ use App\Models\Sprint;
 use App\Policies\SprintPolicy;
 use App\Models\User;
 use App\Policies\UserPolicy;
+use App\Models\School;
+use App\Policies\SchoolPolicy;
 
 class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
 {
@@ -24,6 +26,7 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
         Task::class => TaskPolicy::class,
         Sprint::class => SprintPolicy::class,
         User::class => UserPolicy::class,
+        School::class => SchoolPolicy::class,
     ];
 
     /**
@@ -37,6 +40,11 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
 
         Gate::define('admin-only', function ($user) {
             return $user->email === 'ronaldoagbohou@gmail.com';
+        });
+
+        // Définition des capacités spécifiques pour les écoles
+        Gate::define('manage-school-hosts', function (User $user, School $school) {
+            return $user->can('manageHosts', $school);
         });
     }
 }

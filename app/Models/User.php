@@ -28,6 +28,7 @@ class User extends Authenticatable
         'company',
         'profile_photo_path',
         'role', // Ajouté pour la gestion des rôles
+        'school_id', // Ajouté pour la relation avec l'école
     ];
 
     /**
@@ -68,6 +69,64 @@ class User extends Authenticatable
     public function tasks()
     {
         return $this->hasMany(Task::class, 'assigned_to');
+    }
+
+    /**
+     * Relation avec l'école de l'utilisateur
+     */
+    public function school()
+    {
+        return $this->belongsTo(School::class);
+    }
+
+    /**
+     * Vérifie si l'utilisateur est administrateur d'une école
+     */
+    public function isSchoolAdmin()
+    {
+        return $this->role === 'school_admin' && $this->school_id !== null;
+    }
+
+    /**
+     * Vérifie si l'utilisateur est administrateur de l'école spécifiée
+     */
+    public function isAdminOfSchool($schoolId)
+    {
+        return $this->isSchoolAdmin() && $this->school_id == $schoolId;
+    }
+
+    /**
+     * Récupère le nom de l'école de l'utilisateur
+     */
+    public function getSchoolNameAttribute()
+    {
+        return $this->school ? $this->school->name : 'Aucune école';
+    }
+
+    /**
+     * Récupère le code de l'école de l'utilisateur
+     */
+    public function getSchoolCodeAttribute()
+    {
+        return $this->school ? $this->school->code : null;
+    }
+
+    /**
+     * Vérifie si l'utilisateur peut gérer une école spécifique
+     */
+    public function canManageSchool($schoolId = null)
+    {
+        // Les administrateurs système peuvent tout gérer
+        if ($this->hasRole('admin')) {
+            return true;
+        }
+
+        // Les administrateurs d'école ne peuvent gérer que leur école
+        if ($this->isSchoolAdmin()) {
+            return $schoolId ? $this->school_id == $schoolId : false;
+        }
+
+        return false;
     }
 
     /**

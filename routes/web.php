@@ -80,6 +80,18 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/activities/{activity}', [ActivityController::class, 'show'])->name('activities.show');
 });
 
+// Routes pour la gestion des établissements scolaires
+Route::middleware(['auth'])->group(function () {
+    Route::resource('schools', \App\Http\Controllers\SchoolController::class);
+    
+    // Routes supplémentaires pour les administrateurs
+    Route::middleware('can:admin-only')->group(function () {
+        Route::get('/schools/{school}/hosts', [\App\Http\Controllers\SchoolController::class, 'indexHosts'])->name('schools.hosts.index');
+        Route::post('/schools/{school}/hosts', [\App\Http\Controllers\SchoolController::class, 'addHost'])->name('schools.hosts.add');
+        Route::delete('/schools/{school}/hosts/{user}', [\App\Http\Controllers\SchoolController::class, 'removeHost'])->name('schools.hosts.remove');
+    });
+});
+
 // Rôles (création/suppression)
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/roles/create', [\App\Http\Controllers\UserController::class, 'createRole'])->name('roles.create');

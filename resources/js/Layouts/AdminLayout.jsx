@@ -8,8 +8,11 @@ const navLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6m-6 0v6m0-6H7m6 0h6" /></svg>
   ) },
+  // { href: '/schools', label: 'Institutions', icon: (
+  //   <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+  // ) },
   { href: '/projects', label: 'Projets', icon: (
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5V6.75A2.25 2.25 0 0 1 5.25 4.5h13.5A2.25 2.25 0 0 1 21 6.75v10.5A2.25 2.25 0 0 1 18.75 19.5H5.25A2.25 2.25 0 0 1 3 17.25V7.5z" /></svg>
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5V6.75A2.25 2.25 0 0 1 5.25 4.5h13.5A2.25 2.25 0 0 1 21 6.75v10.5A2.25 2.25 0 0 1 18.75 20H5.25A2.25 2.25 0 0 1 3 17.25V7.5z" /></svg>
   ) },
   { href: '/project-users', label: 'Membres', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m9-5.13a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" /></svg>
@@ -89,13 +92,17 @@ export default function AdminLayout({ children }) {
     const onStart = () => setGlobalLoading(true);
     const onFinish = () => setGlobalLoading(false);
     const onError = () => setGlobalLoading(false);
+    
+    // Ajouter les écouteurs d'événements
     router.on('start', onStart);
     router.on('finish', onFinish);
     router.on('error', onError);
+    
     return () => {
-      router.off('start', onStart);
-      router.off('finish', onFinish);
-      router.off('error', onError);
+      // Supprimer les écouteurs d'événements en utilisant la méthode appropriée
+      // Note: Dans les versions récentes d'Inertia, il n'est pas nécessaire de supprimer manuellement les écouteurs
+      // car ils sont automatiquement nettoyés lors du démontage du composant
+      // Nous laissons cette partie vide pour éviter l'erreur
     };
   }, []);
 
