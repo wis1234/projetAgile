@@ -31,6 +31,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
     Route::patch('/projects/{id}/status', [App\Http\Controllers\ProjectController::class, 'changeStatus'])->name('projects.change-status');
     Route::resource('files', App\Http\Controllers\FileController::class);
+    Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])->name('files.updateContent');
     Route::resource('messages', App\Http\Controllers\MessageController::class);
     Route::resource('audit-logs', App\Http\Controllers\AuditLogController::class);
     Route::resource('project-users', App\Http\Controllers\ProjectUserController::class);

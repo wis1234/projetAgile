@@ -282,6 +282,34 @@ class FileController extends Controller
     /**
      * Télécharger plusieurs fichiers en ZIP
      */
+    public function updateContent(Request $request, File $file)
+    {
+        // Authorize the action
+        $this->authorize('update', $file);
+
+        // Validate the request
+        $request->validate([
+            'content' => 'required|string',
+        ]);
+
+        // Ensure the file is a text file before attempting to write
+        if (!str_starts_with($file->type, 'text/')) {
+            return response()->json(['message' => 'Seuls les fichiers texte peuvent être modifiés de cette manière.'], 400);
+        }
+
+        try {
+            Storage::disk('public')->put($file->file_path, $request->input('content'));
+            activity_log('update', 'Modification contenu fichier texte', $file);
+            return response()->json(['message' => 'Contenu du fichier mis à jour avec succès.']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Erreur lors de la sauvegarde du contenu du fichier.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     *
+     * Télécharger plusieurs fichiers en ZIP
+     */
     public function downloadMultiple(Request $request)
     {
         $ids = $request->input('ids', []);
