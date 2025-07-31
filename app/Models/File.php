@@ -3,10 +3,30 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class File extends Model
 {
     protected $fillable = ['name', 'file_path', 'type', 'size', 'user_id', 'project_id', 'task_id', 'kanban_id', 'description', 'downloads', 'status', 'rejection_reason'];
+
+    /**
+     * Get the full URL to the file
+     *
+     * @return string
+     */
+    public function getUrl()
+    {
+        if (empty($this->file_path)) {
+            return null;
+        }
+
+        // Check if the file exists in storage
+        if (Storage::disk('public')->exists($this->file_path)) {
+            return Storage::disk('public')->url($this->file_path);
+        }
+
+        return null;
+    }
 
     protected static function boot()
     {

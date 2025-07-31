@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/tasks/{task}/payment/validate/{taskPayment}', [App\Http\Controllers\TaskController::class, 'validatePayment'])->name('tasks.payment.validate');
     Route::get('/tasks/{task}/download-receipt', [App\Http\Controllers\TaskController::class, 'downloadReceipt'])->name('tasks.receipt.download');
     Route::get('/kanban', [App\Http\Controllers\KanbanController::class, 'index'])->name('kanban.index');
+    Route::put('/kanban/update-order', [App\Http\Controllers\KanbanController::class, 'updateOrder'])->name('kanban.updateOrder');
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
     Route::patch('/projects/{id}/status', [App\Http\Controllers\ProjectController::class, 'changeStatus'])->name('projects.change-status');

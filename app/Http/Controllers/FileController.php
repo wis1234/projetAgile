@@ -84,7 +84,6 @@ class FileController extends Controller
             'project_id' => 'required|exists:projects,id',
             'task_id' => 'nullable|exists:tasks,id',
             'kanban_id' => 'nullable|exists:sprints,id',
-            'user_id' => 'required|exists:users,id',
             'description' => 'nullable|string',
         ]);
         $file = $request->file('file');
@@ -94,7 +93,7 @@ class FileController extends Controller
             'file_path' => $path,
             'type' => $file->getClientMimeType(),
             'size' => $file->getSize(),
-            'user_id' => $validated['user_id'],
+            'user_id' => $currentUser->id,
             'project_id' => $validated['project_id'],
             'task_id' => $validated['task_id'] ?? null,
             'kanban_id' => $validated['kanban_id'] ?? null,
@@ -114,7 +113,7 @@ class FileController extends Controller
                 return $u->name . ' (' . $role . ')';
             })->implode(', ');
             foreach ($project->users as $member) {
-                if ($member->id != $validated['user_id']) {
+                if ($member->id != $currentUser->id) {
                     $message =
                         "Un nouveau fichier a été uploadé dans le projet : {$project->name}\n" .
                         ($task ? "Tâche : {$task->title}\n" : '') .

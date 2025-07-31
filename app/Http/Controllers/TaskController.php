@@ -73,6 +73,7 @@ class TaskController extends Controller
             'priority' => 'required|string|in:low,medium,high',
             'due_date' => 'nullable|date',
             'project_id' => 'required|exists:projects,id',
+            'sprint_id' => 'required|exists:sprints,id',
             'assigned_to' => 'nullable|exists:users,id',
             'is_paid' => 'boolean',
             'payment_reason' => 'required_if:is_paid,false|nullable|string|in:' . implode(',', [
@@ -86,7 +87,14 @@ class TaskController extends Controller
         $validated['created_by'] = auth()->id();
         $validated['payment_status'] = $validated['is_paid'] ? 
             \App\Models\Task::PAYMENT_STATUS_UNPAID : 
-            null;
+            \App\Models\Task::PAYMENT_STATUS_UNPAID; // Toujours définir une valeur par défaut
+
+        // Si c'est une tâche bénévole, marquer comme payée
+        if (isset($validated['payment_reason']) && $validated['payment_reason'] === \App\Models\Task::REASON_VOLUNTEER) {
+            $validated['is_paid'] = true;
+            $validated['payment_status'] = \App\Models\Task::PAYMENT_STATUS_PAID;
+            $validated['paid_at'] = now();
+        }
 
         $task = Task::create($validated);
 
@@ -237,6 +245,7 @@ class TaskController extends Controller
             'priority' => 'required|string|in:low,medium,high',
             'due_date' => 'nullable|date',
             'project_id' => 'required|exists:projects,id',
+            'sprint_id' => 'required|exists:sprints,id',
             'assigned_to' => 'nullable|exists:users,id',
             'is_paid' => 'boolean',
             'payment_reason' => 'required_if:is_paid,false|nullable|string|in:' . implode(',', [

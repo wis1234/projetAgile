@@ -1,117 +1,275 @@
-import React, { useEffect, useState } from 'react';
-import { router, usePage, Link } from '@inertiajs/react';
-import AdminLayout from '../../Layouts/AdminLayout';
-import { FaFlagCheckered, FaPlus, FaEdit, FaTrash, FaEye, FaSearch } from 'react-icons/fa';
-import ActionButton from '../../Components/ActionButton';
+import React, { useState, useEffect } from 'react';
+import { router, Link, usePage } from '@inertiajs/react';
+import AdminLayout from '@/Layouts/AdminLayout';
+import { FaFlagCheckered, FaPlus, FaSearch, FaTable, FaTh, FaProjectDiagram, FaCalendarAlt, FaList } from 'react-icons/fa';
+import { motion } from 'framer-motion';
 
-function Index({ sprints, filters }) {
+const Index = ({ sprints: initialSprints, filters: initialFilters = {} }) => {
   const { flash = {} } = usePage().props;
-  const [notification, setNotification] = useState(flash.success || '');
-  const [notificationType, setNotificationType] = useState('success');
-  const [search, setSearch] = useState(filters?.search || '');
+  const [sprints, setSprints] = useState(initialSprints);
+  const [search, setSearch] = useState(initialFilters.search || '');
+  const [viewMode, setViewMode] = useState('table'); // 'table' par défaut
+  const [notification, setNotification] = useState(null);
+
+  useEffect(() => {
+    if (flash.success) {
+      setNotification({ type: 'success', message: flash.success });
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [flash.success]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    router.get('/sprints', { search }, { preserveState: true, replace: true });
+    router.get(route('sprints.index'), { search }, { preserveState: true, replace: true });
   };
 
-  const handleDelete = (id) => {
-    if (confirm('Voulez-vous vraiment supprimer ce sprint ?')) {
-      router.delete(`/sprints/${id}`, {
-        onSuccess: () => {
-          setNotification('Sprint supprimé avec succès');
-          setNotificationType('success');
-        },
-        onError: () => {
-          setNotification('Erreur lors de la suppression');
-          setNotificationType('error');
-        }
-      });
+  const formatDate = (date) => {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(date).toLocaleDateString('fr-FR', options);
+  };
+
+  const getStatusInfo = (sprint) => {
+    const endDate = new Date(sprint.end_date);
+    const now = new Date();
+    const isPast = endDate < now;
+
+    if (isPast) {
+      return { label: 'Terminé', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' };
     }
+    return { label: 'En cours', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' };
   };
 
   return (
-    <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-      <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-        <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
-          {notification && (
-            <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
-          )}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-            <div className="flex items-center gap-3">
-              <FaFlagCheckered className="text-3xl text-blue-600" />
-              <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Sprints</h1>
+    <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-950 p-0 m-0">
+      <main className="flex-1 flex flex-col w-full py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-8">
+        {/* Header */}
+        <div className="flex flex-col space-y-4 sm:space-y-6 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <FaFlagCheckered className="text-3xl sm:text-4xl text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
+                Gestion des Sprints
+              </h1>
             </div>
-            <div className="flex gap-2 w-full md:w-auto">
-              <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full md:w-auto">
-                <input
-                  type="text"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Rechercher un sprint..."
-                  className="border px-3 py-2 rounded w-full md:w-64 mb-0 focus:ring-2 focus:ring-blue-400"
-                />
-                <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
-                  <FaSearch />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition duration-200 ${
+                    viewMode === 'table' 
+                      ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+                      : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                  }`}
+                >
+                  <FaList className="text-xs" />
+                  <span className="hidden sm:inline">Tableau</span>
                 </button>
-              </form>
-              <Link href="/sprints/create" className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow whitespace-nowrap">
-                <FaPlus /> Nouveau sprint
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition duration-200 ${
+                    viewMode === 'cards' 
+                      ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+                      : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                  }`}
+                >
+                  <FaTh className="text-xs" />
+                  <span className="hidden sm:inline">Cartes</span>
+                </button>
+              </div>
+              <Link 
+                href={route('sprints.create')}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base"
+              >
+                <FaPlus className="text-sm sm:text-lg" /> 
+                <span className="hidden sm:inline">Nouveau Sprint</span>
+                <span className="sm:hidden">Nouveau</span>
               </Link>
             </div>
           </div>
-          <div className="overflow-x-auto rounded-lg shadow bg-white dark:bg-gray-800 mb-8">
-            <table className="min-w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-white dark:bg-gray-800 shadow">
-                <tr>
-                  <th className="p-3 text-left font-bold">Sprint</th>
-                  <th className="p-3 text-left font-bold">Projet</th>
-                  <th className="p-3 text-left font-bold">Début</th>
-                  <th className="p-3 text-left font-bold">Fin</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sprints.data.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="text-center py-8 text-gray-400 dark:text-gray-500 text-lg font-semibold">
-                      Aucun sprint trouvé pour cette recherche.
-                    </td>
-                  </tr>
-                ) : sprints.data.map(sprint => (
-                  <tr
-                    key={sprint.id}
-                    className="hover:bg-blue-50 dark:hover:bg-blue-900 transition group cursor-pointer"
-                    onClick={() => window.location.href = `/sprints/${sprint.id}`}
-                    tabIndex={0}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') window.location.href = `/sprints/${sprint.id}`; }}
-                  >
-                    <td className="p-3 align-middle font-semibold text-blue-700 dark:text-blue-200 flex items-center gap-2 group-hover:text-blue-800 dark:group-hover:text-blue-100">
-                      <FaFlagCheckered /> {sprint.name}
-                    </td>
-                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{sprint.project?.name || '-'}</td>
-                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{sprint.start_date}</td>
-                    <td className="p-3 align-middle text-gray-600 dark:text-gray-300">{sprint.end_date}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex justify-center gap-2 mb-8">
-            {sprints.links && sprints.links.map((link, i) => (
-              <button
-                key={i}
-                className={`btn btn-sm rounded-full px-4 py-2 font-semibold shadow ${link.active ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-green-700 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-800'}`}
-                disabled={!link.url}
-                onClick={() => link.url && router.get(link.url)}
-                dangerouslySetInnerHTML={{ __html: link.label }}
-              />
-            ))}
-          </div>
         </div>
+
+        {/* Search */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+          <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
+            <div className="lg:col-span-3">
+              <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Recherche par nom de sprint
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  id="search-input"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200"
+                  placeholder="Rechercher un sprint..."
+                />
+                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md"
+            >
+              <FaSearch />
+              <span className="hidden sm:inline">Rechercher</span>
+            </button>
+          </form>
+        </div>
+
+        {/* Content */}
+        {viewMode === 'table' ? (
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg mb-8 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
+                <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
+                  <tr>
+                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Sprint</th>
+                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Projet</th>
+                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Période</th>
+                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sprints?.data?.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="text-center py-10 text-gray-500 dark:text-gray-400 text-lg">
+                        Aucun sprint trouvé.
+                      </td>
+                    </tr>
+                  ) : sprints?.data?.map(sprint => (
+                    <tr 
+                      key={sprint.id} 
+                      className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
+                      onClick={() => router.get(route('sprints.show', sprint.id))}
+                    >
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-blue-200 dark:border-blue-600 shadow-sm group-hover:border-blue-400 transition-colors duration-200">
+                            <FaFlagCheckered className="text-white text-lg" />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-800 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                              {sprint.name}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">ID: {sprint.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                          <FaProjectDiagram />
+                          <span>{sprint.project?.name || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-2">
+                          <FaCalendarAlt />
+                          <span>{formatDate(sprint.start_date)} - {formatDate(sprint.end_date)}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle">
+                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusInfo(sprint).color}`}>
+                          {getStatusInfo(sprint).label}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <motion.div 
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ staggerChildren: 0.1 }}
+          >
+            {sprints?.data?.length === 0 ? (
+              <div className="col-span-full text-center py-16">
+                <FaFlagCheckered className="mx-auto text-6xl text-gray-300 dark:text-gray-600 mb-4" />
+                <p className="text-xl text-gray-500 dark:text-gray-400">Aucun sprint trouvé</p>
+              </div>
+            ) : sprints?.data?.map(sprint => (
+              <motion.div
+                key={sprint.id}
+                className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-105 transition-all duration-200 cursor-pointer group"
+                onClick={() => router.get(route('sprints.show', sprint.id))}
+                variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <FaFlagCheckered className="text-white text-lg" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                        {sprint.name}
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {sprint.project?.name || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusInfo(sprint).color} flex-shrink-0`}>
+                    {getStatusInfo(sprint).label}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <FaCalendarAlt />
+                    <span>{formatDate(sprint.start_date)} - {formatDate(sprint.end_date)}</span>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+
+        {/* Pagination */}
+        {sprints?.links && sprints.links.length > 3 && (
+          <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
+              Affichage de {sprints.from || 0} à {sprints.to || 0} sur {sprints.total || 0} résultats
+            </div>
+            <div className="flex flex-wrap justify-center gap-1 sm:gap-2 order-1 sm:order-2">
+              {sprints.links.map((link, index) => (
+                <Link
+                  key={index}
+                  href={link.url}
+                  className={`px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 ${
+                    link.active
+                      ? 'bg-blue-600 text-white'
+                      : link.url
+                      ? 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                  }`}
+                  dangerouslySetInnerHTML={{ __html: link.label }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Notification */}
+        {notification && (
+          <motion.div 
+            className={`fixed top-4 right-4 z-50 px-4 sm:px-6 py-3 sm:py-4 rounded-lg shadow-xl text-white transition-all text-sm sm:text-base max-w-sm ${
+              notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            }`}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            {notification.message}
+          </motion.div>
+        )}
       </main>
     </div>
   );
-}
+};
 
 Index.layout = page => <AdminLayout children={page} />;
-export default Index; 
+export default Index;

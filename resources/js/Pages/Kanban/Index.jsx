@@ -1,99 +1,141 @@
-import React from 'react';
-import { Link, router } from '@inertiajs/react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import React, { useState, useMemo, useEffect } from 'react';
+import { router, usePage } from '@inertiajs/react';
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, arrayMove } from '@dnd-kit/sortable';
+import { Column } from './Column';
+import { TaskCard } from './TaskCard';
 import AdminLayout from '@/Layouts/AdminLayout';
+import Notification from '@/Components/Notification'; // Importation du composant Notification
 
 const STATUS_COLUMNS = [
-  { key: 'todo', label: 'À faire', color: 'bg-gray-100' },
-  { key: 'in_progress', label: 'En cours', color: 'bg-blue-100' },
-  { key: 'done', label: 'Terminé', color: 'bg-green-100' },
+  { id: 'todo', title: 'À faire' },
+  { id: 'in_progress', title: 'En cours' },
+  { id: 'done', title: 'Terminé' },
 ];
 
-function Kanban({ tasks }) {
-  // Convert tasks object to array for DnD
-  const [columns, setColumns] = React.useState(() => {
-    const cols = {};
-    STATUS_COLUMNS.forEach(col => {
-      cols[col.key] = tasks[col.key] ? [...tasks[col.key]] : [];
-    });
-    return cols;
-  });
+function Kanban({ tasks: initialTasks }) {
+  const { props } = usePage();
+  const [tasks, setTasks] = useState(initialTasks);
+  const [activeTask, setActiveTask] = useState(null);
+  const [notification, setNotification] = useState(null);
 
-  const onDragEnd = (result) => {
-    const { source, destination, draggableId } = result;
-    if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    const sourceCol = columns[source.droppableId];
-    const destCol = columns[destination.droppableId];
-    const [moved] = sourceCol.splice(source.index, 1);
-    moved.status = destination.droppableId;
-    destCol.splice(destination.index, 0, moved);
-    setColumns({ ...columns, [source.droppableId]: sourceCol, [destination.droppableId]: destCol });
-    
-    // Appel backend pour MAJ statut, maintenant protégé par la policy
-    router.put(`/tasks/${draggableId}`, { status: destination.droppableId }, { 
+  useEffect(() => {
+    if (props.success) {
+      setNotification({ type: 'success', message: props.success });
+    }
+    if (props.error) {
+      setNotification({ type: 'error', message: props.error });
+    }
+  }, [props.success, props.error]);
+
+  const columns = useMemo(() => STATUS_COLUMNS, []);
+  const tasksByStatus = useMemo(() => {
+    const groupedTasks = {};
+    columns.forEach(col => (groupedTasks[col.id] = []));
+    tasks.forEach(task => {
+      if (groupedTasks[task.status]) {
+        groupedTasks[task.status].push(task);
+      }
+    });
+    return groupedTasks;
+  }, [tasks, columns]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 3, // 3px
+      },
+    })
+  );
+
+  function onDragStart(event) {
+    if (event.active.data.current?.type === 'Task') {
+      setActiveTask(event.active.data.current.task);
+    }
+  }
+
+  function onDragEnd(event) {
+    setActiveTask(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id;
+    const overId = over.id;
+
+    if (activeId === overId) return;
+
+    const isActiveATask = active.data.current?.type === 'Task';
+    if (!isActiveATask) return;
+
+    const activeTask = tasks.find(t => t.id === activeId);
+    const overTask = tasks.find(t => t.id === overId);
+
+    let newStatus = activeTask.status;
+    let newPosition = activeTask.position;
+
+    if (over.data.current?.type === 'Column') {
+      newStatus = overId;
+      const tasksInNewColumn = tasksByStatus[newStatus];
+      newPosition = tasksInNewColumn.length;
+    } else {
+      newStatus = overTask.status;
+      newPosition = overTask.position;
+    }
+
+    const newTasks = tasks.map(t => {
+      if (t.id === activeId) {
+        return { ...t, status: newStatus, position: newPosition };
+      }
+      return t;
+    });
+
+    setTasks(newTasks);
+
+    router.put(
+      route('kanban.updateOrder'),
+      {
+        tasks: newTasks.map(({ id, status, position }) => ({ id, status, position }))
+      },
+      {
         preserveState: true,
         onError: () => {
-            // Revert state on authorization error
-            sourceCol.splice(source.index, 0, moved);
-            setColumns({ ...columns, [source.droppableId]: sourceCol, [destination.droppableId]: destCol });
-            alert("Vous n'êtes pas autorisé à modifier cette tâche.");
-        }
-    });
-  };
+          setTasks(initialTasks);
+          setNotification({ type: 'error', message: "Erreur lors de la mise à jour de l'ordre des tâches." });
+        },
+      }
+    );
+  }
 
   return (
-    <div className="p-6 min-h-screen bg-gray-50">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Kanban des tâches</h1>
-        <div className="flex gap-2">
-          <Link href="/tasks/create" className="btn">Créer une tâche</Link>
-          <Link href="/tasks" className="btn btn-secondary">Retour à la liste</Link>
-        </div>
+    <AdminLayout>
+      {notification && (
+        <Notification
+          type={notification.type}
+          message={notification.message}
+          onClose={() => setNotification(null)}
+        />
+      )}
+      <div className="p-6 bg-white">
+        <h1 className="text-2xl font-bold mb-4">Kanban</h1>
+        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+          <div className="flex gap-4 overflow-x-auto">
+            <SortableContext items={columns.map(c => c.id)}>
+              {columns.map(col => (
+                <Column
+                  key={col.id}
+                  column={col}
+                  tasks={tasksByStatus[col.id] || []}
+                />
+              ))}
+            </SortableContext>
+          </div>
+          <DragOverlay>
+            {activeTask && <TaskCard task={activeTask} />}
+          </DragOverlay>
+        </DndContext>
       </div>
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {STATUS_COLUMNS.map(col => (
-            <Droppable droppableId={col.key} key={col.key}>
-              {(provided, snapshot) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className={`rounded-lg p-4 shadow ${col.color} min-h-[300px] transition-all ${snapshot.isDraggingOver ? 'ring-2 ring-blue-400' : ''}`}
-                >
-                  <h2 className="text-xl font-semibold mb-4 text-center">{col.label}</h2>
-                  <div className="space-y-3">
-                    {columns[col.key].length === 0 && <div className="text-gray-400 text-center">Aucune tâche</div>}
-                    {columns[col.key].map((task, idx) => (
-                      <Draggable draggableId={String(task.id)} index={idx} key={task.id}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className={`bg-white rounded shadow p-3 border flex flex-col gap-1 transition-all ${snapshot.isDragging ? 'ring-2 ring-blue-400' : ''}`}
-                          >
-                            <div className="font-medium text-lg">{task.title}</div>
-                            <div className="text-sm text-gray-500">{task.description}</div>
-                            <div className="flex justify-between text-xs mt-2">
-                              <span className="px-2 py-0.5 rounded bg-gray-200">{task.priority || '—'}</span>
-                              <span>{task.due_date ? `Échéance : ${task.due_date}` : ''}</span>
-                            </div>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                </div>
-              )}
-            </Droppable>
-          ))}
-        </div>
-      </DragDropContext>
-    </div>
+    </AdminLayout>
   );
 }
 
-Kanban.layout = page => <AdminLayout children={page} />;
-export default Kanban; 
+export default Kanban;

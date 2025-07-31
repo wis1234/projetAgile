@@ -1,282 +1,171 @@
-import React, { useState, useEffect } from 'react';
-import { Link, usePage, router } from '@inertiajs/react';
-import AdminLayout from '../../Layouts/AdminLayout';
-import ActionButton from '../../Components/ActionButton';
-import Notification from '../../Components/Notification'; // Import the Notification component
-import { FaFileAlt, FaClock, FaCommentDots, FaTrash } from 'react-icons/fa';
-import { route } from 'ziggy-js';
+import React, { useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import AdminLayout from '@/Layouts/AdminLayout';
+import { motion } from 'framer-motion';
+import FileHeader from '@/Components/FileDetails/FileHeader';
+import FilePreview from '@/Components/FileDetails/FilePreview';
+import FileMetadata from '@/Components/FileDetails/FileMetadata';
+import StatusUpdateForm from '@/Components/FileDetails/StatusUpdateForm';
+import CommentsSection from '@/Components/FileDetails/CommentsSection';
+import RelatedInfo from '@/Components/FileDetails/RelatedInfo';
+import { FaProjectDiagram, FaTasks, FaUser, FaFileAlt, FaClock } from 'react-icons/fa';
 
-export default function Show({ file, canUpdateStatus, statuses }) {
-    const { flash = {} } = usePage().props;
-    const fileUrl = `/storage/${file.file_path}`;
-    const [status, setStatus] = useState(file.status);
-    const [rejectionReason, setRejectionReason] = useState(file.rejection_reason || '');
-    const [loading, setLoading] = useState(false);
+const Show = ({ file, statuses, auth }) => {
+  const { user: currentUser } = auth;
+  const [currentFile, setCurrentFile] = useState(file);
+  
+  // Vérifier les permissions
+  const isAdmin = currentUser?.role === 'admin';
+  const isProjectManager = currentFile.project?.managers?.some(m => m.id === currentUser?.id);
+  const isFileOwner = currentFile.user_id === currentUser?.id;
+  const canDelete = isAdmin || isProjectManager || isFileOwner;
+  const canUpdateStatus = isAdmin || isProjectManager;
 
-    // Commentaires
-    const [comments, setComments] = useState([]);
-    const [loadingComments, setLoadingComments] = useState(true);
-    const [commentContent, setCommentContent] = useState('');
-    const [posting, setPosting] = useState(false);
-    const [error, setError] = useState('');
-    const { auth } = usePage().props;
-    const userAuth = auth?.user || auth;
-    const isAdmin = userAuth && userAuth.role === 'admin';
-    const isProjectMember = isAdmin || (file.project && file.project.users && file.project.users.some(u => u.id === userAuth.id));
+  const handleStatusUpdate = (updatedFile) => {
+    setCurrentFile(updatedFile);
+  };
 
-    useEffect(() => {
-        fetch(`/api/files/${file.id}/comments`)
-            .then(res => res.json())
-            .then(setComments)
-            .catch(() => setComments([]))
-            .finally(() => setLoadingComments(false));
-    }, [file.id]);
+  const handleDelete = () => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce fichier ?')) {
+      router.delete(route('files.destroy', currentFile.id), {
+        onSuccess: () => {
+          router.visit(route('files.index'));
+        },
+      });
+    }
+  };
 
-    const handleStatusChange = (e) => {
-        setStatus(e.target.value);
-        if (e.target.value !== 'rejected') {
-            setRejectionReason('');
-        }
-    };
+  // Animation variants
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        setLoading(true);
-        router.put(route('files.update', file.id), {
-            name: file.name,
-            project_id: file.project?.id,
-            task_id: file.task?.id,
-            kanban_id: file.kanban?.id,
-            user_id: file.user?.id,
-            description: file.description,
-            status,
-            rejection_reason: status === 'rejected' ? rejectionReason : null,
-        }, {
-            onFinish: () => setLoading(false)
-        });
-    };
+  const item = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.3 } }
+  };
 
-    const handleCommentSubmit = async (e) => {
-        e.preventDefault();
-        setPosting(true);
-        setError('');
-        try {
-            const res = await fetch(`/api/files/${file.id}/comments`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                },
-                body: JSON.stringify({ content: commentContent })
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                setError(data.message || JSON.stringify(data) || 'Erreur lors de l\'envoi');
-                console.error('Erreur serveur:', data);
-            } else {
-                setComments([...comments, data]);
-                setCommentContent('');
-            }
-        } catch (e) {
-            setError(e.message || 'Erreur lors de l\'envoi');
-            console.error('Erreur JS:', e);
-        }
-        setPosting(false);
-    };
-
-    const handleDeleteComment = async (commentId) => {
-        if (!window.confirm('Supprimer ce commentaire ?')) return;
-        const res = await fetch(`/api/files/${file.id}/comments/${commentId}`, {
-            method: 'DELETE',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-            },
-        });
-        if (res.ok) setComments(comments.filter(c => c.id !== commentId));
-    };
-
-    const [editingId, setEditingId] = useState(null);
-    const [editContent, setEditContent] = useState('');
-    const handleEditComment = (comment) => {
-        setEditingId(comment.id);
-        setEditContent(comment.content);
-    };
-    const handleUpdateComment = async (e) => {
-        e.preventDefault();
-        const res = await fetch(`/api/files/${file.id}/comments/${editingId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-            },
-            body: JSON.stringify({ content: editContent })
-        });
-        if (res.ok) {
-            const updated = await res.json();
-            setComments(comments.map(c => c.id === updated.id ? updated : c));
-            setEditingId(null);
-            setEditContent('');
-        }
-    };
-
-    const handleDelete = () => {
-        if (window.confirm('Supprimer ce fichier ? Cette action est irréversible.')) {
-            router.delete(route('files.destroy', file.id), {
-                onSuccess: () => {
-                    // Optionally, display a success flash message if not handled by backend
-                    // and redirect is handled by Inertia automatically
-                },
-                onError: (errors) => {
-                    console.error('Error deleting file:', errors);
-                    alert('Erreur lors de la suppression du fichier.');
-                }
-            });
-        }
-    };
-
-    const statusBadge = (
-        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-            file.status === 'validated' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-            file.status === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-            'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-        }`}>
-            {file.status}
-        </span>
-    );
-
-    return (
-        <div className="flex flex-col w-full bg-white dark:bg-gray-900 p-0 m-0">
-            {flash.success && <Notification message={flash.success} type="success" />}
-            {flash.error && <Notification message={flash.error} type="error" />}
-            <div className="flex flex-col h-full w-full max-w-7xl mx-auto pt-4 bg-white dark:bg-gray-900">
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                        <FaFileAlt className="text-3xl text-blue-600" />
-                        <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail du fichier</h1>
-                    </div>
-                    <div className="flex gap-2">
-                        <a href={route('files.download', file.id)}>
-                          <ActionButton variant="primary">Télécharger</ActionButton>
-                        </a>
-                        {file.type && file.type.startsWith('image/') && (
-                          <a href={fileUrl} target="_blank" rel="noopener noreferrer">
-                            <ActionButton variant="info">Prévisualiser</ActionButton>
-                          </a>
-                        )}
-                        <Link href={route('files.edit', file.id)}>
-                          <ActionButton variant="warning">Éditer</ActionButton>
-                        </Link>
-                        <ActionButton variant="danger" onClick={handleDelete} className="flex items-center gap-2">
-                          <FaTrash /> Supprimer
-                        </ActionButton>
-                        <Link href={route('files.index')}>
-                          <ActionButton variant="default">Retour</ActionButton>
-                        </Link>
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
-                    <div className="mb-4 flex flex-col gap-2">
-                        <div><span className="font-semibold">Nom :</span> <span className="text-blue-800 dark:text-blue-200">{file.name}</span></div>
-                        <div><span className="font-semibold">Projet :</span> {file.project?.name || <span className="text-gray-400">-</span>}</div>
-                        <div><span className="font-semibold">Tâche :</span> {file.task?.title || <span className="text-gray-400">-</span>}</div>
-                        <div><span className="font-semibold">Utilisateur :</span> {file.user?.name || <span className="text-gray-400">-</span>}</div>
-                        <div><span className="font-semibold">Taille :</span> <span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></div>
-                        <div><span className="font-semibold">Statut :</span> {statusBadge}</div>
-                        <div><span className="font-semibold">Date :</span> <span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></div>
-                        {file.description && <div><span className="font-semibold">Description :</span> <span className="italic text-gray-600 dark:text-gray-300">{file.description}</span></div>}
-                    </div>
-                    {canUpdateStatus && (
-                        <form onSubmit={handleSubmit} className="mb-4 p-4 bg-gray-50 dark:bg-gray-900 rounded shadow">
-                            <div className="mb-2">
-                                <label className="font-semibold">Changer le statut :</label>
-                                <select value={status} onChange={handleStatusChange} className="ml-2 px-2 py-1 rounded border">
-                                    {statuses.map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {status === 'rejected' && (
-                                <div className="mb-2">
-                                    <label className="font-semibold">Motif du rejet :</label>
-                                    <input type="text" value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} className="ml-2 px-2 py-1 rounded border w-2/3" required={status === 'rejected'} />
-                                </div>
-                            )}
-                            <button type="submit" className="mt-2" disabled={loading}>
-                              <ActionButton variant="primary" type="submit" disabled={loading}>{loading ? 'Enregistrement...' : 'Enregistrer'}</ActionButton>
-                            </button>
-                        </form>
-                    )}
-                </div>
-                {/* Section Commentaires */}
-                {isProjectMember && (
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
-                      <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-blue-700 dark:text-blue-200"><FaCommentDots /> Commentaires</h2>
-                      {loadingComments ? (
-                          <div className="text-gray-400">Chargement des commentaires...</div>
-                      ) : (
-                          <div>
-                              {comments.length === 0 ? (
-                                  <div className="text-gray-400 italic">Aucun commentaire pour l'instant.</div>
-                              ) : (
-                                  <ul className="space-y-4 mb-6">
-                                      {comments.map(comment => (
-                                          <li key={comment.id} className="bg-blue-50 dark:bg-blue-900 rounded p-3 shadow flex gap-3">
-                                              <img src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}`} alt={comment.user?.name} className="w-8 h-8 rounded-full border-2 border-blue-200" />
-                                              <div className="flex-1">
-                                                  <div className="font-semibold text-blue-800 dark:text-blue-200">{comment.user?.name}</div>
-                                                  <div className="text-gray-600 dark:text-gray-300 text-sm mb-1">{new Date(comment.created_at).toLocaleString()}</div>
-                                                  {editingId === comment.id ? (
-                                                      <form onSubmit={handleUpdateComment} className="flex flex-col gap-2">
-                                                          <textarea value={editContent} onChange={e => setEditContent(e.target.value)} className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400" required maxLength={2000} />
-                                                          <div className="flex gap-2">
-                                                              <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">Enregistrer</button>
-                                                              <button type="button" className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded" onClick={() => setEditingId(null)}>Annuler</button>
-                                                          </div>
-                                                      </form>
-                                                  ) : (
-                                                      <div className="text-gray-900 dark:text-gray-100">{comment.content}</div>
-                                                  )}
-                                              </div>
-                                              {comment.user?.id === auth.user.id && editingId !== comment.id && (
-                                                  <div className="flex flex-col gap-1 ml-2">
-                                                      <button onClick={() => handleEditComment(comment)} className="text-xs text-yellow-700 hover:underline">Éditer</button>
-                                                      <button onClick={() => handleDeleteComment(comment.id)} className="text-xs text-red-600 hover:underline">Supprimer</button>
-                                                  </div>
-                                              )}
-                                          </li>
-                                      ))}
-                                  </ul>
-                              )}
-                              <form onSubmit={handleCommentSubmit} className="flex flex-col gap-2">
-                                  <textarea
-                                      value={commentContent}
-                                      onChange={e => setCommentContent(e.target.value)}
-                                      placeholder="Ajouter un commentaire..."
-                                      className="border rounded p-2 w-full min-h-[60px] focus:ring-2 focus:ring-blue-400"
-                                      disabled={posting}
-                                      required
-                                      maxLength={2000}
-                                  />
-                                  {error && <div className="text-red-500 text-sm">{error}</div>}
-                                  <button type="submit" className="self-end bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow flex items-center gap-2" disabled={posting || !commentContent.trim()}>
-                                      {posting ? 'Envoi...' : 'Commenter'}
-                                  </button>
-                              </form>
-                          </div>
-                      )}
-                  </div>
-                )}
-                
-                {file.type && file.type.startsWith('image/') && (
-                  <div className="mt-6">
-                    <img src={fileUrl} alt={file.name} className="max-w-full rounded shadow" />
-                  </div>
-                )}
+  return (
+    <AdminLayout>
+      <Head title={`Fichier - ${currentFile.name}`} />
+      
+      <div className="min-h-screen bg-white">
+        <FileHeader 
+          file={currentFile} 
+          onDelete={handleDelete} 
+          currentUser={currentUser}
+        />
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <motion.div 
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+            variants={container}
+            initial="hidden"
+            animate="show"
+          >
+            {/* Colonne principale */}
+            <div className="lg:col-span-2 space-y-6">
+              <motion.div variants={item}>
+                <FilePreview file={currentFile} />
+              </motion.div>
+              
+              <motion.div variants={item}>
+                <FileMetadata file={currentFile} />
+              </motion.div>
+              
+              {canUpdateStatus && (
+                <motion.div variants={item}>
+                  <StatusUpdateForm 
+                    file={currentFile} 
+                    statuses={statuses} 
+                    onStatusUpdate={handleStatusUpdate}
+                  />
+                </motion.div>
+              )}
             </div>
+            
+            {/* Colonne secondaire */}
+            <div className="lg:col-span-1 space-y-6">
+              <motion.div 
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300"
+                variants={item}
+              >
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Informations liées
+                  </h2>
+                </div>
+                <div className="p-6 space-y-4">
+                  {currentFile.project && (
+                    <RelatedInfo 
+                      icon={
+                        <FaProjectDiagram className="h-5 w-5 text-blue-600" />
+                      }
+                      title="Projet"
+                      value={currentFile.project.name}
+                      href={route('projects.show', currentFile.project.id)}
+                    />
+                  )}
+                  
+                  {currentFile.task && (
+                    <RelatedInfo 
+                      icon={
+                        <FaTasks className="h-5 w-5 text-purple-600" />
+                      }
+                      title="Tâche"
+                      value={currentFile.task.name}
+                      href={route('tasks.show', [currentFile.project?.id, currentFile.task.id])}
+                    />
+                  )}
+                  
+                  <RelatedInfo 
+                    icon={
+                      <FaUser className="h-5 w-5 text-green-600" />
+                    }
+                    title="Déposé par"
+                    value={currentFile.user?.name || 'Utilisateur inconnu'}
+                  />
+                  
+                  <RelatedInfo 
+                    icon={
+                      <FaFileAlt className="h-5 w-5 text-gray-500" />
+                    }
+                    title="Type de fichier"
+                    value={currentFile.type || 'Inconnu'}
+                  />
+                  
+                  <RelatedInfo 
+                    icon={
+                      <FaClock className="h-5 w-5 text-yellow-600" />
+                    }
+                    title="Date de dépôt"
+                    value={new Date(currentFile.created_at).toLocaleString('fr-FR')}
+                  />
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+          
+          {/* Section des commentaires */}
+          <motion.div 
+            className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+            variants={item}
+          >
+            <CommentsSection 
+              fileId={currentFile.id} 
+              currentUserId={currentUser?.id} 
+            />
+          </motion.div>
         </div>
-    );
-}
-Show.layout = page => <AdminLayout children={page} />; 
+      </div>
+    </AdminLayout>
+  );
+};
+
+export default Show;

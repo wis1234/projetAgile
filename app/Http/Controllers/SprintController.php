@@ -79,7 +79,7 @@ class SprintController extends Controller
      */
     public function show(string $id)
     {
-        $sprint = Sprint::with(['project', 'tasks'])->findOrFail($id);
+        $sprint = Sprint::with(['project', 'tasks.assignedUser'])->findOrFail($id);
         try {
             $this->authorize('view', $sprint);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {

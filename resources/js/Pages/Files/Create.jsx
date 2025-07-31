@@ -5,14 +5,13 @@ import { Link } from '@inertiajs/react';
 import { FaFileAlt } from 'react-icons/fa';
 
 function Create({ projects, users, tasks = [], kanbans = [] }) {
-  const { errors = {}, flash = {} } = usePage().props;
+  const { errors = {}, flash = {}, auth } = usePage().props;
   const urlParams = new URLSearchParams(window.location.search);
   const urlTaskId = urlParams.get('task_id');
   const urlProjectId = urlParams.get('project_id');
   const [name, setName] = useState('');
   const [file, setFile] = useState(null);
   const [projectId, setProjectId] = useState(urlProjectId || projects[0]?.id || '');
-  const [userId, setUserId] = useState(users[0]?.id || '');
   const [taskId, setTaskId] = useState(urlTaskId || '');
   const [kanbanId, setKanbanId] = useState('');
   const [description, setDescription] = useState('');
@@ -32,7 +31,7 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
     formData.append('name', name);
     formData.append('file', file);
     formData.append('project_id', projectId);
-    formData.append('user_id', userId);
+    // user_id n'est plus nécessaire car défini côté serveur
     if (taskId) formData.append('task_id', taskId);
     if (kanbanId) formData.append('kanban_id', kanbanId);
     if (description) formData.append('description', description);

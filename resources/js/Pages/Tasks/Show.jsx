@@ -33,6 +33,8 @@ export default function Show({ task, payments, projectMembers }) {
   const [showConfirmValidationModal, setShowConfirmValidationModal] = useState(false);
   const [paymentToValidateId, setPaymentToValidateId] = useState(null);
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
+  const [showConfirmDeleteCommentModal, setShowConfirmDeleteCommentModal] = useState(false);
+  const [commentToDeleteId, setCommentToDeleteId] = useState(null);
 
   useEffect(() => {
     // When the component loads, if it's a manager/admin, default selected member to current user
@@ -207,16 +209,25 @@ export default function Show({ task, payments, projectMembers }) {
       .finally(() => setLoadingComments(false));
   }, [task.id]);
 
-  const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Supprimer ce commentaire ?')) return;
-    const res = await fetch(`/api/tasks/${task.id}/comments/${commentId}`, {
+  const handleDeleteComment = (commentId) => {
+    setCommentToDeleteId(commentId);
+    setShowConfirmDeleteCommentModal(true);
+  };
+
+  const confirmDeleteComment = async () => {
+    if (!commentToDeleteId) return;
+    const res = await fetch(`/api/tasks/${task.id}/comments/${commentToDeleteId}`, {
       method: 'DELETE',
       headers: {
         'X-Requested-With': 'XMLHttpRequest',
         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
       },
     });
-    if (res.ok) setComments(comments.filter(c => c.id !== commentId));
+    if (res.ok) {
+      setComments(comments.filter(c => c.id !== commentToDeleteId));
+      setShowConfirmDeleteCommentModal(false);
+      setCommentToDeleteId(null);
+    }
   };
 
   const [editingId, setEditingId] = useState(null);
@@ -311,16 +322,21 @@ export default function Show({ task, payments, projectMembers }) {
             >
               Détails
             </button>
-            <button
-              onClick={() => setActiveTab('payment')}
-              className={`${
-                activeTab === 'payment'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-            >
-              Paiement
-            </button>
+            
+            {/* Onglet Rémunération - Uniquement si la tâche est rémunérée */}
+            {task.is_paid && (
+              <button
+                onClick={() => setActiveTab('payment')}
+                className={`${
+                  activeTab === 'payment'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Rémunération
+              </button>
+            )}
+            
             <button
               onClick={() => setActiveTab('files')}
               className={`${
@@ -339,7 +355,7 @@ export default function Show({ task, payments, projectMembers }) {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
-              Commentaires
+              Discussions
             </button>
           </nav>
         </div>
@@ -389,12 +405,41 @@ export default function Show({ task, payments, projectMembers }) {
                   </Link>
                 </div>
 
-                {/* Sprint */}
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">Sprint :</span> 
-                  <Link href={`/sprints/${task.sprint.id}`} className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 text-lg">
-                    <FaFlagCheckered /> {task.sprint ? task.sprint.name : <span className="italic text-gray-400">Aucun</span>}
-                  </Link>
+                {/* Sprint avec plus de détails */}
+                <div className="flex items-start gap-4">
+                  <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Sprint :</span> 
+                  <div className="flex-1">
+                    {task.sprint_id ? (
+                      <div className="space-y-2">
+                        {task.sprint ? (
+                          <>
+                            <Link 
+                              href={`/sprints/${task.sprint.id}`} 
+                              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 text-lg"
+                            >
+                              <FaFlagCheckered /> {task.sprint.name}
+                            </Link>
+                            <div className="text-sm text-gray-600 dark:text-gray-400 pl-6">
+                              <p>Date de début: {new Date(task.sprint.start_date).toLocaleDateString('fr-FR')}</p>
+                              <p>Date de fin: {new Date(task.sprint.end_date).toLocaleDateString('fr-FR')}</p>
+                              {task.sprint.goal && (
+                                <p>Objectif: {task.sprint.goal}</p>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <FaFlagCheckered className="text-gray-400" />
+                            <span className="text-gray-600 dark:text-gray-400">
+                              Sprint ID: {task.sprint_id} (Détails non chargés)
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 italic">Aucun sprint associé</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Status */}
@@ -428,12 +473,121 @@ export default function Show({ task, payments, projectMembers }) {
                 </div>
               </div>
 
+              {/* Détails de la tâche */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                {/* Colonne de gauche */}
+                <div className="space-y-4">
+                  {/* Statut */}
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Statut :</span> 
+                    {getStatusBadge(task.status)}
+                  </div>
+
+                  {/* Priorité */}
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Priorité :</span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      task.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                    }`}>
+                      {task.priority === 'high' ? 'Haute' : task.priority === 'medium' ? 'Moyenne' : 'Basse'}
+                    </span>
+                  </div>
+
+                  {/* Date de création */}
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Créée le :</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {new Date(task.created_at).toLocaleString('fr-FR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Colonne de droite */}
+                <div className="space-y-4">
+                  {/* Assigné à */}
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Assigné à :</span>
+                    {task.assigned_user ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                            {task.assigned_user.name.split(' ').map(n => n[0]).join('')}
+                          </span>
+                        </div>
+                        <span>{task.assigned_user.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 italic">Non assigné</span>
+                    )}
+                  </div>
+
+                  {/* Date d'échéance */}
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Échéance :</span>
+                    <span className={`${
+                      new Date(task.due_date) < new Date() && task.status !== 'done' 
+                        ? 'text-red-600 dark:text-red-400 font-medium' 
+                        : 'text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {new Date(task.due_date).toLocaleDateString('fr-FR', {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                      {new Date(task.due_date) < new Date() && task.status !== 'done' && (
+                        <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-300">
+                          En retard
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Dernière mise à jour */}
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Mise à jour :</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {new Date(task.updated_at).toLocaleString('fr-FR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {/* Description */}
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Description</h3>
-                <p className="text-gray-800 dark:text-gray-200 leading-relaxed">
-                  {task.description || <span className="italic text-gray-400">Aucune description</span>}
-                </p>
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Description</h3>
+                </div>
+                
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  {task.description ? (
+                    <div className="prose dark:prose-invert max-w-none">
+                      {task.description.split('\n').map((paragraph, index) => (
+                        <p key={index} className="text-gray-700 dark:text-gray-300">
+                          {paragraph || <br />}
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-400 italic">
+                      Aucune description n'a été ajoutée à cette tâche.
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -459,7 +613,7 @@ export default function Show({ task, payments, projectMembers }) {
             </div>
           )}
 
-          {activeTab === 'payment' && (
+          {activeTab === 'payment' && task.is_paid && (
             <div>
               {/* Payment Section - Current User's Payment */}
               <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
@@ -826,15 +980,15 @@ export default function Show({ task, payments, projectMembers }) {
 
           {activeTab === 'comments' && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-              <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200"><FaCommentDots /> Commentaires</h2>
+              <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200"><FaCommentDots /> Discussions</h2>
               {loadingComments ? (
-                <div className="text-gray-400 italic">Chargement des commentaires...</div>
+                <div className="text-gray-400 italic">Chargement des discussions...</div>
               ) : (
                 <div>
                   {comments.length === 0 ? (
                     <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3 mb-6">
                       <FaInfoCircle className="text-blue-600 dark:text-blue-300 text-xl" />
-                      <p className="text-blue-800 dark:text-blue-200 italic">Aucun commentaire pour l'instant.</p>
+                      <p className="text-blue-800 dark:text-blue-200 italic">Aucune discussion pour l'instant.</p>
                     </div>
                   ) : (
                     <ul className="space-y-6 mb-6">
@@ -860,8 +1014,14 @@ export default function Show({ task, payments, projectMembers }) {
                           </div>
                           {comment.user?.id === auth.user.id && editingId !== comment.id && (
                             <div className="flex flex-col gap-2 ml-4">
-                              <button onClick={() => handleEditComment(comment)} className="text-sm text-yellow-700 hover:underline hover:text-yellow-800 transition-colors duration-200">Éditer</button>
-                              <button onClick={() => handleDeleteComment(comment.id)} className="text-sm text-red-600 hover:underline hover:text-red-700 transition-colors duration-200">Supprimer</button>
+                              <button onClick={() => handleEditComment(comment)} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200">
+                                <FaEdit />
+                                <span>Éditer</span>
+                              </button>
+                              <button onClick={() => handleDeleteComment(comment.id)} className="flex items-center gap-1 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200">
+                                <FaTrash />
+                                <span>Supprimer</span>
+                              </button>
                             </div>
                           )}
                         </li>
@@ -869,12 +1029,12 @@ export default function Show({ task, payments, projectMembers }) {
                     </ul>
                   )}
                   <form onSubmit={handleCommentSubmit} className="flex flex-col gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Ajouter un nouveau commentaire</h3>
+                    <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Ajouter une nouvelle discussion</h3>
                     <textarea
                       value={commentContent}
                       onChange={e => setCommentContent(e.target.value)}
                       onKeyDown={handleCommentKeyDown}
-                      placeholder="Écrire votre commentaire ici..."
+                      placeholder="Écrire votre message ici..."
                       className="border border-gray-300 rounded-lg p-3 w-full min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
                       disabled={posting}
                       required
@@ -882,7 +1042,7 @@ export default function Show({ task, payments, projectMembers }) {
                     />
                     {error && <div className="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-lg text-sm">{error}</div>}
                     <button type="submit" className="self-end bg-blue-700 hover:bg-blue-800 text-white px-5 py-3 rounded-lg font-semibold hover:shadow-md flex items-center gap-2 transition duration-200" disabled={posting || !commentContent.trim()}>
-                      {posting ? 'Envoi...' : 'Envoyer le commentaire'}
+                      {posting ? 'Envoi...' : 'Envoyer le message'}
                     </button>
                   </form>
                 </div>
@@ -925,6 +1085,26 @@ export default function Show({ task, payments, projectMembers }) {
                 Annuler
               </button>
               <button onClick={confirmDeleteTask} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Delete Comment Confirmation Modal */}
+        <Modal show={showConfirmDeleteCommentModal} onClose={() => setShowConfirmDeleteCommentModal(false)} maxWidth="sm">
+          <div className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+              Confirmer la suppression du message
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Êtes-vous sûr de vouloir supprimer ce message ? Cette action est irréversible.
+            </p>
+            <div className="mt-6 flex justify-end">
+              <button onClick={() => setShowConfirmDeleteCommentModal(false)} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                Annuler
+              </button>
+              <button onClick={confirmDeleteComment} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                 Supprimer
               </button>
             </div>

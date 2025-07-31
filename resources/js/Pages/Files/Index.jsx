@@ -1,23 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Inertia } from '@inertiajs/inertia';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaFileAlt, FaPlus, FaUser, FaProjectDiagram, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSearch, FaDownload } from 'react-icons/fa';
-import ActionButton from '../../Components/ActionButton';
-import axios from 'axios';
+import { FaFileAlt, FaPlus, FaSearch, FaDownload, FaTable, FaTh, FaImage, FaFilePdf, FaFileWord, FaFileExcel, FaFileCode, FaClock } from 'react-icons/fa';
 
 export default function Index({ files, filters }) {
     const { flash = {} } = usePage().props;
     const [search, setSearch] = useState(filters?.search || '');
-    const [notification, setNotification] = React.useState(flash.success || '');
-    const [notificationType, setNotificationType] = React.useState('success');
+    const [notification, setNotification] = useState(flash.success || '');
     const [selectedFiles, setSelectedFiles] = useState([]);
-    const allChecked = files.data.length > 0 && selectedFiles.length === files.data.length;
-    const isIndeterminate = selectedFiles.length > 0 && selectedFiles.length < files.data.length;
-
+    const [viewMode, setViewMode] = useState('table');
+    
     const handleSearchSubmit = (e) => {
         e.preventDefault();
-        Inertia.get('/files', { search }, { preserveState: true, replace: true });
+        router.get('/files', { search }, { preserveState: true, replace: true });
+    };
+
+    const handleRowClick = (fileId) => {
+        router.visit(`/files/${fileId}`);
     };
 
     const handleSelectAll = (e) => {
@@ -53,143 +53,230 @@ export default function Index({ files, filters }) {
         }
     };
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (flash.success) {
             setNotification(flash.success);
-            setNotificationType('success');
         }
     }, [flash.success]);
 
+    const getFileIcon = (fileType) => {
+        if (!fileType) return <FaFileAlt className="text-gray-400 text-xl" />;
+        if (fileType.startsWith('image/')) return <FaImage className="text-pink-500 text-xl" />;
+        if (fileType.includes('pdf')) return <FaFilePdf className="text-red-500 text-xl" />;
+        if (fileType.includes('word')) return <FaFileWord className="text-blue-500 text-xl" />;
+        if (fileType.includes('excel')) return <FaFileExcel className="text-green-500 text-xl" />;
+        if (fileType.includes('html')) return <FaFileCode className="text-orange-500 text-xl" />;
+        return <FaFileAlt className="text-gray-400 text-xl" />;
+    };
+
+    const truncateFileType = (fileType) => {
+        if (!fileType) return 'Inconnu';
+        const mainType = fileType.split('(')[0].trim();
+        return mainType.length > 15 ? `${mainType.substring(0, 12)}...` : mainType;
+    };
+
     return (
-        <div className="flex flex-col w-full bg-white dark:bg-gray-900 rounded-none shadow-none p-0 m-0">
-            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 p-0 m-0">
-                <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-                        <div className="flex items-center gap-3">
-                            <FaFileAlt className="text-3xl text-blue-600" />
-                            <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Fichiers</h1>
+        <div className="min-h-screen bg-white dark:bg-gray-900 p-4 sm:p-6">
+            {/* Header */}
+            <div className="mb-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                            <FaFileAlt className="text-blue-600 dark:text-blue-300 text-2xl" />
                         </div>
-                        <div className="flex gap-2 w-full md:w-auto">
-                            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full md:w-auto">
-                                <input
-                                    type="text"
-                                    value={search}
-                                    onChange={e => setSearch(e.target.value)}
-                                    placeholder="Rechercher un fichier..."
-                                    className="border px-3 py-2 rounded w-full md:w-64 mb-0 focus:ring-2 focus:ring-blue-400"
-                                />
-                                <button type="submit" className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow font-semibold">
-                                    <FaSearch />
-                                </button>
-                            </form>
-                            <Link href="/files/create" className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold shadow whitespace-nowrap">
-                                <FaPlus /> Nouveau fichier
-                            </Link>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Fichiers</h1>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+                        <div className="inline-flex rounded-md shadow-sm border border-gray-300 dark:border-gray-600">
                             <button
-                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold disabled:opacity-50"
-                                disabled={selectedFiles.length === 0}
-                                onClick={handleBulkDownload}
-                                type="button"
+                                onClick={() => setViewMode('table')}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-l-md ${viewMode === 'table' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200'}`}
                             >
-                                <FaDownload /> Télécharger{selectedFiles.length > 1 ? ' (' + selectedFiles.length + ')' : ''}
+                                <FaTable className="inline mr-1" /> Tableau
+                            </button>
+                            <button
+                                onClick={() => setViewMode('cards')}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-r-md ${viewMode === 'cards' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200'}`}
+                            >
+                                <FaTh className="inline mr-1" /> Cartes
                             </button>
                         </div>
+                        
+                        <Link 
+                            href="/files/create" 
+                            className="inline-flex items-center gap-1 px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                        >
+                            <FaPlus /> Nouveau fichier
+                        </Link>
                     </div>
-                    {notification && (
-                        <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded shadow-lg text-white transition-all ${notificationType === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{notification}</div>
-                    )}
-                    <div className="overflow-x-auto rounded-lg shadow bg-white dark:bg-gray-800 mb-8">
-                        <table className="min-w-full text-sm">
-                            <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-100 to-blue-300 dark:from-blue-900 dark:to-blue-700 shadow">
-                                <tr>
-                                    <th className="p-2 md:p-3 text-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={allChecked}
-                                            ref={el => { if (el) el.indeterminate = isIndeterminate; }}
-                                            onChange={handleSelectAll}
-                                            aria-label="Tout sélectionner"
-                                        />
-                                    </th>
-                                    <th className="p-2 md:p-3 text-left font-bold">Type</th>
-                                    <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Nom</th>
-                                    <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Projet</th>
-                                    <th className="p-2 md:p-3 text-left font-bold max-w-[120px] truncate">Utilisateur</th>
-                                    <th className="p-2 md:p-3 text-left font-bold">Taille</th>
-                                    <th className="p-2 md:p-3 text-left font-bold">Statut</th>
-                                    <th className="p-2 md:p-3 text-left font-bold">Date</th>
-                                    <th className="p-2 md:p-3 text-left font-bold">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {files.data.map((file, idx) => {
-                                    const isImage = file.type && file.type.startsWith('image/');
-                                    const isPdf = file.type && file.type.includes('pdf');
-                                    const isDoc = file.type && (file.type.includes('word') || file.type.includes('doc'));
-                                    const isExcel = file.type && (file.type.includes('excel') || file.type.includes('spreadsheet'));
-                                    const isHtml = file.type && file.type.includes('html');
-                                    let icon = <FaFileAlt className="text-gray-400" />;
-                                    if (isImage) icon = <FaFileAlt className="text-pink-400" />;
-                                    else if (isPdf) icon = <FaFileAlt className="text-red-500" />;
-                                    else if (isDoc) icon = <FaFileAlt className="text-blue-500" />;
-                                    else if (isExcel) icon = <FaFileAlt className="text-green-500" />;
-                                    else if (isHtml) icon = <FaFileAlt className="text-orange-500" />;
-                                    let statusBadge = <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800"><FaHourglassHalf /> En attente</span>;
-                                    if (file.status === 'validated') statusBadge = <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-green-100 text-green-800"><FaCheckCircle /> Validé</span>;
-                                    if (file.status === 'rejected') statusBadge = <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-100 text-red-800"><FaTimesCircle /> Rejeté</span>;
-                                    return (
-                                        <tr
-                                            key={file.id}
-                                            className={idx % 2 === 0 ? 'bg-white dark:bg-gray-800 cursor-pointer' : 'bg-blue-50 dark:bg-blue-900 cursor-pointer'}
-                                            onClick={() => window.location.href = `/files/${file.id}`}
-                                            tabIndex={0}
-                                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') window.location.href = `/files/${file.id}`; }}
+                </div>
+                
+                {/* Search */}
+                <form onSubmit={handleSearchSubmit} className="max-w-xl">
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FaSearch className="text-gray-400" />
+                        </div>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Rechercher des fichiers..."
+                        />
+                    </div>
+                </form>
+            </div>
+
+            {/* No Results Message */}
+            {files.data.length === 0 && (
+                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 text-center">
+                    <FaFileAlt className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-white">
+                        Aucun fichier trouvé
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        {search ? 'Aucun fichier ne correspond à votre recherche.' : 'Commencez par ajouter votre premier fichier.'}
+                    </p>
+                    <div className="mt-6">
+                        <Link
+                            href="/files/create"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                        >
+                            <FaPlus className="mr-2 h-4 w-4" />
+                            Nouveau fichier
+                        </Link>
+                    </div>
+                </div>
+            )}
+
+            {/* Content */}
+            {files.data.length > 0 && (
+                viewMode === 'table' ? (
+                    <div className="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg">
+                        <div className="overflow-x-auto w-full">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                            Nom
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                            Projet
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                            Taille
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                            Date
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                    {files.data.map((file) => (
+                                        <tr 
+                                            key={file.id} 
+                                            className="hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 ease-in-out cursor-pointer transform hover:-translate-y-0.5 hover:shadow-md"
+                                            onClick={() => handleRowClick(file.id)}
                                         >
-                                            <td className="p-2 md:p-3 align-middle text-center" onClick={e => e.stopPropagation()}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedFiles.includes(file.id)}
-                                                    onChange={() => handleSelectFile(file.id)}
-                                                    aria-label={`Sélectionner ${file.name}`}
-                                                />
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center">
+                                                    <div className="flex-shrink-0">
+                                                        {getFileIcon(file.type)}
+                                                    </div>
+                                                    <div className="ml-4">
+                                                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                            {file.name}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                            {truncateFileType(file.type)}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </td>
-                                            <td className="p-2 md:p-3 align-middle">{icon}</td>
-                                            <td className="p-2 md:p-3 align-middle font-semibold text-blue-800 dark:text-blue-200 max-w-[120px] truncate">{file.name}</td>
-                                            <td className="p-2 md:p-3 align-middle max-w-[120px] truncate">{file.project?.name || '-'}</td>
-                                            <td className="p-2 md:p-3 align-middle max-w-[120px] truncate">{file.user?.name || '-'}</td>
-                                            <td className="p-2 md:p-3 align-middle"><span className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs font-mono">{file.size} o</span></td>
-                                            <td className="p-2 md:p-3 align-middle">{statusBadge}</td>
-                                            <td className="p-2 md:p-3 align-middle"><span className="inline-flex items-center gap-1"><FaClock className="text-gray-400" /> {new Date(file.created_at).toLocaleString()}</span></td>
-                                            <td className="p-2 md:p-3 align-middle text-center" onClick={e => e.stopPropagation()}>
-                                                <a
-                                                    href={route('files.download', { file: file.id })}
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                    title="Télécharger le fichier"
-                                                >
-                                                    <FaDownload />
-                                                </a>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm text-gray-900 dark:text-white">
+                                                    {file.project?.name || '-'}
+                                                </div>
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                    {file.user?.name || '-'}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                {(file.size / 1024).toFixed(2)} KB
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                <div className="flex items-center">
+                                                    <FaClock className="mr-1 text-gray-400" />
+                                                    {new Date(file.created_at).toLocaleDateString('fr-FR')}
+                                                </div>
                                             </td>
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div className="mt-6 flex justify-center gap-2 mb-8">
-                        {files.links && files.links.map((link, i) => (
-                            <button
-                                key={i}
-                                className={`btn btn-sm rounded-full px-4 py-2 font-semibold shadow ${link.active ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-blue-700 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-800'}`}
-                                disabled={!link.url}
-                                onClick={() => link.url && Inertia.get(link.url)}
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {files.data.map((file) => (
+                            <div 
+                                key={file.id} 
+                                className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden hover:shadow-lg transition-shadow duration-200 border border-gray-200 dark:border-gray-700 cursor-pointer transform hover:-translate-y-0.5"
+                                onClick={() => handleRowClick(file.id)}
+                            >
+                                <div className="p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                                            {getFileIcon(file.type)}
+                                        </div>
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{file.name}</h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
+                                        {truncateFileType(file.type)}
+                                    </p>
+                                    
+                                    <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                        <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
+                                            <span>Taille: {(file.size / 1024).toFixed(2)} KB</span>
+                                            <span className="flex items-center">
+                                                <FaClock className="mr-1" />
+                                                {new Date(file.created_at).toLocaleDateString('fr-FR')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )
+            )}
+
+            {/* Pagination */}
+            {files.data.length > 0 && files.links.length > 3 && (
+                <div className="mt-4">
+                    <div className="flex flex-wrap -mb-1">
+                        {files.links.map((link, index) => (
+                            <Link
+                                key={index}
+                                href={link.url || '#'}
+                                className={`mr-1 mb-1 px-4 py-2 text-sm rounded ${link.active ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'} ${!link.url ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                 dangerouslySetInnerHTML={{ __html: link.label }}
                             />
                         ))}
                     </div>
                 </div>
-            </main>
+            )}
+
+            {/* Notification */}
+            {notification && (
+                <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg">
+                    {notification}
+                </div>
+            )}
         </div>
     );
 }
 
-Index.layout = page => <AdminLayout children={page} />; 
+Index.layout = page => <AdminLayout children={page} />;
