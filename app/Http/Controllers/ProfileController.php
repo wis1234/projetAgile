@@ -42,25 +42,48 @@ class ProfileController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
+        
         $user = $request->user();
         $data = $request->validated();
 
         // Gestion de la photo de profil
         if ($request->hasFile('profile_photo')) {
-            // Supprimer l'ancienne photo si elle existe
-            if ($user->profile_photo_path) {
-                Storage::disk('public')->delete($user->profile_photo_path);
+            try {
+                // Supprimer l'ancienne photo si elle existe et n'est pas l'avatar par défaut
+                if ($user->profile_photo_path && 
+                    !str_contains($user->profile_photo_path, 'ui-avatars.com') &&
+                    Storage::disk('public')->exists($user->profile_photo_path)) {
+                    Storage::disk('public')->delete($user->profile_photo_path);
+                }
+                
+                // Stocker la nouvelle photo
+                $path = $request->file('profile_photo')->store('profile-photos', 'public');
+                $data['profile_photo_path'] = $path;
+            } catch (\Exception $e) {
+                \Log::error('Erreur lors de la mise à jour de la photo de profil : ' . $e->getMessage());
+                return back()->withErrors(['profile_photo' => 'Une erreur est survenue lors du téléchargement de la photo.']);
             }
-            $path = $request->file('profile_photo')->store('profile-photos', 'public');
-            $data['profile_photo_path'] = $path;
         }
 
+        // Mise à jour des champs du profil
         $user->fill($data);
+        
+        // Réinitialiser la vérification d'email si l'email a changé
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
+            $user->sendEmailVerificationNotification();
         }
-        $user->save();
-        return Redirect::route('profile.edit')->with('success', 'Profil mis à jour avec succès');
+        
+        try {
+            $user->save();
+            return back()->with([
+                'success' => 'Profil mis à jour avec succès',
+                'user' => $user->only(['id', 'name', 'email', 'profile_photo_path', 'profile_photo_url'])
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Erreur lors de la mise à jour du profil : ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Une erreur est survenue lors de la mise à jour du profil.']);
+        }
     }
 
     /**
