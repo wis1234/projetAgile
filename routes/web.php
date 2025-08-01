@@ -103,6 +103,47 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // Fichiers : accès direct à la vue
 Route::get('files/{file}', [App\Http\Controllers\FileController::class, 'show'])->name('files.show');
 
+// Route pour exécuter manuellement la file d'attente
+Route::get('/run-queue', function () {
+    try {
+        // Exécuter la commande queue:work avec stop-when-empty
+        $exitCode = \Artisan::call('queue:work', [
+            '--stop-when-empty' => true,
+            '--tries' => 3,
+            '--timeout' => 60
+        ]);
+        
+        // Récupérer la sortie de la commande
+        $output = \Artisan::output();
+        
+        // Journaliser l'exécution
+        \Log::info('File d\'attente exécutée manuellement', [
+            'exit_code' => $exitCode,
+            'output' => $output,
+            'jobs_processed' => trim($output) !== '' ? count(explode("\n", trim($output))) : 0
+        ]);
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'File d\'attente traitée avec succès',
+            'output' => $output,
+            'jobs_processed' => trim($output) !== '' ? count(explode("\n", trim($output))) : 0
+        ]);
+        
+    } catch (\Exception $e) {
+        \Log::error('Erreur lors de l\'exécution de la file d\'attente', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Erreur lors du traitement de la file d\'attente',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+})->name('queue.run');
+
 // Pages d'erreur personnalisées
 Route::get('/error/403', function () {
     return Inertia::render('Error403');
