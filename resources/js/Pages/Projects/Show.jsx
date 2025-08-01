@@ -54,8 +54,16 @@ import Modal from '../../Components/Modal';
 
 function Show({ project, tasks = [], auth, stats = {} }) {
   const { flash = {} } = usePage().props;
-  const isAdmin = auth?.role === 'admin' || auth?.roles?.includes?.('admin');
-  const isManager = auth?.role === 'manager' || auth?.roles?.includes?.('manager');
+  
+  // Récupération des rôles de l'utilisateur
+  const userRoles = auth?.user?.roles || [];
+  const isAdmin = userRoles.includes('admin');
+  const isManager = userRoles.includes('manager');
+  
+  // Logs de débogage
+  console.log('User roles from auth:', userRoles);
+  console.log('isAdmin:', isAdmin, 'isManager:', isManager);
+
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [deleteLoading, setDeleteLoading] = React.useState(false);
 
@@ -247,9 +255,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               {/* Carte des membres */}
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                    <FaUserFriends className="text-blue-500" /> Membres ({project.users?.length || 0})
-                  </h3>
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Membres ({project.users?.length || 0})</h3>
                 </div>
                 <div className="space-y-3">
                   {project.users && project.users.length > 0 ? (
@@ -279,47 +285,41 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               </div>
             </div>
 
-            {/* Actions */}
+            {/* Actions Rapides */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Actions Rapides</h3>
               <div className="flex flex-wrap gap-4">
-                {(isAdmin || isManager) && (
-                  <Link
-                    href={`/project-users/${project.id}/edit`}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
-                  >
-                    <FaUsers /> Ajouter un membre
-                  </Link>
-                )}
-                {(isAdmin || isManager) && (
-                  <Link
-                    href={`/tasks/create?project_id=${project.id}`}
-                    className="bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
-                  >
-                    <FaTasks /> Créer une tâche
-                  </Link>
-                )}
-                {(isAdmin || isManager) && (
-                  <Link
-                    href={`/sprints/create?project_id=${project.id}`}
-                    className="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
-                  >
-                    <FaClipboardList /> Créer un sprint
-                  </Link>
-                )}
-                <Link
-                  href={`/projects/${project.id}/edit`}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
-                >
-                  <FaEdit /> Modifier
-                </Link>
-                {isAdmin && (
-                  <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
-                  >
-                    <FaTrash /> Supprimer
-                  </button>
+                {(isAdmin || isManager) ? (
+                  <>
+                    <Link
+                      href={`/project-users/${project.id}/edit`}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                    >
+                      <FaUsers /> Ajouter un membre
+                    </Link>
+                    <Link
+                      href={`/tasks/create?project_id=${project.id}`}
+                      className="bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                    >
+                      <FaTasks /> Créer une tâche
+                    </Link>
+                    <Link
+                      href={`/projects/${project.id}/edit`}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                    >
+                      <FaEdit /> Modifier le projet
+                    </Link>
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                    >
+                      <FaTrash /> Supprimer le projet
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-gray-500 dark:text-gray-400 text-sm italic">
+                    Seuls les administrateurs et les gestionnaires peuvent effectuer des actions sur ce projet.
+                  </div>
                 )}
               </div>
             </div>

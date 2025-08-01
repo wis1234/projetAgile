@@ -139,7 +139,9 @@ class ProjectController extends Controller
             'project' => $project,
             'tasks' => $tasks,
             'auth' => [
-                'user' => $authUser
+                'user' => array_merge($authUser, [
+                    'roles' => $currentUser->getRoleNames()->toArray()
+                ])
             ],
             'availableStatuses' => Project::getAvailableStatuses(),
             'stats' => [
