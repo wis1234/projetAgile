@@ -106,9 +106,12 @@ class TaskController extends Controller
                 'task_id' => $task->id,
                 'task_title' => $task->title,
                 'task_description' => $task->description,
-                'task_url' => route('tasks.show', $task->id),
+                'task_status' => $task->status,
+                'task_priority' => $task->priority,
                 'assigned_to' => $task->assigned_to ? $task->assignedUser->name : 'Non assigné',
                 'due_date' => $task->due_date ? $task->due_date->format('d/m/Y') : 'Non définie',
+                'created_by' => auth()->user()->name,
+                'project_name' => $project->name,
             ]);
         }
 
@@ -268,11 +271,14 @@ class TaskController extends Controller
                 $project->notifyMembers('task_updated', [
                     'task_id' => $task->id,
                     'task_title' => $task->title,
+                    'task_description' => $task->description,
                     'task_status' => $task->status,
-                    'task_url' => route('tasks.show', $task->id),
+                    'old_status' => $oldStatus !== $task->status ? $oldStatus : null,
+                    'task_priority' => $task->priority,
                     'assigned_to' => $task->assigned_to ? $task->assignedUser->name : 'Non assigné',
                     'due_date' => $task->due_date ? $task->due_date->format('d/m/Y') : 'Non définie',
                     'updated_by' => auth()->user()->name,
+                    'project_name' => $project->name,
                 ]);
             }
         }
