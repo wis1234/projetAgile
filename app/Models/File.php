@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 
 class File extends Model
 {
-    protected $fillable = ['name', 'file_path', 'type', 'size', 'user_id', 'project_id', 'task_id', 'kanban_id', 'description', 'downloads', 'status', 'rejection_reason'];
+    protected $fillable = ['name', 'file_path', 'type', 'size', 'user_id', 'project_id', 'task_id', 'kanban_id', 'description', 'downloads', 'status', 'rejection_reason', 'dropbox_path'];
 
     /**
      * Get the full URL to the file

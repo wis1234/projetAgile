@@ -103,6 +103,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // Fichiers : accès direct à la vue
 Route::get('files/{file}', [App\Http\Controllers\FileController::class, 'show'])->name('files.show');
 
+// Routes pour les fichiers
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/files/{file}/save-to-dropbox', [App\Http\Controllers\DropboxController::class, 'uploadToDropbox'])
+        ->name('files.save-to-dropbox');
+});
+
 // Route pour exécuter manuellement la file d'attente
 Route::get('/run-queue', function () {
     try {

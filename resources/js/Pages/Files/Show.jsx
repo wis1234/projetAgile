@@ -8,6 +8,7 @@ import FileMetadata from '@/Components/FileDetails/FileMetadata';
 import StatusUpdateForm from '@/Components/FileDetails/StatusUpdateForm';
 import CommentsSection from '@/Components/FileDetails/CommentsSection';
 import RelatedInfo from '@/Components/FileDetails/RelatedInfo';
+import SaveToDropboxButton from '@/Components/Files/SaveToDropboxButton';
 import { FaProjectDiagram, FaTasks, FaUser, FaFileAlt, FaClock } from 'react-icons/fa';
 
 const Show = ({ file, statuses, auth }) => {
@@ -146,6 +147,11 @@ const Show = ({ file, statuses, auth }) => {
                     }
                     title="Date de dépôt"
                     value={new Date(currentFile.created_at).toLocaleString('fr-FR')}
+                  />
+                  
+                  <SaveToDropboxButton 
+                    fileId={currentFile.id} 
+                    className="w-full justify-center"
                   />
                 </div>
               </motion.div>
