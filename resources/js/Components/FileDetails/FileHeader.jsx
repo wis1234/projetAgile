@@ -3,7 +3,7 @@ import { FaTrash, FaDownload, FaArrowLeft } from 'react-icons/fa';
 import { useState } from 'react';
 import ConfirmationModal from '../Common/ConfirmationModal';
 
-const FileHeader = ({ file, onDelete, currentUser }) => {
+const FileHeader = ({ file, onDelete, currentUser, children }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   const isAdmin = currentUser?.role === 'admin';
@@ -34,7 +34,10 @@ const FileHeader = ({ file, onDelete, currentUser }) => {
             {file.name}
           </h3>
         </div>
-        <div className="ml-4 mt-2 flex-shrink-0 flex space-x-3">
+        <div className="ml-4 mt-2 flex-shrink-0 flex flex-wrap gap-2">
+          {/* Render any children components (like the SaveToDropboxButton) */}
+          {children}
+          
           <a
             href={route('files.download', file.id)}
             className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -63,6 +66,8 @@ const FileHeader = ({ file, onDelete, currentUser }) => {
         title="Supprimer le fichier"
         message="Êtes-vous sûr de vouloir supprimer ce fichier ? Cette action est irréversible."
         confirmText="Supprimer"
+        cancelText="Annuler"
+        confirmButtonStyle="bg-red-600 hover:bg-red-700 focus:ring-red-500"
       />
     </div>
   );

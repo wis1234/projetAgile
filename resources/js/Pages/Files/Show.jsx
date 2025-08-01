@@ -59,9 +59,17 @@ const Show = ({ file, statuses, auth }) => {
       <div className="min-h-screen bg-white">
         <FileHeader 
           file={currentFile} 
-          onDelete={handleDelete} 
-          currentUser={currentUser}
-        />
+          onDelete={canDelete ? handleDelete : null}
+        >
+          {(isAdmin || isProjectManager) && (
+            <SaveToDropboxButton 
+              fileId={currentFile.id} 
+              className="ml-2"
+              userRole={currentUser?.role}
+              isProjectManager={isProjectManager}
+            />
+          )}
+        </FileHeader>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <motion.div 
@@ -147,11 +155,6 @@ const Show = ({ file, statuses, auth }) => {
                     }
                     title="Date de dépôt"
                     value={new Date(currentFile.created_at).toLocaleString('fr-FR')}
-                  />
-                  
-                  <SaveToDropboxButton 
-                    fileId={currentFile.id} 
-                    className="w-full justify-center"
                   />
                 </div>
               </motion.div>
