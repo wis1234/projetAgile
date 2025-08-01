@@ -139,7 +139,7 @@ class User extends Authenticatable
         if ($this->profile_photo_path) {
             return asset('storage/' . $this->profile_photo_path);
         }
-
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&background=0D8ABC&color=fff';
+        
+        return 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&color=FFFFFF&background=0D8ABC';
     }
 }

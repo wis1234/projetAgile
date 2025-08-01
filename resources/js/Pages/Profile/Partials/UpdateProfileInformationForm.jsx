@@ -106,12 +106,19 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status, clas
                     {/* Photo de profil */}
                     <div className="w-full md:w-1/3 flex flex-col items-center">
                         <div className="relative group mb-4">
-                            <img
-                                src={preview}
-                                alt="Photo de profil"
-                                className="w-40 h-40 rounded-full border-4 border-blue-400 object-cover cursor-pointer hover:opacity-80 transition"
+                            <div 
+                                className="w-40 h-40 rounded-full border-4 border-blue-400 overflow-hidden cursor-pointer hover:opacity-80 transition relative"
                                 onClick={() => fileInput.current.click()}
-                            />
+                            >
+                                <img
+                                    src={preview}
+                                    alt="Photo de profil"
+                                    className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black bg-opacity-50">
+                                    <span className="text-white font-medium">Changer</span>
+                                </div>
+                            </div>
                             <input
                                 type="file"
                                 accept="image/*"
@@ -120,9 +127,6 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status, clas
                                 onChange={handlePhotoChange}
                                 disabled={isUploading}
                             />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black bg-opacity-50 rounded-full">
-                                <span className="text-white font-medium">Changer</span>
-                            </div>
                         </div>
                         
                         {data.profile_photo && (
