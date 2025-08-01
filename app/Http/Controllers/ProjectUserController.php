@@ -57,43 +57,53 @@ class ProjectUserController extends Controller
      */
     public function store(Request $request)
     {
+        try {
+            $this->authorize('create', Project::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
+
         $validated = $request->validate([
             'project_id' => 'required|exists:projects,id',
             'user_id' => 'required|exists:users,id',
-            'role' => ['required', 'string', 'max:50', Rule::in(self::ALLOWED_ROLES)],
+            'role' => ['required', 'string', Rule::in(self::ALLOWED_ROLES)],
         ]);
+
         $project = Project::findOrFail($validated['project_id']);
-        $this->authorize('manageMembers', $project);
-        $project->users()->attach($validated['user_id'], ['role' => $validated['role']]);
+        $user = User::findOrFail($validated['user_id']);
 
-        // Notifier le membre ajouté et les autres membres en arrière-plan
-        $addedUser = User::find($validated['user_id']);
-        $subject = 'Vous avez été ajouté au projet : ' . $project->name;
-        $message = 'Bonjour ' . $addedUser->name . ',<br>Vous avez été ajouté au projet <b>' . $project->name . '</b> en tant que <b>' . $validated['role'] . '</b>.';
-        $actionUrl = url('/projects/' . $project->id);
-        $actionText = 'Voir le projet';
-        $addedUserNotif = new UserActionMailNotification($subject, $message, $actionUrl, $actionText, [
-            'project_id' => $project->id,
+        // Vérifier si l'utilisateur est déjà membre du projet
+        if ($project->users()->where('user_id', $user->id)->exists()) {
+            return redirect()->back()->with('error', 'Cet utilisateur est déjà membre de ce projet.');
+        }
+
+        // Ajouter l'utilisateur au projet avec le rôle spécifié
+        $project->users()->attach($user->id, [
+            'role' => $validated['role'],
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
-        $otherMembers = $project->users()->where('users.id', '!=', $addedUser->id)->get();
-        $otherNotifs = [];
-        foreach ($otherMembers as $member) {
-            $subject = 'Nouveau membre ajouté au projet : ' . $project->name;
-            $message = 'Bonjour ' . $member->name . ',<br>Le membre <b>' . $addedUser->name . '</b> a été ajouté au projet <b>' . $project->name . '</b>.';
-            $otherNotifs[] = [
-                'user' => $member,
-                'notif' => new UserActionMailNotification($subject, $message, $actionUrl, $actionText, [
-                    'project_id' => $project->id,
-                ])
-            ];
-        }
-        // Envoi en file d'attente
-        Notification::send($addedUser, $addedUserNotif);
-        foreach ($otherNotifs as $n) {
-            Notification::send($n['user'], $n['notif']);
-        }
 
-        return redirect()->route('project-users.index')->with('success', 'Membre ajouté et notifications envoyées.');
+        // Envoyer une notification à l'utilisateur ajouté
+        $user->notify(new \App\Notifications\ProjectNotification('user_added', [
+            'project_id' => $project->id,
+            'project_name' => $project->name,
+            'project_url' => route('projects.show', $project->id),
+            'role' => $validated['role'],
+            'added_by' => auth()->user()->name,
+        ]));
+
+        // Notifier les autres membres du projet
+        $project->notifyMembers('user_added_to_project', [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_email' => $user->email,
+            'role' => $validated['role'],
+            'added_by' => auth()->user()->name,
+        ]);
+
+        return redirect()->route('project-users.index')
+            ->with('success', 'Utilisateur ajouté au projet avec succès.');
     }
 
     /**

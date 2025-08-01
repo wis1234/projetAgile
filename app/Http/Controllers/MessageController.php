@@ -9,6 +9,7 @@ use App\Models\User;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Notifications\UserActionMailNotification;
 
 class MessageController extends Controller
 {

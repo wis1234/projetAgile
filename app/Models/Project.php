@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Notifications\ProjectNotification;
+use Illuminate\Support\Facades\Auth;
 
 class Project extends Model
 {
@@ -23,6 +25,33 @@ class Project extends Model
     public const STATUS_AVANCE = 'avance';
     public const STATUS_TERMINE = 'termine';
     public const STATUS_SUSPENDU = 'suspendu';
+
+    /**
+     * Notifie tous les membres du projet d'un événement
+     * 
+     * @param string $type Type de notification (user_added, task_created, task_updated, discussion_created)
+     * @param array $data Données supplémentaires pour la notification
+     * @return void
+     */
+    public function notifyMembers($type, $data = [])
+    {
+        // Ajouter les informations de base du projet aux données de notification
+        $notificationData = array_merge([
+            'project_id' => $this->id,
+            'project_name' => $this->name,
+            'project_url' => route('projects.show', $this->id),
+        ], $data);
+
+        // Récupérer tous les utilisateurs du projet sauf celui qui a déclenché l'action
+        $users = $this->users()
+            ->where('users.id', '!=', Auth::id())
+            ->get();
+
+        // Envoyer la notification à chaque utilisateur
+        foreach ($users as $user) {
+            $user->notify(new ProjectNotification($type, $notificationData));
+        }
+    }
 
     // Méthode pour obtenir tous les statuts disponibles
     public static function getAvailableStatuses()

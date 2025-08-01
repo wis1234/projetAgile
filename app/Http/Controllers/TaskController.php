@@ -66,6 +66,7 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
+        
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -87,7 +88,7 @@ class TaskController extends Controller
         $validated['created_by'] = auth()->id();
         $validated['payment_status'] = $validated['is_paid'] ? 
             \App\Models\Task::PAYMENT_STATUS_UNPAID : 
-            \App\Models\Task::PAYMENT_STATUS_UNPAID; // Toujours définir une valeur par défaut
+            \App\Models\Task::PAYMENT_STATUS_UNPAID;
 
         // Si c'est une tâche bénévole, marquer comme payée
         if (isset($validated['payment_reason']) && $validated['payment_reason'] === \App\Models\Task::REASON_VOLUNTEER) {
@@ -97,31 +98,21 @@ class TaskController extends Controller
         }
 
         $task = Task::create($validated);
-
-        // Notifier l'utilisateur assigné
-        $assignedUser = \App\Models\User::find($validated['assigned_to']);
-        $project = \App\Models\Project::find($validated['project_id']);
-        $subject = 'Nouvelle tâche assignée dans le projet : ' . $project->name;
-        $message = 'Bonjour ' . $assignedUser->name . ',<br>Vous avez été assigné à la tâche <b>' . $task->title . '</b> dans le projet <b>' . $project->name . '</b>.';
-        $actionUrl = url('/tasks/' . $task->id);
-        $actionText = 'Voir la tâche';
-        $assignedUser->notify(new UserActionMailNotification($subject, $message, $actionUrl, $actionText, [
-            'task_id' => $task->id,
-            'project_id' => $project->id,
-        ]));
-
-        // Notifier les autres membres du projet (sauf l'assigné)
-        $otherMembers = $project->users()->where('users.id', '!=', $assignedUser->id)->get();
-        foreach ($otherMembers as $member) {
-            $subject = 'Nouvelle tâche créée dans le projet : ' . $project->name;
-            $message = 'Bonjour ' . $member->name . ',<br>La tâche <b>' . $task->title . '</b> a été créée et assignée à <b>' . $assignedUser->name . '</b> dans le projet <b>' . $project->name . '</b>.';
-            $member->notify(new UserActionMailNotification($subject, $message, $actionUrl, $actionText, [
+        
+        // Envoyer une notification à tous les membres du projet
+        $project = Project::find($validated['project_id']);
+        if ($project) {
+            $project->notifyMembers('task_created', [
                 'task_id' => $task->id,
-                'project_id' => $project->id,
-            ]));
+                'task_title' => $task->title,
+                'task_description' => $task->description,
+                'task_url' => route('tasks.show', $task->id),
+                'assigned_to' => $task->assigned_to ? $task->assignedUser->name : 'Non assigné',
+                'due_date' => $task->due_date ? $task->due_date->format('d/m/Y') : 'Non définie',
+            ]);
         }
 
-        return redirect()->route('tasks.show', $task)
+        return redirect()->route('tasks.index')
             ->with('success', 'Tâche créée avec succès.');
     }
 
@@ -238,6 +229,7 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -248,30 +240,47 @@ class TaskController extends Controller
             'sprint_id' => 'required|exists:sprints,id',
             'assigned_to' => 'nullable|exists:users,id',
             'is_paid' => 'boolean',
-            'payment_reason' => 'required_if:is_paid,false|nullable|string|in:' . implode(',', [
-                \App\Models\Task::REASON_VOLUNTEER,
-                \App\Models\Task::REASON_ACADEMIC,
-                \App\Models\Task::REASON_OTHER,
-            ]),
-            'amount' => 'required_if:is_paid,true|nullable|numeric|min:0',
             'payment_status' => 'sometimes|string|in:' . implode(',', [
                 \App\Models\Task::PAYMENT_STATUS_UNPAID,
                 \App\Models\Task::PAYMENT_STATUS_PENDING,
                 \App\Models\Task::PAYMENT_STATUS_PAID,
                 \App\Models\Task::PAYMENT_STATUS_FAILED,
             ]),
+            'payment_reason' => 'required_if:is_paid,false|nullable|string|in:' . implode(',', [
+                \App\Models\Task::REASON_VOLUNTEER,
+                \App\Models\Task::REASON_ACADEMIC,
+                \App\Models\Task::REASON_OTHER,
+            ]),
+            'amount' => 'required_if:is_paid,true|nullable|numeric|min:0',
         ]);
 
-        // Update payment status timestamp if status changed to paid
-        if (isset($validated['payment_status']) && 
-            $validated['payment_status'] === \App\Models\Task::PAYMENT_STATUS_PAID && 
-            $task->payment_status !== \App\Models\Task::PAYMENT_STATUS_PAID) {
-            $validated['paid_at'] = now();
-        }
+        // Sauvegarder l'ancien statut pour la comparaison
+        $oldStatus = $task->status;
+        $oldAssignee = $task->assigned_to;
 
+        // Mettre à jour la tâche
         $task->update($validated);
 
-        return redirect()->route('tasks.show', $task)
+        // Si le statut a changé ou si la tâche a été réassignée, envoyer une notification
+        if ($oldStatus !== $task->status || $oldAssignee != $task->assigned_to) {
+            $project = $task->project;
+            if ($project) {
+                $project->notifyMembers('task_updated', [
+                    'task_id' => $task->id,
+                    'task_title' => $task->title,
+                    'task_status' => $task->status,
+                    'task_url' => route('tasks.show', $task->id),
+                    'assigned_to' => $task->assigned_to ? $task->assignedUser->name : 'Non assigné',
+                    'due_date' => $task->due_date ? $task->due_date->format('d/m/Y') : 'Non définie',
+                    'updated_by' => auth()->user()->name,
+                ]);
+            }
+        }
+
+        // Déclencher l'événement de mise à jour de tâche
+        event(new TaskUpdated($task));
+
+        return redirect()->route('tasks.show', $task->id)
             ->with('success', 'Tâche mise à jour avec succès.');
     }
 
