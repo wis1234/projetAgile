@@ -67,35 +67,66 @@ class ProjectController extends Controller
      */
     public function show(string $id)
     {
-        $project = Project::with('users')->findOrFail($id);
+        $project = Project::with(['users' => function($query) {
+            $query->select('users.id', 'name', 'email', 'profile_photo_path')
+                  ->withCasts(['profile_photo_url' => 'string']);
+        }])->findOrFail($id);
+        
         if (!$project->isMember(auth()->user())) {
             return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
+        
         $tasks = $project->tasks()->with(['assignedUser', 'sprint'])->orderBy('created_at', 'desc')->get();
-        $auth = auth()->user();
+        $currentUser = auth()->user();
+        
+        // Préparer les informations de l'utilisateur connecté
+        $authUser = [
+            'id' => $currentUser->id,
+            'name' => $currentUser->name,
+            'email' => $currentUser->email,
+            'profile_photo_url' => $currentUser->profile_photo_url ?? null,
+        ];
+
+        // Préparer les utilisateurs avec leur URL de photo de profil
+        $users = $project->users->map(function($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'profile_photo_url' => $user->profile_photo_url ?? null,
+            ];
+        });
+
+        // Mettre à jour la collection des utilisateurs avec les URLs de photos
+        $project->setRelation('users', $users);
 
         // Statistiques :
         // 1. Nombre d'activités par utilisateur (liées au projet ou à ses tâches)
         $taskIds = $project->tasks()->pluck('id');
         $activitiesByUser = \App\Models\Activity::where(function($q) use ($project, $taskIds) {
             $q->where(function($q2) use ($project) {
-                $q2->where('subject_type', 'App\\Models\\Project')->where('subject_id', $project->id);
+                $q2->where('subject_type', 'App\\Models\\Project')
+                   ->where('subject_id', $project->id);
             })->orWhere(function($q2) use ($taskIds) {
-                $q2->where('subject_type', 'App\\Models\\Task')->whereIn('subject_id', $taskIds);
+                $q2->where('subject_type', 'App\\Models\\Task')
+                   ->whereIn('subject_id', $taskIds);
             });
         })
         ->selectRaw('user_id, count(*) as count')
         ->groupBy('user_id')
         ->get();
+        
         // 2. Nombre de commentaires sur les tâches du projet
-        $taskIds = $project->tasks()->pluck('id');
         $commentsCount = \App\Models\TaskComment::whereIn('task_id', $taskIds)->count();
+        
         // 3. Nombre de fichiers liés au projet
         $filesCount = $project->files()->count();
+        
         // 4. Nombre de tâches terminées (et par membre)
         $doneTasks = $project->tasks()->where('status', 'done')->get();
         $doneTasksCount = $doneTasks->count();
         $doneTasksByUser = $doneTasks->groupBy('assigned_to')->map->count();
+        
         // 5. Evolution des tâches terminées par semaine (sur 8 semaines)
         $doneTasksByWeek = $project->tasks()
             ->where('status', 'done')
@@ -107,7 +138,9 @@ class ProjectController extends Controller
         return Inertia::render('Projects/Show', [
             'project' => $project,
             'tasks' => $tasks,
-            'auth' => $auth,
+            'auth' => [
+                'user' => $authUser
+            ],
             'availableStatuses' => Project::getAvailableStatuses(),
             'stats' => [
                 'activitiesByUser' => $activitiesByUser,

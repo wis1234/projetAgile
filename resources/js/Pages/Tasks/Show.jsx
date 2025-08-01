@@ -767,7 +767,7 @@ export default function Show({ task, payments, projectMembers }) {
                       <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 rounded-xl p-6 border border-blue-200 dark:border-blue-700 transition duration-200 hover:shadow-md h-full flex flex-col justify-between">
                         <div>
                           <div className="flex items-center gap-3 mb-4">
-                            <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center hover:shadow-lg">
+                            <div className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-3 rounded-full bg-blue-100 dark:bg-blue-800 group-hover:bg-blue-200 dark:group-hover:bg-blue-700 transition">
                               <span className="text-white text-2xl">💳</span>
                             </div>
                             <div>
@@ -980,47 +980,116 @@ export default function Show({ task, payments, projectMembers }) {
 
           {activeTab === 'comments' && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-              <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200"><FaCommentDots /> Discussions</h2>
+              <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">
+                <FaCommentDots /> Discussions
+                {loadingComments && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
+                    Chargement...
+                  </span>
+                )}
+              </h2>
               {loadingComments ? (
-                <div className="text-gray-400 italic">Chargement des discussions...</div>
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                </div>
               ) : (
                 <div>
                   {comments.length === 0 ? (
                     <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3 mb-6">
-                      <FaInfoCircle className="text-blue-600 dark:text-blue-300 text-xl" />
-                      <p className="text-blue-800 dark:text-blue-200 italic">Aucune discussion pour l'instant.</p>
+                      <FaInfoCircle className="text-blue-600 dark:text-blue-300 text-xl flex-shrink-0" />
+                      <p className="text-blue-800 dark:text-blue-200 italic">Aucune discussion pour l'instant. Soyez le premier à commenter !</p>
                     </div>
                   ) : (
                     <ul className="space-y-6 mb-6">
                       {comments.map(comment => (
-                        <li key={comment.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 flex gap-4 transition duration-200 hover:shadow-sm">
-                          <img src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}`} alt={comment.user?.name} className="w-10 h-10 rounded-full border-2 border-blue-200" />
-                          <div className="flex-1">
+                        <li key={comment.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 flex gap-4 transition duration-200 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500">
+                          <div className="relative group">
+                            <img 
+                              src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}&background=0D8ABC&color=fff`} 
+                              alt={comment.user?.name} 
+                              className="w-12 h-12 rounded-full border-2 border-blue-300 dark:border-blue-600 object-cover transition-transform duration-200 group-hover:scale-110"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || 'U')}&background=0D8ABC&color=fff`;
+                              }}
+                            />
+                            <span className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white dark:border-gray-700">
+                              {comment.user?.name?.charAt(0).toUpperCase() || '?'}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="font-semibold text-blue-800 dark:text-blue-200 text-lg">{comment.user?.name}</span>
-                              <span className="text-gray-600 dark:text-gray-300 text-sm">{new Date(comment.created_at).toLocaleString()}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-blue-800 dark:text-blue-200 text-lg truncate">
+                                  {comment.user?.name || 'Utilisateur inconnu'}
+                                </span>
+                                {comment.user?.role === 'admin' && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                    Admin
+                                  </span>
+                                )}
+                                {comment.user?.role === 'manager' && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    Manager
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap ml-2">
+                                {new Date(comment.created_at).toLocaleString('fr-FR', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
                             </div>
                             {editingId === comment.id ? (
                               <form onSubmit={handleUpdateComment} className="flex flex-col gap-3 mt-2">
-                                <textarea value={editContent} onChange={e => setEditContent(e.target.value)} className="border border-gray-300 rounded-lg p-3 w-full min-h-[80px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200" required maxLength={2000} />
+                                <textarea 
+                                  value={editContent} 
+                                  onChange={e => setEditContent(e.target.value)} 
+                                  className="border border-gray-300 rounded-lg p-3 w-full min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200" 
+                                  required 
+                                  maxLength={2000}
+                                  autoFocus
+                                />
                                 <div className="flex gap-3 justify-end">
-                                  <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors duration-200 hover:shadow-md">Enregistrer</button>
-                                  <button type="button" className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg font-semibold transition-colors duration-200 hover:shadow-md" onClick={() => setEditingId(null)}>Annuler</button>
+                                  <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 hover:shadow-md flex items-center gap-2">
+                                    <FaEdit /> Enregistrer
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium transition-colors duration-200 hover:shadow-md flex items-center gap-2" 
+                                    onClick={() => setEditingId(null)}
+                                  >
+                                    Annuler
+                                  </button>
                                 </div>
                               </form>
                             ) : (
-                              <p className="text-gray-900 dark:text-gray-100 leading-relaxed">{comment.content}</p>
+                              <div className="prose max-w-none dark:prose-invert">
+                                <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
+                                  {comment.content}
+                                </p>
+                              </div>
                             )}
                           </div>
                           {comment.user?.id === auth.user.id && editingId !== comment.id && (
-                            <div className="flex flex-col gap-2 ml-4">
-                              <button onClick={() => handleEditComment(comment)} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200">
-                                <FaEdit />
-                                <span>Éditer</span>
+                            <div className="flex flex-col gap-2 ml-2">
+                              <button 
+                                onClick={() => handleEditComment(comment)} 
+                                className="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 rounded-full hover:bg-blue-50 dark:hover:bg-gray-600"
+                                title="Modifier le commentaire"
+                              >
+                                <FaEdit className="w-4 h-4" />
                               </button>
-                              <button onClick={() => handleDeleteComment(comment.id)} className="flex items-center gap-1 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200">
-                                <FaTrash />
-                                <span>Supprimer</span>
+                              <button 
+                                onClick={() => handleDeleteComment(comment.id)} 
+                                className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200 rounded-full hover:bg-red-50 dark:hover:bg-gray-600"
+                                title="Supprimer le commentaire"
+                              >
+                                <FaTrash className="w-4 h-4" />
                               </button>
                             </div>
                           )}
@@ -1030,20 +1099,60 @@ export default function Show({ task, payments, projectMembers }) {
                   )}
                   <form onSubmit={handleCommentSubmit} className="flex flex-col gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                     <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Ajouter une nouvelle discussion</h3>
-                    <textarea
-                      value={commentContent}
-                      onChange={e => setCommentContent(e.target.value)}
-                      onKeyDown={handleCommentKeyDown}
-                      placeholder="Écrire votre message ici..."
-                      className="border border-gray-300 rounded-lg p-3 w-full min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
-                      disabled={posting}
-                      required
-                      maxLength={2000}
-                    />
-                    {error && <div className="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-lg text-sm">{error}</div>}
-                    <button type="submit" className="self-end bg-blue-700 hover:bg-blue-800 text-white px-5 py-3 rounded-lg font-semibold hover:shadow-md flex items-center gap-2 transition duration-200" disabled={posting || !commentContent.trim()}>
-                      {posting ? 'Envoi...' : 'Envoyer le message'}
-                    </button>
+                    <div className="relative">
+                      <textarea
+                        value={commentContent}
+                        onChange={e => setCommentContent(e.target.value)}
+                        onKeyDown={handleCommentKeyDown}
+                        placeholder="Écrire votre message ici..."
+                        className="border border-gray-300 rounded-lg p-4 w-full min-h-[120px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200 pr-12"
+                        disabled={posting}
+                        required
+                        maxLength={2000}
+                      />
+                      <div className="absolute bottom-3 right-3 text-xs text-gray-500 dark:text-gray-400">
+                        {commentContent.length}/2000
+                      </div>
+                    </div>
+                    {error && (
+                      <div className="bg-red-50 border-l-4 border-red-400 p-4">
+                        <div className="flex">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        Appuyez sur Ctrl+Entrée pour envoyer
+                      </div>
+                      <button 
+                        type="submit" 
+                        className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-md flex items-center gap-2 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed" 
+                        disabled={posting || !commentContent.trim()}
+                      >
+                        {posting ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Envoi en cours...
+                          </>
+                        ) : (
+                          <>
+                            <FaCommentDots />
+                            Envoyer le message
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </form>
                 </div>
               )}

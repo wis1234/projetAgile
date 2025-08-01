@@ -41,10 +41,21 @@ class UserController extends Controller
         }
         $users = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
         $roles = Role::orderBy('name')->get();
+        
+        // Ajouter l'URL de la photo de profil à l'utilisateur connecté
+        $authUser = [
+            'id' => $currentUser->id,
+            'name' => $currentUser->name,
+            'email' => $currentUser->email,
+            'profile_photo_url' => $currentUser->profile_photo_url ?? null,
+        ];
+        
         return Inertia::render('Users/Index', [
             'users' => $users,
             'filters' => $request->only('search'),
-            'auth' => $currentUser,
+            'auth' => [
+                'user' => $authUser
+            ],
             'roles' => $roles,
         ]);
     }
@@ -95,9 +106,20 @@ class UserController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
+        
+        $currentUser = Auth::user();
+        $authUser = [
+            'id' => $currentUser->id,
+            'name' => $currentUser->name,
+            'email' => $currentUser->email,
+            'profile_photo_url' => $currentUser->profile_photo_url ?? null,
+        ];
+        
         return Inertia::render('Users/Show', [
             'user' => $user,
-            'auth' => Auth::user(),
+            'auth' => [
+                'user' => $authUser
+            ],
         ]);
     }
 
@@ -112,8 +134,20 @@ class UserController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
+        
+        $currentUser = Auth::user();
+        $authUser = [
+            'id' => $currentUser->id,
+            'name' => $currentUser->name,
+            'email' => $currentUser->email,
+            'profile_photo_url' => $currentUser->profile_photo_url ?? null,
+        ];
+        
         return Inertia::render('Users/Edit', [
             'user' => $user,
+            'auth' => [
+                'user' => $authUser
+            ],
         ]);
     }
 
