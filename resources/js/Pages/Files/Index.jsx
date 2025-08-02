@@ -9,7 +9,7 @@ export default function Index({ files, filters }) {
     const [search, setSearch] = useState(filters?.search || '');
     const [notification, setNotification] = useState(flash.success || '');
     const [selectedFiles, setSelectedFiles] = useState([]);
-    const [viewMode, setViewMode] = useState('table');
+    const [viewMode, setViewMode] = useState('cards');
     
     const handleSearchSubmit = (e) => {
         e.preventDefault();

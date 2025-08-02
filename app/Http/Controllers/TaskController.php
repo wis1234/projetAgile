@@ -126,7 +126,18 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
-        $task->load(['project', 'sprint', 'assignedUser', 'files']);
+        
+        // Charger les relations nécessaires avec les rôles
+        $task->load([
+            'project.users' => function($query) {
+                $query->select('users.id', 'users.name', 'users.email')
+                      ->withPivot('role');
+            },
+            'sprint',
+            'assignedUser',
+            'files',
+            'comments.user'
+        ]);
         
         $user = auth()->user();
         $payments = collect(); 
@@ -142,9 +153,15 @@ class TaskController extends Controller
             }
         }
 
-        $projectMembers = $task->project->users()->get(['users.id', 'users.name']);
-
-        return Inertia::render('Tasks/Show', ['task' => $task, 'payments' => $payments, 'projectMembers' => $projectMembers]);
+        // Ajouter le rôle de l'utilisateur actuel pour faciliter la vérification côté frontend
+        $currentUserRole = $task->project->users->find($user->id)?->pivot->role;
+        
+        return Inertia::render('Tasks/Show', [
+            'task' => $task,
+            'payments' => $payments,
+            'projectMembers' => $task->project->users,
+            'currentUserRole' => $currentUserRole
+        ]);
     }
 
     public function savePaymentInfo(Request $request, Task $task)

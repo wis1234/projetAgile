@@ -5,13 +5,37 @@ import ActionButton from '../../Components/ActionButton';
 import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 
-export default function Show({ task, payments, projectMembers }) {
+export default function Show({ task, payments, projectMembers, currentUserRole }) {
   const { auth } = usePage().props;
-  const isAssigned = auth?.user?.id === task.assigned_to;
+  
+  // Vérification des droits basée sur les rôles
   const isAdmin = auth?.user?.role === 'admin' || auth?.user?.is_admin;
-  const isProjectManager = task.project?.users?.some(
-    u => u.id === auth.user.id && u.pivot?.role === 'manager'
-  );
+  const isProjectManager = currentUserRole === 'manager';
+  const canEditTask = isAdmin || isProjectManager;
+
+  // Logs de débogage
+  useEffect(() => {
+    console.log('=== DÉBOGAGE DROITS UTILISATEUR ===');
+    console.log('Utilisateur:', auth.user);
+    console.log('Rôle actuel:', currentUserRole);
+    console.log('Est admin:', isAdmin);
+    console.log('Est manager:', isProjectManager);
+    console.log('Peut modifier:', canEditTask);
+  }, [auth.user, currentUserRole, isAdmin, isProjectManager, canEditTask]);
+
+  // Debug logs
+  console.log('Auth user:', auth?.user);
+  console.log('Task project users:', task.project?.users);
+  console.log('Is admin:', isAdmin);
+  console.log('Is project manager:', isProjectManager);
+  console.log('Current user ID:', auth.user?.id);
+  console.log('Project users with roles:', task.project?.users?.map(u => ({
+    id: u.id,
+    name: u.name,
+    role: u.pivot?.role
+  })));
+  
+  const isAssigned = auth?.user?.id === task.assigned_to;
   const isProjectMember = task.project?.users?.some(u => u.id === auth.user.id);
 
   // For adding payment for other members
@@ -300,13 +324,50 @@ export default function Show({ task, payments, projectMembers }) {
     <div className="flex flex-col w-full bg-white dark:bg-gray-950 p-0 m-0 min-h-screen">
       <div className="flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
         
-        {/* Header Section */}
-        <div className="flex items-center gap-4 mb-8">
-          <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" />
-          <h1 className="text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">Détail de la tâche</h1>
-          <Link href="/tasks" className="ml-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md">
-            <FaArrowLeft /> Retour à la liste
-          </Link>
+        {/* Section En-tête */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+          <div className="flex items-center gap-4">
+            <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" />
+            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
+              Détail de la tâche
+              {process.env.NODE_ENV !== 'production' && (
+                <div className="text-xs text-gray-500 mt-1">
+                  Droits: {isAdmin ? 'Admin' : isProjectManager ? 'Manager' : 'Membre'}
+                </div>
+              )}
+            </h1>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-3">
+              {canEditTask && (
+                <>
+                  <Link 
+                    href={`/tasks/${task.id}/edit`} 
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+                  >
+                    <FaEdit /> 
+                    <span>Modifier</span>
+                  </Link>
+                  <button
+                    onClick={handleDeleteTask}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+                  >
+                    <FaTrash /> 
+                    <span>Supprimer</span>
+                  </button>
+                </>
+              )}
+              
+              <Link 
+                href="/tasks" 
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+              >
+                <FaArrowLeft /> 
+                <span>Retour</span>
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Tabs Navigation */}
@@ -946,23 +1007,23 @@ export default function Show({ task, payments, projectMembers }) {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 text-sm">
-                            <div className="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600">
+                            <div className="flex-shrink-0">
                               <img 
                                 src={file.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(file.user?.name || '')}&background=3b82f6&color=fff`} 
                                 alt={file.user?.name} 
                                 className="w-6 h-6 rounded-full" 
                               />
-                              <span className="text-gray-700 dark:text-gray-200 font-medium">{file.user?.name}</span>
-                              {file.user?.role === 'manager' || file.user?.role === 'admin' ? (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ml-2">
-                                  {file.user?.role === 'admin' ? 'Admin' : 'Manager'}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
-                                  Membre
-                                </span>
-                              )}
                             </div>
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">{file.user?.name}</span>
+                            {file.user?.role === 'manager' || file.user?.role === 'admin' ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ml-2">
+                                {file.user?.role === 'admin' ? 'Admin' : 'Manager'}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
+                                Membre
+                              </span>
+                            )}
                           </div>
                         </div>
                       </Link>

@@ -19,17 +19,18 @@ const FileHeader = ({ file, onDelete, currentUser, children }) => {
   };
 
   return (
-    <div className="bg-white px-4 py-5 border-b border-gray-200 sm:px-6">
+    <div className="bg-white dark:bg-gray-900 px-4 py-5 border-b border-gray-200 dark:border-gray-700 sm:px-6">
       <div className="-ml-4 -mt-2 flex items-center justify-between flex-wrap sm:flex-nowrap">
         <div className="ml-4 mt-2">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
+          <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
             <Link 
               href={route('files.index')}
-              className="inline-flex items-center text-blue-600 hover:text-blue-900 mr-3"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap inline-flex mb-2"
             >
-              <FaArrowLeft className="mr-1" /> Retour
+              <FaArrowLeft /> 
+              <span>Retour</span>
             </Link>
-            {file.name}
+            <span className="block mt-2">{file.name}</span>
           </h3>
         </div>
         <div className="ml-4 mt-2 flex-shrink-0 flex flex-wrap gap-2">
