@@ -26,15 +26,44 @@ const FileMetadata = ({ file }) => {
     { label: 'Taille', value: formatFileSize(file.size), bgGray: true },
     { label: 'Type MIME', value: file.type || 'Inconnu' },
     { 
-      label: 'Date de création', 
-      value: new Date(file.created_at).toLocaleString('fr-FR'),
+      label: 'Statut', 
+      value: (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          file.status === 'validated' 
+            ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' 
+            : file.status === 'rejected'
+            ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
+        }`}>
+          {file.status === 'validated' 
+            ? 'Validé' 
+            : file.status === 'rejected' 
+            ? 'Rejeté' 
+            : 'En attente'}
+        </span>
+      ),
       bgGray: true 
     },
     { 
+      label: 'Date de création', 
+      value: new Date(file.created_at).toLocaleString('fr-FR'),
+      bgGray: false 
+    },
+    { 
       label: 'Dernière modification', 
-      value: new Date(file.updated_at).toLocaleString('fr-FR') 
+      value: new Date(file.updated_at).toLocaleString('fr-FR'),
+      bgGray: true
     },
   ];
+
+  if (file.status === 'rejected' && file.rejection_reason) {
+    metadata.push({
+      label: 'Raison du rejet',
+      value: file.rejection_reason,
+      bgGray: false,
+      className: 'text-red-600 dark:text-red-400 whitespace-pre-line'
+    });
+  }
 
   if (file.description) {
     metadata.push({

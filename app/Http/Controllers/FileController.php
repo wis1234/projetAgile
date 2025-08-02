@@ -82,8 +82,8 @@ class FileController extends Controller
             'name' => 'required|string|max:255',
             'file' => 'required|file|max:10240', // 10 Mo max
             'project_id' => 'required|exists:projects,id',
-            'task_id' => 'nullable|exists:tasks,id',
-            'kanban_id' => 'nullable|exists:sprints,id',
+            'task_id' => 'required|exists:tasks,id',
+            'kanban_id' => 'required|exists:sprints,id',
             'description' => 'nullable|string',
         ]);
         $file = $request->file('file');
@@ -95,8 +95,8 @@ class FileController extends Controller
             'size' => $file->getSize(),
             'user_id' => $currentUser->id,
             'project_id' => $validated['project_id'],
-            'task_id' => $validated['task_id'] ?? null,
-            'kanban_id' => $validated['kanban_id'] ?? null,
+            'task_id' => $validated['task_id'],
+            'kanban_id' => $validated['kanban_id'],
             'description' => $validated['description'] ?? null,
             'status' => 'pending',
         ]);
@@ -203,8 +203,8 @@ class FileController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'project_id' => 'required|exists:projects,id',
-            'task_id' => 'nullable|exists:tasks,id',
-            'kanban_id' => 'nullable|exists:sprints,id',
+            'task_id' => 'required|exists:tasks,id',
+            'kanban_id' => 'required|exists:sprints,id',
             'user_id' => 'required|exists:users,id',
             'description' => 'nullable|string',
             'status' => 'required|in:pending,validated,rejected',

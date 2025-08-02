@@ -68,17 +68,17 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
             )}
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block font-semibold mb-1">Nom du fichier</label>
+                <label className="block font-semibold mb-1">Nom du fichier <span className="text-red-500">*</span></label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} className="input" required />
                 {errors.name && <div className="text-error text-sm">{errors.name}</div>}
               </div>
               <div>
-                <label className="block font-semibold mb-1">Fichier à importer</label>
+                <label className="block font-semibold mb-1">Fichier à importer <span className="text-red-500">*</span></label>
                 <input type="file" onChange={e => setFile(e.target.files[0])} className="input" required />
                 {errors.file && <div className="text-error text-sm">{errors.file}</div>}
               </div>
               <div>
-                <label className="block font-semibold mb-1">Projet associé</label>
+                <label className="block font-semibold mb-1">Projet associé <span className="text-red-500">*</span></label>
                 <select value={projectId} onChange={e => setProjectId(e.target.value)} className="input" required disabled={!!urlProjectId}>
                   {projects.map(project => (
                     <option key={project.id} value={project.id}>{project.name}</option>
@@ -87,11 +87,19 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
                 {errors.project_id && <div className="text-error text-sm">{errors.project_id}</div>}
               </div>
               <div>
-                <label className="block font-semibold mb-1">Tâche liée (optionnel)</label>
-                <select value={taskId} onChange={e => setTaskId(e.target.value)} className="input" disabled={!!urlTaskId}>
-                  <option value="">Aucune</option>
-                  {tasks.map(task => (
-                    <option key={task.id} value={task.id}>{task.title}</option>
+                <label className="block font-semibold mb-1">Tâche liée <span className="text-red-500">*</span></label>
+                <select 
+                  name="task_id" 
+                  value={taskId} 
+                  onChange={e => setTaskId(e.target.value)} 
+                  className="input"
+                  required
+                >
+                  <option value="">Sélectionner une tâche</option>
+                  {tasks.map((task) => (
+                    <option key={task.id} value={task.id}>
+                      {task.title || `Tâche #${task.id}`}
+                    </option>
                   ))}
                 </select>
                 {errors.task_id && <div className="text-error text-sm">{errors.task_id}</div>}

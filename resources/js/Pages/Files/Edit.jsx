@@ -7,6 +7,8 @@ import { useRef } from 'react';
 
 export default function Edit({ file, projects, users, tasks = [], kanbans = [] }) {
     const { errors, flash = {} } = usePage().props;
+    const { auth } = usePage().props;
+    const isAdmin = auth?.user?.role === 'admin';
     const [values, setValues] = useState({
         name: file.name || '',
         project_id: file.project_id || projects[0]?.id || '',
@@ -105,15 +107,17 @@ export default function Edit({ file, projects, users, tasks = [], kanbans = [] }
                             </select>
                             {errors.project_id && <div className="text-error text-sm">{errors.project_id}</div>}
                         </div>
-                        <div>
-                            <label className="block font-semibold mb-1">Utilisateur</label>
-                            <select name="user_id" value={values.user_id} onChange={handleChange} className="input" required>
-                                {users.map(user => (
-                                    <option key={user.id} value={user.id}>{user.name}</option>
-                                ))}
-                            </select>
-                            {errors.user_id && <div className="text-error text-sm">{errors.user_id}</div>}
-                        </div>
+                        {isAdmin && (
+                            <div>
+                                <label className="block font-semibold mb-1">Utilisateur</label>
+                                <select name="user_id" value={values.user_id} onChange={handleChange} className="input" required>
+                                    {users.map(user => (
+                                        <option key={user.id} value={user.id}>{user.name}</option>
+                                    ))}
+                                </select>
+                                {errors.user_id && <div className="text-error text-sm">{errors.user_id}</div>}
+                            </div>
+                        )}
                         <div>
                             <label className="block font-semibold mb-1">Tâche liée (optionnel)</label>
                             <select name="task_id" value={values.task_id} onChange={handleChange} className="input">
