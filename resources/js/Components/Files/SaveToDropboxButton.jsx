@@ -1,24 +1,42 @@
 import { useState } from 'react';
-import { router } from '@inertiajs/react';
 import { toast } from 'react-toastify';
-import { FaSpinner, FaCloudUploadAlt, FaTimes } from 'react-icons/fa';
+import { FaSpinner, FaCloudUploadAlt, FaTimes, FaFolder } from 'react-icons/fa';
+import Modal from '@/Components/Modal';
+import DropboxFolderSelector from './DropboxFolderSelector';
 
-export default function SaveToDropboxButton({ fileId, className = '' }) {
+export default function SaveToDropboxButton({ fileId, fileName, className = '' }) {
     const [isSaving, setIsSaving] = useState(false);
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [showModal, setShowModal] = useState(false);
+    const [selectedFolder, setSelectedFolder] = useState('');
+    const [customFileName, setCustomFileName] = useState(fileName || '');
+    const [showFolderSelector, setShowFolderSelector] = useState(false);
 
     const handleSaveToDropbox = async () => {
-        setShowConfirmModal(false);
+        if (!selectedFolder) {
+            toast.error('Veuillez sélectionner un dossier de destination');
+            return;
+        }
+
+        if (!customFileName.trim()) {
+            toast.error('Veuillez spécifier un nom de fichier');
+            return;
+        }
+
         setIsSaving(true);
         
         try {
-            const response = await fetch(`/files/${fileId}/save-to-dropbox`, {
+            const response = await fetch(`/api/files/${fileId}/save-to-dropbox`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    folder_path: selectedFolder,
+                    file_name: customFileName
+                })
             });
 
             const data = await response.json();
@@ -36,6 +54,8 @@ export default function SaveToDropboxButton({ fileId, className = '' }) {
                 draggable: true
             });
 
+            setShowModal(false);
+            
             // Rafraîchir la page pour afficher le statut mis à jour
             if (data.file) {
                 window.location.reload();
@@ -55,82 +75,127 @@ export default function SaveToDropboxButton({ fileId, className = '' }) {
         }
     };
 
+    const handleFolderSelect = (folderPath) => {
+        setSelectedFolder(folderPath);
+        setShowFolderSelector(false);
+    };
+
+    const resetForm = () => {
+        setSelectedFolder('');
+        setCustomFileName(fileName || '');
+        setShowModal(false);
+    };
+
     return (
         <>
             <button
-                type="button"
-                onClick={() => setShowConfirmModal(true)}
+                onClick={() => setShowModal(true)}
                 disabled={isSaving}
-                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${className} ${isSaving ? 'opacity-75 cursor-not-allowed' : ''}`}
+                className={`inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150 ${className} ${isSaving ? 'opacity-75' : ''}`}
             >
                 {isSaving ? (
                     <>
-                        <FaSpinner className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                        Enregistrement...
+                        <FaSpinner className="animate-spin mr-2" />
+                        Envoi...
                     </>
                 ) : (
                     <>
-                        <FaCloudUploadAlt className="-ml-1 mr-2 h-4 w-4" />
-                        Sauvegarder sur Dropbox
+                        <FaCloudUploadAlt className="mr-2" />
+                        Envoyer vers Dropbox
                     </>
                 )}
             </button>
 
-            {/* Modal de confirmation */}
-            {showConfirmModal && (
-                <div className="fixed z-10 inset-0 overflow-y-auto">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-                            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            <Modal show={showModal} onClose={resetForm} maxWidth="2xl">
+                <div className="p-6">
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                        Envoyer vers Dropbox
+                    </h2>
+                    
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Nom du fichier
+                            </label>
+                            <input
+                                type="text"
+                                value={customFileName}
+                                onChange={(e) => setCustomFileName(e.target.value)}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                placeholder="Nom du fichier"
+                            />
                         </div>
-
-                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">
-                            &#8203;
-                        </span>
-
-                        <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-                            <div className="sm:flex sm:items-start">
-                                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
-                                    <FaCloudUploadAlt className="h-6 w-6 text-blue-600" />
-                                </div>
-                                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                                        Sauvegarder sur Dropbox
-                                    </h3>
-                                    <div className="mt-2">
-                                        <p className="text-sm text-gray-500">
-                                            Êtes-vous sûr de vouloir sauvegarder ce fichier sur Dropbox ?
-                                        </p>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Dossier de destination
+                            </label>
+                            <div className="mt-1 flex rounded-md shadow-sm">
+                                <div className="relative flex items-stretch flex-grow focus-within:z-10">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <FaFolder className="h-5 w-5 text-gray-400" />
                                     </div>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={selectedFolder || 'Aucun dossier sélectionné'}
+                                        className="focus:ring-blue-500 focus:border-blue-500 block w-full rounded-none rounded-l-md pl-10 sm:text-sm border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        placeholder="Sélectionner un dossier"
+                                    />
                                 </div>
-                            </div>
-                            <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
                                 <button
                                     type="button"
-                                    onClick={handleSaveToDropbox}
-                                    disabled={isSaving}
-                                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                                    onClick={() => setShowFolderSelector(true)}
+                                    className="-ml-px relative inline-flex items-center space-x-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:text-white dark:hover:bg-gray-500"
                                 >
-                                    {isSaving ? (
-                                        <>
-                                            <FaSpinner className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                            Enregistrement...
-                                        </>
-                                    ) : 'Confirmer'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowConfirmModal(false)}
-                                    disabled={isSaving}
-                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm"
-                                >
-                                    Annuler
+                                    <FaFolder className="h-5 w-5 text-gray-400" />
+                                    <span>Parcourir</span>
                                 </button>
                             </div>
                         </div>
                     </div>
+
+                    <div className="mt-6 flex justify-end space-x-3">
+                        <button
+                            type="button"
+                            onClick={resetForm}
+                            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:text-white dark:hover:bg-gray-500"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSaveToDropbox}
+                            disabled={isSaving || !selectedFolder || !customFileName.trim()}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                        >
+                            {isSaving ? (
+                                <>
+                                    <FaSpinner className="animate-spin mr-2" />
+                                    Envoi en cours...
+                                </>
+                            ) : (
+                                'Enregistrer sur Dropbox'
+                            )}
+                        </button>
+                    </div>
                 </div>
-            )}
+            </Modal>
+
+            {/* Modal de sélection de dossier */}
+            <Modal 
+                show={showFolderSelector} 
+                onClose={() => setShowFolderSelector(false)}
+                maxWidth="lg"
+            >
+                <div className="p-4">
+                    <DropboxFolderSelector 
+                        onSelect={handleFolderSelect}
+                        onCancel={() => setShowFolderSelector(false)}
+                        currentPath={selectedFolder}
+                    />
+                </div>
+            </Modal>
         </>
     );
 }
