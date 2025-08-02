@@ -3,15 +3,9 @@ import { router } from '@inertiajs/react';
 import { toast } from 'react-toastify';
 import { FaSpinner, FaCloudUploadAlt, FaTimes } from 'react-icons/fa';
 
-export default function SaveToDropboxButton({ fileId, className = '', userRole, isProjectManager = false }) {
+export default function SaveToDropboxButton({ fileId, className = '' }) {
     const [isSaving, setIsSaving] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-
-    // Only show button for admin or project manager
-    const shouldShowButton = userRole === 'admin' || isProjectManager;
-    if (!shouldShowButton) {
-        return null;
-    }
 
     const handleSaveToDropbox = async () => {
         setShowConfirmModal(false);
@@ -42,7 +36,7 @@ export default function SaveToDropboxButton({ fileId, className = '', userRole, 
                 draggable: true
             });
 
-            // Refresh the page to show the updated file status
+            // Rafraîchir la page pour afficher le statut mis à jour
             if (data.file) {
                 window.location.reload();
             }
@@ -50,7 +44,7 @@ export default function SaveToDropboxButton({ fileId, className = '', userRole, 
             console.error('Erreur lors de la sauvegarde sur Dropbox:', error);
             toast.error(error.message || 'Erreur lors de la sauvegarde sur Dropbox', {
                 position: "top-right",
-                autoClose: 7000,
+                autoClose: 5000,
                 hideProgressBar: false,
                 closeOnClick: true,
                 pauseOnHover: true,
@@ -64,27 +58,28 @@ export default function SaveToDropboxButton({ fileId, className = '', userRole, 
     return (
         <>
             <button
+                type="button"
                 onClick={() => setShowConfirmModal(true)}
                 disabled={isSaving}
-                className={`inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150 ${isSaving ? 'opacity-75' : ''} ${className}`}
+                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${className} ${isSaving ? 'opacity-75 cursor-not-allowed' : ''}`}
             >
                 {isSaving ? (
                     <>
-                        <FaSpinner className="animate-spin mr-2" />
-                        Sauvegarde...
+                        <FaSpinner className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                        Enregistrement...
                     </>
                 ) : (
                     <>
-                        <FaCloudUploadAlt className="mr-2" />
+                        <FaCloudUploadAlt className="-ml-1 mr-2 h-4 w-4" />
                         Sauvegarder sur Dropbox
                     </>
                 )}
             </button>
 
-            {/* Custom Modal */}
+            {/* Modal de confirmation */}
             {showConfirmModal && (
-                <div className="fixed z-50 inset-0 overflow-y-auto">
-                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed z-10 inset-0 overflow-y-auto">
+                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                         <div className="fixed inset-0 transition-opacity" aria-hidden="true">
                             <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
                         </div>
@@ -100,11 +95,11 @@ export default function SaveToDropboxButton({ fileId, className = '', userRole, 
                                 </div>
                                 <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
                                     <h3 className="text-lg leading-6 font-medium text-gray-900">
-                                        Confirmer la sauvegarde
+                                        Sauvegarder sur Dropbox
                                     </h3>
                                     <div className="mt-2">
                                         <p className="text-sm text-gray-500">
-                                            Voulez-vous vraiment sauvegarder ce fichier sur Dropbox ?
+                                            Êtes-vous sûr de vouloir sauvegarder ce fichier sur Dropbox ?
                                         </p>
                                     </div>
                                 </div>
@@ -118,8 +113,8 @@ export default function SaveToDropboxButton({ fileId, className = '', userRole, 
                                 >
                                     {isSaving ? (
                                         <>
-                                            <FaSpinner className="animate-spin mr-2" />
-                                            Sauvegarde...
+                                            <FaSpinner className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                            Enregistrement...
                                         </>
                                     ) : 'Confirmer'}
                                 </button>

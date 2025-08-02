@@ -1,15 +1,13 @@
 import { Link } from '@inertiajs/react';
-import { FaTrash, FaDownload, FaArrowLeft } from 'react-icons/fa';
+import { FaTrash, FaDownload, FaArrowLeft, FaEdit } from 'react-icons/fa';
 import { useState } from 'react';
 import ConfirmationModal from '../Common/ConfirmationModal';
 
 const FileHeader = ({ file, onDelete, currentUser, children }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
-  const isAdmin = currentUser?.role === 'admin';
-  const isProjectManager = file.project?.managers?.some(m => m.id === currentUser?.id);
-  const isFileOwner = file.user_id === currentUser?.id;
-  const canDelete = isAdmin || isProjectManager || isFileOwner;
+  // Tous les utilisateurs peuvent voir les boutons
+  const showAdminControls = true;
 
   const handleDeleteClick = () => {
     setShowDeleteModal(true);
@@ -17,7 +15,7 @@ const FileHeader = ({ file, onDelete, currentUser, children }) => {
 
   const confirmDelete = () => {
     setShowDeleteModal(false);
-    onDelete();
+    onDelete?.();
   };
 
   return (
@@ -35,7 +33,6 @@ const FileHeader = ({ file, onDelete, currentUser, children }) => {
           </h3>
         </div>
         <div className="ml-4 mt-2 flex-shrink-0 flex flex-wrap gap-2">
-          {/* Render any children components (like the SaveToDropboxButton) */}
           {children}
           
           <a
@@ -46,16 +43,22 @@ const FileHeader = ({ file, onDelete, currentUser, children }) => {
             Télécharger
           </a>
           
-          {canDelete && (
-            <button
-              type="button"
-              onClick={handleDeleteClick}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              <FaTrash className="-ml-1 mr-2 h-4 w-4" />
-              Supprimer
-            </button>
-          )}
+          <Link
+            href={route('files.edit', file.id)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+          >
+            <FaEdit className="-ml-1 mr-2 h-4 w-4" />
+            Modifier
+          </Link>
+          
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          >
+            <FaTrash className="-ml-1 mr-2 h-4 w-4" />
+            Supprimer
+          </button>
         </div>
       </div>
 
@@ -67,7 +70,7 @@ const FileHeader = ({ file, onDelete, currentUser, children }) => {
         message="Êtes-vous sûr de vouloir supprimer ce fichier ? Cette action est irréversible."
         confirmText="Supprimer"
         cancelText="Annuler"
-        confirmButtonStyle="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+        confirmButtonClass="bg-red-600 hover:bg-red-700 focus:ring-red-500"
       />
     </div>
   );

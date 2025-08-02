@@ -15,12 +15,8 @@ const Show = ({ file, statuses, auth }) => {
   const { user: currentUser } = auth;
   const [currentFile, setCurrentFile] = useState(file);
   
-  // Vérifier les permissions
-  const isAdmin = currentUser?.role === 'admin';
-  const isProjectManager = currentFile.project?.managers?.some(m => m.id === currentUser?.id);
   const isFileOwner = currentFile.user_id === currentUser?.id;
-  const canDelete = isAdmin || isProjectManager || isFileOwner;
-  const canUpdateStatus = isAdmin || isProjectManager;
+  const canDelete = isFileOwner; // Seul le propriétaire peut supprimer
 
   const handleStatusUpdate = (updatedFile) => {
     setCurrentFile(updatedFile);
@@ -60,15 +56,12 @@ const Show = ({ file, statuses, auth }) => {
         <FileHeader 
           file={currentFile} 
           onDelete={canDelete ? handleDelete : null}
+          currentUser={currentUser}
         >
-          {(isAdmin || isProjectManager) && (
-            <SaveToDropboxButton 
-              fileId={currentFile.id} 
-              className="ml-2"
-              userRole={currentUser?.role}
-              isProjectManager={isProjectManager}
-            />
-          )}
+          <SaveToDropboxButton 
+            fileId={currentFile.id} 
+            className="ml-2"
+          />
         </FileHeader>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -88,15 +81,18 @@ const Show = ({ file, statuses, auth }) => {
                 <FileMetadata file={currentFile} />
               </motion.div>
               
-              {canUpdateStatus && (
-                <motion.div variants={item}>
-                  <StatusUpdateForm 
-                    file={currentFile} 
-                    statuses={statuses} 
-                    onStatusUpdate={handleStatusUpdate}
-                  />
-                </motion.div>
-              )}
+              <motion.div variants={item}>
+                <StatusUpdateForm 
+                  file={currentFile} 
+                  statuses={statuses} 
+                  onStatusUpdate={handleStatusUpdate}
+                />
+              </motion.div>
+              
+              {/* Section des commentaires */}
+              <motion.div variants={item} className="mt-6">
+                <CommentsSection fileId={currentFile.id} currentUser={currentUser} />
+              </motion.div>
             </div>
             
             {/* Colonne secondaire */}
@@ -159,17 +155,6 @@ const Show = ({ file, statuses, auth }) => {
                 </div>
               </motion.div>
             </div>
-          </motion.div>
-          
-          {/* Section des commentaires */}
-          <motion.div 
-            className="bg-white rounded-xl border border-gray-200 overflow-hidden"
-            variants={item}
-          >
-            <CommentsSection 
-              fileId={currentFile.id} 
-              currentUserId={currentUser?.id} 
-            />
           </motion.div>
         </div>
       </div>
