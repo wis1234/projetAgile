@@ -38,138 +38,68 @@ class DropboxController extends Controller
     {
         try {
             $validated = $request->validate([
-                'folder_path' => 'required|string',
-                'file_name' => 'required|string|max:255',
+                'path' => 'required|string',
+                'use_filename' => 'boolean',
+                'custom_filename' => 'nullable|string'
             ]);
-            
-            $folderPath = trim($validated['folder_path'], '/');
-            $fileName = $validated['file_name'];
-            
+
+            $path = trim($validated['path'], '/');
+            if (empty($path)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le chemin du dossier ne peut pas être vide.'
+                ], 422);
+            }
+
             $file = File::findOrFail($fileId);
-            
-            // Vérifier si le fichier existe localement
             $localPath = 'public/' . ltrim($file->file_path, '/');
-            
+
             if (!Storage::exists($localPath)) {
-                Log::error('Fichier non trouvé localement', [
-                    'file_id' => $file->id,
-                    'path' => $localPath,
-                    'storage_path' => storage_path('app/' . $localPath)
-                ]);
-                
                 return response()->json([
                     'success' => false,
                     'message' => 'Le fichier n\'existe pas sur le serveur.'
                 ], 404);
             }
-            
+
             $filePath = storage_path('app/' . $localPath);
-            $fileExtension = pathinfo($file->file_path, PATHINFO_EXTENSION);
-            $dropboxPath = '/' . $folderPath . '/' . $fileName . ($fileExtension ? '.' . $fileExtension : '');
-            
-            Log::info('Tentative d\'upload vers Dropbox', [
-                'file_id' => $file->id,
-                'local_path' => $filePath,
-                'dropbox_path' => $dropboxPath,
-                'file_exists' => file_exists($filePath),
-                'is_readable' => is_readable($filePath),
-                'file_size' => filesize($filePath) . ' bytes'
-            ]);
-            
-            // Vérifier si le fichier est lisible
-            if (!is_readable($filePath)) {
-                $error = error_get_last();
-                Log::error('Fichier non lisible', [
-                    'file_id' => $file->id,
-                    'path' => $filePath,
-                    'error' => $error ? $error['message'] : 'Inconnu',
-                    'permissions' => substr(sprintf('%o', fileperms($filePath)), -4)
-                ]);
-                
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Impossible de lire le fichier. Vérifiez les permissions.'
-                ], 500);
-            }
-            
-            // Lire le contenu du fichier
             $fileContent = file_get_contents($filePath);
-            if ($fileContent === false) {
-                $error = error_get_last();
-                throw new \Exception('Impossible de lire le contenu du fichier: ' . ($error['message'] ?? 'Inconnu'));
-            }
             
-            // Téléverser le fichier
-            Log::info('Téléversement vers Dropbox en cours...', [
-                'file_id' => $file->id,
-                'dropbox_path' => $dropboxPath,
-                'content_length' => strlen($fileContent) . ' bytes'
+            // Déterminer le nom du fichier à utiliser
+            $fileName = $validated['custom_filename'] ?? $file->name;
+            
+            // Construire le chemin Dropbox final
+            $dropboxPath = '/' . trim($path, '/') . '/' . $fileName;
+
+            // Créer le dossier de destination s'il n'existe pas
+            $this->createDirectoryIfNotExists(dirname($dropboxPath));
+
+            $result = $this->dropbox->upload($dropboxPath, $fileContent, 'overwrite');
+
+            $file->dropbox_path = $dropboxPath;
+            $file->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Fichier sauvegardé sur Dropbox avec succès',
+                'path' => $dropboxPath
             ]);
-            
-            try {
-                // Créer le dossier s'il n'existe pas
-                $this->createDirectoryIfNotExists($folderPath);
-                
-                $result = $this->dropbox->upload($dropboxPath, $fileContent, 'overwrite');
-                
-                Log::info('Réponse de Dropbox', [
-                    'file_id' => $file->id,
-                    'response' => json_encode($result)
-                ]);
-                
-                // Mettre à jour le statut du fichier dans la base de données
-                $file->dropbox_path = $dropboxPath;
-                $file->save();
-                
-                Log::info('Fichier sauvegardé avec succès sur Dropbox', [
-                    'file_id' => $file->id,
-                    'dropbox_path' => $dropboxPath,
-                    'size' => $file->size
-                ]);
-                
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Fichier sauvegardé sur Dropbox avec succès',
-                    'path' => $dropboxPath
-                ]);
-                
-            } catch (\Exception $uploadException) {
-                $errorDetails = [
-                    'message' => $uploadException->getMessage(),
-                    'code' => $uploadException->getCode(),
-                    'file' => $uploadException->getFile(),
-                    'line' => $uploadException->getLine(),
-                ];
-                
-                if ($uploadException->getPrevious() instanceof \GuzzleHttp\Exception\ClientException) {
-                    $response = $uploadException->getPrevious()->getResponse();
-                    $errorDetails['response'] = [
-                        'status' => $response->getStatusCode(),
-                        'body' => (string) $response->getBody()
-                    ];
-                }
-                
-                Log::error('Erreur lors de l\'upload vers Dropbox', $errorDetails);
-                
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors de l\'upload vers Dropbox: ' . $uploadException->getMessage(),
-                    'details' => $errorDetails
-                ], 500);
-            }
-            
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation',
+                'errors' => $e->errors()
+            ], 422);
         } catch (\Exception $e) {
             Log::error('Erreur lors de la sauvegarde sur Dropbox', [
                 'file_id' => $fileId ?? 'inconnu',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'previous' => $e->getPrevious() ? $e->getPrevious()->getMessage() : null
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la sauvegarde sur Dropbox: ' . $e->getMessage(),
-                'trace' => config('app.debug') ? $e->getTraceAsString() : null
             ], 500);
         }
     }
@@ -185,93 +115,35 @@ class DropboxController extends Controller
         try {
             $path = $request->input('path', '');
             $path = trim($path, '/');
-            
-            Log::info('Liste des dossiers Dropbox demandée', ['path' => $path]);
-            
-            // Si le chemin est vide, on liste le contenu de la racine
-            $dropboxPath = $path === '' ? '' : "/$path";
-            
+            $dropboxPath = $path === '' ? '' : '/' . $path;
+
             try {
-                // Récupérer la liste des dossiers
                 $response = $this->dropbox->listFolder($dropboxPath, false);
-                
-                // Filtrer pour ne garder que les dossiers
-                $folders = array_filter($response['entries'], function($entry) {
+                $folders = array_filter($response['entries'], function ($entry) {
                     return $entry['.tag'] === 'folder';
                 });
-                
-                // Trier les dossiers par nom
-                usort($folders, function($a, $b) {
-                    return strcasecmp($a['name'], $b['name']);
-                });
-                
-                // Formater les données pour le frontend
-                $formattedFolders = array_map(function($folder) use ($path) {
-                    return [
-                        'name' => $folder['name'],
-                        'path_lower' => $folder['path_lower'],
-                        'path_display' => $folder['path_display'],
-                        'id' => $folder['id']
-                    ];
-                }, $folders);
-                
-                Log::info('Dossiers récupérés avec succès', [
-                    'path' => $path,
-                    'count' => count($formattedFolders)
-                ]);
-                
+
                 return response()->json([
                     'success' => true,
-                    'folders' => array_values($formattedFolders), // Réindexer le tableau
-                    'path' => $path
+                    'folders' => array_values($folders)
                 ]);
-                
+
             } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
-                Log::error('Erreur Dropbox (BadRequest)', [
-                    'message' => $e->getMessage(),
-                    'path' => $path,
-                    'code' => $e->getCode()
-                ]);
-                
-                // Si le dossier n'existe pas, retourner un tableau vide
                 if (strpos($e->getMessage(), 'not_found') !== false) {
-                    return response()->json([
-                        'success' => true,
-                        'folders' => [],
-                        'path' => $path
-                    ]);
+                    return response()->json(['success' => true, 'folders' => []]);
                 }
-                
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors de la récupération des dossiers: ' . $e->getMessage(),
-                    'code' => $e->getCode()
-                ], 400);
-                
-            } catch (\Exception $e) {
-                Log::error('Erreur lors de la récupération des dossiers Dropbox', [
-                    'message' => $e->getMessage(),
-                    'path' => $path,
-                    'trace' => $e->getTraceAsString()
-                ]);
-                
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors de la récupération des dossiers: ' . $e->getMessage(),
-                    'code' => $e->getCode()
-                ], 500);
+                throw $e;
             }
-            
+
         } catch (\Exception $e) {
-            Log::error('Erreur inattendue dans listFolders', [
+            Log::error('Erreur lors de la récupération des dossiers Dropbox', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Une erreur inattendue est survenue: ' . $e->getMessage(),
-                'code' => $e->getCode()
+                'message' => 'Erreur lors de la récupération des dossiers: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -287,73 +159,69 @@ class DropboxController extends Controller
         try {
             $validated = $request->validate([
                 'path' => 'required|string',
-                'name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9 _-]+$/'],
             ]);
-            
-            $basePath = trim($validated['path'], '/');
-            $folderName = trim($validated['name']);
-            $folderPath = $basePath === '' ? "/$folderName" : "/$basePath/$folderName";
-            
-            Log::info('Création de dossier Dropbox demandée', [
-                'base_path' => $basePath,
-                'folder_name' => $folderName,
-                'full_path' => $folderPath
-            ]);
-            
-            try {
-                // Créer le dossier
-                $folderMetadata = $this->dropbox->createFolder($folderPath);
-                
-                Log::info('Dossier créé avec succès', [
-                    'path' => $folderPath,
-                    'metadata' => $folderMetadata
-                ]);
-                
-                // Récupérer les informations du dossier créé
-                $folderInfo = [
-                    'name' => $folderName,
-                    'path_lower' => strtolower($folderPath),
-                    'path_display' => $folderPath,
-                    'id' => $folderMetadata['id'] ?? null
-                ];
-                
+
+            $path = trim($validated['path'], '/');
+            if (empty($path)) {
                 return response()->json([
-                    'success' => true,
-                    'message' => 'Dossier créé avec succès',
-                    'folder' => $folderInfo
-                ]);
-                
-            } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
-                // Vérifier si l'erreur est due à un dossier existant
-                if (strpos($e->getMessage(), 'path/conflict/folder/') !== false) {
+                    'success' => false,
+                    'message' => 'Le nom du dossier ne peut pas être vide.'
+                ], 422);
+            }
+
+            Log::info('Création de dossier Dropbox demandée', [
+                'full_path' => $path
+            ]);
+
+            try {
+                // Vérifier si le dossier existe déjà
+                try {
+                    $this->dropbox->getMetadata('/' . $path);
                     return response()->json([
                         'success' => false,
                         'message' => 'Un dossier avec ce nom existe déjà.'
                     ], 409);
+                } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
+                    // Le dossier n'existe pas, on peut continuer
                 }
-                
-                // Autre erreur
-                throw $e;
+
+                // Créer le dossier
+                $folderMetadata = $this->dropbox->createFolder('/' . $path);
+
+                Log::info('Dossier créé avec succès', [
+                    'path' => '/' . $path,
+                    'metadata' => $folderMetadata
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Dossier créé avec succès',
+                    'folder' => $folderMetadata
+                ]);
+
+            } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
+                Log::error('Erreur lors de la création du dossier', [
+                    'path' => '/' . $path,
+                    'error' => $e->getMessage()
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Erreur lors de la création du dossier: ' . $e->getMessage()
+                ], 400);
             }
-            
+
         } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Validation error in createFolder', [
-                'errors' => $e->errors(),
-                'request' => $request->all()
-            ]);
-            
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur de validation',
                 'errors' => $e->errors()
             ], 422);
-            
         } catch (\Exception $e) {
             Log::error('Erreur inattendue dans createFolder', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Une erreur est survenue: ' . $e->getMessage()
@@ -369,41 +237,16 @@ class DropboxController extends Controller
      */
     protected function createDirectoryIfNotExists($path)
     {
+        $path = trim($path, '/');
+        if (empty($path)) {
+            return;
+        }
+
         try {
-            $path = trim($path, '/');
-            if (empty($path)) {
-                return; // Racine, rien à créer
-            }
-            
-            $parts = explode('/', $path);
-            $currentPath = '';
-            
-            foreach ($parts as $part) {
-                $currentPath = $currentPath === '' ? $part : "$currentPath/$part";
-                $fullPath = "/$currentPath";
-                
-                try {
-                    // Essayer de créer le dossier
-                    $this->dropbox->createFolder($fullPath);
-                    Log::info("Dossier créé: $fullPath");
-                } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
-                    // Le dossier existe déjà, on continue
-                    if (strpos($e->getMessage(), 'path/conflict/folder/') === false) {
-                        // Autre erreur que le conflit de dossier existant
-                        Log::warning("Erreur lors de la création du dossier $fullPath", [
-                            'error' => $e->getMessage()
-                        ]);
-                        throw $e;
-                    }
-                }
-            }
-            
-        } catch (\Exception $e) {
-            Log::error("Erreur dans createDirectoryIfNotExists pour le chemin: $path", [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw $e;
+            $this->dropbox->getMetadata('/' . $path);
+        } catch (\Spatie\Dropbox\Exceptions\BadRequest $e) {
+            // Le dossier n'existe pas, nous le créons
+            $this->dropbox->createFolder('/' . $path);
         }
     }
 }
