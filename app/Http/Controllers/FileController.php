@@ -142,22 +142,30 @@ class FileController extends Controller
     public function show(File $file)
     {
         $file->load(['project', 'user', 'task']);
-        $canUpdateStatus = false;
         $statuses = ['pending', 'validated', 'rejected'];
         $user = auth()->user();
-        // Suppression de toute restriction d'accès à la prévisualisation :
-        // Tous les membres du projet peuvent prévisualiser le fichier
-        if ($file->project && $user) {
-            $pivot = $file->project->users()->where('user_id', $user->id)->first();
-            if ($pivot && $pivot->pivot->role === 'manager') {
+
+        $canUpdateStatus = false;
+        $canManageFile = false;
+
+        if ($user) {
+            if ($user->hasRole('admin')) {
                 $canUpdateStatus = true;
+                $canManageFile = true;
+            } elseif ($file->project) {
+                $projectUser = $file->project->users()->where('user_id', $user->id)->first();
+                if ($projectUser && $projectUser->pivot->role === 'manager') {
+                    $canUpdateStatus = true;
+                    $canManageFile = true;
+                }
             }
         }
-        // On ne retourne plus d'erreur 403 pour la prévisualisation
+
         return Inertia::render('Files/Show', [
             'file' => $file,
             'canUpdateStatus' => $canUpdateStatus,
             'statuses' => $statuses,
+            'canManageFile' => $canManageFile,
         ]);
     }
 
@@ -201,9 +209,30 @@ class FileController extends Controller
             'description' => 'nullable|string',
             'status' => 'required|in:pending,validated,rejected',
             'rejection_reason' => 'nullable|string',
+            'file' => 'nullable|file|max:10240', // 10 Mo max
         ]);
+
         $oldStatus = $file->status;
-        $file->update($validated);
+
+        $updateData = $request->except('file');
+
+        // Handle file update
+        if ($request->hasFile('file')) {
+            // Delete old file
+            if ($file->file_path && Storage::disk('public')->exists($file->file_path)) {
+                Storage::disk('public')->delete($file->file_path);
+            }
+
+            // Store new file
+            $newFile = $request->file('file');
+            $path = $newFile->store('files', 'public');
+            $updateData['file_path'] = $path;
+            $updateData['type'] = $newFile->getClientMimeType();
+            $updateData['size'] = $newFile->getSize();
+        }
+
+        $file->update($updateData);
+
         activity_log('update', 'Modification fichier', $file);
         // Notifier l'utilisateur si le statut change
         if ($validated['status'] !== $oldStatus) {

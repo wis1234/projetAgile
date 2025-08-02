@@ -11,12 +11,12 @@ import RelatedInfo from '@/Components/FileDetails/RelatedInfo';
 import SaveToDropboxButton from '@/Components/Files/SaveToDropboxButton';
 import { FaProjectDiagram, FaTasks, FaUser, FaFileAlt, FaClock } from 'react-icons/fa';
 
-const Show = ({ file, statuses, auth }) => {
+const Show = ({ file, statuses, auth, canManageFile }) => {
   const { user: currentUser } = auth;
   const [currentFile, setCurrentFile] = useState(file);
   
   const isFileOwner = currentFile.user_id === currentUser?.id;
-  const canDelete = isFileOwner; // Seul le propriétaire peut supprimer
+  
 
   const handleStatusUpdate = (updatedFile) => {
     setCurrentFile(updatedFile);
@@ -54,15 +54,17 @@ const Show = ({ file, statuses, auth }) => {
       
       <div className="min-h-screen bg-white">
         <FileHeader 
-          file={currentFile} 
-          onDelete={canDelete ? handleDelete : null}
-          currentUser={currentUser}
-        >
-          <SaveToDropboxButton 
-            fileId={currentFile.id} 
-            className="ml-2"
-          />
-        </FileHeader>
+            file={currentFile} 
+            onDelete={canManageFile ? handleDelete : null}
+            currentUser={currentUser}
+          >
+            {canManageFile && (
+              <SaveToDropboxButton 
+                fileId={currentFile.id} 
+                className="ml-2"
+              />
+            )}
+          </FileHeader>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <motion.div 
