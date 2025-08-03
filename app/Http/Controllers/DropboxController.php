@@ -46,24 +46,24 @@ class DropboxController extends Controller
 
             $file = File::findOrFail($fileId);
             
-            // Vérifier si le fichier existe en local
-            if (!Storage::disk('local')->exists($file->path)) {
+            // Vérifier si le fichier existe dans le stockage public
+            if (!Storage::disk('public')->exists($file->file_path)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Le fichier source n\'existe pas.'
+                    'message' => 'Le fichier source n\'existe pas dans le stockage public.'
                 ], 404);
             }
 
             // Déterminer le nom du fichier
             $filename = $validated['use_filename'] && !empty($validated['custom_filename']) 
                 ? $validated['custom_filename'] 
-                : basename($file->path);
+                : basename($file->file_path);
 
             // Chemin complet sur Dropbox
-            $dropboxPath = '/' . $path . '/' . $filename;
+            $dropboxPath = '/' . trim($path, '/') . '/' . $filename;
 
-            // Lire le contenu du fichier
-            $fileContent = Storage::disk('local')->get($file->path);
+            // Lire le contenu du fichier depuis le stockage public
+            $fileContent = Storage::disk('public')->get($file->file_path);
 
             // Téléverser le fichier vers Dropbox
             $this->dropbox->upload($dropboxPath, $fileContent);
