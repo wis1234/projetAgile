@@ -135,10 +135,24 @@ Route::get('/fichiers', function () {
     return Inertia::render('Files/Index');
 })->middleware(['auth', 'verified'])->name('fichiers');
 
-// Route pour exécuter la file d'attente manuellement (à protéger en production)
+// Route pour exécuter la file d'attente manuellement (protégée par jeton)
 Route::get('/run-queue', function () {
-    if (!app()->environment('local') && !auth()->check()) {
-        abort(403, 'Accès non autorisé');
+    // Journaliser la tentative d'accès
+    \Log::info('Tentative d\'accès à /run-queue', [
+        'ip' => request()->ip(),
+        'user_agent' => request()->userAgent(),
+        'authenticated' => auth()->check(),
+        'environment' => app()->environment(),
+        'token' => request()->query('token')
+    ]);
+
+    // Vérifier le jeton d'autorisation
+    $validToken = env('QUEUE_WORKER_TOKEN');
+    $providedToken = request()->query('token');
+
+    if (!$validToken || $providedToken !== $validToken) {
+        \Log::warning('Accès non autorisé à /run-queue - Jeton invalide ou manquant');
+        abort(403, 'Accès non autorisé - Jeton invalide ou manquant');
     }
 
     try {
@@ -163,7 +177,7 @@ Route::get('/run-queue', function () {
         $output = \Artisan::output();
         
         // Journaliser l'exécution
-        \Log::info('File d\'attente exécutée manuellement via /run-queue', [
+        \Log::info('File d\'attente exécutée avec succès via /run-queue', [
             'exit_code' => $exitCode,
             'output' => $output,
             'jobs_processed' => trim($output) !== '' ? count(explode("\n", trim($output))) : 0,
@@ -173,8 +187,7 @@ Route::get('/run-queue', function () {
         
         return response()->json([
             'status' => 'success',
-            'message' => 'File d\'attente traitée avec succès via /run-queue',
-            'output' => $output,
+            'message' => 'File d\'attente traitée avec succès',
             'jobs_processed' => trim($output) !== '' ? count(explode("\n", trim($output))) : 0,
             'memory_usage' => memory_get_usage(true) / 1024 / 1024 . 'MB',
             'execution_time' => microtime(true) - LARAVEL_START . 's'
@@ -194,7 +207,7 @@ Route::get('/run-queue', function () {
         ], 500);
         
     } catch (\Exception $e) {
-        \Log::error('Erreur lors de l\'exécution de la file d\'attente via /run-queue', [
+        \Log::error('Erreur lors de l\'exécution de la file d\'attente', [
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
             'code' => $e->getCode()
