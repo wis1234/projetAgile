@@ -36,9 +36,8 @@ const navLinks = [
 const Loader = () => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
     <div className="relative">
-      {/* Logo de l'application avec animation de pulsation */}
       <div className="flex flex-col items-center">
-        <div className="relative w-20 h-20 mb-4">
+        <div className="relative w-20 h-20">
           {/* Animation de cercle extérieur */}
           <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-blue-400 border-b-blue-300 border-l-blue-400 animate-spin"></div>
           
@@ -49,34 +48,8 @@ const Loader = () => (
             </div>
           </div>
         </div>
-        
-        {/* Texte de chargement avec animation de points */}
-        <div className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center space-x-1">
-          <span>Chargement</span>
-          <span className="flex space-x-1">
-            <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
-            <span className="animate-bounce" style={{ animationDelay: '150ms' }}>.</span>
-            <span className="animate-bounce" style={{ animationDelay: '300ms' }}>.</span>
-          </span>
-        </div>
-      </div>
-      
-      {/* Barre de progression subtile en bas */}
-      <div className="absolute bottom-10 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-blue-500 to-blue-300 rounded-full animate-progress"></div>
       </div>
     </div>
-    
-    {/* Ajout de styles d'animation personnalisés */}
-    <style jsx global>{`
-      @keyframes progress {
-        0% { width: 0; opacity: 1; }
-        100% { width: 100%; opacity: 0; }
-      }
-      .animate-progress {
-        animation: progress 1.5s ease-in-out infinite;
-      }
-    `}</style>
   </div>
 );
 
