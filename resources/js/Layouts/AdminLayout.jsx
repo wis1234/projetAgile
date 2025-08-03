@@ -2,20 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import Notification from '../Components/Notification';
 import { router } from '@inertiajs/react';
-import Loader from '../Components/Loader';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6m-6 0v6m0-6H7m6 0h6" /></svg>
   ) },
-  // { href: '/schools', label: 'Institutions', icon: (
-  //   <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-  // ) },
   { href: '/projects', label: 'Projets', icon: (
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5V6.75A2.25 2.25 0 0 1 5.25 4.5h13.5A2.25 2.25 0 0 1 21 6.75v10.5A2.25 2.25 0 0 1 18.75 20H5.25A2.25 2.25 0 0 1 3 17.25V7.5z" /></svg>
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44z" /></svg>
   ) },
   { href: '/project-users', label: 'Membres', icon: (
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m9-5.13a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" /></svg>
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
   ) },
   { href: '/sprints', label: 'Sprints', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" /></svg>
@@ -29,9 +25,6 @@ const navLinks = [
   { href: '/files', label: 'Fichiers', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V9h-3.75z" /></svg>
   ) },
-  // { href: '/messages', label: 'Messages', icon: (
-  //   <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-  // ) },
   { href: '/users', label: 'Utilisateurs', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m9-5.13a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" /></svg>
   ) },
@@ -39,6 +32,53 @@ const navLinks = [
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a4 4 0 0 1 4-4h4M7 7h.01M7 11h.01M7 15h.01" /></svg>
   ) },
 ];
+
+const Loader = () => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
+    <div className="relative">
+      {/* Logo de l'application avec animation de pulsation */}
+      <div className="flex flex-col items-center">
+        <div className="relative w-20 h-20 mb-4">
+          {/* Animation de cercle extérieur */}
+          <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-blue-400 border-b-blue-300 border-l-blue-400 animate-spin"></div>
+          
+          {/* Logo ou initiale au centre */}
+          <div className="absolute inset-2 flex items-center justify-center">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              PROJA
+            </div>
+          </div>
+        </div>
+        
+        {/* Texte de chargement avec animation de points */}
+        <div className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center space-x-1">
+          <span>Chargement</span>
+          <span className="flex space-x-1">
+            <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
+            <span className="animate-bounce" style={{ animationDelay: '150ms' }}>.</span>
+            <span className="animate-bounce" style={{ animationDelay: '300ms' }}>.</span>
+          </span>
+        </div>
+      </div>
+      
+      {/* Barre de progression subtile en bas */}
+      <div className="absolute bottom-10 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-blue-500 to-blue-300 rounded-full animate-progress"></div>
+      </div>
+    </div>
+    
+    {/* Ajout de styles d'animation personnalisés */}
+    <style jsx global>{`
+      @keyframes progress {
+        0% { width: 0; opacity: 1; }
+        100% { width: 100%; opacity: 0; }
+      }
+      .animate-progress {
+        animation: progress 1.5s ease-in-out infinite;
+      }
+    `}</style>
+  </div>
+);
 
 export default function AdminLayout({ children }) {
   const { auth, flash = {}, appName } = usePage().props;
@@ -121,35 +161,56 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-colors">
-      {globalLoading && <Loader fullscreen />}
+      {globalLoading && <Loader />}
       {/* Sidebar */}
-      <aside className={`z-40 fixed top-0 left-0 h-screen w-64 bg-white dark:bg-gray-800 flex flex-col py-6 px-4 space-y-6 border-r border-gray-200 dark:border-gamma-700 transition-transform duration-300
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-        {/* Bouton croix toujours visible sur mobile quand menu ouvert */}
-        {sidebarOpen && (
-          <button
-            className="md:hidden fixed top-4 left-60 z-50 text-3xl bg-white dark:bg-gray-800 rounded-full shadow p-2 border border-gray-200 dark:border-gray-700"
-            style={{transform: 'translateX(-50%)'}}
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Fermer le menu"
-          >&times;</button>
-        )}
-        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 mb-8 flex items-center justify-between">
-          {appName || 'Admin'}
-          {/* Ancien bouton croix, masqué sur mobile car doublon */}
-          <span className="md:hidden text-2xl opacity-0 pointer-events-none">&times;</span>
+      <aside className={`fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-40 flex flex-col shadow-xl`}>
+        {/* Logo */}
+        <div className="flex items-center justify-between h-20 px-6">
+          <div className="flex items-center space-x-3">
+            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <span className="text-xl font-bold text-white">PROJA</span>
+          </div>
+          <button className="md:hidden text-white/70 hover:text-white transition-colors" onClick={() => setSidebarOpen(false)}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <nav className="flex-1 space-y-2 overflow-y-auto">
-          {navLinks.map(link => (
-            <Link key={link.href} href={link.href} className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-800 dark:hover:text-blue-200 font-medium transition" onClick={() => setSidebarOpen(false)}>
-              {link.icon}
-              {link.label}
+
+        {/* Menu */}
+        <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide space-y-1.5">
+          {navLinks.map((link, index) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 ${
+                route().current(link.href.replace(/^\//, ''))
+                  ? 'bg-white/10 text-white shadow-lg'
+                  : 'text-white/80 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <span className="text-lg">
+                {link.icon || (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                )}
+              </span>
+              <span className="font-medium">{link.label}</span>
+              {route().current(link.href.replace(/^\//, '')) && (
+                <span className="ml-auto w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
+              )}
             </Link>
           ))}
         </nav>
-        <div className="mt-auto flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0 1 12 15c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" /></svg>
-          {userName}
+
+        {/* Version */}
+        <div className="p-4 border-t border-white/10 text-center">
+          <div className="text-sm font-medium text-white/60">
+            PROJA v1.0
+          </div>
         </div>
       </aside>
       {/* Overlay for mobile */}
@@ -157,14 +218,14 @@ export default function AdminLayout({ children }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
         {/* Header */}
-        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gamma-700 flex items-center justify-between px-4 sm:px-6 z-40 transition-all duration-300">
+        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white bg-opacity-100 border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 z-40 transition-all duration-300">
           <button className="md:hidden text-2xl mr-2" onClick={() => setSidebarOpen(true)}>&#9776;</button>
-          <div className="text-xl font-bold text-blue-700 dark:text-blue-200">Dashboard</div>
+          <div className="text-xl font-bold text-blue-700 dark:text-blue-200">DASHBOARD PROJA</div>
           <div className="flex items-center gap-4">
             {/* Notifications internes */}
             <div className="relative">
               <button className="relative" title="Notifications internes" onClick={() => setNotifDropdown(d => !d)}>
-                <svg className="w-7 h-7 text-gray-600 dark:text-gray-200" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" /></svg>
+                <svg className="w-7 h-7 text-gray-600 dark:text-gray-200" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                 {notifCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 animate-pulse">{notifCount}</span>}
               </button>
               {notifDropdown && (

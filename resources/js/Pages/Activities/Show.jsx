@@ -75,59 +75,96 @@ export default function Show({ activity, subject }) {
     return <FaRegListAlt className="text-gray-400" />;
   };
   return (
-    <>
-      <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-        <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-          <div className="flex flex-col h-full w-full max-w-7xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900">
-            {/* Header section */}
-            <div className="flex items-center gap-3 mb-8">
-              <FaHistory className="text-3xl text-blue-600" />
-              <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail de l'activité</h1>
-            </div>
-            {/* Grille infos activité + objet lié */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              {/* Carte principale activité */}
-              <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <div className="flex flex-col md:flex-row md:items-center gap-6 mb-6">
-                  <div className="flex items-center gap-3">
-                    {activity.user ? (
-                      <img src={activity.user.profile_photo_url || (activity.user.profile_photo_path ? `/storage/${activity.user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.user.name)}`)} alt={activity.user.name} className="w-16 h-16 rounded-full shadow border-2 border-blue-200" />
-                    ) : (
-                      <FaUserCircle className="w-16 h-16 text-gray-400" />
-                    )}
-                    <div>
-                      <div className="font-bold text-lg text-blue-700 dark:text-blue-100">{activity.user ? activity.user.name : <span className="italic text-gray-400">Invité</span>}</div>
-                      {activity.user?.roles && activity.user.roles.length > 0 && (
-                        <span className="ml-1 px-2 py-1 rounded text-xs font-bold bg-yellow-100 text-yellow-800">{activity.user.roles[0].name}</span>
-                      )}
-                    </div>
+    <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900">
+      <div className="flex-1 flex flex-col w-full max-w-7xl mx-auto px-4 py-6">
+        {/* Header section */}
+        <div className="flex items-center gap-3 mb-6">
+          <FaHistory className="text-3xl text-blue-600" />
+          <h1 className="text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Détail de l'activité</h1>
+        </div>
+        
+        {/* Grille infos activité + objet lié */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Carte principale activité */}
+          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <div className="flex flex-col md:flex-row md:items-center gap-6 mb-6">
+              <div className="flex items-center gap-3">
+                {activity.user ? (
+                  <img 
+                    src={activity.user.profile_photo_url || 
+                        (activity.user.profile_photo_path ? 
+                          `/storage/${activity.user.profile_photo_path}` : 
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.user.name)}`)} 
+                    alt={activity.user.name} 
+                    className="w-16 h-16 rounded-full shadow border-2 border-blue-200" 
+                  />
+                ) : (
+                  <FaUserCircle className="w-16 h-16 text-gray-400" />
+                )}
+                <div>
+                  <div className="font-bold text-lg text-blue-700 dark:text-blue-100">
+                    {activity.user ? activity.user.name : <span className="italic text-gray-400">Invité</span>}
                   </div>
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><span className="font-semibold">Date :</span> {new Date(activity.created_at).toLocaleString()}</div>
-                    <div><span className="font-semibold">Type :</span> {getTypeBadge(activity.type)}</div>
-                    <div className="md:col-span-2"><span className="font-semibold">Description :</span> {activity.description || <span className="italic text-gray-400">Aucune</span>}</div>
-                    <div><span className="font-semibold">Objet concerné :</span> <span className="inline-flex items-center gap-1">{getSubjectIcon(activity.subject_type)} {activity.subject_type ? `${activity.subject_type.split('\\').pop()}` : '-'}</span></div>
-                    <div><span className="font-semibold">IP :</span> <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">{activity.ip_address}</span></div>
-                    <div className="md:col-span-2"><span className="font-semibold">User Agent :</span> <span className="break-all text-xs text-gray-500">{activity.user_agent}</span></div>
-                  </div>
+                  {activity.user?.roles && activity.user.roles.length > 0 && (
+                    <span className="ml-1 px-2 py-1 rounded text-xs font-bold bg-yellow-100 text-yellow-800">
+                      {activity.user.roles[0].name}
+                    </span>
+                  )}
                 </div>
               </div>
-              {/* Carte objet lié */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold mb-2 text-blue-600 dark:text-blue-300 flex items-center gap-2">{getSubjectIcon(activity.subject_type)} Détails de l'objet lié</h2>
-                {subject ? renderSubjectDetails(subject, activity.subject_type) : <div className="text-gray-400">Aucun objet lié</div>}
-              </div>
-            </div>
-            {/* Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
-              <div className="flex gap-3 justify-center items-center">
-                <Link href={route('activities.index')} className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition"><FaArrowLeft /> Retour au journal</Link>
+              
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><span className="font-semibold">Date :</span> {new Date(activity.created_at).toLocaleString()}</div>
+                <div><span className="font-semibold">Type :</span> {getTypeBadge(activity.type)}</div>
+                <div className="md:col-span-2">
+                  <span className="font-semibold">Description :</span> {activity.description || <span className="italic text-gray-400">Aucune</span>}
+                </div>
+                <div>
+                  <span className="font-semibold">Objet concerné :</span>{' '}
+                  <span className="inline-flex items-center gap-1">
+                    {getSubjectIcon(activity.subject_type)} {activity.subject_type ? `${activity.subject_type.split('\\').pop()}` : '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-semibold">IP :</span>{' '}
+                  <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
+                    {activity.ip_address}
+                  </span>
+                </div>
+                <div className="md:col-span-2">
+                  <span className="font-semibold">User Agent :</span>{' '}
+                  <span className="block text-xs text-gray-500 mt-1">
+                    {activity.user_agent}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </main>
+
+          {/* Carte objet lié */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h2 className="text-lg font-semibold mb-4 text-blue-600 dark:text-blue-300 flex items-center gap-2">
+              {getSubjectIcon(activity.subject_type)} Détails de l'objet lié
+            </h2>
+            {subject ? (
+              renderSubjectDetails(subject, activity.subject_type)
+            ) : (
+              <div className="text-gray-400">Aucun objet lié disponible</div>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-center">
+          <Link 
+            href={route('activities.index')} 
+            className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition"
+          >
+            <FaArrowLeft /> Retour au journal
+          </Link>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
