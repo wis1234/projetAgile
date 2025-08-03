@@ -55,6 +55,7 @@ export default function SaveToDropboxButton({
                 },
                 body: JSON.stringify({
                     path: cleanFolderPath,
+                    use_filename: true,  // Toujours utiliser le nom personnalisé
                     custom_filename: customFileName
                 })
             });

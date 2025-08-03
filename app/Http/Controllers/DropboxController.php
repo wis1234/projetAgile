@@ -32,9 +32,13 @@ class DropboxController extends Controller
         try {
             $validated = $request->validate([
                 'path' => 'required|string',
-                'use_filename' => 'boolean',
-                'custom_filename' => 'nullable|string'
+                'use_filename' => 'sometimes|boolean',
+                'custom_filename' => 'nullable|string|max:255'
             ]);
+
+            // Définir les valeurs par défaut
+            $validated['use_filename'] = $validated['use_filename'] ?? false;
+            $validated['custom_filename'] = $validated['custom_filename'] ?? null;
 
             $path = trim($validated['path'], '/');
             if (empty($path)) {
