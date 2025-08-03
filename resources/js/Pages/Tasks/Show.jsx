@@ -1008,9 +1008,18 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                                     isUploadedByAssignedUser 
                                       ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' 
                                       : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                  }">
+                                  } mr-2">
                                     {isUploadedByAssignedUser ? 'Traitement' : 'Ressources'}
                                   </span>
+                                  {/* Dropbox badge */}
+                                  {file.dropbox_path && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white dark:bg-blue-600">
+                                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M6 1.807L0 5.629l6 3.815 5.936-3.759L6 1.807zm12 .01L9.297 5.864 15.466 10.1 24 6.196l-6-4.38zM0 13.274l6 3.819 6.003-3.863L6.004 9.39 0 13.275zm9.297 4.056l6-3.863 5.7 3.86-5.7 3.869-6-3.866z"/>
+                                      </svg>
+                                      Dropbox
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                   {file.description || <span className="italic text-gray-400">Aucune description</span>}
