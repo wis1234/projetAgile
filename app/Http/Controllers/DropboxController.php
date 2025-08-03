@@ -58,18 +58,19 @@ class DropboxController extends Controller
                 ], 404);
             }
 
-            // Déterminer le nom du fichier
-            $filename = $validated['use_filename'] && !empty($validated['custom_filename']) 
-                ? $validated['custom_filename'] 
-                : basename($file->file_path);
-
-            // S'assurer que le nom du fichier a une extension
-            $originalExtension = pathinfo($file->file_path, PATHINFO_EXTENSION);
-            $desiredExtension = pathinfo($filename, PATHINFO_EXTENSION);
+            // Utiliser le nom personnalisé fourni dans la requête
+            $filename = $validated['custom_filename'] ?? $file->name;
             
-            if (empty($desiredExtension) && !empty($originalExtension)) {
+            // Obtenir l'extension du fichier original
+            $originalExtension = pathinfo($file->file_path, PATHINFO_EXTENSION);
+            
+            // S'assurer que le nom du fichier a une extension
+            if (!empty($originalExtension) && !str_ends_with(strtolower($filename), '.' . strtolower($originalExtension))) {
                 $filename .= '.' . $originalExtension;
             }
+
+            // Nettoyer le nom du fichier pour éviter les problèmes de caractères spéciaux
+            $filename = preg_replace('/[^\w\-\.]/', '_', $filename);
 
             // Chemin complet sur Dropbox
             $dropboxPath = '/' . trim($path, '/') . '/' . $filename;
