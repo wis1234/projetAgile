@@ -973,62 +973,91 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
           {activeTab === 'files' && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-              <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200"><FaFileUpload /> Ressources</h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-3 text-blue-700 dark:text-blue-200">
+                  <FaFileUpload /> Ressources
+                </h2>
+                {/* Upload button visible to all members */}
+                <Link 
+                  href={`/files/create?task_id=${task.id}&project_id=${task.project_id}`} 
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md"
+                >
+                  <FaFileUpload /> Ajouter un fichier
+                </Link>
+              </div>
+              
               {task.files && task.files.length > 0 ? (
                 <ul className="space-y-4">
-                  {task.files.map(file => (
-                    <li key={file.id} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-200 border border-gray-200 dark:border-gray-600 group hover:shadow-sm">
-                      <Link href={`/files/${file.id}`} className="flex flex-col">
-                        <div className="flex items-start justify-between w-full">
-                          <div className="flex items-center gap-4">
-                            <div className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-3 rounded-full bg-blue-100 dark:bg-blue-800 group-hover:bg-blue-200 dark:group-hover:bg-blue-700 transition">
-                              <FaFileUpload className="text-xl" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-blue-600 dark:text-blue-300 text-lg group-hover:underline">{file.name}</div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">{file.description || <span className="italic text-gray-400">Aucune description</span>}</div>
-                              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                <span>{Math.round(file.size / 1024)} KB</span>
-                                <span>•</span>
-                                <span>Téléversé le {new Date(file.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                                <span>•</span>
-                                <span className="flex items-center gap-1">
-                                  Par <span className="font-medium text-gray-600 dark:text-gray-300">
-                                    {(() => {
-                                      // Trouver l'utilisateur dans projectMembers ou dans la liste des utilisateurs du projet
-                                      const fileUser = projectMembers?.find(u => u.id === file.user_id) || 
-                                                     task.project?.users?.find(u => u.id === file.user_id) || 
-                                                     { name: 'Utilisateur inconnu' };
-                                      return fileUser.name;
-                                    })()}
+                  {task.files.map(file => {
+                    // Determine if the file was uploaded by the assigned user
+                    const isUploadedByAssignedUser = file.user_id === task.assigned_to?.id || file.user_id === task.assigned_to;
+                    
+                    return (
+                      <li key={file.id} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-200 border border-gray-200 dark:border-gray-600 group hover:shadow-sm">
+                        <Link href={`/files/${file.id}`} className="flex flex-col">
+                          <div className="flex items-start justify-between w-full">
+                            <div className="flex items-center gap-4">
+                              <div className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-3 rounded-full bg-blue-100 dark:bg-blue-800 group-hover:bg-blue-200 dark:group-hover:bg-blue-700 transition">
+                                <FaFileUpload className="text-xl" />
+                              </div>
+                              <div>
+                                <div className="font-semibold text-blue-600 dark:text-blue-300 text-lg group-hover:underline">
+                                  {file.name}
+                                  {/* Badge for file type */}
+                                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    isUploadedByAssignedUser 
+                                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' 
+                                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                  }">
+                                    {isUploadedByAssignedUser ? 'Traitement' : 'Ressources'}
                                   </span>
-                                </span>
+                                </div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                  {file.description || <span className="italic text-gray-400">Aucune description</span>}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  <span>{Math.round(file.size / 1024)} KB</span>
+                                  <span>•</span>
+                                  <span>Téléversé le {new Date(file.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                  <span>•</span>
+                                  <span className="flex items-center gap-1">
+                                    Par <span className="font-medium text-gray-600 dark:text-gray-300">
+                                      {(() => {
+                                        // Find the user in projectMembers or in the project's users list
+                                        const fileUser = projectMembers?.find(u => u.id === file.user_id) || 
+                                                       task.project?.users?.find(u => u.id === file.user_id) || 
+                                                       { name: 'Utilisateur inconnu' };
+                                        return fileUser.name;
+                                      })()}
+                                    </span>
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="flex-shrink-0">
-                              <img 
-                                src={file.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(file.user?.name || '')}&background=3b82f6&color=fff`} 
-                                alt={file.user?.name} 
-                                className="w-6 h-6 rounded-full" 
-                              />
+                            <div className="flex items-center gap-2 text-sm">
+                              <div className="flex-shrink-0">
+                                <img 
+                                  src={file.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(file.user?.name || '')}&background=3b82f6&color=fff`} 
+                                  alt={file.user?.name} 
+                                  className="w-6 h-6 rounded-full" 
+                                />
+                              </div>
+                              <span className="text-gray-700 dark:text-gray-200 font-medium">{file.user?.name}</span>
+                              {file.user?.role === 'manager' || file.user?.role === 'admin' ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ml-2">
+                                  {file.user?.role === 'admin' ? 'Admin' : 'Manager'}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
+                                  Membre
+                                </span>
+                              )}
                             </div>
-                            <span className="text-gray-700 dark:text-gray-200 font-medium">{file.user?.name}</span>
-                            {file.user?.role === 'manager' || file.user?.role === 'admin' ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ml-2">
-                                {file.user?.role === 'admin' ? 'Admin' : 'Manager'}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
-                                Membre
-                              </span>
-                            )}
                           </div>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3">
