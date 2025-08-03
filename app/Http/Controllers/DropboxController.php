@@ -63,6 +63,14 @@ class DropboxController extends Controller
                 ? $validated['custom_filename'] 
                 : basename($file->file_path);
 
+            // S'assurer que le nom du fichier a une extension
+            $originalExtension = pathinfo($file->file_path, PATHINFO_EXTENSION);
+            $desiredExtension = pathinfo($filename, PATHINFO_EXTENSION);
+            
+            if (empty($desiredExtension) && !empty($originalExtension)) {
+                $filename .= '.' . $originalExtension;
+            }
+
             // Chemin complet sur Dropbox
             $dropboxPath = '/' . trim($path, '/') . '/' . $filename;
 
