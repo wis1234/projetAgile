@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import DropboxService from '../../Services/dropboxService';
 
 // Helper component for consistent detail row styling
 const DetailItem = ({ label, value, bgGray = false, className = '' }) => (
@@ -21,6 +22,40 @@ const formatFileSize = (bytes) => {
 };
 
 const FileMetadata = ({ file }) => {
+  const [fileMetadata, setFileMetadata] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchFileMetadata = async () => {
+      if (!file || !file.path_lower) return;
+      
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Utilisation du service Dropbox pour récupérer les métadonnées
+        const response = await DropboxService.dbx.filesGetMetadata({
+          path: file.path_lower,
+          include_media_info: true,
+          include_has_explicit_shared_members: true,
+          include_property_groups: {
+            template_ids: ['ptid:1a5n2g6-3a4b-5c6d-7e8f-9g0h1i2j3k4l5']
+          }
+        });
+        
+        setFileMetadata(response.result);
+      } catch (err) {
+        console.error('Erreur lors de la récupération des métadonnées:', err);
+        setError('Impossible de charger les métadonnées du fichier');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFileMetadata();
+  }, [file]);
+
   const metadata = [
     { label: 'Nom du fichier', value: file.name },
     { label: 'Taille', value: formatFileSize(file.size), bgGray: true },
@@ -56,6 +91,26 @@ const FileMetadata = ({ file }) => {
     },
   ];
 
+  // Ajouter les métadonnées Dropbox si disponibles
+  if (fileMetadata) {
+    if (fileMetadata.client_modified) {
+      metadata.push({
+        label: 'Dernière modification Dropbox',
+        value: new Date(fileMetadata.client_modified).toLocaleString('fr-FR'),
+        bgGray: false
+      });
+    }
+    
+    if (fileMetadata.content_hash) {
+      metadata.push({
+        label: 'Hash du contenu',
+        value: fileMetadata.content_hash,
+        bgGray: true,
+        className: 'font-mono text-xs truncate'
+      });
+    }
+  }
+
   if (file.status === 'rejected' && file.rejection_reason) {
     metadata.push({
       label: 'Raison du rejet',
@@ -80,17 +135,25 @@ const FileMetadata = ({ file }) => {
         <h2 className="text-lg font-medium text-gray-900 dark:text-white">Détails du fichier</h2>
       </div>
       <div className="bg-white dark:bg-gray-800 overflow-hidden">
-        <dl className="sm:divide-y sm:divide-gray-200 dark:divide-gray-700">
-          {metadata.map((item, index) => (
-            <DetailItem 
-              key={index}
-              label={item.label}
-              value={item.value}
-              bgGray={item.bgGray}
-              className={item.className || ''}
-            />
-          ))}
-        </dl>
+        {isLoading ? (
+          <div className="flex justify-center items-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          </div>
+        ) : error ? (
+          <div className="p-4 text-red-500">{error}</div>
+        ) : (
+          <dl className="sm:divide-y sm:divide-gray-200 dark:divide-gray-700">
+            {metadata.map((item, index) => (
+              <DetailItem 
+                key={index}
+                label={item.label}
+                value={item.value}
+                bgGray={item.bgGray}
+                className={item.className || ''}
+              />
+            ))}
+          </dl>
+        )}
       </div>
     </div>
   );

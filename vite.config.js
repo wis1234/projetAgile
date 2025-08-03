@@ -3,7 +3,8 @@ import laravel from 'laravel-vite-plugin';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-export default defineConfig({
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => ({
     plugins: [
         laravel({
             input: 'resources/js/app.jsx',
@@ -23,4 +24,11 @@ export default defineConfig({
             '~bootstrap': path.resolve(__dirname, 'node_modules/bootstrap'),
         },
     },
-});
+    // Exposer les variables d'environnement avec le préfixe VITE_
+    define: {
+        'import.meta.env.VITE_DROPBOX_APP_KEY': JSON.stringify(process.env.VITE_DROPBOX_APP_KEY || ''),
+        'import.meta.env.VITE_DROPBOX_APP_SECRET': JSON.stringify(process.env.VITE_DROPBOX_APP_SECRET || ''),
+        'import.meta.env.VITE_DROPBOX_ACCESS_TOKEN': JSON.stringify(process.env.VITE_DROPBOX_ACCESS_TOKEN || ''),
+        'import.meta.env.VITE_DROPBOX_REFRESH_TOKEN': JSON.stringify(process.env.VITE_DROPBOX_REFRESH_TOKEN || '')
+    },
+}));
