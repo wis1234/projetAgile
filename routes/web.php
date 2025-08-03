@@ -136,48 +136,88 @@ Route::get('/fichiers', function () {
 })->middleware(['auth', 'verified'])->name('fichiers');
 
 // Route pour exécuter la file d'attente manuellement (à protéger en production)
-Route::get('/queue/work', function () {
-    if (app()->environment('local')) {
-        try {
-            // Exécuter la file d'attente avec un délai d'expiration
-            $exitCode = \Artisan::call('queue:work', [
-                '--stop-when-empty' => true,
-                '--tries' => 3,
-                '--timeout' => 60
-            ]);
-            
-            // Récupérer la sortie de la commande
-            $output = \Artisan::output();
-            
-            // Journaliser l'exécution
-            \Log::info('File d\'attente exécutée manuellement', [
-                'exit_code' => $exitCode,
-                'output' => $output,
-                'jobs_processed' => trim($output) !== '' ? count(explode("\n", trim($output))) : 0
-            ]);
-            
-            return response()->json([
-                'status' => 'success',
-                'message' => 'File d\'attente traitée avec succès',
-                'output' => $output,
-                'jobs_processed' => trim($output) !== '' ? count(explode("\n", trim($output))) : 0
-            ]);
-            
-        } catch (\Exception $e) {
-            \Log::error('Erreur lors de l\'exécution de la file d\'attente', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Erreur lors du traitement de la file d\'attente',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+Route::get('/run-queue', function () {
+    if (!app()->environment('local') && !auth()->check()) {
+        abort(403, 'Accès non autorisé');
     }
-    
-    return response()->json(['status' => 'error', 'message' => 'Non autorisé'], 403);
-});
+
+    try {
+        // Vérifier si la table jobs existe
+        if (!\Schema::hasTable('jobs')) {
+            throw new \Exception("La table 'jobs' n'existe pas dans la base de données.");
+        }
+        
+        // Vérifier la connexion à la base de données
+        \DB::connection()->getPdo();
+        
+        // Exécuter la file d'attente avec un délai d'expiration
+        $exitCode = \Artisan::call('queue:work', [
+            '--stop-when-empty' => true,
+            '--tries' => 3,
+            '--timeout' => 60,
+            '--queue' => 'default',
+            '--sleep' => 3,
+        ]);
+        
+        // Récupérer la sortie de la commande
+        $output = \Artisan::output();
+        
+        // Journaliser l'exécution
+        \Log::info('File d\'attente exécutée manuellement via /run-queue', [
+            'exit_code' => $exitCode,
+            'output' => $output,
+            'jobs_processed' => trim($output) !== '' ? count(explode("\n", trim($output))) : 0,
+            'memory_usage' => memory_get_usage(true) / 1024 / 1024 . 'MB',
+            'execution_time' => microtime(true) - LARAVEL_START . 's'
+        ]);
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'File d\'attente traitée avec succès via /run-queue',
+            'output' => $output,
+            'jobs_processed' => trim($output) !== '' ? count(explode("\n", trim($output))) : 0,
+            'memory_usage' => memory_get_usage(true) / 1024 / 1024 . 'MB',
+            'execution_time' => microtime(true) - LARAVEL_START . 's'
+        ]);
+        
+    } catch (\PDOException $e) {
+        \Log::error('Erreur de connexion à la base de données', [
+            'error' => $e->getMessage(),
+            'code' => $e->getCode()
+        ]);
+        
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Erreur de connexion à la base de données',
+            'error' => $e->getMessage(),
+            'code' => $e->getCode()
+        ], 500);
+        
+    } catch (\Exception $e) {
+        \Log::error('Erreur lors de l\'exécution de la file d\'attente via /run-queue', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'code' => $e->getCode()
+        ]);
+        
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Erreur lors du traitement de la file d\'attente',
+            'error' => $e->getMessage(),
+            'code' => $e->getCode()
+        ], 500);
+    }
+})->name('queue.work');
+
+// Supprimer l'ancienne route /queue/work si elle existe
+if (Route::has('queue.work')) {
+    Route::get('/queue/work', function () {
+        return response()->json([
+            'status' => 'moved',
+            'message' => 'Cette route a été déplacée vers /run-queue',
+            'new_url' => url('/run-queue')
+        ], 301);
+    });
+}
 
 require __DIR__.'/auth.php';
