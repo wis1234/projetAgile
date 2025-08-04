@@ -48,11 +48,9 @@ function Create() {
   };
 
   return (
-    <>
-      <div className="flex flex-col w-full h-screen bg-white dark:bg-gray-900 overflow-x-hidden rounded-none shadow-none p-0 m-0">
-        {/* Contenu principal */}
-        <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden overflow-y-auto p-0 m-0" style={{ height: 'calc(100vh - 4rem)' }}>
-          <div className="flex flex-col h-full w-full max-w-5xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white dark:bg-gray-900">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="pt-16">
             {/* Header section - Responsive */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
               <Link href="/projects" className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-100 transition flex-shrink-0">
@@ -184,10 +182,9 @@ function Create() {
                 </div>
               </form>
             </div>
-          </div>
-        </main>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
