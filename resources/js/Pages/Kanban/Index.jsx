@@ -204,7 +204,7 @@ function Kanban({ tasks: initialTasks }) {
       <AdminLayout>
         <div className="text-center py-12">
           <div className="text-red-500 mb-4">
-            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
@@ -417,21 +417,38 @@ const TaskCard = ({ task, isDragging, textColor, hoverColor }) => {
           </p>
         )}
         
-        <div className="flex items-center justify-between text-xs text-gray-600">
+        <div className="flex items-center justify-between text-xs text-gray-600 mt-2">
           <span className="flex items-center">
             <svg className="h-3.5 w-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             {formattedDate}
           </span>
-          {task.user && (
+          
+          {(task.assigned_user || task.user) ? (
             <div className="flex items-center">
-              <span className="mr-2 text-gray-700">{task.user.name.split(' ')[0]}</span>
-              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-medium text-blue-700">
-                {task.user.name.charAt(0).toUpperCase()}
-              </div>
+              <span className="mr-2 text-gray-700 text-sm">
+                {((task.assigned_user || task.user || {}).name || '').split(' ')[0]}
+              </span>
+              {((task.assigned_user || task.user || {}).photo_url || (task.assigned_user || task.user || {}).profile_photo_url) ? (
+                <img 
+                  src={(task.assigned_user || task.user).photo_url || (task.assigned_user || task.user).profile_photo_url} 
+                  alt="User" 
+                  className="w-6 h-6 rounded-full object-cover border border-gray-200"
+                  onError={(e) => {
+                    // If image fails to load, show the initial instead
+                    e.target.style.display = 'none';
+                    const initialDiv = e.target.nextElementSibling;
+                    if (initialDiv) initialDiv.style.display = 'flex';
+                  }}
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-medium text-blue-700 border border-gray-200">
+                  {((task.assigned_user || task.user || {}).name || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     );
