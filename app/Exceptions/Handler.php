@@ -20,13 +20,24 @@ class Handler extends Exception
             }
         }
 
-        // Gestion des erreurs d'authentification (session expirée)
-        if ($exception instanceof AuthenticationException || $exception instanceof TokenMismatchException) {
+        // Gestion des erreurs 419 (Session expirée / Token CSRF invalide)
+        if ($exception instanceof TokenMismatchException) {
             if ($request->hasHeader('X-Inertia')) {
-                return Inertia::render('Expired')->toResponse($request)->setStatusCode(401);
+                return Inertia::render('Error419')->toResponse($request)->setStatusCode(419);
             }
             
-            return redirect()->route('login')->with('error', 'Votre session a expiré. Veuillez vous reconnecter.');
+            return redirect()->route('login')
+                ->with('error', 'Votre session a expiré en raison d\'une inactivité prolongée. Veuillez vous reconnecter.');
+        }
+
+        // Gestion des erreurs d'authentification
+        if ($exception instanceof AuthenticationException) {
+            if ($request->hasHeader('X-Inertia')) {
+                return Inertia::render('Error419')->toResponse($request)->setStatusCode(401);
+            }
+            
+            return redirect()->route('login')
+                ->with('error', 'Veuillez vous connecter pour accéder à cette page.');
         }
 
         return parent::render($request, $exception);
