@@ -48,6 +48,7 @@ Route::middleware('auth')->group(function () {
     // Tableau Kanban
     Route::get('/kanban', [App\Http\Controllers\KanbanController::class, 'index'])->name('kanban.index');
     Route::put('/kanban/update-order', [App\Http\Controllers\KanbanController::class, 'updateOrder'])->name('kanban.updateOrder');
+    Route::get('/api/kanban/tasks', [App\Http\Controllers\KanbanController::class, 'apiTasks'])->name('kanban.api.tasks');
     
     // Gestion des projets
     Route::patch('/projects/{id}/status', [App\Http\Controllers\ProjectController::class, 'changeStatus'])->name('projects.change-status');
