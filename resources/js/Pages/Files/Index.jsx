@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaFileAlt, FaPlus, FaSearch, FaDownload, FaTable, FaTh, FaImage, FaFilePdf, FaFileWord, FaFileExcel, FaFileCode, FaClock } from 'react-icons/fa';
+import { FaFileAlt, FaPlus, FaSearch, FaDownload, FaTable, FaTh, FaImage, FaFilePdf, FaFileWord, FaFileExcel, FaFileCode, FaClock, FaDropbox } from 'react-icons/fa';
 
 export default function Index({ files, filters }) {
     const { flash = {} } = usePage().props;
@@ -171,6 +171,9 @@ export default function Index({ files, filters }) {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                             Date
                                         </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                            Dropbox
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -212,6 +215,13 @@ export default function Index({ files, filters }) {
                                                     {new Date(file.created_at).toLocaleDateString('fr-FR')}
                                                 </div>
                                             </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                {file.dropbox_path && (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                        <FaDropbox className="mr-1" /> Dropbox
+                                                    </span>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -231,6 +241,11 @@ export default function Index({ files, filters }) {
                                         <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
                                             {getFileIcon(file.type)}
                                         </div>
+                                        {file.dropbox_path && (
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                <FaDropbox className="mr-1" /> Dropbox
+                                            </span>
+                                        )}
                                     </div>
                                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{file.name}</h3>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
