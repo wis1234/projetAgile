@@ -27,7 +27,14 @@ class ProjectUserController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
-        $projects = Project::with('users')->get();
+        
+        // Get only projects where the authenticated user is a member
+        $projects = Project::whereHas('users', function($query) {
+            $query->where('user_id', auth()->id());
+        })->with(['users' => function($query) {
+            $query->withPivot('role');
+        }])->get();
+
         return Inertia::render('ProjectUsers/Index', [
             'projects' => $projects,
         ]);
@@ -43,8 +50,27 @@ class ProjectUserController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
-        $projects = Project::all(['id', 'name']);
-        $users = User::all(['id', 'name']);
+        
+        // Only show projects where the authenticated user is a member
+        $projects = Project::whereHas('users', function($query) {
+            $query->where('user_id', auth()->id());
+        })->get(['id', 'name']);
+        
+        // Only show users who are not already members of any project
+        $users = User::whereDoesntHave('projects', function($query) {
+            $query->whereIn('project_id', function($q) {
+                $q->select('project_id')
+                  ->from('project_user')
+                  ->whereIn('project_id', function($sub) {
+                      $sub->select('id')
+                          ->from('projects')
+                          ->whereHas('users', function($q) {
+                              $q->where('user_id', auth()->id());
+                          });
+                  });
+            });
+        })->get(['id', 'name', 'email']);
+        
         return Inertia::render('ProjectUsers/Create', [
             'projects' => $projects,
             'users' => $users,
@@ -64,27 +90,41 @@ class ProjectUserController extends Controller
         }
 
         $validated = $request->validate([
-            'project_id' => 'required|exists:projects,id',
-            'user_id' => 'required|exists:users,id',
+            'project_id' => [
+                'required',
+                'exists:projects,id',
+                // Ensure the authenticated user is a member of this project
+                Rule::exists('project_user', 'project_id')->where('user_id', auth()->id())
+            ],
+            'user_id' => [
+                'required',
+                'exists:users,id',
+                // Ensure the user is not already a member of this project
+                function($attribute, $value, $fail) use ($request) {
+                    $exists = \DB::table('project_user')
+                        ->where('project_id', $request->project_id)
+                        ->where('user_id', $value)
+                        ->exists();
+                    
+                    if ($exists) {
+                        $fail('Cet utilisateur est déjà membre de ce projet.');
+                    }
+                }
+            ],
             'role' => ['required', 'string', Rule::in(self::ALLOWED_ROLES)],
         ]);
 
         $project = Project::findOrFail($validated['project_id']);
         $user = User::findOrFail($validated['user_id']);
 
-        // Vérifier si l'utilisateur est déjà membre du projet
-        if ($project->users()->where('user_id', $user->id)->exists()) {
-            return redirect()->back()->with('error', 'Cet utilisateur est déjà membre de ce projet.');
-        }
-
-        // Ajouter l'utilisateur au projet avec le rôle spécifié
+        // Add the user to the project with the specified role
         $project->users()->attach($user->id, [
             'role' => $validated['role'],
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
-        // Envoyer une notification à l'utilisateur ajouté
+        // Send a notification to the added user
         $user->notify(new \App\Notifications\ProjectNotification('user_added', [
             'project_id' => $project->id,
             'project_name' => $project->name,
@@ -93,7 +133,7 @@ class ProjectUserController extends Controller
             'added_by' => auth()->user()->name,
         ]));
 
-        // Notifier les autres membres du projet
+        // Notify other project members
         $project->notifyMembers('user_added_to_project', [
             'user_id' => $user->id,
             'user_name' => $user->name,
@@ -111,7 +151,13 @@ class ProjectUserController extends Controller
      */
     public function show(string $id)
     {
-        $project = Project::with('users')->findOrFail($id);
+        // Get the project and ensure the authenticated user is a member
+        $project = Project::whereHas('users', function($query) {
+            $query->where('user_id', auth()->id());
+        })->with(['users' => function($query) {
+            $query->withPivot('role');
+        }])->findOrFail($id);
+        
         try {
             $this->authorize('view', $project);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
@@ -127,13 +173,22 @@ class ProjectUserController extends Controller
      */
     public function edit(string $id)
     {
-        $project = Project::with('users')->findOrFail($id);
+        // Get the project and ensure the authenticated user is a member
+        $project = Project::whereHas('users', function($query) {
+            $query->where('user_id', auth()->id());
+        })->with(['users' => function($query) {
+            $query->withPivot('role');
+        }])->findOrFail($id);
+        
         try {
             $this->authorize('update', $project);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
-        $users = User::all(['id', 'name']);
+        
+        // Only get users who are already members of the project
+        $users = $project->users()->get(['users.id', 'users.name']);
+        
         return Inertia::render('ProjectUsers/Edit', [
             'project' => $project,
             'users' => $users,
@@ -146,14 +201,30 @@ class ProjectUserController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $project = Project::findOrFail($id);
+        // Get the project and ensure the authenticated user is a member
+        $project = Project::whereHas('users', function($query) {
+            $query->where('user_id', auth()->id());
+        })->findOrFail($id);
+        
         $this->authorize('manageMembers', $project);
+        
         $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => [
+                'required',
+                'exists:users,id',
+                // Ensure the user is a member of this project
+                Rule::exists('project_user', 'user_id')->where('project_id', $id)
+            ],
             'role' => ['required', 'string', 'max:50', Rule::in(self::ALLOWED_ROLES)],
         ]);
-        $project->users()->updateExistingPivot($validated['user_id'], ['role' => $validated['role']]);
-        return redirect()->route('project-users.index');
+        
+        $project->users()->updateExistingPivot($validated['user_id'], [
+            'role' => $validated['role'],
+            'updated_at' => now()
+        ]);
+        
+        return redirect()->route('project-users.index')
+            ->with('success', 'Le rôle du membre a été mis à jour avec succès.');
     }
 
     /**
@@ -161,12 +232,25 @@ class ProjectUserController extends Controller
      */
     public function destroy(string $id)
     {
-        // Pour supprimer un membre d'un projet, il faut l'ID du projet et de l'utilisateur
-        $projectId = request('project_id');
-        $userId = request('user_id');
-        $project = Project::findOrFail($projectId);
+        // Get the project and ensure the authenticated user is a member
+        $project = Project::whereHas('users', function($query) {
+            $query->where('user_id', auth()->id());
+        })->findOrFail($id);
+        
         $this->authorize('manageMembers', $project);
-        $project->users()->detach($userId);
-        return redirect()->route('project-users.index');
+        
+        $validated = request()->validate([
+            'user_id' => [
+                'required',
+                'exists:users,id',
+                // Ensure the user is a member of this project
+                Rule::exists('project_user', 'user_id')->where('project_id', $id)
+            ]
+        ]);
+        
+        $project->users()->detach($validated['user_id']);
+        
+        return redirect()->route('project-users.index')
+            ->with('success', 'Le membre a été retiré du projet avec succès.');
     }
 }
