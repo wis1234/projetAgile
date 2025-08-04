@@ -36,7 +36,7 @@ export default function Login({ status, canResetPassword }) {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 font-sans">
+        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 font-sans p-4 sm:p-6">
             <Head title="Connexion" />
 
             <div className="flex flex-col md:flex-row w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
@@ -48,17 +48,23 @@ export default function Login({ status, canResetPassword }) {
                 </div>
 
                 {/* Right Panel: Form */}
-                <div className="w-full md:w-1/2 p-8 md:p-12">
-                    <div className="md:hidden text-center mb-8">
-                        <ApplicationLogo className="text-5xl" />
+                <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-12">
+                    <div className="md:hidden text-center mb-6">
+                        <div className="flex justify-center mb-4">
+                            <ApplicationLogo className="h-16 w-auto text-blue-600" />
+                        </div>
+                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">Bienvenue sur ProjA</h1>
+                        <p className="text-gray-600 dark:text-gray-300 text-sm">Votre solution de gestion de projet</p>
                     </div>
 
-                    <h2 className="text-3xl font-bold text-center text-blue-800 dark:text-blue-200 mb-2">
-                        Connexion
-                    </h2>
-                    <p className="text-center text-gray-500 dark:text-gray-400 mb-8">
-                        Heureux de vous revoir !
-                    </p>
+                    <div className="text-center mb-6 sm:mb-8">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-blue-800 dark:text-blue-200 mb-2">
+                            Connexion
+                        </h2>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
+                            Heureux de vous revoir !
+                        </p>
+                    </div>
 
                     {/* Message de statut */}
                     {status && (
@@ -77,14 +83,14 @@ export default function Login({ status, canResetPassword }) {
                         </div>
                     )}
 
-                    <form onSubmit={submit} className="space-y-6">
+                    <form onSubmit={submit} className="space-y-5 sm:space-y-6">
                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Adresse email
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FaEnvelope className="h-5 w-5 text-gray-400" />
+                                    <FaEnvelope className="h-5 w-5 text-gray-400 flex-shrink-0" />
                                 </div>
                                 <TextInput
                                     id="email"
@@ -107,7 +113,7 @@ export default function Login({ status, canResetPassword }) {
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FaLock className="h-5 w-5 text-gray-400" />
+                                    <FaLock className="h-5 w-5 text-gray-400 flex-shrink-0" />
                                 </div>
                                 <TextInput
                                     id="password"
@@ -149,7 +155,7 @@ export default function Login({ status, canResetPassword }) {
                             <button
                                 type="submit"
                                 disabled={processing}
-                                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base sm:text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
                             >
                                 <span className="absolute left-0 inset-y-0 flex items-center pl-3">
                                     <FaSignInAlt className="h-5 w-5 text-blue-300 group-hover:text-blue-200" />

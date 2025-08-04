@@ -4,12 +4,40 @@ import Notification from '../../Components/Notification';
 import TaskModal from '../../Components/TaskModal';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
-import { FaSearch, FaTasks, FaEdit, FaTrash, FaEye, FaPlus, FaFilter, FaCalendarAlt } from 'react-icons/fa';
+import { FaSearch, FaTasks, FaEdit, FaTrash, FaEye, FaPlus, FaFilter, FaCalendarAlt, FaProjectDiagram, FaList, FaTh } from 'react-icons/fa';
 
 // Icônes Heroicons SVG inline - Remplacées par react-icons si possible
 const KanbanIcon = () => (
   <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 5.25A2.25 2.25 0 0 1 6 3h12a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 18 21H6a2.25 2.25 0 0 1-2.25-2.25V5.25ZM9 7.5v9M15 7.5v9" /></svg>
 );
+
+// Composant pour afficher le badge de statut
+const getStatusBadge = (status) => {
+  switch(status) {
+    case 'todo':
+      return <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-xs font-bold">À faire</span>;
+    case 'in_progress':
+      return <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">En cours</span>;
+    case 'done':
+      return <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">Terminé</span>;
+    default:
+      return <span className="inline-block px-3 py-1 rounded-full bg-gray-300 text-gray-600 text-xs font-bold">{status}</span>;
+  }
+};
+
+// Composant pour afficher le badge de priorité
+const getPriorityBadge = (priority) => {
+  switch(priority) {
+    case 'low':
+      return <span className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">Faible</span>;
+    case 'medium':
+      return <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">Moyenne</span>;
+    case 'high':
+      return <span className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">Élevée</span>;
+    default:
+      return <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-600 text-xs font-bold">{priority}</span>;
+  }
+};
 
 function Index({ tasks, filters }) {
   const { flash = {}, errors = {}, auth } = usePage().props;
@@ -19,6 +47,25 @@ function Index({ tasks, filters }) {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [modalTask, setModalTask] = useState(null);
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Détecter si on est sur mobile/tablette au chargement et au redimensionnement
+  useEffect(() => {
+    const checkIfMobile = () => {
+      const mobile = window.innerWidth < 1024; // lg breakpoint de Tailwind
+      setIsMobile(mobile);
+      if (mobile) {
+        setViewMode('cards');
+      } else {
+        setViewMode('table');
+      }
+    };
+    
+    checkIfMobile();
+    window.addEventListener('resize', checkIfMobile);
+    return () => window.removeEventListener('resize', checkIfMobile);
+  }, []);
 
   useEffect(() => {
     if (window.Echo) {
@@ -99,11 +146,41 @@ function Index({ tasks, filters }) {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
-            <Link href="/tasks/create" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap">
-              <FaPlus className="text-lg" /> Nouvelle tâche
+            {/* View Mode Toggle - Responsive */}
+            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition duration-200 ${
+                  viewMode === 'table' 
+                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                }`}
+              >
+                <FaList className="text-xs" />
+                <span className="hidden sm:inline">Tableau</span>
+              </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition duration-200 ${
+                  viewMode === 'cards' 
+                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                }`}
+              >
+                <FaTh className="text-xs" />
+                <span className="hidden sm:inline">Cartes</span>
+              </button>
+            </div>
+            
+            <Link href="/tasks/create" className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base">
+              <FaPlus className="text-sm sm:text-lg" /> 
+              <span className="hidden sm:inline">Nouvelle tâche</span>
+              <span className="sm:hidden">Nouvelle</span>
             </Link>
-            <Link href="/kanban" className="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap">
-              <KanbanIcon /> Voir Kanban
+            <Link href="/kanban" className="bg-green-600 hover:bg-green-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base">
+              <KanbanIcon /> 
+              <span className="hidden sm:inline">Voir Kanban</span>
+              <span className="sm:hidden">Kanban</span>
             </Link>
           </div>
         </div>
@@ -132,51 +209,131 @@ function Index({ tasks, filters }) {
           </form>
         </div>
 
-        {/* Task Table Section */}
-        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition duration-200 hover:shadow-lg mb-8">
-          <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
-            <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Titre</th>
-                <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Projet</th>
-                <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Statut</th>
-                <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Priorité</th>
-                <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Assigné à</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tasks.data.length === 0 ? (
+        {/* Task View Section */}
+        {viewMode === 'table' ? (
+          <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition duration-200 hover:shadow-lg mb-8">
+            <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
+              <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
                 <tr>
-                  <td colSpan="6" className="text-center py-10 text-gray-500 dark:text-gray-400 text-lg">
-                    Aucune tâche trouvée pour cette recherche ou filtre.
-                  </td>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Titre</th>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Projet</th>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Statut</th>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Priorité</th>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Assigné à</th>
                 </tr>
-              ) : tasks.data.map(task => (
-                <tr
-                  key={task.id}
-                  className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
-                  onClick={() => router.visit(`/tasks/${task.id}`)}
-                >
-                  <td className="p-4 align-middle font-semibold text-blue-700 dark:text-blue-200 group-hover:underline">{task.title}</td>
-                  <td className="p-4 align-middle text-gray-600 dark:text-gray-300">{task.project?.name || <span className="italic text-gray-400">Aucun</span>}</td>
-                  <td className="p-4 align-middle">
-                    {task.status === 'todo' && <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-xs font-bold">À faire</span>}
-                    {task.status === 'in_progress' && <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">En cours</span>}
-                    {task.status === 'done' && <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">Terminé</span>}
-                    {!['todo','in_progress','done'].includes(task.status) && <span className="inline-block px-3 py-1 rounded-full bg-gray-300 text-gray-600 text-xs font-bold">{task.status}</span>}
-                  </td>
-                  <td className="p-4 align-middle">
-                    {task.priority === 'low' && <span className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">Faible</span>}
-                    {task.priority === 'medium' && <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">Moyenne</span>}
-                    {task.priority === 'high' && <span className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">Élevée</span>}
-                    {!['low','medium','high'].includes(task.priority) && <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-500 text-xs font-bold">{task.priority}</span>}
-                  </td>
-                  <td className="p-4 align-middle text-gray-600 dark:text-gray-300">{task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">Aucun</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {tasks.data.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-10 text-gray-500 dark:text-gray-400 text-lg">
+                      Aucune tâche trouvée pour cette recherche ou filtre.
+                    </td>
+                  </tr>
+                ) : tasks.data.map(task => (
+                  <tr
+                    key={task.id}
+                    className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
+                    onClick={() => router.visit(`/tasks/${task.id}`)}
+                  >
+                    <td className="p-4 align-middle font-semibold text-blue-700 dark:text-blue-200 group-hover:underline">{task.title}</td>
+                    <td className="p-4 align-middle text-gray-600 dark:text-gray-300">{task.project?.name || <span className="italic text-gray-400">Aucun</span>}</td>
+                    <td className="p-4 align-middle">
+                      {getStatusBadge(task.status)}
+                    </td>
+                    <td className="p-4 align-middle">
+                      {getPriorityBadge(task.priority)}
+                    </td>
+                    <td className="p-4 align-middle text-gray-600 dark:text-gray-300">
+                      {task.assigned_user || task.assignedUser ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 text-xs font-semibold">
+                            {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase()}
+                          </div>
+                          <span>{(task.assigned_user?.name || task.assignedUser?.name)}</span>
+                        </div>
+                      ) : (
+                        <span className="italic text-gray-400">Non assigné</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* Cards View */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+            {tasks.data.length === 0 ? (
+              <div className="col-span-full text-center py-16">
+                <FaTasks className="mx-auto text-6xl text-gray-300 dark:text-gray-600 mb-4" />
+                <p className="text-xl text-gray-500 dark:text-gray-400">Aucune tâche trouvée</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">Créez votre première tâche pour commencer</p>
+              </div>
+            ) : tasks.data.map(task => (
+              <div
+                key={task.id}
+                className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-105 transition-all duration-200 cursor-pointer group"
+                onClick={() => router.visit(`/tasks/${task.id}`)}
+              >
+                {/* Task Header */}
+                <div className="flex items-start justify-between mb-3">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 line-clamp-2">
+                    {task.title}
+                  </h3>
+                  <div className="flex-shrink-0">
+                    {getPriorityBadge(task.priority)}
+                  </div>
+                </div>
+
+                {/* Project Info */}
+                {task.project && (
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Projet</p>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <FaProjectDiagram className="text-blue-500 text-sm" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                        {task.project.name}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status and Assignee */}
+                <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Statut</p>
+                    {getStatusBadge(task.status)}
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assigné à</p>
+                    {task.assigned_user || task.assignedUser ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 text-xs font-semibold">
+                          {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </div>
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
+                          {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ')[0]}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Non assigné</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Due Date */}
+                {task.due_date && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <FaCalendarAlt className="text-xs" />
+                      <span>Échéance: {new Date(task.due_date).toLocaleDateString('fr-FR')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Pagination */}
         <div className="flex justify-center gap-3 mb-8">

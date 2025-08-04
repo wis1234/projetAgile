@@ -8,7 +8,26 @@ export default function Index({ projects, filters }) {
     const [search, setSearch] = useState(filters?.search || '');
     const [notification, setNotification] = useState(flash.success || '');
     const [notificationType, setNotificationType] = useState('success');
-    const [viewMode, setViewMode] = useState('table'); // 'table' par défaut comme demandé
+    // État pour le mode de vue (cartes par défaut sur mobile/tablet, tableau sur desktop)
+    const [viewMode, setViewMode] = useState('table');
+    const [isMobile, setIsMobile] = useState(false);
+    
+    // Détecter si on est sur mobile/tablette au chargement
+    useEffect(() => {
+        const checkIfMobile = () => {
+            const mobile = window.innerWidth < 1024; // lg breakpoint de Tailwind
+            setIsMobile(mobile);
+            if (mobile) {
+                setViewMode('cards');
+            } else {
+                setViewMode('table');
+            }
+        };
+        
+        checkIfMobile();
+        window.addEventListener('resize', checkIfMobile);
+        return () => window.removeEventListener('resize', checkIfMobile);
+    }, []);
 
     useEffect(() => {
         if (window.Echo) {

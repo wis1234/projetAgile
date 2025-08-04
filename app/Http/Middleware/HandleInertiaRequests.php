@@ -29,16 +29,24 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $auth = [
+            'user' => null,
+        ];
+
+        if ($request->user()) {
+            $auth['user'] = [
+                'id' => $request->user()->id,
+                'name' => $request->user()->name,
+                'email' => $request->user()->email,
+                'profile_photo_url' => $request->user()->profile_photo_url ?? null,
+                'notifications' => $request->user()->notifications()->latest()->take(20)->get(),
+                'unreadNotificationsCount' => $request->user()->unreadNotifications()->count(),
+            ];
+        }
+
         return [
             ...parent::share($request),
-            'auth' => [
-                'user' => $request->user() ? [
-                    'id' => $request->user()->id,
-                    'name' => $request->user()->name,
-                    'email' => $request->user()->email,
-                    'profile_photo_url' => $request->user()->profile_photo_url ?? null,
-                ] : null,
-            ],
+            'auth' => $auth,
             'appName' => config('app.name'),
         ];
     }

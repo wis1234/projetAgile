@@ -14,6 +14,7 @@ export default function Index({ users, filters, roles = [], auth }) {
     const [notification, setNotification] = useState(flash.success || '');
     const [notificationType, setNotificationType] = useState('success');
     const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
+    const [isMobile, setIsMobile] = useState(false);
     const canAssignRole = auth && auth.email === 'ronaldoagbohou@gmail.com';
     const [roleLoading, setRoleLoading] = useState({});
     const [roleSuccess, setRoleSuccess] = useState({});
@@ -24,6 +25,23 @@ export default function Index({ users, filters, roles = [], auth }) {
     const [newRoleError, setNewRoleError] = useState('');
     const [roleToDelete, setRoleToDelete] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
+
+    // Détecter si on est sur mobile/tablette au chargement et au redimensionnement
+    useEffect(() => {
+        const checkIfMobile = () => {
+            const mobile = window.innerWidth < 1024; // lg breakpoint de Tailwind
+            setIsMobile(mobile);
+            if (mobile) {
+                setViewMode('cards');
+            } else {
+                setViewMode('table');
+            }
+        };
+        
+        checkIfMobile();
+        window.addEventListener('resize', checkIfMobile);
+        return () => window.removeEventListener('resize', checkIfMobile);
+    }, []);
 
     useEffect(() => {
         if (flash.success) {
