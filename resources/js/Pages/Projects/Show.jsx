@@ -33,7 +33,8 @@ import {
     FaGlobe,
     FaCode,
     FaBug,
-    FaLightbulb
+    FaLightbulb,
+    FaUserPlus
 } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
 import { 
@@ -67,39 +68,115 @@ function Show({ project, tasks = [], auth, stats = {} }) {
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [deleteLoading, setDeleteLoading] = React.useState(false);
 
-  // Préparation des données pour le graphique de tendance
-  const doneTasksByWeek = stats.doneTasksByWeek || [];
-  const weekLabels = doneTasksByWeek.map(w => w.yearweek);
-  const weekData = doneTasksByWeek.map(w => w.count);
+  // Préparation des données pour le graphique d'évolution (30 derniers jours)
+  const last30Days = Array.from({length: 30}, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (29 - i));
+    return date.toISOString().split('T')[0];
+  });
 
+  // Compter les tâches par date
+  const taskCounts = last30Days.map(date => {
+    const tasksForDate = tasks.filter(task => {
+      const taskDate = new Date(task.created_at).toISOString().split('T')[0];
+      return taskDate === date;
+    });
+    
+    return {
+      date,
+      total: tasksForDate.length,
+      done: tasksForDate.filter(t => t.status === 'done').length
+    };
+  });
+
+  // Calculer les totaux cumulés
+  let cumulativeTotal = 0;
+  let cumulativeDone = 0;
+  
+  const chartData = taskCounts.map(day => {
+    cumulativeTotal += day.total;
+    cumulativeDone += day.done;
+    
+    return {
+      ...day,
+      cumulativeTotal,
+      cumulativeDone,
+      inProgress: cumulativeTotal - cumulativeDone
+    };
+  });
+  
+  // Données pour le graphique
   const trendChartData = {
-    labels: weekLabels,
+    labels: last30Days.map(date => new Date(date).toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'})),
     datasets: [
       {
-        label: 'Tâches terminées',
-        data: weekData,
-        fill: true,
+        label: 'Tâches totales',
+        data: chartData.map(d => d.cumulativeTotal),
         borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: (context) => {
-            const chart = context.chart;
-            const {ctx, chartArea} = chart;
-            if (!chartArea) {
-                return null;
-            }
-            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-            gradient.addColorStop(0, 'rgba(59, 130, 246, 0)');
-            gradient.addColorStop(1, 'rgba(59, 130, 246, 0.4)');
-            return gradient;
-        },
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: 'rgb(59, 130, 246)',
-        pointBorderColor: '#fff',
-        pointHoverRadius: 6,
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true
       },
+      {
+        label: 'Tâches terminées',
+        data: chartData.map(d => d.cumulativeDone),
+        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true
+      }
     ],
+  };
+
+  // Configuration des options du graphique
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: {
+          usePointStyle: true,
+          padding: 20
+        }
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        callbacks: {
+          label: function(context) {
+            let label = context.dataset.label || '';
+            if (label) label += ': ';
+            if (context.parsed.y !== null) {
+              label += context.parsed.y + ' ' + (context.parsed.y > 1 ? 'tâches' : 'tâche');
+            }
+            return label;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Nombre de tâches',
+          color: '#6b7280',
+          font: { weight: 'bold' }
+        },
+        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+        ticks: { stepSize: 1, precision: 0 }
+      },
+      x: {
+        grid: { display: false },
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45
+        }
+      }
+    }
   };
 
   const trendChartOptions = {
@@ -292,10 +369,16 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 {(isAdmin || isManager) ? (
                   <>
                     <Link
-                      href={`/project-users/${project.id}/edit`}
+                      href={route('project-users.create')}
                       className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
                     >
-                      <FaUsers /> Ajouter un membre
+                      <FaUserPlus /> Ajouter un membre
+                    </Link>
+                    <Link
+                      href={`/project-users/${project.id}/edit`}
+                      className="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                    >
+                      <FaUserFriends /> Modifier les membres
                     </Link>
                     <Link
                       href={`/tasks/create?project_id=${project.id}`}
@@ -321,6 +404,46 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     Seuls les administrateurs et les gestionnaires peuvent effectuer des actions sur ce projet.
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Graphique d'évolution des tâches */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                  <FaChartLine className="text-blue-500" /> Évolution des tâches (30 derniers jours)
+                </h3>
+                <div className="flex items-center gap-4 mt-2 md:mt-0">
+                  <div className="flex items-center gap-1 text-sm">
+                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                    <span className="text-gray-600 dark:text-gray-300">Total</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-sm">
+                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                    <span className="text-gray-600 dark:text-gray-300">Terminées</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="h-80 w-full">
+                <Line data={trendChartData} options={chartOptions} />
+              </div>
+              
+              <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                <p>Évolution du nombre total de tâches et des tâches terminées au fil du temps</p>
+                <p className="text-xs mt-1">Les données sont cumulatives et montrent la progression globale</p>
+              </div>
+              
+              <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
+                <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full">
+                  <span className="font-semibold">{tasks.length}</span> tâches au total
+                </div>
+                <div className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1 rounded-full">
+                  <span className="font-semibold">{tasks.filter(t => t.status === 'done').length}</span> tâches terminées
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full">
+                  <span className="font-semibold">{tasks.filter(t => t.status === 'in_progress').length}</span> en cours
+                </div>
               </div>
             </div>
 
@@ -399,14 +522,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 <StatCard icon={<FaCommentDots className="text-purple-500 text-3xl" />} label="Commentaires" value={stats.commentsCount ?? 0} />
                 <StatCard icon={<FaUsers className="text-yellow-500 text-3xl" />} label="Membres" value={project.users?.length ?? 0} />
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                <FaChartLine /> Tendance des tâches terminées
-              </h3>
-              <div className="w-full h-80">
-                <Line data={trendChartData} options={trendChartOptions} />
-              </div>
-            </div>
+        
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                 <FaUsers /> Tâches terminées par membre
