@@ -56,25 +56,25 @@ class ProjectUserController extends Controller
             $query->where('user_id', auth()->id());
         })->get(['id', 'name']);
         
-        // Only show users who are not already members of any project
-        $users = User::whereDoesntHave('projects', function($query) {
-            $query->whereIn('project_id', function($q) {
-                $q->select('project_id')
-                  ->from('project_user')
-                  ->whereIn('project_id', function($sub) {
-                      $sub->select('id')
-                          ->from('projects')
-                          ->whereHas('users', function($q) {
-                              $q->where('user_id', auth()->id());
-                          });
-                  });
-            });
-        })->get(['id', 'name', 'email']);
+        // Afficher tous les utilisateurs sauf l'utilisateur actuel
+        $users = User::where('id', '!=', auth()->id())
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+        
+        // Log pour débogage
+        \Log::info('Utilisateurs chargés pour le formulaire d\'ajout de membre:', [
+            'count' => $users->count(),
+            'users' => $users->toArray()
+        ]);
         
         return Inertia::render('ProjectUsers/Create', [
             'projects' => $projects,
             'users' => $users,
             'roles' => self::ALLOWED_ROLES,
+            'debug' => [
+                'users_count' => $users->count(),
+                'current_user_id' => auth()->id()
+            ]
         ]);
     }
 
@@ -93,13 +93,13 @@ class ProjectUserController extends Controller
             'project_id' => [
                 'required',
                 'exists:projects,id',
-                // Ensure the authenticated user is a member of this project
+                // Vérifier que l'utilisateur connecté est membre du projet
                 Rule::exists('project_user', 'project_id')->where('user_id', auth()->id())
             ],
             'user_id' => [
                 'required',
                 'exists:users,id',
-                // Ensure the user is not already a member of this project
+                // Vérifier que l'utilisateur n'est pas déjà membre de ce projet
                 function($attribute, $value, $fail) use ($request) {
                     $exists = \DB::table('project_user')
                         ->where('project_id', $request->project_id)
@@ -108,6 +108,12 @@ class ProjectUserController extends Controller
                     
                     if ($exists) {
                         $fail('Cet utilisateur est déjà membre de ce projet.');
+                    }
+                },
+                // S'assurer qu'on ne s'ajoute pas soi-même
+                function($attribute, $value, $fail) {
+                    if ($value == auth()->id()) {
+                        $fail('Vous ne pouvez pas vous ajouter vous-même.');
                     }
                 }
             ],
