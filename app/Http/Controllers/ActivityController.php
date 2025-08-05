@@ -16,7 +16,38 @@ class ActivityController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
         $query = Activity::with('user');
+        
+        // Pour les non-admins, filtrer pour ne montrer que les activités liées à leurs projets
+        if (!$user->hasRole('admin')) {
+            $projectIds = $user->projects()->pluck('projects.id');
+            
+            $query->where(function($q) use ($projectIds, $user) {
+                // Activités sur les projets de l'utilisateur
+                $q->whereHasMorph('subject', 'App\Models\Project', 
+                    function($q) use ($projectIds) {
+                        $q->whereIn('id', $projectIds);
+                    }
+                )
+                // Activités sur les tâches des projets de l'utilisateur
+                ->orWhereHasMorph('subject', 'App\Models\Task',
+                    function($q) use ($projectIds) {
+                        $q->whereIn('project_id', $projectIds);
+                    }
+                )
+                // Activités sur les fichiers des projets de l'utilisateur
+                ->orWhereHasMorph('subject', 'App\Models\File',
+                    function($q) use ($projectIds) {
+                        $q->whereIn('project_id', $projectIds);
+                    }
+                )
+                // Ou activités effectuées par l'utilisateur
+                ->orWhere('user_id', $user->id);
+            });
+        }
+        
+        // Filtres additionnels
         if ($request->user_id) {
             $query->where('user_id', $request->user_id);
         }
@@ -26,9 +57,35 @@ class ActivityController extends Controller
         if ($request->date) {
             $query->whereDate('created_at', $request->date);
         }
+        
         $activities = $query->orderByDesc('created_at')->paginate(30)->withQueryString();
-        $users = \App\Models\User::orderBy('name')->get(['id', 'name']);
+        
+        // Pour le filtre des utilisateurs, ne montrer que les utilisateurs pertinents
+        $usersQuery = $user->hasRole('admin') 
+            ? User::query() 
+            : User::whereIn('id', 
+                Activity::where(function($q) use ($user) {
+                    $projectIds = $user->projects()->pluck('projects.id');
+                    
+                    $q->whereHasMorph('subject', 'App\Models\Project', 
+                        function($q) use ($projectIds) {
+                            $q->whereIn('id', $projectIds);
+                        }
+                    )->orWhereHasMorph('subject', 'App\Models\Task',
+                        function($q) use ($projectIds) {
+                            $q->whereIn('project_id', $projectIds);
+                        }
+                    )->orWhereHasMorph('subject', 'App\Models\File',
+                        function($q) use ($projectIds) {
+                            $q->whereIn('project_id', $projectIds);
+                        }
+                    )->orWhere('user_id', $user->id);
+                })->pluck('user_id')
+            );
+            
+        $users = $usersQuery->orderBy('name')->get(['id', 'name']);
         $types = Activity::select('type')->distinct()->pluck('type');
+        
         return Inertia::render('Activities/Index', [
             'activities' => $activities,
             'users' => $users,
@@ -39,7 +96,38 @@ class ActivityController extends Controller
 
     public function export(Request $request)
     {
+        $user = $request->user();
         $query = Activity::with('user');
+        
+        // Appliquer le même filtrage que pour l'index
+        if (!$user->hasRole('admin')) {
+            $projectIds = $user->projects()->pluck('projects.id');
+            
+            $query->where(function($q) use ($projectIds, $user) {
+                // Activités sur les projets de l'utilisateur
+                $q->whereHasMorph('subject', 'App\Models\Project', 
+                    function($q) use ($projectIds) {
+                        $q->whereIn('id', $projectIds);
+                    }
+                )
+                // Activités sur les tâches des projets de l'utilisateur
+                ->orWhereHasMorph('subject', 'App\Models\Task',
+                    function($q) use ($projectIds) {
+                        $q->whereIn('project_id', $projectIds);
+                    }
+                )
+                // Activités sur les fichiers des projets de l'utilisateur
+                ->orWhereHasMorph('subject', 'App\Models\File',
+                    function($q) use ($projectIds) {
+                        $q->whereIn('project_id', $projectIds);
+                    }
+                )
+                // Ou activités effectuées par l'utilisateur
+                ->orWhere('user_id', $user->id);
+            });
+        }
+        
+        // Appliquer les filtres additionnels
         if ($request->user_id) {
             $query->where('user_id', $request->user_id);
         }
@@ -49,6 +137,7 @@ class ActivityController extends Controller
         if ($request->date) {
             $query->whereDate('created_at', $request->date);
         }
+        
         $activities = $query->orderByDesc('created_at')->get();
         return Excel::download(new ActivitiesExport($activities), 'activities.xlsx');
     }

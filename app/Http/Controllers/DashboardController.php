@@ -15,27 +15,64 @@ class DashboardController extends Controller
 {
     public function index()
     {
+        $user = auth()->user();
+        $isAdmin = $user->hasRole('admin');
+        
+        // Base query for projects and tasks
+        $projectQuery = Project::query();
+        $taskQuery = Task::query();
+        
+        // If not admin, filter by user's projects
+        if (!$isAdmin) {
+            $userProjectIds = $user->projects()->pluck('projects.id');
+            $projectQuery->whereIn('id', $userProjectIds);
+            $taskQuery->whereIn('project_id', $userProjectIds);
+        }
+
         // Récupération des statistiques de base
         $stats = [
-            'tasks' => Task::count(),
-            'sprints' => Sprint::count(),
-            'projects' => Project::count(),
-            'users' => User::count(),
-            'files' => File::count(),
-            'auditLogs' => DB::table('audit_logs')->count(),
-            'members' => DB::table('project_user')->count(),
+            'tasks' => $taskQuery->count(),
+            'sprints' => $isAdmin ? Sprint::count() : Sprint::whereIn('project_id', $userProjectIds ?? [])->count(),
+            'projects' => $projectQuery->count(),
+            'users' => $isAdmin ? User::count() : 0, // Hide user count for non-admins
+            'files' => $isAdmin ? File::count() : File::where('user_id', $user->id)->count(),
+            'auditLogs' => $isAdmin ? DB::table('audit_logs')->count() : 0, // Hide audit logs for non-admins
+            'members' => $isAdmin ? DB::table('project_user')->count() : 0, // Hide member count for non-admins
             // Statistiques des tâches par statut
             'tasksByStatus' => [
-                'todo' => Task::where('status', 'todo')->count(),
-                'in_progress' => Task::where('status', 'in_progress')->count(),
-                'done' => Task::where('status', 'done')->count(),
-                'en_attente' => Task::where('status', 'en_attente')->count(),
+                'todo' => (clone $taskQuery)->where('status', 'todo')->count(),
+                'in_progress' => (clone $taskQuery)->where('status', 'in_progress')->count(),
+                'done' => (clone $taskQuery)->where('status', 'done')->count(),
+                'en_attente' => (clone $taskQuery)->where('status', 'en_attente')->count(),
             ],
         ];
 
         // Activités récentes (depuis la table activities)
-        $recentActivities = Activity::with(['user', 'subject'])
-            ->latest()
+        $activityQuery = Activity::with(['user', 'subject']);
+        
+        // Filter activities for non-admin users
+        if (!$isAdmin) {
+            // Get all project IDs the user has access to
+            $userProjectIds = $user->projects()->pluck('projects.id');
+            
+            // Get all task IDs from those projects
+            $userTaskIds = Task::whereIn('project_id', $userProjectIds)->pluck('id');
+            
+            $activityQuery->where(function($query) use ($user, $userProjectIds, $userTaskIds) {
+                // User's own activities
+                $query->where('user_id', $user->id)
+                    // Or activities related to user's projects
+                    ->orWhereHasMorph('subject', [Project::class], function($q) use ($userProjectIds) {
+                        $q->whereIn('id', $userProjectIds);
+                    })
+                    // Or activities related to tasks in user's projects
+                    ->orWhereHasMorph('subject', [Task::class], function($q) use ($userTaskIds) {
+                        $q->whereIn('id', $userTaskIds);
+                    });
+            });
+        }
+        
+        $recentActivities = $activityQuery->latest()
             ->take(10)
             ->get()
             ->map(function ($activity) {
@@ -55,12 +92,26 @@ class DashboardController extends Controller
             });
 
         // Statistiques d'activité sur 30 jours (depuis la table activities)
-        $activityByDay = Activity::select(
+        $activityByDayQuery = Activity::select(
                 DB::raw('DATE(created_at) as day'),
                 DB::raw('count(*) as count')
             )
-            ->where('created_at', '>=', now()->subDays(30))
-            ->groupBy('day')
+            ->where('created_at', '>=', now()->subDays(30));
+            
+        // Filter activities for non-admin users
+        if (!$isAdmin) {
+            $activityByDayQuery->where(function($query) use ($user, $userProjectIds, $userTaskIds) {
+                $query->where('user_id', $user->id)
+                    ->orWhereHasMorph('subject', [Project::class], function($q) use ($userProjectIds) {
+                        $q->whereIn('id', $userProjectIds);
+                    })
+                    ->orWhereHasMorph('subject', [Task::class], function($q) use ($userTaskIds) {
+                        $q->whereIn('id', $userTaskIds);
+                    });
+            });
+        }
+        
+        $activityByDay = $activityByDayQuery->groupBy('day')
             ->orderBy('day')
             ->get()
             ->map(function ($item) {
@@ -71,13 +122,27 @@ class DashboardController extends Controller
             });
 
         // Top utilisateurs actifs (basé sur les activités)
-        $topUsers = Activity::select(
+        $topUsersQuery = Activity::select(
                 'user_id',
                 DB::raw('count(*) as activity_count')
             )
             ->with('user')
-            ->where('created_at', '>=', now()->subDays(30))
-            ->groupBy('user_id')
+            ->where('created_at', '>=', now()->subDays(30));
+            
+        // Filter activities for non-admin users
+        if (!$isAdmin) {
+            $topUsersQuery->where(function($query) use ($user, $userProjectIds, $userTaskIds) {
+                $query->where('user_id', $user->id)
+                    ->orWhereHasMorph('subject', [Project::class], function($q) use ($userProjectIds) {
+                        $q->whereIn('id', $userProjectIds);
+                    })
+                    ->orWhereHasMorph('subject', [Task::class], function($q) use ($userTaskIds) {
+                        $q->whereIn('id', $userTaskIds);
+                    });
+            });
+        }
+        
+        $topUsers = $topUsersQuery->groupBy('user_id')
             ->orderByDesc('activity_count')
             ->take(5)
             ->get()
@@ -91,34 +156,50 @@ class DashboardController extends Controller
             });
 
         // Projets récents
-        $recentProjects = Project::with(['users' => function($query) {
+        $recentProjectsQuery = Project::with(['users' => function($query) {
             $query->wherePivot('role', 'manager');
-        }])
-        ->latest()
-        ->take(5)
-        ->get()
-        ->map(function ($project) {
-            $manager = $project->users->first();
-            return [
-                'id' => $project->id,
-                'name' => $project->name,
-                'description' => $project->description,
-                'status' => $project->status,
-                'deadline' => $project->deadline,
-                'task_count' => $project->tasks()->count(),
-                'manager' => $manager ? [
-                    'name' => $manager->name,
-                    'avatar' => $manager->profile_photo_url ?? null,
-                ] : [
-                    'name' => 'Aucun gestionnaire',
-                    'avatar' => null
-                ],
-            ];
-        });
+        }]);
+        
+        // Filter projects for non-admin users
+        if (!$isAdmin) {
+            $recentProjectsQuery->whereIn('id', $userProjectIds);
+        }
+        
+        $recentProjects = $recentProjectsQuery->latest()
+            ->take(5)
+            ->get()
+            ->map(function ($project) {
+                $manager = $project->users->first();
+                return [
+                    'id' => $project->id,
+                    'name' => $project->name,
+                    'description' => $project->description,
+                    'status' => $project->status,
+                    'deadline' => $project->deadline,
+                    'task_count' => $project->tasks()->count(),
+                    'manager' => $manager ? [
+                        'name' => $manager->name,
+                        'avatar' => $manager->profile_photo_url ?? null,
+                    ] : [
+                        'name' => 'Aucun gestionnaire',
+                        'avatar' => null
+                    ],
+                ];
+            });
 
         // Fichiers récents
-        $recentFiles = File::with(['user', 'project', 'task'])
-            ->latest()
+        $recentFilesQuery = File::with(['user', 'project', 'task']);
+        
+        // Filter files for non-admin users
+        if (!$isAdmin) {
+            $recentFilesQuery->where(function($query) use ($user, $userProjectIds, $userTaskIds) {
+                $query->where('user_id', $user->id)
+                    ->orWhereIn('project_id', $userProjectIds)
+                    ->orWhereIn('task_id', $userTaskIds);
+            });
+        }
+        
+        $recentFiles = $recentFilesQuery->latest()
             ->take(5)
             ->get()
             ->map(function ($file) {

@@ -17,9 +17,20 @@ class KanbanController extends Controller
      */
     public function index()
     {
+        $user = Auth::user();
+        
+        // Vérifier si l'utilisateur est admin ou manager d'au moins un projet
+        if (!$user->hasRole('admin')) {
+            $managedProjectsCount = $user->managedProjects()->count();
+            if ($managedProjectsCount === 0) {
+                return Inertia::render('Error403', [
+                    'message' => 'Accès refusé. Vous devez être administrateur ou manager de projet pour accéder au tableau Kanban.'
+                ])->toResponse(request())->setStatusCode(403);
+            }
+        }
+
         $this->authorize('viewAny', Task::class);
 
-        $user = Auth::user();
         $query = Task::with(['assignedUser', 'project'])
             ->orderBy('position')
             ->orderBy('updated_at', 'desc');

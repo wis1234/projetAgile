@@ -64,6 +64,17 @@ class User extends Authenticatable
     public function projects() {
         return $this->belongsToMany(Project::class)->withPivot('role')->withTimestamps();
     }
+    
+    /**
+     * Récupère les projets où l'utilisateur est manager
+     */
+    public function managedProjects()
+    {
+        return $this->belongsToMany(Project::class, 'project_user')
+            ->select('projects.*') // Spécifie explicitement la table pour éviter l'ambiguïté
+            ->wherePivot('role', 'manager')
+            ->withTimestamps();
+    }
     public function files() {
         return $this->hasMany(File::class);
     }

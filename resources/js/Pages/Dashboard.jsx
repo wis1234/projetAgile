@@ -150,7 +150,8 @@ const ProjectCard = ({ project }) => {
   );
 };
 
-export default function Dashboard({ stats = {}, activityByDay = [], recentActivities = [], topUsers = [], recentProjects = [], recentFiles = [] }) {
+export default function Dashboard({ auth, stats = {}, activityByDay = [], recentActivities = [], topUsers = [], recentProjects = [], recentFiles = [] }) {
+  const isAdmin = auth?.user?.roles?.includes('admin');
   // Initialisation des valeurs par défaut pour les tâches par statut
   const tasksByStatus = stats.tasksByStatus || {
     todo: 0,
@@ -166,30 +167,41 @@ export default function Dashboard({ stats = {}, activityByDay = [], recentActivi
       count: stats.tasks || 0,
       color: 'bg-gradient-to-r from-blue-500 to-blue-600 text-white',
       link: '/tasks',
-      icon: <FaTasks className="text-3xl opacity-80" />
+      icon: <FaTasks className="text-3xl opacity-80" />,
+      show: true
     },
     {
       title: 'Projets',
       count: stats.projects || 0,
       color: 'bg-gradient-to-r from-green-500 to-green-600 text-white',
       link: '/projects',
-      icon: <FaProjectDiagram className="text-3xl opacity-80" />
+      icon: <FaProjectDiagram className="text-3xl opacity-80" />,
+      show: true
     },
     {
       title: 'Utilisateurs',
       count: stats.users || 0,
       color: 'bg-gradient-to-r from-purple-500 to-purple-600 text-white',
       link: '/users',
-      icon: <FaUsers className="text-3xl opacity-80" />
+      icon: <FaUsers className="text-3xl opacity-80" />,
+      show: isAdmin // Only show users widget to admins
     },
     {
       title: 'Fichiers',
       count: stats.files || 0,
       color: 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white',
       link: '/files',
-      icon: <FaFileAlt className="text-3xl opacity-80" />
+      icon: <FaFileAlt className="text-3xl opacity-80" />,
+      show: true
     }
   ];
+
+  // Filter out widgets based on visibility rules and count
+  const visibleWidgets = statsData.filter(widget => 
+    widget.show !== false && // Respect the show flag
+    (widget.count > 0 || widget.count === 0) && 
+    widget.link
+  );
 
   // Données pour le graphique d'activité
   const activityChartData = {
@@ -246,14 +258,14 @@ export default function Dashboard({ stats = {}, activityByDay = [], recentActivi
 
         {/* Grille des widgets */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          {statsData.map((stat, index) => (
+          {visibleWidgets.map((widget, index) => (
             <Widget 
               key={index}
-              title={stat.title}
-              count={stat.count}
-              color={stat.color}
-              link={stat.link}
-              icon={stat.icon}
+              title={widget.title}
+              count={widget.count}
+              color={widget.color}
+              link={widget.link}
+              icon={widget.icon}
             />
           ))}
         </div>
@@ -306,7 +318,7 @@ export default function Dashboard({ stats = {}, activityByDay = [], recentActivi
                           <img 
                             src={user.avatar} 
                             alt={user.name} 
-                            className="w-10 h-10 rounded-full object-cover"
+                            className="w-10 h-10 rounded-full"
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
