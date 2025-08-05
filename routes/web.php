@@ -36,6 +36,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
     Route::resource('files', App\Http\Controllers\FileController::class);
+    Route::post('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])
+        ->name('files.update-content');
     Route::resource('messages', App\Http\Controllers\MessageController::class);
     Route::resource('audit-logs', App\Http\Controllers\AuditLogController::class);
     Route::resource('project-users', App\Http\Controllers\ProjectUserController::class);
@@ -54,6 +56,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/projects/{id}/status', [App\Http\Controllers\ProjectController::class, 'changeStatus'])->name('projects.change-status');
     
     // Gestion des fichiers
+    Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])->name('files.edit-content');
     Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])->name('files.updateContent');
     Route::get('files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])->name('files.download');
     Route::post('files/download-multiple', [App\Http\Controllers\FileController::class, 'downloadMultiple'])->name('files.downloadMultiple');

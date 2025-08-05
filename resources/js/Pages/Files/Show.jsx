@@ -9,13 +9,15 @@ import StatusUpdateForm from '@/Components/FileDetails/StatusUpdateForm';
 import CommentsSection from '@/Components/FileDetails/CommentsSection';
 import RelatedInfo from '@/Components/FileDetails/RelatedInfo';
 import SaveToDropboxButton from '@/Components/Files/SaveToDropboxButton';
-import { FaProjectDiagram, FaTasks, FaUser, FaFileAlt, FaClock } from 'react-icons/fa';
+import { FaProjectDiagram, FaTasks, FaUser, FaFileAlt, FaClock, FaEdit } from 'react-icons/fa';
+import { isFileEditable } from '@/utils/fileUtils';
 
 const Show = ({ file, statuses, auth, canManageFile }) => {
   const { user: currentUser } = auth;
   const [currentFile, setCurrentFile] = useState(file);
   
   const isFileOwner = currentFile.user_id === currentUser?.id;
+  const canEditContent = isFileEditable(currentFile.type, currentFile.name);
   
 
   const handleStatusUpdate = (updatedFile) => {
@@ -53,18 +55,32 @@ const Show = ({ file, statuses, auth, canManageFile }) => {
       <Head title={`Fichier - ${currentFile.name}`} />
       
       <div className="min-h-screen bg-white">
-        <FileHeader 
-            file={currentFile} 
-            onDelete={canManageFile ? handleDelete : null}
-            currentUser={currentUser}
-          >
-            {canManageFile && (
-              <SaveToDropboxButton 
-                fileId={currentFile.id} 
-                className="ml-2"
-              />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <FileHeader 
+              file={currentFile} 
+              onDelete={canManageFile ? handleDelete : null}
+              currentUser={currentUser}
+            >
+              {canManageFile && (
+                <SaveToDropboxButton 
+                  fileId={currentFile.id} 
+                  className="ml-2"
+                />
+              )}
+            </FileHeader>
+            
+            {canEditContent && (
+              <a
+                href={route('files.edit-content', currentFile.id)}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:border-blue-900 focus:ring focus:ring-blue-300 disabled:opacity-25 transition ml-4"
+              >
+                <FaEdit className="mr-2" />
+                Modifier le contenu
+              </a>
             )}
-          </FileHeader>
+          </div>
+        </div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <motion.div 

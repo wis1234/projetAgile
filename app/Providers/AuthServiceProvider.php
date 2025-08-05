@@ -13,6 +13,8 @@ use App\Models\User;
 use App\Policies\UserPolicy;
 use App\Models\School;
 use App\Policies\SchoolPolicy;
+use App\Models\File;
+use App\Policies\FilePolicy;
 
 class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
 {
@@ -27,6 +29,7 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
         Sprint::class => SprintPolicy::class,
         User::class => UserPolicy::class,
         School::class => SchoolPolicy::class,
+        File::class => FilePolicy::class,
     ];
 
     /**

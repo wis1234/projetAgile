@@ -80,60 +80,113 @@ class FileController extends Controller
         }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'file' => 'required|file|max:10240', // 10 Mo max
+            'file' => 'required|file|max:102400', // 100 Mo max
             'project_id' => 'required|exists:projects,id',
-            'task_id' => 'required|exists:tasks,id',
-            'kanban_id' => 'required|exists:sprints,id',
+            'task_id' => 'nullable|exists:tasks,id',
+            'kanban_id' => 'nullable|exists:sprints,id',
             'description' => 'nullable|string',
         ]);
-        $file = $request->file('file');
-        $path = $file->store('files', 'public');
-        $fileModel = File::create([
-            'name' => $validated['name'],
-            'file_path' => $path,
-            'type' => $file->getClientMimeType(),
-            'size' => $file->getSize(),
-            'user_id' => $currentUser->id,
-            'project_id' => $validated['project_id'],
-            'task_id' => $validated['task_id'],
-            'kanban_id' => $validated['kanban_id'],
-            'description' => $validated['description'] ?? null,
-            'status' => 'pending',
-        ]);
-        activity_log('upload', 'Upload fichier', $fileModel);
-        // Notifier tous les membres du projet (sauf l'uploader)
-        $project = Project::with('users')->find($validated['project_id']);
-        $task = null;
-        if ($validated['task_id'] ?? null) {
-            $task = \App\Models\Task::find($validated['task_id']);
-        }
-        if ($project) {
-            $membersList = $project->users->map(function($u) {
-                $role = $u->pivot->role ?? '-';
-                return $u->name . ' (' . $role . ')';
-            })->implode(', ');
-            foreach ($project->users as $member) {
-                if ($member->id != $currentUser->id) {
-                    $message =
-                        "Un nouveau fichier a été uploadé dans le projet : {$project->name}\n" .
-                        ($task ? "Tâche : {$task->title}\n" : '') .
-                        "Fichier : {$fileModel->name} ({$fileModel->size} octets)\n" .
-                        "Ajouté par : " . ($fileModel->user->name ?? 'un membre du projet') . "\n" .
-                        "Membres du projet : {$membersList}";
-                    $member->notify(new \App\Notifications\UserActionMailNotification(
-                        'Nouveau fichier ajouté au projet',
-                        $message,
-                        route('files.show', $fileModel->id),
-                        'Voir le fichier',
-                        [
-                            'file_id' => $fileModel->id,
-                            'project_id' => $project->id,
-                        ]
-                    ));
+        try {
+            $file = $request->file('file');
+            $originalName = $file->getClientOriginalName();
+            $extension = $file->getClientOriginalExtension();
+            $fileName = $validated['name'] . (str_ends_with(strtolower($validated['name']), '.' . strtolower($extension)) ? '' : '.' . $extension);
+            
+            // Stocker le fichier
+            $path = $file->storeAs('files', $fileName, 'public');
+            
+            // Créer l'entrée en base de données
+            $fileModel = File::create([
+                'name' => $validated['name'],
+                'file_path' => $path,
+                'type' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+                'user_id' => $currentUser->id,
+                'project_id' => $validated['project_id'],
+                'task_id' => $validated['task_id'] ?? null,
+                'kanban_id' => $validated['kanban_id'] ?? null,
+                'description' => $validated['description'] ?? null,
+                'status' => 'pending',
+            ]);
+            // Journaliser l'action
+            activity_log('upload', 'Upload fichier', $fileModel);
+
+            // Notifier tous les membres du projet (sauf l'uploader)
+            $project = Project::with('users')->find($validated['project_id']);
+            $task = null;
+            if ($validated['task_id'] ?? null) {
+                $task = \App\Models\Task::find($validated['task_id']);
+            }
+            
+            // Envoyer les notifications de manière asynchrone
+            if ($project) {
+                $membersList = $project->users->map(function($u) {
+                    $role = $u->pivot->role ?? '-';
+                    return $u->name . ' (' . $role . ')';
+                })->implode(', ');
+                
+                foreach ($project->users as $member) {
+                    if ($member->id != $currentUser->id) {
+                        $message =
+                            "Un nouveau fichier a été uploadé dans le projet : {$project->name}\n" .
+                            ($task ? "Tâche : {$task->title}\n" : '') .
+                            "Fichier : {$fileModel->name} ({$fileModel->size} octets)\n" .
+                            "Ajouté par : " . ($fileModel->user->name ?? 'un membre du projet') . "\n" .
+                            "Membres du projet : {$membersList}";
+                        
+                        $member->notify(new \App\Notifications\UserActionMailNotification(
+                            'Nouveau fichier ajouté au projet',
+                            $message,
+                            route('files.show', $fileModel->id),
+                            'Voir le fichier',
+                            [
+                                'file_id' => $fileModel->id,
+                                'project_id' => $project->id,
+                            ]
+                        ));
+                    }
                 }
             }
+
+            // Répondre en fonction du type de requête
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Fichier importé avec succès',
+                    'data' => [
+                        'id' => $fileModel->id,
+                        'name' => $fileModel->name,
+                        'url' => Storage::url($fileModel->file_path),
+                        'created_at' => $fileModel->created_at->format('d/m/Y H:i')
+                    ]
+                ]);
+            }
+
+            return redirect()->route('files.index')
+                ->with('success', 'Fichier importé avec succès');
+                
+        } catch (\Exception $e) {
+            // Supprimer le fichier s'il a été créé
+            if (isset($path) && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+            
+            // Journaliser l'erreur
+            \Log::error('Erreur lors de l\'upload du fichier : ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Une erreur est survenue lors de l\'upload du fichier : ' . $e->getMessage()
+                ], 500);
+            }
+            
+            return back()->withInput()
+                ->with('error', 'Une erreur est survenue lors de l\'upload du fichier : ' . $e->getMessage());
         }
-        return redirect()->route('files.index')->with('success', 'Fichier importé avec succès');
     }
 
     /**
@@ -276,17 +329,16 @@ class FileController extends Controller
      */
     public function destroy(File $file)
     {
-        $file->load(['project']);
-        if (!$file->project || !$file->project->isMember(auth()->user())) {
-            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
-        }
+        $this->authorize('delete', $file);
+        
         // Supprimer le fichier physique
-        if ($file->file_path && \Storage::disk('public')->exists($file->file_path)) {
-            \Storage::disk('public')->delete($file->file_path);
-        }
+        Storage::disk('public')->delete($file->file_path);
+        
+        // Supprimer l'entrée en base de données
         $file->delete();
-        activity_log('delete', 'Suppression fichier', $file);
-        return redirect()->route('files.index')->with('success', 'Fichier supprimé');
+        
+        return redirect()->route('files.index')
+            ->with('success', 'Fichier supprimé avec succès');
     }
 
     public function download(File $file)
@@ -308,29 +360,102 @@ class FileController extends Controller
     }
 
     /**
-     * Télécharger plusieurs fichiers en ZIP
+     * Affiche le formulaire d'édition du contenu d'un fichier
+     *
+     * @param  \App\Models\File  $file
+     * @return \Inertia\Response|\Illuminate\Http\RedirectResponse
+     */
+    public function editContent(File $file)
+    {
+        $this->authorize('update', $file);
+        
+        // Vérifier si le fichier est éditable (exemple: fichiers texte, pas de binaires)
+        $editableTypes = ['text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json', 'application/xml'];
+        $extension = pathinfo($file->name, PATHINFO_EXTENSION);
+        $isEditable = in_array($file->type, $editableTypes) || in_array(strtolower($extension), ['txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'php']);
+        
+        if (!$isEditable) {
+            return redirect()->back()->with('error', 'Ce type de fichier ne peut pas être édité directement.');
+        }
+        
+        // Charger le contenu du fichier
+        $content = '';
+        $filePath = storage_path('app/public/' . $file->file_path);
+        
+        if (file_exists($filePath) && is_readable($filePath)) {
+            $content = file_get_contents($filePath);
+        } else {
+            return redirect()->back()->with('error', 'Impossible de charger le contenu du fichier.');
+        }
+        
+        return Inertia::render('Files/EditContent', [
+            'file' => array_merge($file->toArray(), [
+                'content' => $content,
+                'is_editable' => $isEditable
+            ])
+        ]);
+    }
+
+    /**
+     * Met à jour le contenu d'un fichier texte
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\File  $file
+     * @return \Illuminate\Http\JsonResponse
      */
     public function updateContent(Request $request, File $file)
     {
         // Authorize the action
         $this->authorize('update', $file);
 
-        // Validate the request
-        $request->validate([
-            'content' => 'required|string',
-        ]);
+        // Récupérer le contenu du fichier
+        $content = '';
+        if ($request->has('content')) {
+            // Si c'est un objet Blob/File (depuis FormData)
+            if ($request->content instanceof \Illuminate\Http\UploadedFile) {
+                $content = file_get_contents($request->content->getRealPath());
+            } 
+            // Si c'est une chaîne JSON
+            elseif (is_string($request->content)) {
+                $content = $request->content;
+            }
+        }
 
-        // Ensure the file is a text file before attempting to write
-        if (!str_starts_with($file->type, 'text/')) {
+        // Valider que le contenu n'est pas vide
+        if (empty($content)) {
+            return response()->json(['message' => 'Le contenu du fichier ne peut pas être vide.'], 422);
+        }
+
+        // Vérifier que le fichier est un fichier texte
+        $editableTypes = ['text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json', 'application/xml'];
+        $extension = pathinfo($file->name, PATHINFO_EXTENSION);
+        $isEditable = in_array($file->type, $editableTypes) || in_array(strtolower($extension), ['txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'php']);
+        
+        if (!$isEditable) {
             return response()->json(['message' => 'Seuls les fichiers texte peuvent être modifiés de cette manière.'], 400);
         }
 
         try {
-            Storage::disk('public')->put($file->file_path, $request->input('content'));
+            // Sauvegarder le contenu dans le fichier
+            Storage::disk('public')->put($file->file_path, $content);
+            
+            // Mettre à jour la taille du fichier dans la base de données
+            $file->size = Storage::disk('public')->size($file->file_path);
+            $file->save();
+            
+            // Journaliser l'action
             activity_log('update', 'Modification contenu fichier texte', $file);
-            return response()->json(['message' => 'Contenu du fichier mis à jour avec succès.']);
+            
+            return response()->json([
+                'message' => 'Contenu du fichier mis à jour avec succès.',
+                'file' => $file->fresh()
+            ]);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Erreur lors de la sauvegarde du contenu du fichier.', 'error' => $e->getMessage()], 500);
+            \Log::error('Erreur lors de la sauvegarde du fichier : ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Erreur lors de la sauvegarde du contenu du fichier.',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 

@@ -1,28 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { router, usePage } from '@inertiajs/react';
+import { router, usePage, Link } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { Link } from '@inertiajs/react';
 import { motion } from 'framer-motion';
 import { 
   FaFileAlt, 
   FaUpload, 
   FaPlus, 
   FaSave, 
-  FaBold, 
-  FaItalic, 
-  FaListUl, 
-  FaListOl, 
-  FaLink, 
-  FaImage,
-  FaCode,
-  FaQuoteLeft,
-  FaTable,
-  FaUndo,
-  FaRedo,
   FaTimes
 } from 'react-icons/fa';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
 
 function Create({ projects, users, tasks = [], kanbans = [] }) {
   const { errors = {}, flash = {}, auth } = usePage().props;
@@ -46,27 +32,17 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
   const [loading, setLoading] = useState(false);
   
   // Références
-  const quillRef = useRef(null);
   const fileInputRef = useRef(null);
-
-  // Configuration de l'éditeur
-  const modules = {
-    toolbar: [
-      ['bold', 'italic', 'underline', 'strike'],
-      ['blockquote', 'code-block'],
-      [{ 'header': 1 }, { 'header': 2 }],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      ['link', 'image'],
-      ['clean']
-    ],
-  };
-
-  const formats = [
-    'header', 'font', 'size',
-    'bold', 'italic', 'underline', 'strike', 'blockquote',
-    'list', 'bullet', 'indent',
-    'link', 'image', 'code-block'
-  ];
+  const textareaRef = useRef(null);
+  
+  // Gestion de la taille automatique du textarea
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 800)}px`;
+    }
+  }, [content]);
 
   useEffect(() => {
     if (urlProjectId) setProjectId(urlProjectId);
@@ -77,61 +53,95 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
     e.preventDefault();
     setLoading(true);
     
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('project_id', projectId);
-    
-    if (activeTab === 'import') {
-      if (!file) {
-        setNotification('Veuillez sélectionner un fichier');
-        setNotificationType('error');
-        setLoading(false);
-        return;
-      }
-      formData.append('file', file);
-    } else {
-      // Création d'un fichier texte à partir du contenu de l'éditeur
-      const blob = new Blob([content], { type: 'text/plain' });
-      const filename = name.endsWith('.txt') ? name : `${name}.txt`;
-      formData.append('file', blob, filename);
+    if (!projectId) {
+      setNotification('Veuillez sélectionner un projet');
+      setNotificationType('error');
+      setLoading(false);
+      return;
     }
     
-    if (taskId) formData.append('task_id', taskId);
-    if (kanbanId) formData.append('kanban_id', kanbanId);
-    if (description) formData.append('description', description);
-    
     try {
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('project_id', projectId);
+      
+      if (file) {
+        // Si un fichier est téléchargé, l'envoyer directement
+        formData.append('file', file);
+      } else if (content) {
+        // Pour le contenu texte, créer un Blob avec le contenu
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const filename = name.endsWith('.txt') ? name : `${name}.txt`;
+        formData.append('file', blob, filename);
+      } else {
+        throw new Error('Aucun contenu fourni');
+      }
+      
+      // Ajouter les champs optionnels
+      if (taskId) formData.append('task_id', taskId);
+      if (kanbanId) formData.append('kanban_id', kanbanId);
+      if (description) formData.append('description', description);
+      
+      // Envoyer la requête avec gestion du timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // Timeout après 60 secondes
+      
       const response = await fetch('/files', {
         method: 'POST',
+        signal: controller.signal,
         headers: {
+          'Accept': 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
         },
         body: formData,
       });
       
-      const data = await response.json();
+      clearTimeout(timeoutId);
       
-      if (response.ok) {
-        setNotification('Fichier créé avec succès');
-        setNotificationType('success');
-        setName('');
-        setFile(null);
-        setContent('');
-        setDescription('');
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        
-        setTimeout(() => router.visit('/files'), 1200);
-      } else {
-        setNotification(data.message || 'Erreur lors de la création du fichier');
-        setNotificationType('error');
+      // Vérifier le type de contenu de la réponse
+      const contentType = response.headers.get('content-type');
+      let errorData = {};
+      
+      if (contentType && contentType.includes('application/json')) {
+        errorData = await response.json().catch(() => ({}));
+      } else if (contentType && contentType.includes('text/html')) {
+        // Si la réponse est du HTML, c'est probablement une page d'erreur
+        const text = await response.text();
+        throw new Error('Le serveur a renvoyé une page HTML au lieu de JSON. Vérifiez la console pour plus de détails.');
       }
+      
+      if (!response.ok) {
+        throw new Error(errorData.message || `Erreur HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // Réinitialiser le formulaire après un succès
+      setNotification('Fichier créé avec succès', 'success');
+      setNotificationType('success');
+      setName('');
+      setFile(null);
+      setContent('');
+      setDescription('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      
+      // Rediriger vers la liste des fichiers après un court délai
+      setTimeout(() => router.visit('/files'), 1200);
+      
     } catch (error) {
-      setNotification('Une erreur est survenue lors de la communication avec le serveur');
+      console.error('Erreur lors de la création du fichier:', error);
+      let errorMessage = 'Une erreur est survenue lors de la communication avec le serveur';
+      
+      if (error.name === 'AbortError') {
+        errorMessage = 'La requête a expiré. Veuillez réessayer avec un fichier plus petit ou vérifier votre connexion.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setNotification(errorMessage);
       setNotificationType('error');
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
   
   const handleFileChange = (e) => {
@@ -283,20 +293,23 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
                 </div>
               ) : (
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="fileContent" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Contenu du fichier
                   </label>
-                  <div className="mt-1 rounded-md shadow-sm">
-                    <ReactQuill
-                      ref={quillRef}
-                      theme="snow"
+                  <div className="mt-1 relative">
+                    <textarea
+                      id="fileContent"
+                      ref={textareaRef}
                       value={content}
-                      onChange={setContent}
-                      modules={modules}
-                      formats={formats}
-                      className="h-64 bg-white dark:bg-gray-700 rounded-b-md"
+                      onChange={(e) => setContent(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                       placeholder="Saisissez le contenu de votre fichier..."
+                      rows={15}
+                      style={{ minHeight: '300px', maxHeight: '70vh', resize: 'vertical' }}
                     />
+                    <div className="absolute bottom-2 right-2 text-xs text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded">
+                      {content.length} caractères
+                    </div>
                   </div>
                 </div>
               )}
