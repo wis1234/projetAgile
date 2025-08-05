@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import React, { useState, useEffect } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { FaSave, FaTimes, FaFileAlt } from 'react-icons/fa';
 import { isFileEditable, isPdfFile } from '@/utils/fileUtils';
+import Tiptap from '@/Components/Editor/Tiptap';
 
 const EditContent = ({ file }) => {
   const { flash } = usePage().props;
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState('<p></p>');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const textareaRef = useRef(null);
   const isPdf = isPdfFile(file.type, file.name);
   
   // Charger le contenu du fichier
@@ -19,7 +19,10 @@ const EditContent = ({ file }) => {
         const response = await fetch(`/storage/${file.file_path}`);
         if (!response.ok) throw new Error('Impossible de charger le contenu du fichier');
         const text = await response.text();
-        setContent(text);
+        
+        // Si c'est du HTML valide, on l'utilise tel quel, sinon on l'encapsule dans un paragraphe
+        const isHTML = /<[a-z][\s\S]*>/i.test(text);
+        setContent(isHTML ? text : `<p>${text}</p>`);
       } catch (err) {
         setError('Erreur lors du chargement du fichier : ' + err.message);
         console.error('Erreur:', err);
@@ -32,17 +35,6 @@ const EditContent = ({ file }) => {
       setError('La modification des fichiers PDF n\'est pas prise en charge');
     }
   }, [file, isPdf]);
-
-  // Ajuster automatiquement la hauteur du textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(
-        textareaRef.current.scrollHeight,
-        800 // Hauteur maximale de 800px
-      )}px`;
-    }
-  }, [content]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -115,93 +107,65 @@ const EditContent = ({ file }) => {
       <Head title={`Modifier le contenu - ${file.name}`} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Modifier le contenu
-            </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {file.name} • {new Date(file.created_at).toLocaleDateString()}
-            </p>
-          </div>
-          <div className="flex space-x-3">
-            <button
-              type="button"
-              onClick={() => router.visit(route('files.show', file.id))}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              <FaTimes className="mr-2 h-4 w-4" />
-              Annuler
-            </button>
-            <button
-              type="submit"
-              form="edit-content-form"
-              disabled={isLoading}
-              className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                isLoading ? 'opacity-75 cursor-not-allowed' : ''
-              }`}
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Enregistrement...
-                </>
-              ) : (
-                <>
-                  <FaSave className="mr-2 h-4 w-4" />
-                  Enregistrer les modifications
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+          <div className="p-6 bg-white dark:bg-gray-800 border-b border-gray-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
+                <FaFileAlt className="inline-block mr-2" />
+                Éditer le contenu : {file.name}
+              </h2>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => window.history.back()}
+                  className="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md font-semibold text-xs text-gray-700 dark:text-gray-200 uppercase tracking-widest hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
+                >
+                  <FaTimes className="mr-2" /> Annuler
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150 disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Enregistrement...
+                    </>
+                  ) : (
+                    <>
+                      <FaSave className="mr-2" /> Enregistrer
+                    </>
+                  )}
+                </button>
               </div>
             </div>
-          </div>
-        )}
 
-        <form id="edit-content-form" onSubmit={handleSubmit}>
-          <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+            {error && (
+              <div className="mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
+                <p>{error}</p>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Contenu du fichier
-              </h3>
-              <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-                Modifiez le contenu du fichier ci-dessous.
+              </label>
+              <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
+                <Tiptap 
+                  content={content} 
+                  onChange={setContent} 
+                  editable={!isLoading} 
+                />
+              </div>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Utilisez la barre d'outils pour formater votre texte. Les modifications seront enregistrées uniquement après avoir cliqué sur le bouton "Enregistrer".
               </p>
             </div>
-            <div className="px-4 py-5 sm:p-6">
-              <div className="relative">
-                <textarea
-                  ref={textareaRef}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                  rows={20}
-                  style={{ minHeight: '300px', maxHeight: '70vh', resize: 'vertical' }}
-                  spellCheck="false"
-                />
-                <div className="absolute bottom-2 right-2 text-xs text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded">
-                  {content.length} caractères • {content.split('\n').length} lignes
-                </div>
-              </div>
-            </div>
           </div>
-        </form>
+        </div>
       </div>
     </AdminLayout>
   );
