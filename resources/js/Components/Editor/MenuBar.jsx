@@ -40,6 +40,11 @@ const COLORS = [
   { name: 'Gris', value: '#808080' },
   { name: 'Marron', value: '#A52A2A' },
   { name: 'Rose', value: '#FFC0CB' },
+  { name: 'Bleu clair', value: '#87CEEB' },
+  { name: 'Vert clair', value: '#90EE90' },
+  { name: 'Rouge foncé', value: '#8B0000' },
+  { name: 'Bleu marine', value: '#000080' },
+  { name: 'Vert foncé', value: '#006400' },
 ];
 
 const MenuBar = ({ editor, colors = COLORS, onTrackChanges }) => {
@@ -148,36 +153,62 @@ const MenuBar = ({ editor, colors = COLORS, onTrackChanges }) => {
           title="Couleur du texte"
         >
           <div className="flex items-center">
-            <FaPalette className="w-5 h-5" style={{ color: currentColor }} />
+            <div className="relative">
+              <FaPalette className="w-5 h-5" style={{ color: currentColor }} />
+              <div 
+                className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white"
+                style={{ backgroundColor: currentColor }}
+              />
+            </div>
             <span className="ml-1 text-sm">Couleur</span>
           </div>
         </button>
         {showColorPicker && (
-          <div className="absolute z-10 mt-1 w-48 p-2 bg-white rounded-md shadow-lg border border-gray-200 grid grid-cols-5 gap-1">
-            {colors.map((color) => (
-              <button
-                key={color.value}
-                onClick={() => {
-                  editor.chain().focus().setColor(color.value).run();
-                  setCurrentColor(color.value);
-                  setShowColorPicker(false);
-                }}
-                className="w-6 h-6 rounded-full border border-gray-300"
-                style={{ backgroundColor: color.value }}
-                title={`${color.name} (${color.value})`}
-              />
-            ))}
-            <div className="col-span-5 mt-2 pt-2 border-t border-gray-100">
-              <input
-                type="color"
-                value={currentColor}
-                onChange={(e) => {
-                  const newColor = e.target.value;
-                  editor.chain().focus().setColor(newColor).run();
-                  setCurrentColor(newColor);
-                }}
-                className="w-full h-8 cursor-pointer"
-              />
+          <div className="absolute z-50 mt-1 w-64 p-3 bg-white rounded-md shadow-xl border border-gray-200">
+            <div className="grid grid-cols-6 gap-2">
+              {colors.map((color) => (
+                <button
+                  key={color.value}
+                  onClick={() => {
+                    editor.chain().focus().setColor(color.value).run();
+                    setCurrentColor(color.value);
+                    setShowColorPicker(false);
+                  }}
+                  className={`w-6 h-6 rounded-full border-2 ${currentColor === color.value ? 'ring-2 ring-offset-2 ring-blue-500' : 'border-gray-200'} hover:scale-110 transition-transform`}
+                  style={{ backgroundColor: color.value }}
+                  title={`${color.name} (${color.value})`}
+                />
+              ))}
+            </div>
+            
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <div className="flex items-center mb-2">
+                <input
+                  type="color"
+                  value={currentColor}
+                  onChange={(e) => {
+                    const newColor = e.target.value;
+                    editor.chain().focus().setColor(newColor).run();
+                    setCurrentColor(newColor);
+                  }}
+                  className="w-10 h-8 cursor-pointer rounded"
+                />
+                <span className="ml-2 text-sm text-gray-600">Personnalisé</span>
+              </div>
+              
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-xs text-gray-500">Sélectionnez une couleur</span>
+                <button
+                  onClick={() => {
+                    editor.chain().focus().unsetColor().run();
+                    setCurrentColor('#000000');
+                    setShowColorPicker(false);
+                  }}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  Réinitialiser
+                </button>
+              </div>
             </div>
           </div>
         )}

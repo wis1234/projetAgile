@@ -31,3 +31,29 @@ input, select, textarea {
 .text-error {
   @apply text-red-600 dark:text-red-400;
 }
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  @apply p-4 min-h-[200px] outline-none border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800;
+}
+
+.ProseMirror:focus {
+  @apply ring-2 ring-blue-500 border-transparent;
+}
+
+.ProseMirror p {
+  @apply my-2;
+}
+
+.ProseMirror h1, 
+.ProseMirror h2, 
+.ProseMirror h3, 
+.ProseMirror h4, 
+.ProseMirror h5, 
+.ProseMirror h6 {
+  @apply mt-4 mb-2 font-bold;
+}
+
+.ProseMirror h1 { @apply text-2xl; }
+.ProseMirror h2 { @apply text-xl; }
+.ProseMirror h3 { @apply text-lg; }
