@@ -7,7 +7,13 @@ import {
   FaUpload, 
   FaPlus, 
   FaSave, 
-  FaTimes
+  FaTimes,
+  FaInfoCircle,
+  FaFileWord,
+  FaFilePdf,
+  FaFileExcel,
+  FaFileImage,
+  FaFileCode
 } from 'react-icons/fa';
 
 function Create({ projects, users, tasks = [], kanbans = [] }) {
@@ -207,44 +213,80 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
           )}
 
           {/* Onglets */}
-          <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('import')}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'import'
-                  ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FaUpload className="h-4 w-4" />
-                Importer un fichier
+          <div className="mb-6">
+            <div className="border-b border-gray-200 dark:border-gray-700">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('import')}
+                  className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'import'
+                      ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FaUpload className="h-4 w-4" />
+                    Importer un fichier
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('create')}
+                  className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'create'
+                      ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FaPlus className="h-4 w-4" />
+                    Créer un fichier texte
+                  </div>
+                </button>
+              </nav>
+            </div>
+            
+            {/* Note d'information */}
+            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start">
+                <FaInfoCircle className="flex-shrink-0 h-5 w-5 text-blue-400 mt-0.5 mr-2" />
+                <div>
+                  <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">À propos des fichiers éditables</h4>
+                  <div className="mt-1 text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                    <p>• Les fichiers texte (.txt) peuvent être modifiés directement sur la plateforme</p>
+                    <p>• Pour les autres formats (PDF, DOCX, XLSX, etc.), vous devrez :</p>
+                    <div className="ml-4">
+                      <p>1. Télécharger le fichier</p>
+                      <p>2. Le modifier localement</p>
+                      <p>3. Le réimporter</p>
+                    </div>
+                    <div className="flex items-center gap-4 mt-2 text-xs">
+                      <span className="flex items-center text-green-600 dark:text-green-400">
+                        <FaFileCode className="mr-1" /> Formats éditables : .txt
+                      </span>
+                      <span className="flex items-center text-amber-600 dark:text-amber-400">
+                        <FaFilePdf className="mr-1" /> Formats non-éditables : .pdf, .docx, .xlsx, etc.
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('create')}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'create'
-                  ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FaPlus className="h-4 w-4" />
-                Créer un fichier
-              </div>
-            </button>
-            </nav>
+            </div>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
           <form onSubmit={handleSubmit} className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Nom du fichier <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Nom du fichier <span className="text-red-500">*</span>
+                  </label>
+                  {activeTab === 'create' && (
+                    <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 px-2 py-1 rounded">
+                      .txt sera ajouté automatiquement
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   id="name"
@@ -268,11 +310,32 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
                     onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <div className="space-y-1 text-center">
-                      <FaUpload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="flex text-sm text-gray-600 dark:text-gray-400">
+                    <div className="space-y-3 text-center">
+                      <div className="flex justify-center">
+                        {file ? (
+                          <div className="flex flex-col items-center">
+                            {file.name.endsWith('.pdf') && <FaFilePdf className="h-12 w-12 text-red-500" />}
+                            {['.doc', '.docx'].some(ext => file.name.endsWith(ext)) && <FaFileWord className="h-12 w-12 text-blue-600" />}
+                            {['.xls', '.xlsx'].some(ext => file.name.endsWith(ext)) && <FaFileExcel className="h-12 w-12 text-green-600" />}
+                            {['.jpg', '.jpeg', '.png', '.gif'].some(ext => file.name.endsWith(ext)) && <FaFileImage className="h-12 w-12 text-purple-500" />}
+                            {!['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.gif'].some(ext => file.name.endsWith(ext)) && 
+                              <FaFileAlt className="h-12 w-12 text-gray-400" />
+                            }
+                            <p className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {(file.size / 1024).toFixed(1)} KB • {file.type || 'Type inconnu'}
+                            </p>
+                          </div>
+                        ) : (
+                          <FaUpload className="h-12 w-12 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex text-sm text-gray-600 dark:text-gray-400 justify-center">
                         <label className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus-within:outline-none">
-                          <span>Téléverser un fichier</span>
+                          <span className="flex items-center">
+                            <FaUpload className="mr-1 h-3 w-3" />
+                            Sélectionner un fichier
+                          </span>
                           <input 
                             ref={fileInputRef}
                             id="file-upload" 
@@ -282,10 +345,11 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
                             onChange={handleFileChange}
                           />
                         </label>
-                        <p className="pl-1">ou glisser-déposer</p>
+                        <p className="px-2 text-gray-400">ou</p>
+                        <span className="text-gray-600 dark:text-gray-300">glisser-déposer</span>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {file ? file.name : 'Aucun fichier sélectionné'}
+                        Formats supportés : .txt, .pdf, .doc, .docx, .xls, .xlsx, .jpg, .jpeg, .png, .gif
                       </p>
                     </div>
                   </div>

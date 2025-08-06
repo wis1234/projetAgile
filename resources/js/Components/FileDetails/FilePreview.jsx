@@ -207,13 +207,23 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
         
         {/* Boutons d'action rapide en bas */}
         <div className="flex flex-wrap justify-center gap-3 mt-6 w-full">
-          <button
-            onClick={handlePreview}
-            className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex-1 sm:flex-none"
-          >
-            <FaEye className="mr-2 h-4 w-4" />
-            {isImage ? 'Aperçu' : 'Ouvrir'}
-          </button>
+          {isEditable && !isPdf ? (
+            <button
+              onClick={handleEditContent}
+              className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex-1 sm:flex-none"
+            >
+              <FaEdit className="mr-2 h-4 w-4" />
+              Modifier le contenu
+            </button>
+          ) : (
+            <button
+              onClick={handlePreview}
+              className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex-1 sm:flex-none"
+            >
+              <FaEye className="mr-2 h-4 w-4" />
+              {isImage ? 'Aperçu' : 'Ouvrir'}
+            </button>
+          )}
           
           <button
             onClick={handleDownload}

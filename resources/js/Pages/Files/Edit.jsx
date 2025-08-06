@@ -50,7 +50,7 @@ export default function Edit({ file, projects, users, tasks = [], kanbans = [] }
                 setNotification('Fichier mis à jour avec succès');
                 setNotificationType('success');
                 setSubmitting(false);
-                setTimeout(() => Inertia.visit('/files'), 1200);
+                // La redirection est gérée par le contrôleur
             },
             onError: () => {
                 setNotification('Erreur lors de la mise à jour');

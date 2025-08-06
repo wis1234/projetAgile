@@ -325,6 +325,12 @@ class FileController extends Controller
                 ));
             }
         }
+        if ($request->header('X-Inertia')) {
+            // Si la requête vient d'Inertia, utiliser Inertia::location pour forcer une redirection côté client
+            return Inertia::location(route('files.index'));
+        }
+        
+        // Pour les requêtes normales (API, etc.)
         return redirect()->route('files.index')->with('success', 'Fichier mis à jour');
     }
 

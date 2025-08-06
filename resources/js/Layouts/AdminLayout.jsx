@@ -193,7 +193,14 @@ export default function AdminLayout({ children }) {
         {/* Header */}
         <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white bg-opacity-100 border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 z-40 transition-all duration-300">
           <button className="md:hidden text-2xl mr-2" onClick={() => setSidebarOpen(true)}>&#9776;</button>
-          <div className="text-xl font-bold text-blue-700 dark:text-blue-200">DASHBOARD PROJA</div>
+          <div className="flex items-center">
+            <span className="text-xl md:text-2xl font-light tracking-wider text-gray-700 dark:text-gray-200">
+              DASHBOARD
+            </span>
+            <span className="ml-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-medium rounded-full border border-blue-100 dark:border-blue-800">
+              v1.0
+            </span>
+          </div>
           <div className="flex items-center gap-4">
             {/* Notifications internes */}
             <div className="relative">

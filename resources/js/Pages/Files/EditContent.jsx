@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { FaSave, FaTimes, FaFileAlt, FaExpand, FaCompress, FaSpinner } from 'react-icons/fa';
+import { FaSave, FaTimes, FaFileAlt, FaSpinner } from 'react-icons/fa';
 import { isFileEditable, isPdfFile, formatFileSize } from '@/utils/fileUtils';
 import MenuBar from '@/Components/Editor/MenuBar';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -19,7 +19,6 @@ const EditContent = ({ file }) => {
   const [content, setContent] = useState('<p></p>');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [lastSaved, setLastSaved] = useState(null);
@@ -80,9 +79,6 @@ const EditContent = ({ file }) => {
     }
   }, [file, isPdf]);
 
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-  };
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
@@ -277,6 +273,20 @@ const EditContent = ({ file }) => {
                     )}
                   </div>
                 </div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    <FaFileAlt className="inline-block mr-2 text-blue-600" />
+                    {file.name}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => window.history.back()}
+                    className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    title="Fermer"
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <div className="flex items-center space-x-2 text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-md">
                     <span>{wordCount} mots</span>
@@ -284,18 +294,11 @@ const EditContent = ({ file }) => {
                     <span>{charCount} caractères</span>
                   </div>
                   <button
-                    onClick={toggleFullscreen}
-                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md focus:outline-none transition-colors"
-                    title={isFullscreen ? 'Réduire' : 'Plein écran'}
-                  >
-                    {isFullscreen ? <FaCompress className="w-5 h-5" /> : <FaExpand className="w-5 h-5" />}
-                  </button>
-                  <button
                     onClick={() => window.history.back()}
                     className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-medium text-sm text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                     disabled={isLoading}
                   >
-                    <FaTimes className="mr-2" /> Annuler
+                    <FaTimes className="mr-2" /> Retour
                   </button>
                   <button
                     onClick={handleSubmit}
@@ -326,16 +329,13 @@ const EditContent = ({ file }) => {
               )}
               
               <div className="mt-4">
-                <div 
-                  className={`border border-gray-200 rounded-lg overflow-hidden shadow-sm transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 m-0 bg-white flex flex-col' : 'flex flex-col'}`}
-                  style={isFullscreen ? { borderRadius: 0 } : {}}
-                >
+                <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm flex flex-col">
                   <MenuBar editor={editor} colors={colors} />
                   <div className="border-t border-gray-200 flex-1 flex flex-col">
                     <EditorContent 
                       editor={editor} 
                       className="flex-1 overflow-y-auto p-4 focus:outline-none"
-                      style={{ minHeight: isFullscreen ? 'calc(100vh - 60px)' : '500px' }}
+                      style={{ minHeight: '500px' }}
                     />
                   </div>
                 </div>
