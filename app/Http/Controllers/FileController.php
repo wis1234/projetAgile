@@ -398,11 +398,17 @@ class FileController extends Controller
             return redirect()->back()->with('error', 'Impossible de charger le contenu du fichier.');
         }
         
+        $file->load('lastModifiedBy');
+
         return Inertia::render('Files/EditContent', [
             'file' => array_merge($file->toArray(), [
                 'content' => $content,
                 'is_editable' => $isEditable
-            ])
+            ]),
+            'lastModifiedBy' => $file->lastModifiedBy ? [
+                'name' => $file->lastModifiedBy->name,
+                'timestamp' => $file->updated_at->toDateTimeString(),
+            ] : null,
         ]);
     }
 
@@ -417,55 +423,37 @@ class FileController extends Controller
      */
     public function updateContent(Request $request, File $file)
     {
-        // Vérifier que l'utilisateur a la permission de modifier ce fichier
         $this->authorize('update', $file);
 
-        // Valider la requête
         $request->validate([
             'content' => 'required|string',
         ]);
 
         try {
-            // Vérifier si le fichier est éditable
             if (!is_file_editable($file->type, $file->name)) {
-                return response()->json([
-                    'message' => 'Ce type de fichier ne peut pas être modifié directement.',
-                ], 422);
+                return back()->with('error', 'Ce type de fichier ne peut pas être modifié.');
             }
 
-            // Sauvegarder le contenu dans le stockage
             $path = 'files/' . $file->project_id . '/' . $file->name;
-            \Storage::disk('public')->put($path, $request->content);
+            Storage::disk('public')->put($path, $request->content);
 
-            // Mettre à jour le fichier dans la base de données
             $file->update([
                 'file_path' => $path,
-                'size' => \Storage::disk('public')->size($path),
+                'size' => Storage::disk('public')->size($path),
+                'last_modified_by' => Auth::id(),
                 'updated_at' => now(),
             ]);
 
-            // Enregistrer l'activité
             activity()
                 ->causedBy(auth()->user())
                 ->performedOn($file)
-                ->withProperties([
-                    'action' => 'updated',
-                    'model' => 'File',
-                    'id' => $file->id,
-                    'name' => $file->name,
-                ])
                 ->log('Contenu du fichier mis à jour');
 
-            return response()->json([
-                'message' => 'Le contenu du fichier a été mis à jour avec succès.',
-                'file' => $file->fresh(),
-            ]);
+            return back()->with('success', 'Le contenu a été sauvegardé avec succès.');
+
         } catch (\Exception $e) {
-            \Log::error('Erreur lors de la mise à jour du contenu du fichier: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Une erreur est survenue lors de la mise à jour du contenu du fichier.',
-                'error' => $e->getMessage(),
-            ], 500);
+            Log::error('Erreur lors de la mise à jour du contenu du fichier: ' . $e->getMessage());
+            return back()->with('error', 'Une erreur est survenue lors de la sauvegarde.');
         }
     }
 

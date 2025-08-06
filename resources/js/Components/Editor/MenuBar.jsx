@@ -1,34 +1,61 @@
-import React, { useCallback } from 'react';
-import { useEditor } from '@tiptap/react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { 
   FaBold, 
   FaItalic, 
   FaUnderline, 
   FaStrikethrough, 
-  FaCode, 
-  FaListUl, 
-  FaListOl, 
-  FaQuoteRight, 
   FaAlignLeft, 
   FaAlignCenter, 
   FaAlignRight, 
-  FaAlignJustify, 
-  FaLink, 
-  FaUnlink, 
-  FaImage, 
-  FaPaperclip,
+  FaAlignJustify,
+  FaListUl,
+  FaListOl,
+  FaUndo,
+  FaRedo,
+  FaLink,
+  FaImage,
   FaHeading,
-  FaPalette,
-  FaFont
+  FaCode,
+  FaHistory,
+  FaPalette
 } from 'react-icons/fa';
+import { BiFontSize } from 'react-icons/bi';
 
-const MenuBar = ({ editor, colors = [] }) => {
-  if (!editor) {
-    return null;
-  }
+const FONT_SIZES = [
+  { label: 'Petit', value: '12px' },
+  { label: 'Normal', value: '16px' },
+  { label: 'Moyen', value: '20px' },
+  { label: 'Grand', value: '24px' },
+  { label: 'Très grand', value: '32px' },
+];
+
+const COLORS = [
+  { name: 'Noir', value: '#000000' },
+  { name: 'Rouge', value: '#FF0000' },
+  { name: 'Vert', value: '#008000' },
+  { name: 'Bleu', value: '#0000FF' },
+  { name: 'Jaune', value: '#FFD700' },
+  { name: 'Orange', value: '#FFA500' },
+  { name: 'Violet', value: '#800080' },
+  { name: 'Gris', value: '#808080' },
+  { name: 'Marron', value: '#A52A2A' },
+  { name: 'Rose', value: '#FFC0CB' },
+];
+
+const MenuBar = ({ editor, colors = COLORS, onTrackChanges }) => {
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showFontSize, setShowFontSize] = useState(false);
+  const [currentColor, setCurrentColor] = useState('#000000');
+
+  useEffect(() => {
+    if (editor?.isActive('textStyle')) {
+      const color = editor.getAttributes('textStyle').color || '#000000';
+      setCurrentColor(color);
+    }
+  }, [editor?.state.selection]);
 
   const addImage = useCallback(() => {
-    const url = window.prompt('Entrez l\'URL de l\'image');
+    const url = window.prompt(`Entrez l'URL de l'image`);
     if (url) {
       editor.chain().focus().setImage({ src: url }).run();
     }
@@ -38,195 +65,145 @@ const MenuBar = ({ editor, colors = [] }) => {
     const previousUrl = editor.getAttributes('link').href;
     const url = window.prompt('URL', previousUrl);
 
-    if (url === null) {
-      return;
-    }
-
+    if (url === null) return;
     if (url === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
       return;
     }
 
-    // Vérifier si l'URL commence par http:// ou https://, sinon l'ajouter
-    const formattedUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
-    editor.chain().focus().extendMarkRange('link').setLink({ href: formattedUrl, target: '_blank' }).run();
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   }, [editor]);
 
+  if (!editor) return null;
+
   return (
-    <div className="editor-menu flex flex-wrap items-center gap-1 p-2 bg-white border-b border-gray-100 rounded-t-lg">
-      {/* Boutons de formatage de base */}
-      <div className="flex items-center space-x-1 bg-gray-50 p-1 rounded-lg">
-        <button
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('bold') ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Gras (Ctrl+B)"
-        >
-          <FaBold className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('italic') ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Italique (Ctrl+I)"
-        >
-          <FaItalic className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('underline') ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Souligné (Ctrl+U)"
-        >
-          <FaUnderline className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('strike') ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Barré (Ctrl+Shift+S)"
-        >
-          <FaStrikethrough className="w-4 h-4" />
-        </button>
-      </div>
+    <div className="menu-bar flex flex-wrap items-center gap-1 p-2 border-b border-gray-200 bg-white rounded-t-lg">
+      {/* Text Formatting */}
+      <button
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('bold') ? 'bg-gray-200' : ''}`}
+        title="Gras"
+      >
+        <FaBold />
+      </button>
+      <button
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('italic') ? 'bg-gray-200' : ''}`}
+        title="Italique"
+      >
+        <FaItalic />
+      </button>
+      <button
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('underline') ? 'bg-gray-200' : ''}`}
+        title="Souligné"
+      >
+        <FaUnderline />
+      </button>
+      <button
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+        className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('strike') ? 'bg-gray-200' : ''}`}
+        title="Barré"
+      >
+        <FaStrikethrough />
+      </button>
 
-      <div className="w-px h-8 bg-gray-300 mx-1"></div>
+      <div className="border-l border-gray-300 h-6 mx-1"></div>
 
-      {/* Boutons de titres et listes */}
-      <div className="flex items-center space-x-1 bg-gray-50 p-1 rounded-lg">
-        <div className="relative group">
-          <button
-            className="p-2 rounded hover:bg-gray-200 text-gray-700"
-            title="Titres"
-          >
-            <FaHeading className="w-4 h-4" />
-          </button>
-          <div className="absolute left-0 mt-1 w-32 bg-white shadow-lg rounded-md p-2 hidden group-hover:block z-10">
-            {[1, 2, 3, 4, 5, 6].map((level) => (
+      {/* Font Size */}
+      <div className="relative">
+        <button
+          onClick={() => setShowFontSize(!showFontSize)}
+          className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('textStyle') ? 'bg-gray-200' : ''}`}
+          title="Taille de police"
+        >
+          <div className="flex items-center">
+            <BiFontSize className="w-5 h-5" />
+            <span className="ml-1 text-sm">Taille</span>
+          </div>
+        </button>
+        {showFontSize && (
+          <div className="absolute z-10 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200">
+            {FONT_SIZES.map((size) => (
               <button
-                key={level}
-                onClick={() => editor.chain().focus().toggleHeading({ level }).run()}
-                className={`w-full text-left px-2 py-1 text-sm rounded hover:bg-gray-100 ${editor.isActive('heading', { level }) ? 'bg-blue-50 text-blue-600' : ''}`}
+                key={size.value}
+                onClick={() => {
+                  editor.chain().focus().setFontSize(size.value).run();
+                  setShowFontSize(false);
+                }}
+                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
               >
-                Titre {level}
+                {size.label}
               </button>
             ))}
-            <button
-              onClick={() => editor.chain().focus().setParagraph().run()}
-              className={`w-full text-left px-2 py-1 text-sm rounded hover:bg-gray-100 ${editor.isActive('paragraph') ? 'bg-blue-50 text-blue-600' : ''}`}
-            >
-              Paragraphe
-            </button>
           </div>
-        </div>
-
-        <button
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('bulletList') ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Liste à puces"
-        >
-          <FaListUl className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('orderedList') ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Liste numérotée"
-        >
-          <FaListOl className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('blockquote') ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Citation"
-        >
-          <FaQuoteRight className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive('codeBlock') ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Bloc de code"
-        >
-          <FaCode className="w-4 h-4" />
-        </button>
+        )}
       </div>
 
-      <div className="w-px h-8 bg-gray-300 mx-1"></div>
-
-      {/* Boutons d'alignement et de mise en forme */}
-      <div className="flex items-center space-x-1 bg-gray-50 p-1 rounded-lg">
+      {/* Text Color */}
+      <div className="relative">
         <button
-          onClick={() => editor.chain().focus().setTextAlign('left').run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive({ textAlign: 'left' }) ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Aligner à gauche"
-        >
-          <FaAlignLeft className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().setTextAlign('center').run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive({ textAlign: 'center' }) ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Centrer"
-        >
-          <FaAlignCenter className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().setTextAlign('right').run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive({ textAlign: 'right' }) ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Aligner à droite"
-        >
-          <FaAlignRight className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-          className={`p-2 rounded hover:bg-gray-200 ${editor.isActive({ textAlign: 'justify' }) ? 'bg-gray-200 text-blue-600' : 'text-gray-700'}`}
-          title="Justifier"
-        >
-          <FaAlignJustify className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="w-px h-8 bg-gray-300 mx-1"></div>
-
-      {/* Liens et médias */}
-      <div className="flex items-center space-x-1 bg-gray-50 p-1 rounded-lg">
-        <button
-          onClick={setLink}
-          className={`p-2 rounded ${editor.isActive('link') ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
-          title="Insérer un lien"
-        >
-          <FaLink />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().unsetLink().run()}
-          disabled={!editor.isActive('link')}
-          className="p-2 rounded text-gray-400 disabled:opacity-50"
-          title="Supprimer le lien"
-        >
-          <FaUnlink />
-        </button>
-        <button
-          onClick={addImage}
-          className="p-2 rounded text-gray-600 hover:bg-gray-100"
-          title="Insérer une image"
-        >
-          <FaImage />
-        </button>
-      </div>
-
-      {/* Couleur de texte et surlignage */}
-      <div className="flex items-center space-x-1">
-        <input
-          type="color"
-          onInput={event => editor.chain().focus().setColor(event.target.value).run()}
-          value={editor.getAttributes('textStyle').color || '#000000'}
-          className="w-8 h-8 p-0 border-0 bg-transparent cursor-pointer"
+          onClick={() => setShowColorPicker(!showColorPicker)}
+          className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('textStyle') ? 'bg-gray-200' : ''}`}
           title="Couleur du texte"
-        />
-        <button
-          onClick={() => editor.chain().focus().toggleHighlight().run()}
-          className={`p-2 rounded ${editor.isActive('highlight') ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
-          title="Surligner"
         >
-          <span className="px-1 bg-yellow-200">A</span>
+          <div className="flex items-center">
+            <FaPalette className="w-5 h-5" style={{ color: currentColor }} />
+            <span className="ml-1 text-sm">Couleur</span>
+          </div>
         </button>
+        {showColorPicker && (
+          <div className="absolute z-10 mt-1 w-48 p-2 bg-white rounded-md shadow-lg border border-gray-200 grid grid-cols-5 gap-1">
+            {colors.map((color) => (
+              <button
+                key={color.value}
+                onClick={() => {
+                  editor.chain().focus().setColor(color.value).run();
+                  setCurrentColor(color.value);
+                  setShowColorPicker(false);
+                }}
+                className="w-6 h-6 rounded-full border border-gray-300"
+                style={{ backgroundColor: color.value }}
+                title={`${color.name} (${color.value})`}
+              />
+            ))}
+            <div className="col-span-5 mt-2 pt-2 border-t border-gray-100">
+              <input
+                type="color"
+                value={currentColor}
+                onChange={(e) => {
+                  const newColor = e.target.value;
+                  editor.chain().focus().setColor(newColor).run();
+                  setCurrentColor(newColor);
+                }}
+                className="w-full h-8 cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
       </div>
+
+      <button
+        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('codeBlock') ? 'bg-gray-200' : ''}`}
+        title="Bloc de code"
+      >
+        <FaCode className="w-5 h-5" />
+      </button>
+
+      {onTrackChanges && (
+        <button
+          onClick={onTrackChanges}
+          className="ml-auto p-2 text-blue-600 hover:bg-blue-50 rounded"
+          title="Suivi des modifications"
+        >
+          <FaHistory className="w-5 h-5" />
+        </button>
+      )}
     </div>
   );
 };
 
 export default MenuBar;
+
+
