@@ -57,3 +57,56 @@ input, select, textarea {
 .ProseMirror h1 { @apply text-2xl; }
 .ProseMirror h2 { @apply text-xl; }
 .ProseMirror h3 { @apply text-lg; }
+
+/* Styles pour la surbrillance */
+.ProseMirror .highlight {
+  @apply px-1 rounded;
+  background-color: rgba(255, 213, 0, 0.2); /* Jaune clair par défaut */
+}
+
+/* Styles pour les blocs de code */
+.ProseMirror .code-block {
+  @apply bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-4 rounded-md my-3 font-mono text-sm overflow-x-auto;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  position: relative;
+}
+
+/* Style pour le conteneur du sélecteur de langage */
+.code-language {
+  @apply absolute top-2 right-2 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-700 px-2 py-1 rounded;
+  z-index: 10;
+}
+
+/* Styles pour la coloration syntaxique */
+.hljs {
+  @apply bg-transparent p-0;
+}
+
+/* Styles spécifiques pour les éléments de code en ligne */
+.ProseMirror code {
+  @apply bg-gray-100 dark:bg-gray-700 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+/* Style pour le conteneur du bloc de code */
+.code-block-wrapper {
+  @apply relative;
+}
+
+/* Style pour le bouton de copie */
+.copy-code-button {
+  @apply absolute top-2 right-2 p-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-white/80 dark:bg-gray-700/80 rounded opacity-0 transition-opacity duration-200;
+}
+
+.code-block-wrapper:hover .copy-code-button {
+  @apply opacity-100;
+}
+
+/* Styles spécifiques pour la coloration syntaxique */
+.hljs-keyword { @apply text-purple-600 dark:text-purple-400; }
+.hljs-title { @apply text-blue-600 dark:text-blue-400; }
+.hljs-params { @apply text-gray-700 dark:text-gray-300; }
+.hljs-string { @apply text-green-600 dark:text-green-400; }
+.hljs-comment { @apply text-gray-500 dark:text-gray-400 italic; }
+.hljs-number { @apply text-blue-600 dark:text-blue-400; }
+.hljs-built_in { @apply text-yellow-600 dark:text-yellow-400; }
+.hljs-literal { @apply text-red-600 dark:text-red-400; }

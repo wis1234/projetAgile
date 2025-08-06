@@ -17,7 +17,10 @@ import {
   FaHeading,
   FaCode,
   FaHistory,
-  FaPalette
+  FaPalette,
+  FaHighlighter,
+  FaCheck,
+  FaTimes
 } from 'react-icons/fa';
 import { BiFontSize } from 'react-icons/bi';
 
@@ -47,7 +50,20 @@ const COLORS = [
   { name: 'Vert foncé', value: '#006400' },
 ];
 
+const HIGHLIGHT_COLORS = [
+  { name: 'Jaune', value: 'rgba(255, 213, 0, 0.3)' },
+  { name: 'Rouge', value: 'rgba(255, 0, 0, 0.2)' },
+  { name: 'Vert', value: 'rgba(0, 200, 0, 0.2)' },
+  { name: 'Bleu', value: 'rgba(0, 0, 255, 0.2)' },
+  { name: 'Orange', value: 'rgba(255, 165, 0, 0.2)' },
+  { name: 'Violet', value: 'rgba(128, 0, 128, 0.2)' },
+];
+
+
+
 const MenuBar = ({ editor, colors = COLORS, onTrackChanges }) => {
+  const [showHighlightMenu, setShowHighlightMenu] = useState(false);
+  const [currentHighlightColor, setCurrentHighlightColor] = useState(HIGHLIGHT_COLORS[0].value);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showFontSize, setShowFontSize] = useState(false);
   const [currentColor, setCurrentColor] = useState('#000000');
@@ -214,6 +230,52 @@ const MenuBar = ({ editor, colors = COLORS, onTrackChanges }) => {
         )}
       </div>
 
+      {/* Bouton de surbrillance */}
+      <div className="relative">
+        <button
+          onClick={() => setShowHighlightMenu(!showHighlightMenu)}
+          className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('highlight') ? 'bg-gray-200' : ''}`}
+          title="Surbrillance"
+        >
+          <FaHighlighter className="w-5 h-5" style={{ color: currentHighlightColor }} />
+        </button>
+        {showHighlightMenu && (
+          <div className="absolute z-50 mt-1 p-2 bg-white rounded-md shadow-xl border border-gray-200">
+            <div className="grid grid-cols-3 gap-2">
+              {HIGHLIGHT_COLORS.map((color) => (
+                <button
+                  key={color.value}
+                  onClick={() => {
+                    editor.chain().focus().toggleHighlight({ color: color.value }).run();
+                    setCurrentHighlightColor(color.value);
+                    setShowHighlightMenu(false);
+                  }}
+                  className={`w-6 h-6 rounded ${editor.isActive('highlight', { color: color.value }) ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}
+                  style={{ backgroundColor: color.value }}
+                  title={color.name}
+                >
+                  {editor.isActive('highlight', { color: color.value }) && (
+                    <FaCheck className="w-3 h-3 mx-auto text-gray-700" />
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  editor.chain().focus().unsetHighlight().run();
+                  setShowHighlightMenu(false);
+                }}
+                className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+              >
+                <FaTimes className="w-3 h-3" /> Supprimer la surbrillance
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bouton de code simplifié */}
       <button
         onClick={() => editor.chain().focus().toggleCodeBlock().run()}
         className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('codeBlock') ? 'bg-gray-200' : ''}`}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { FaSave, FaSpinner, FaArrowLeft } from 'react-icons/fa';
+import { FaSave, FaSpinner, FaArrowLeft, FaCode } from 'react-icons/fa';
 import { isPdfFile, formatFileSize } from '@/utils/fileUtils';
 import MenuBar from '@/Components/Editor/MenuBar';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -27,7 +27,15 @@ const EditContent = ({ file, lastModifiedBy }) => {
 
     const editor = useEditor({
         extensions: [
-            StarterKit.configure({ textStyle: false }),
+            StarterKit.configure({
+                textStyle: false,
+                // Utilisation du codeBlock de base
+                codeBlock: {
+                    HTMLAttributes: {
+                        class: 'code-block',
+                    },
+                },
+            }),
             TextStyle,
             FontFamily,
             FontSize.configure({
@@ -36,7 +44,12 @@ const EditContent = ({ file, lastModifiedBy }) => {
             Underline,
             TextAlign.configure({ types: ['heading', 'paragraph'] }),
             Link.configure({ openOnClick: false }),
-            Highlight.configure({ multicolor: true }),
+            Highlight.configure({ 
+                multicolor: true,
+                HTMLAttributes: {
+                    class: 'highlight',
+                },
+            }),
             Color,
             Image.configure({ inline: true, allowBase64: true }),
         ],
