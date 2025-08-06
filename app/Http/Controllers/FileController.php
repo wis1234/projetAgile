@@ -12,7 +12,11 @@ use App\Notifications\InternalNotification;
 use App\Notifications\UserActionMailNotification;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
+use Illuminate\Support\Facades\App;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+
+// Charger le helper personnalisé
+require_once app_path('Helpers/file_helpers.php');
 
 class FileController extends Controller
 {
@@ -396,6 +400,8 @@ class FileController extends Controller
         ]);
     }
 
+
+
     /**
      * Met à jour le contenu d'un fichier texte
      *
@@ -405,62 +411,59 @@ class FileController extends Controller
      */
     public function updateContent(Request $request, File $file)
     {
-        // Authorize the action
+        // Vérifier que l'utilisateur a la permission de modifier ce fichier
         $this->authorize('update', $file);
 
-        // Récupérer le contenu du fichier
-        $content = '';
-        if ($request->has('content')) {
-            // Si c'est un objet Blob/File (depuis FormData)
-            if ($request->content instanceof \Illuminate\Http\UploadedFile) {
-                $content = file_get_contents($request->content->getRealPath());
-            } 
-            // Si c'est une chaîne JSON
-            elseif (is_string($request->content)) {
-                $content = $request->content;
-            }
-        }
-
-        // Valider que le contenu n'est pas vide
-        if (empty($content)) {
-            return response()->json(['message' => 'Le contenu du fichier ne peut pas être vide.'], 422);
-        }
-
-        // Vérifier que le fichier est un fichier texte
-        $editableTypes = ['text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json', 'application/xml'];
-        $extension = pathinfo($file->name, PATHINFO_EXTENSION);
-        $isEditable = in_array($file->type, $editableTypes) || in_array(strtolower($extension), ['txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'php']);
-        
-        if (!$isEditable) {
-            return response()->json(['message' => 'Seuls les fichiers texte peuvent être modifiés de cette manière.'], 400);
-        }
+        // Valider la requête
+        $request->validate([
+            'content' => 'required|string',
+        ]);
 
         try {
-            // Sauvegarder le contenu dans le fichier
-            Storage::disk('public')->put($file->file_path, $content);
-            
-            // Mettre à jour la taille du fichier dans la base de données
-            $file->size = Storage::disk('public')->size($file->file_path);
-            $file->save();
-            
-            // Journaliser l'action
-            activity_log('update', 'Modification contenu fichier texte', $file);
-            
+            // Vérifier si le fichier est éditable
+            if (!is_file_editable($file->type, $file->name)) {
+                return response()->json([
+                    'message' => 'Ce type de fichier ne peut pas être modifié directement.',
+                ], 422);
+            }
+
+            // Sauvegarder le contenu dans le stockage
+            $path = 'files/' . $file->project_id . '/' . $file->name;
+            \Storage::disk('public')->put($path, $request->content);
+
+            // Mettre à jour le fichier dans la base de données
+            $file->update([
+                'file_path' => $path,
+                'size' => \Storage::disk('public')->size($path),
+                'updated_at' => now(),
+            ]);
+
+            // Enregistrer l'activité
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($file)
+                ->withProperties([
+                    'action' => 'updated',
+                    'model' => 'File',
+                    'id' => $file->id,
+                    'name' => $file->name,
+                ])
+                ->log('Contenu du fichier mis à jour');
+
             return response()->json([
-                'message' => 'Contenu du fichier mis à jour avec succès.',
-                'file' => $file->fresh()
+                'message' => 'Le contenu du fichier a été mis à jour avec succès.',
+                'file' => $file->fresh(),
             ]);
         } catch (\Exception $e) {
-            \Log::error('Erreur lors de la sauvegarde du fichier : ' . $e->getMessage());
+            \Log::error('Erreur lors de la mise à jour du contenu du fichier: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Erreur lors de la sauvegarde du contenu du fichier.',
-                'error' => $e->getMessage()
+                'message' => 'Une erreur est survenue lors de la mise à jour du contenu du fichier.',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     *
      * Télécharger plusieurs fichiers en ZIP
      */
     public function downloadMultiple(Request $request)

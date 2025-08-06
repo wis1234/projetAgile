@@ -66,7 +66,24 @@ export const isFileEditable = (fileType, fileName) => {
  * @returns {boolean} - True si le fichier est un PDF
  */
 export const isPdfFile = (fileType, fileName) => {
-  if (fileType === 'application/pdf') return true;
-  const extension = (fileName || '').split('.').pop().toLowerCase();
-  return extension === 'pdf';
+  return fileType === 'application/pdf' || 
+         (fileName && fileName.toLowerCase().endsWith('.pdf'));
+};
+
+/**
+ * Formate une taille de fichier en octets en une chaîne lisible
+ * @param {number} bytes - Taille en octets
+ * @param {number} [decimals=2] - Nombre de décimales à afficher
+ * @returns {string} - Taille formatée (ex: "1.5 MB")
+ */
+export const formatFileSize = (bytes, decimals = 2) => {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
