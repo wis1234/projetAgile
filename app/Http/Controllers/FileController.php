@@ -398,12 +398,28 @@ class FileController extends Controller
             return redirect()->back()->with('error', 'Impossible de charger le contenu du fichier.');
         }
         
-        $file->load('lastModifiedBy');
+        $file->load(['lastModifiedBy', 'project.users']);
+
+        // Récupérer les membres du projet avec leurs informations de base
+        $projectMembers = [];
+        if ($file->project && $file->project->users) {
+            $projectMembers = $file->project->users->map(function($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'avatar' => $user->profile_photo_url ?? null
+                ];
+            });
+        }
 
         return Inertia::render('Files/EditContent', [
             'file' => array_merge($file->toArray(), [
                 'content' => $content,
-                'is_editable' => $isEditable
+                'is_editable' => $isEditable,
+                'project' => $file->project ? array_merge($file->project->toArray(), [
+                    'users' => $projectMembers
+                ]) : null
             ]),
             'lastModifiedBy' => $file->lastModifiedBy ? [
                 'name' => $file->lastModifiedBy->name,
