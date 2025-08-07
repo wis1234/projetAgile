@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { FaSave, FaSpinner, FaArrowLeft, FaCode } from 'react-icons/fa';
+import { FaSave, FaSpinner, FaArrowLeft, FaCode, FaUserEdit } from 'react-icons/fa';
 import { isPdfFile, formatFileSize } from '@/utils/fileUtils';
 import MenuBar from '@/Components/Editor/MenuBar';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -15,8 +15,9 @@ import { Color } from '@tiptap/extension-color';
 import { Image } from '@tiptap/extension-image';
 import FontFamily from '@tiptap/extension-font-family';
 import FontSize from '@tiptap/extension-font-size';
+import TrackChanges from '@/Components/Editor/extensions/track-changes';
 
-const EditContent = ({ file, lastModifiedBy }) => {
+const EditContent = ({ file, lastModifiedBy, auth }) => {
     const { flash } = usePage().props;
     const [content, setContent] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -26,6 +27,7 @@ const EditContent = ({ file, lastModifiedBy }) => {
     const isPdf = isPdfFile(file.type, file.name);
 
     const editor = useEditor({
+        user: auth.user,
         extensions: [
             StarterKit.configure({
                 textStyle: false,
@@ -44,12 +46,13 @@ const EditContent = ({ file, lastModifiedBy }) => {
             Underline,
             TextAlign.configure({ types: ['heading', 'paragraph'] }),
             Link.configure({ openOnClick: false }),
-            Highlight.configure({ 
+            Highlight.configure({
                 multicolor: true,
                 HTMLAttributes: {
                     class: 'highlight',
                 },
             }),
+            TrackChanges,
             Color,
             Image.configure({ inline: true, allowBase64: true }),
         ],
@@ -178,7 +181,21 @@ const EditContent = ({ file, lastModifiedBy }) => {
                 <div className="flex-1 overflow-y-auto p-6">
                     {success && <div className="p-3 mb-4 bg-green-100 text-green-700 rounded-md">{success}</div>}
                     {error && <div className="p-3 mb-4 bg-red-100 text-red-700 rounded-md">{error}</div>}
-                    <EditorContent editor={editor} />
+                    <div className="prose max-w-none min-h-[400px] p-4 border rounded-lg">
+                        <EditorContent editor={editor} className="min-h-[300px]" />
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center text-sm text-gray-600">
+                            <FaUserEdit className="mr-2 text-gray-400" />
+                            <span>Vous éditez en tant que <span className="font-medium">{auth.user.name}</span></span>
+                        </div>
+                        {lastModifiedBy && (
+                            <div className="mt-2 text-xs text-gray-500">
+                                Dernière modification par {lastModifiedBy.name} le {new Date(file.updated_at).toLocaleString()}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <footer className="p-3 border-t bg-gray-50 shrink-0">
