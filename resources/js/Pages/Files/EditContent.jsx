@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { FaSave, FaSpinner, FaArrowLeft, FaCode, FaUserEdit, FaFilter, FaTimes } from 'react-icons/fa';
+import { FaSave, FaSpinner, FaArrowLeft, FaCode, FaUserEdit, FaFilter, FaTimes, FaAlignLeft, FaAlignCenter, FaAlignRight, FaAlignJustify } from 'react-icons/fa';
 import { isPdfFile, formatFileSize } from '@/utils/fileUtils';
 import MenuBar from '@/Components/Editor/MenuBar';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -66,7 +66,11 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
                 types: ['textStyle'],
             }),
             Underline,
-            TextAlign.configure({ types: ['heading', 'paragraph'] }),
+            TextAlign.configure({
+                types: ['heading', 'paragraph'],
+                alignments: ['left', 'center', 'right', 'justify'],
+                defaultAlignment: 'left',
+            }),
             Link.configure({ openOnClick: false }),
             // S'assurer que Highlight est chargée avant TrackChanges
             Highlight.configure({
@@ -344,86 +348,65 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
         <AdminLayout>
             <Head title={`Édition de ${file.name}`} />
             <div className="flex flex-col h-screen bg-white overflow-hidden">
-                <header className="flex items-center justify-between p-3 border-b bg-gray-50 z-20 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <button onClick={handleClose} className="p-2 rounded-full hover:bg-gray-200">
-                            <FaArrowLeft />
-                        </button>
-                        <div>
-                            <h1 className="text-lg font-semibold">{file.name}</h1>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button onClick={handleSave} disabled={isSaving || !isDirty} className="px-4 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 disabled:bg-blue-300 flex items-center gap-2">
-                            {isSaving ? <FaSpinner className="animate-spin" /> : <FaSave />}
-                            <span>{isSaving ? 'Sauvegarde...' : 'Sauvegarder'}</span>
-                        </button>
-                        <button onClick={handleClose} className="px-4 py-2 bg-gray-200 rounded-md font-semibold hover:bg-gray-300">
-                            Fermer
-                        </button>
-                    </div>
-                </header>
-
-                <div className="sticky top-0 z-10 bg-white shadow-md shrink-0">
+                <div className="sticky top-0 z-10 bg-white shadow-md">
                     <div className="flex items-center justify-between p-2 border-b">
-                        {editor && <MenuBar editor={editor} />}
-                        <button 
-                            onClick={() => setShowFilters(!showFilters)}
-                            className={`p-2 rounded-md ${activeFilters ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
-                            title="Filtrer les modifications"
-                        >
-                            <FaFilter />
-                        </button>
-                    </div>
-                    
-                    {showFilters && (
-                        <div className="p-3 border-b bg-gray-50">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Membre</label>
-                                    <select
-                                        value={filters.userId}
-                                        onChange={(e) => setFilters({...filters, userId: e.target.value})}
-                                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                                    >
-                                        <option value="">Tous les membres</option>
-                                        {projectMembers.map(user => (
-                                            <option key={user.id} value={user.id}>
-                                                {user.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                                    <input
-                                        type="date"
-                                        value={filters.date}
-                                        onChange={(e) => setFilters({...filters, date: e.target.value})}
-                                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                                    />
-                                </div>
-                                <div className="flex items-end gap-2">
-                                    <button
-                                        onClick={() => {
-                                            applyFilters();
-                                            setActiveFilters(true);
-                                        }}
-                                        className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-                                    >
-                                        Appliquer
-                                    </button>
-                                    <button
-                                        onClick={clearFilters}
-                                        className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300 flex items-center gap-1"
-                                    >
-                                        <FaTimes />
-                                        <span>Effacer</span>
-                                    </button>
-                                </div>
+                        <div className="flex items-center space-x-2">
+                            <div className="text-sm font-mono text-gray-500 border-r border-gray-200 pr-3 mr-2">
+                                {file.name}
                             </div>
+                            <div className="flex items-center space-x-2">
+                                <button 
+                                    onClick={handleSave} 
+                                    disabled={isSaving || !isDirty}
+                                    className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1 ${isSaving || !isDirty ? 'bg-blue-300 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                                >
+                                    {isSaving ? <FaSpinner className="animate-spin mr-1" /> : <FaSave className="mr-1" />}
+                                    {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                                </button>
+                                <button 
+                                    onClick={handleClose}
+                                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md font-medium hover:bg-gray-300"
+                                >
+                                    Fermer
+                                </button>
+                            </div>
+                            {editor && (
+                                <>
+                                    <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                                    <MenuBar editor={editor} />
+                                    <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                                    <button
+                                        onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                                        className={`p-2 rounded-md ${editor.isActive({ textAlign: 'left' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+                                        title="Aligner à gauche"
+                                    >
+                                        <FaAlignLeft />
+                                    </button>
+                                    <button
+                                        onClick={() => editor.chain().focus().setTextAlign('center').run()}
+                                        className={`p-2 rounded-md ${editor.isActive({ textAlign: 'center' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+                                        title="Centrer"
+                                    >
+                                        <FaAlignCenter />
+                                    </button>
+                                    <button
+                                        onClick={() => editor.chain().focus().setTextAlign('right').run()}
+                                        className={`p-2 rounded-md ${editor.isActive({ textAlign: 'right' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+                                        title="Aligner à droite"
+                                    >
+                                        <FaAlignRight />
+                                    </button>
+                                    <button
+                                        onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+                                        className={`p-2 rounded-md ${editor.isActive({ textAlign: 'justify' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+                                        title="Justifier"
+                                    >
+                                        <FaAlignJustify />
+                                    </button>
+                                </>
+                            )}
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6">
@@ -440,18 +423,31 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
                         </div>
                         {lastModifiedBy && (
                             <div className="mt-2 text-xs text-gray-500">
-                                Dernière modification par {lastModifiedBy.name} le {new Date(file.updated_at).toLocaleString()}
+                                Dernière modification par {lastModifiedBy.name} le {new Date(file.updated_at).toLocaleString('fr-FR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
                             </div>
                         )}
                     </div>
                 </div>
-
-                <footer className="p-3 border-t bg-gray-50 shrink-0">
-                    {lastModifiedBy && (
-                        <p className="text-sm text-gray-500 text-center">
-                            Dernière modification par {lastModifiedBy.name} le {new Date(lastModifiedBy.timestamp).toLocaleString()}
-                        </p>
-                    )}
+                
+                {/* Pied de page avec informations de dernière modification */}
+                <footer className="border-t border-gray-200 bg-white py-2 px-4">
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                        <div className="flex items-center">
+                            <FaUserEdit className="mr-2 text-gray-400" />
+                            <span>
+                                Dernière modification par <span className="font-medium">{lastModifiedBy?.name || 'Système'}</span> le {new Date(file.updated_at).toLocaleDateString('fr-FR', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                })}
+                            </span>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                            Version: {new Date(file.updated_at).getTime()}
+                        </div>
+                    </div>
                 </footer>
             </div>
         </AdminLayout>
