@@ -43,7 +43,7 @@ class KanbanController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'avatar' => $user->profile_photo_url ?? null,
+            'profile_photo_url' => $user->profile_photo_url ?? null,
             'is_admin' => $user->hasRole('admin'),
             'is_manager' => $user->hasRole('manager')
         ];
