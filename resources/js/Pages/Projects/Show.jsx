@@ -399,15 +399,46 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Actions Rapides</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <a 
-                  href={`/projects/${project.id}/suivi-global`}
-                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <FaFileAlt className="text-lg" />
-                  <span>Télécharger le suivi global</span>
-                </a>
+                <div className="relative group">
+                  <button 
+                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 w-full"
+                  >
+                    <FaFileAlt className="text-lg" />
+                    <span>Exporter le suivi</span>
+                    <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </button>
+                  <div className="absolute z-10 hidden group-hover:block w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden mt-1">
+                    <a 
+                      href={`/projects/${project.id}/suivi-global/txt`}
+                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span className="text-blue-500">📄</span>
+                      <span>Format TXT</span>
+                    </a>
+                    <a 
+                      href={`/projects/${project.id}/suivi-global/pdf`}
+                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span className="text-red-500">📊</span>
+                      <span>Format PDF</span>
+                    </a>
+                    <a 
+                      href={`/projects/${project.id}/suivi-global/docx`}
+                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span className="text-blue-700">📝</span>
+                      <span>Format Word</span>
+                    </a>
+                  </div>
+                </div>
                 
                 {(isAdmin || isManager) ? (
                   <>

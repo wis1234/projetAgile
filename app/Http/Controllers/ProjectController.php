@@ -9,8 +9,8 @@ use Inertia\Inertia;
 use App\Events\ProjectUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
@@ -407,12 +407,13 @@ class ProjectController extends Controller
      * Génère un fichier de suivi global pour le projet
      *
      * @param  int  $id
+     * @param  string  $format Format de sortie (txt, pdf, docx)
      * @return \Illuminate\Http\Response
      */
-    public function generateSuiviGlobal($id)
+    public function generateSuiviGlobal($id, $format = 'txt')
     {
-        $project = Project::with(['tasks.files' => function($query) {
-            $query->where('type', 'text/plain'); // Seulement les fichiers texte
+        $project = Project::with(['tasks' => function($query) {
+            $query->with(['assignedUser', 'files'])->orderBy('created_at');
         }])->findOrFail($id);
 
         // Vérifier que l'utilisateur a accès à ce projet
@@ -420,17 +421,41 @@ class ProjectController extends Controller
             abort(403, 'Accès non autorisé à ce projet.');
         }
 
-        $content = "# SUIVI GLOBAL DU PROJET: {$project->name}\n";
-        $content .= "Généré le: " . now()->format('d/m/Y H:i') . "\n\n";
+        // Préparer les données pour la vue
+        $data = [
+            'project' => $project,
+            'tasks' => $project->tasks,
+            'generated_at' => now()->format('d/m/Y H:i'),
+        ];
+
+        // Générer le contenu en fonction du format demandé
+        switch (strtolower($format)) {
+            case 'pdf':
+                return $this->generatePdf($data);
+                
+            case 'docx':
+                return $this->generateWord($data);
+                
+            case 'txt':
+            default:
+                return $this->generateText($data);
+        }
+    }
+    
+    /**
+     * Génère un fichier texte formaté
+     *
+     * @param  array  $data
+     * @return \Illuminate\Http\Response
+     */
+    protected function generateText($data)
+    {
+        $content = "# SUIVI GLOBAL DU PROJET: {$data['project']->name}\n";
+        $content .= "Généré le: " . $data['generated_at'] . "\n\n";
         $content .= "## Description du projet\n";
-        $content .= $project->description . "\n\n";
+        $content .= strip_tags($data['project']->description) . "\n\n";
 
-        // Récupérer toutes les tâches avec leurs fichiers texte
-        $tasks = $project->tasks()->with(['files' => function($query) {
-            $query->where('type', 'text/plain');
-        }])->orderBy('created_at')->get();
-
-        foreach ($tasks as $task) {
+        foreach ($data['tasks'] as $task) {
             $content .= "\n## TÂCHE: {$task->title}\n";
             $content .= "Statut: " . ucfirst($task->status) . "\n";
             $content .= "Priorité: " . ucfirst($task->priority) . "\n";
@@ -439,19 +464,32 @@ class ProjectController extends Controller
             
             if ($task->description) {
                 $content .= "### Description de la tâche\n";
-                $content .= $task->description . "\n\n";
+                $content .= strip_tags(preg_replace('/<\/?[a-z][^>]*>/', ' ', $task->description)) . "\n\n";
             }
 
-            // Ajouter le contenu des fichiers texte liés à la tâche
+            // Ajouter les fichiers liés à la tâche
             if ($task->files->isNotEmpty()) {
                 $content .= "### Fichiers liés\n";
                 foreach ($task->files as $file) {
-                    try {
-                        $fileContent = Storage::disk('public')->get($file->file_path);
-                        $content .= "#### Fichier: {$file->name} (mis à jour le: " . $file->updated_at->format('d/m/Y H:i') . ")\n\n";
-                        $content .= $fileContent . "\n\n";
-                    } catch (\Exception $e) {
-                        $content .= "#### Fichier: {$file->name} (impossible de lire le contenu)\n\n";
+                    $content .= "- {$file->name} (Type: {$file->type}, Taille: " . $this->formatFileSize($file->size) . ", " . 
+                                "Mis à jour le: " . $file->updated_at->format('d/m/Y H:i') . ")\n";
+                    
+                    // Si c'est un fichier texte, ajouter son contenu nettoyé
+                    if (str_starts_with($file->type, 'text/')) {
+                        try {
+                            $fileContent = Storage::disk('public')->get($file->file_path);
+                            if ($fileContent !== false) {
+                                $content .= "  ```\n" . 
+                                preg_replace(['/^[\r\n]+|[
+]+$/', '/[\r\n]+/'], ["", "\n  "], 
+                                strip_tags(preg_replace('/<\/?[a-z][^>]*>/', ' ', $fileContent))) . 
+                                "\n  ```\n\n";
+                            }
+                        } catch (\Exception $e) {
+                            $content .= "  (Impossible d'afficher le contenu du fichier)\n\n";
+                        }
+                    } else {
+                        $content .= "  [Lien vers le fichier] " . route('files.download', $file->id) . "\n\n";
                     }
                 }
             }
@@ -459,14 +497,187 @@ class ProjectController extends Controller
             $content .= str_repeat("-", 80) . "\n\n";
         }
 
-        // Créer un nom de fichier unique
-        $filename = 'suivi_global_' . Str::slug($project->name) . '_' . now()->format('Ymd_His') . '.txt';
+        $filename = 'suivi_global_' . Str::slug($data['project']->name) . '_' . now()->format('Ymd_His') . '.txt';
         
-        // Retourner le fichier en téléchargement
         return response()->streamDownload(function() use ($content) {
             echo $content;
         }, $filename, [
-            'Content-Type' => 'text/plain',
+            'Content-Type' => 'text/plain; charset=utf-8',
         ]);
+    }
+    
+    /**
+     * Génère un fichier PDF formaté
+     *
+     * @param  array  $data
+     * @return \Illuminate\Http\Response
+     */
+    protected function generatePdf($data)
+    {
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.project-pdf', $data);
+        $filename = 'suivi_global_' . Str::slug($data['project']->name) . '_' . now()->format('Ymd_His') . '.pdf';
+        
+        return $pdf->download($filename);
+    }
+    
+    /**
+     * Génère un fichier Word formaté
+     *
+     * @param  array  $data
+     * @return \Illuminate\Http\Response
+     */
+    /**
+     * Formate une taille de fichier en octets dans un format lisible (o, Ko, Mo, Go, etc.)
+     *
+     * @param  int  $bytes
+     * @param  int  $precision
+     * @return string
+     */
+    protected function formatFileSize($bytes, $precision = 2)
+    {
+        $units = ['o', 'Ko', 'Mo', 'Go', 'To', 'Po', 'Eo', 'Zo', 'Yo'];
+        
+        for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
+            $bytes /= 1024;
+        }
+        
+        return round($bytes, $precision) . ' ' . $units[$i];
+    }
+    
+    /**
+     * Génère un fichier Word formaté
+     *
+     * @param  array  $data
+     * @return \Illuminate\Http\Response
+     */
+    protected function generateWord($data)
+    {
+        // Créer un nouveau document Word avec l'encodage UTF-8
+        $phpWord = new \PhpOffice\PhpWord\PhpWord();
+        $phpWord->setDefaultFontName('Arial');
+        $phpWord->setDefaultFontSize(11);
+        
+        // Ajouter une section au document
+        $section = $phpWord->addSection([
+            'marginLeft' => 1000, // 1 inch = 1000 twips
+            'marginRight' => 1000,
+            'marginTop' => 1000,
+            'marginBottom' => 1000
+        ]);
+        
+        // Définir les styles
+        $phpWord->addTitleStyle(1, ['size' => 16, 'bold' => true, 'color' => '1F497D']);
+        $phpWord->addTitleStyle(2, ['size' => 14, 'bold' => true, 'color' => '4F81BD']);
+        $phpWord->addTitleStyle(3, ['size' => 12, 'bold' => true, 'color' => '4F81BD']);
+        
+        // Style pour le contenu normal
+        $phpWord->addFontStyle('normal', ['name' => 'Arial', 'size' => 11, 'color' => '000000']);
+        $phpWord->addFontStyle('small', ['name' => 'Arial', 'size' => 9, 'color' => '666666']);
+        $phpWord->addFontStyle('bold', ['name' => 'Arial', 'size' => 11, 'bold' => true, 'color' => '000000']);
+        
+        // Fonction pour nettoyer le texte
+        $cleanText = function($text) {
+            if (is_null($text) || !is_string($text)) {
+                return '';
+            }
+            // Supprimer les balises HTML et nettoyer le texte
+            $text = strip_tags($text);
+            // Remplacer les caractères problématiques
+            $text = str_replace(["\r\n", "\r", "\n"], "\n", $text);
+            // Nettoyer les caractères non valides
+            return iconv('UTF-8', 'UTF-8//IGNORE', $text);
+        };
+        
+        // Ajouter le titre
+        $section->addTitle('SUIVI GLOBAL DU PROJET: ' . $cleanText($data['project']->name), 1);
+        $section->addText('Généré le: ' . $data['generated_at'], 'normal');
+        $section->addTextBreak(2);
+        
+        // Description du projet
+        $section->addTitle('Description du projet', 2);
+        $section->addText($cleanText($data['project']->description), 'normal');
+        $section->addTextBreak(2);
+        
+        // Tâches
+        foreach ($data['tasks'] as $task) {
+            $section->addTitle('TÂCHE: ' . $cleanText($task->title), 2);
+            
+            // Informations de base de la tâche
+            $section->addText('Statut: ' . ucfirst($task->status), 'normal');
+            $section->addText('Priorité: ' . ucfirst($task->priority), 'normal');
+            $section->addText('Assigné à: ' . ($task->assignedUser ? $cleanText($task->assignedUser->name) : 'Non assigné'), 'normal');
+            $section->addText('Date d\'échéance: ' . ($task->due_date ? $task->due_date->format('d/m/Y') : 'Non définie'), 'normal');
+            $section->addTextBreak(1);
+            
+            // Description de la tâche
+            if ($task->description) {
+                $section->addTitle('Description de la tâche', 3);
+                $section->addText($cleanText($task->description), 'normal');
+                $section->addTextBreak(1);
+            }
+            
+            // Fichiers joints
+            if ($task->files->isNotEmpty()) {
+                $section->addTitle('Fichiers liés', 3);
+                foreach ($task->files as $file) {
+                    $fileInfo = '• ' . $cleanText($file->name);
+                    $fileInfo .= ' (' . $file->type . ', ';
+                    $fileInfo .= $file->size > 0 ? $this->formatFileSize($file->size) : 'taille inconnue';
+                    $fileInfo .= ', mis à jour le ' . $file->updated_at->format('d/m/Y H:i') . ')';
+                    $fileInfo .= ' (Fichier joint - non affiché dans cette version)';
+                    
+                    $section->addText($fileInfo, 'normal');
+                    $section->addTextBreak(1);
+                }
+                $section->addTextBreak(1);
+            }
+            
+            // Séparateur entre les tâches
+            $section->addText(str_repeat('-', 80), 'small');
+            $section->addTextBreak(2);
+        }
+        
+        // Générer un nom de fichier sécurisé
+        $filename = 'suivi_global_' . Str::slug($data['project']->name) . '_' . now()->format('Ymd_His') . '.docx';
+        $filename = preg_replace('/[^a-z0-9\-\._]/i', '_', $filename);
+        
+        // Créer un fichier temporaire
+        $tempDir = sys_get_temp_dir();
+        $tempFile = tempnam($tempDir, 'word_') . '.docx';
+        
+        try {
+            // Enregistrer le document
+            $objWriter = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+            $objWriter->save($tempFile);
+            
+            // Vérifier que le fichier a été créé
+            if (!file_exists($tempFile)) {
+                throw new \Exception("Échec de la création du fichier Word");
+            }
+            
+            // Télécharger le fichier
+            return response()->download($tempFile, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0',
+                'Pragma' => 'no-cache',
+                'Expires' => '0'
+            ])->deleteFileAfterSend(true);
+            
+        } catch (\Exception $e) {
+            // En cas d'erreur, supprimer le fichier temporaire s'il existe
+            if (file_exists($tempFile)) {
+                @unlink($tempFile);
+            }
+            
+            // Journaliser l'erreur
+            \Log::error('Erreur lors de la génération du fichier Word: ' . $e->getMessage());
+            
+            // Retourner une réponse d'erreur
+            return response()->json([
+                'error' => 'Une erreur est survenue lors de la génération du document Word.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }

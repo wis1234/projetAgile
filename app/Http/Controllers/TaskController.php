@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Notifications\UserActionMailNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class TaskController extends Controller
 {
@@ -119,6 +120,36 @@ class TaskController extends Controller
             ->with('success', 'Tâche créée avec succès.');
     }
 
+    /**
+     * Télécharge un fichier attaché à une tâche
+     *
+     * @param  \App\Models\Task  $task
+     * @param  int  $file
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     */
+    public function downloadFile(Task $task, $file)
+    {
+        // Vérifier que l'utilisateur a accès à la tâche
+        $this->authorize('view', $task);
+        
+        // Trouver le fichier dans les pièces jointes de la tâche
+        $file = $task->files()->findOrFail($file);
+        
+        // Vérifier que le fichier existe dans le stockage
+        if (!Storage::disk('public')->exists($file->file_path)) {
+            abort(404, 'Le fichier demandé n\'existe plus.');
+        }
+        
+        // Télécharger le fichier
+        return Storage::disk('public')->download($file->file_path, $file->name);
+    }
+    
+    /**
+     * Affiche les détails d'une tâche
+     *
+     * @param  \App\Models\Task  $task
+     * @return \Inertia\Response
+     */
     public function show(Task $task)
     {
         try {

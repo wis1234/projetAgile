@@ -54,13 +54,20 @@ Route::middleware('auth')->group(function () {
     
     // Gestion des projets
     Route::patch('/projects/{id}/status', [App\Http\Controllers\ProjectController::class, 'changeStatus'])->name('projects.change-status');
-    Route::get('/projects/{id}/suivi-global', [App\Http\Controllers\ProjectController::class, 'generateSuiviGlobal'])->name('projects.suivi-global');
+    Route::get('/projects/{id}/suivi-global/{format?}', [App\Http\Controllers\ProjectController::class, 'generateSuiviGlobal'])
+        ->where('format', 'txt|pdf|docx')
+        ->defaults('format', 'txt')
+        ->name('projects.suivi-global');
     
     // Gestion des fichiers
     Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])->name('files.edit-content');
     Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])->name('files.updateContent');
     Route::get('files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])->name('files.download');
     Route::post('files/download-multiple', [App\Http\Controllers\FileController::class, 'downloadMultiple'])->name('files.downloadMultiple');
+    
+    // Téléchargement des fichiers de tâches
+    Route::get('/tasks/{task}/files/{file}/download', [App\Http\Controllers\TaskController::class, 'downloadFile'])
+        ->name('tasks.files.download');
     
     // API endpoints
     Route::prefix('api')->group(function () {
