@@ -59,11 +59,9 @@ axiosInstance.interceptors.response.use(
                 break;
                 
             case 419: // CSRF Token Mismatch
-                // Afficher le modal d'erreur CSRF si la fonction est disponible
-                if (typeof window !== 'undefined' && window.showCsrfError) {
-                    window.showCsrfError();
-                } else {
-                    console.error('CSRF token mismatch. Please refresh the page.');
+                // Forcer un rechargement complet de la page pour afficher la page d'erreur 419 personnalisée
+                if (typeof window !== 'undefined') {
+                    window.location.reload();
                 }
                 break;
                 

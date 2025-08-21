@@ -54,6 +54,7 @@ Route::middleware('auth')->group(function () {
     
     // Gestion des projets
     Route::patch('/projects/{id}/status', [App\Http\Controllers\ProjectController::class, 'changeStatus'])->name('projects.change-status');
+    Route::get('/projects/{id}/suivi-global', [App\Http\Controllers\ProjectController::class, 'generateSuiviGlobal'])->name('projects.suivi-global');
     
     // Gestion des fichiers
     Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])->name('files.edit-content');
@@ -91,6 +92,16 @@ Route::middleware('auth')->group(function () {
             ->name('api.files.save-to-dropbox');
     });
 });
+
+// Route pour gérer l'erreur 419 (Session expirée)
+Route::get('/419', function () {
+    if (request()->hasHeader('X-Inertia')) {
+        return Inertia::render('Error419');
+    }
+    
+    return redirect()->route('login')
+        ->with('error', 'Votre session a expiré. Veuillez vous reconnecter.');
+})->name('session.expired');
 
 // Gestion des utilisateurs (partie publique)
 Route::middleware(['auth'])->group(function () {

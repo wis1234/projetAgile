@@ -19,14 +19,9 @@ class KanbanController extends Controller
     {
         $user = Auth::user();
         
-        // Vérifier si l'utilisateur est admin ou manager d'au moins un projet
-        if (!$user->hasRole('admin')) {
-            $managedProjectsCount = $user->managedProjects()->count();
-            if ($managedProjectsCount === 0) {
-                return Inertia::render('Error403', [
-                    'message' => 'Accès refusé. Vous devez être administrateur ou manager de projet pour accéder au tableau Kanban.'
-                ])->toResponse(request())->setStatusCode(403);
-            }
+        // Vérifier si l'utilisateur est authentifié
+        if (!$user) {
+            return redirect()->route('login');
         }
 
         $this->authorize('viewAny', Task::class);
@@ -36,15 +31,28 @@ class KanbanController extends Controller
             ->orderBy('updated_at', 'desc');
 
         if (!$user->hasRole('admin')) {
-            // Pour les non-admins, ne montrer que les tâches des projets où l'utilisateur est manager
-            $projectIds = $user->managedProjects()->pluck('id');
+            // Pour les non-admins, ne montrer que les tâches des projets auxquels ils appartiennent
+            $projectIds = $user->projects()->pluck('projects.id');
             $query->whereIn('project_id', $projectIds);
         }
 
         $tasks = $query->get();
 
+        // Récupérer toutes les informations nécessaires pour l'utilisateur
+        $userData = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar' => $user->profile_photo_url ?? null,
+            'is_admin' => $user->hasRole('admin'),
+            'is_manager' => $user->hasRole('manager')
+        ];
+
         return Inertia::render('Kanban/Index', [
             'tasks' => $tasks,
+            'auth' => [
+                'user' => $userData
+            ]
         ]);
     }
 
@@ -53,7 +61,41 @@ class KanbanController extends Controller
      */
     public function updateOrder(Request $request)
     {
-        $request->validate([
+        // Journalisation des données brutes reçues
+        $rawInput = $request->getContent();
+        \Log::info('Données brutes reçues pour la mise à jour du Kanban', [
+            'raw_input' => $rawInput,
+            'content_type' => $request->header('Content-Type'),
+            'accept' => $request->header('Accept'),
+            'x_csrf_token' => $request->header('X-CSRF-TOKEN'),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'user_id' => auth()->id(),
+            'authenticated' => auth()->check()
+        ]);
+
+        // Journalisation des données parsées
+        $jsonData = json_decode($rawInput, true);
+        \Log::info('Données JSON décodées', [
+            'json_data' => $jsonData,
+            'json_last_error' => json_last_error(),
+            'json_last_error_msg' => json_last_error_msg()
+        ]);
+
+        // Valider que nous avons des données JSON valides
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            \Log::error('Erreur de décodage JSON', [
+                'error' => json_last_error_msg(),
+                'input' => $rawInput
+            ]);
+            return response()->json([
+                'message' => 'Données JSON invalides',
+                'error' => json_last_error_msg()
+            ], 400);
+        }
+
+        // Valider la structure des données
+        $validator = \Validator::make($jsonData, [
             'tasks' => 'required|array|min:1',
             'tasks.*.id' => [
                 'required',
@@ -65,7 +107,7 @@ class KanbanController extends Controller
                 'string',
                 Rule::in(['todo', 'in_progress', 'done'])
             ],
-            'tasks.*.position' => 'required|integer|min:0',
+            'tasks.*.position' => 'required|integer', // Retrait de la validation min:0 pour permettre les positions négatives
         ]);
 
         $tasks = $request->input('tasks');
@@ -147,9 +189,9 @@ class KanbanController extends Controller
             ->orderBy('position', 'asc') // Puis par position
             ->orderBy('updated_at', 'desc'); // Enfin par date de mise à jour
 
-        // Filtrer par projets gérés pour les non-admins
+        // Filtrer par projets auxquels l'utilisateur a accès
         if (!$user->hasRole('admin')) {
-            $projectIds = $user->managedProjects()->pluck('id');
+            $projectIds = $user->projects()->pluck('projects.id');
             $query->whereIn('project_id', $projectIds);
         }
 

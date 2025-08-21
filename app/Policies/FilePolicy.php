@@ -64,12 +64,9 @@ class FilePolicy
             return true;
         }
 
-        // Les managers du projet peuvent modifier les fichiers du projet
-        if ($file->project) {
-            $projectUser = $file->project->users()->where('user_id', $user->id)->first();
-            if ($projectUser && $projectUser->pivot->role === 'manager') {
-                return true;
-            }
+        // Tous les membres du projet peuvent modifier le contenu des fichiers du projet
+        if ($file->project && $file->project->users->contains('id', $user->id)) {
+            return true;
         }
 
         return false;

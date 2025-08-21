@@ -9,6 +9,8 @@ use Inertia\Inertia;
 use App\Events\ProjectUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
@@ -382,18 +384,6 @@ class ProjectController extends Controller
     }
 
     /**
-     * Manage project members
-     * Only accessible to project managers and admins
-     */
-    public function manageMembers($id)
-    {
-        // Only allow access if the user is a manager or admin of the project
-        $project = Project::whereHas('users', function($query) {
-            $query->where('user_id', auth()->id())
-                  ->whereIn('role', ['manager', 'admin']);
-        })->with(['users' => function($query) {
-            $query->select('users.id', 'name', 'email')
-                  ->withPivot('role');
         }])->findOrFail($id);
         
         // Get all users who are not already members of the project
@@ -410,6 +400,73 @@ class ProjectController extends Controller
             'members' => $project->users,
             'nonMembers' => $nonMembers,
             'availableRoles' => ['member', 'manager', 'observer'],
+        ]);
+    }
+
+    /**
+     * Génère un fichier de suivi global pour le projet
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function generateSuiviGlobal($id)
+    {
+        $project = Project::with(['tasks.files' => function($query) {
+            $query->where('type', 'text/plain'); // Seulement les fichiers texte
+        }])->findOrFail($id);
+
+        // Vérifier que l'utilisateur a accès à ce projet
+        if (!$project->users->contains(auth()->id())) {
+            abort(403, 'Accès non autorisé à ce projet.');
+        }
+
+        $content = "# SUIVI GLOBAL DU PROJET: {$project->name}\n";
+        $content .= "Généré le: " . now()->format('d/m/Y H:i') . "\n\n";
+        $content .= "## Description du projet\n";
+        $content .= $project->description . "\n\n";
+
+        // Récupérer toutes les tâches avec leurs fichiers texte
+        $tasks = $project->tasks()->with(['files' => function($query) {
+            $query->where('type', 'text/plain');
+        }])->orderBy('created_at')->get();
+
+        foreach ($tasks as $task) {
+            $content .= "\n## TÂCHE: {$task->title}\n";
+            $content .= "Statut: " . ucfirst($task->status) . "\n";
+            $content .= "Priorité: " . ucfirst($task->priority) . "\n";
+            $content .= "Assigné à: " . ($task->assignedUser ? $task->assignedUser->name : 'Non assigné') . "\n";
+            $content .= "Date d'échéance: " . ($task->due_date ? $task->due_date->format('d/m/Y') : 'Non définie') . "\n\n";
+            
+            if ($task->description) {
+                $content .= "### Description de la tâche\n";
+                $content .= $task->description . "\n\n";
+            }
+
+            // Ajouter le contenu des fichiers texte liés à la tâche
+            if ($task->files->isNotEmpty()) {
+                $content .= "### Fichiers liés\n";
+                foreach ($task->files as $file) {
+                    try {
+                        $fileContent = Storage::disk('public')->get($file->file_path);
+                        $content .= "#### Fichier: {$file->name} (mis à jour le: " . $file->updated_at->format('d/m/Y H:i') . ")\n\n";
+                        $content .= $fileContent . "\n\n";
+                    } catch (\Exception $e) {
+                        $content .= "#### Fichier: {$file->name} (impossible de lire le contenu)\n\n";
+                    }
+                }
+            }
+            
+            $content .= str_repeat("-", 80) . "\n\n";
+        }
+
+        // Créer un nom de fichier unique
+        $filename = 'suivi_global_' . Str::slug($project->name) . '_' . now()->format('Ymd_His') . '.txt';
+        
+        // Retourner le fichier en téléchargement
+        return response()->streamDownload(function() use ($content) {
+            echo $content;
+        }, $filename, [
+            'Content-Type' => 'text/plain',
         ]);
     }
 }

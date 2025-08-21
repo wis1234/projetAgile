@@ -39,12 +39,15 @@ const STATUS_COLUMNS = [
   },
 ];
 
-function Kanban({ tasks: initialTasks }) {
+function Kanban({ tasks: initialTasks, auth }) {
   const { props } = usePage();
   const [tasks, setTasks] = useState(initialTasks || []);
   const [activeTask, setActiveTask] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Vérifier si l'utilisateur peut modifier les tâches (admin ou manager)
+  const canModifyTasks = auth?.user?.is_admin || auth?.user?.is_manager;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -97,6 +100,13 @@ function Kanban({ tasks: initialTasks }) {
   }, [tasks]);
 
   const handleDragStart = (event) => {
+    // Vérifier les autorisations avant de permettre le glisser-déposer
+    if (!canModifyTasks) {
+      toast.error("Seuls les administrateurs et les managers peuvent déplacer les tâches");
+      event.preventDefault();
+      return;
+    }
+    
     if (event.active.data.current?.type === 'Task') {
       setActiveTask(event.active.data.current.task);
     }
@@ -108,6 +118,12 @@ function Kanban({ tasks: initialTasks }) {
 
     if (!over) return;
     if (isLoading) return;
+    
+    // Vérifier les autorisations avant de traiter le glisser-déposer
+    if (!canModifyTasks) {
+      toast.error("Seuls les administrateurs et les managers peuvent modifier les tâches");
+      return;
+    }
 
     const activeId = active.id;
     const overId = over.id;
@@ -157,20 +173,69 @@ function Kanban({ tasks: initialTasks }) {
 
       // Préparer les données pour le serveur avec les positions mises à jour
       const updatedTasks = newTasks.map((task, index) => ({
-        id: task.id,
+        id: parseInt(task.id), // S'assurer que c'est un entier
         status: task.status,
         position: task.position || 0, // Utiliser la position existante ou 0 par défaut
       }));
 
-      // Envoyer les mises à jour au serveur
-      const response = await axios.put(route('kanban.updateOrder'), { tasks: updatedTasks });
-      
-      if (response.data.success) {
-        toast.success(response.data.message || 'Tableau mis à jour avec succès');
-        // Recharger les tâches depuis le serveur pour s'assurer de la cohérence
-        await fetchTasks();
-      } else {
-        throw new Error(response.data.message || 'Erreur lors de la mise à jour du tableau');
+      // Journalisation pour le débogage
+      console.log('Envoi des données au serveur:', { tasks: updatedTasks });
+
+      try {
+        // Envoyer les mises à jour au serveur
+        const response = await axios.put(route('kanban.updateOrder'), {
+          tasks: updatedTasks
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+          },
+          validateStatus: status => status < 500 // Ne pas lancer d'exception pour les erreurs 4xx
+        });
+        
+        if (response.status === 200) {
+          toast.success(response.data?.message || 'Tableau mis à jour avec succès');
+          // Recharger les tâches depuis le serveur pour s'assurer de la cohérence
+          await fetchTasks();
+        } else if (response.status === 422) {
+          // Afficher les erreurs de validation
+          const errorMessages = [];
+          if (response.data.errors) {
+            Object.values(response.data.errors).forEach(messages => {
+              errorMessages.push(...messages);
+            });
+          }
+          throw new Error(`Erreur de validation: ${errorMessages.join(', ') || 'Données invalides'}`);
+        } else {
+          throw new Error(response.data?.message || `Erreur serveur (${response.status})`);
+        }
+      } catch (error) {
+        console.error('Erreur détaillée:', error);
+        if (error.response) {
+          // La requête a été faite et le serveur a répondu avec un code d'erreur
+          console.error('Données de la réponse:', error.response.data);
+          console.error('Statut de la réponse:', error.response.status);
+          console.error('En-têtes de la réponse:', error.response.headers);
+          
+          if (error.response.status === 422 && error.response.data.errors) {
+            // Afficher les erreurs de validation
+            const errorMessages = [];
+            Object.values(error.response.data.errors).forEach(messages => {
+              errorMessages.push(...messages);
+            });
+            throw new Error(`Erreur de validation: ${errorMessages.join(', ')}`);
+          }
+          
+          throw new Error(error.response.data?.message || `Erreur serveur (${error.response.status})`);
+        } else if (error.request) {
+          // La requête a été faite mais aucune réponse n'a été reçue
+          console.error('Aucune réponse reçue:', error.request);
+          throw new Error('Aucune réponse du serveur. Vérifiez votre connexion.');
+        } else {
+          // Une erreur s'est produite lors de la configuration de la requête
+          console.error('Erreur de configuration de la requête:', error.message);
+          throw new Error(`Erreur de configuration: ${error.message}`);
+        }
       }
       
     } catch (error) {
@@ -268,21 +333,25 @@ function Kanban({ tasks: initialTasks }) {
                 onDragEnd={handleDragEnd}
             >
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {STATUS_COLUMNS.map((column) => (
+                {STATUS_COLUMNS.map((column) => {
+                  const columnTasks = tasks.filter((task) => task.status === column.id);
+                  return (
                     <Column
-                        key={column.id}
-                        id={column.id}
-                        title={column.title}
-                        tasks={tasksByStatus[column.id] || []}
-                        color={column.color}
-                        borderColor={column.borderColor}
-                        headerBg={column.headerBg}
-                        onAddTask={handleAddTask}
-                        isLoading={isLoading}
-                        textColor={column.textColor}
-                        hoverColor={column.hoverColor}
+                      key={column.id}
+                      id={column.id}
+                      title={column.title}
+                      tasks={columnTasks}
+                      color={column.color}
+                      borderColor={column.borderColor}
+                      headerBg={column.headerBg}
+                      onAddTask={canModifyTasks ? handleAddTask : null}
+                      isLoading={isLoading}
+                      textColor={column.textColor}
+                      hoverColor={column.hoverColor}
+                      canModify={canModifyTasks}
                     />
-                ))}
+                  );
+                })}
                 </div>
 
                 <DragOverlay>
@@ -313,7 +382,7 @@ function Kanban({ tasks: initialTasks }) {
 
 export default Kanban;
 
-const Column = ({ id, title, tasks, color, borderColor, headerBg, onAddTask, isLoading, textColor, hoverColor }) => {
+const Column = ({ id, title, tasks, color, borderColor, headerBg, onAddTask, isLoading, textColor, hoverColor, canModify = true }) => {
     const { setNodeRef } = useSortable({
         id: id,
         data: {
@@ -331,23 +400,27 @@ const Column = ({ id, title, tasks, color, borderColor, headerBg, onAddTask, isL
               {tasks.length}
             </span>
           </div>
-          <button 
-            onClick={() => onAddTask(id)}
-            disabled={isLoading}
-            className="p-1 rounded-full bg-white bg-opacity-20 hover:bg-opacity-30 transition-all duration-200 disabled:opacity-50"
-            aria-label={`Ajouter une tâche à ${title}`}
-          >
-            <PlusIcon className="h-5 w-5" />
-          </button>
+          {onAddTask && (
+            <button 
+              onClick={() => onAddTask(id)}
+              disabled={isLoading || !canModify}
+              className="p-1 rounded-full bg-white bg-opacity-20 hover:bg-opacity-30 transition-all duration-200 disabled:opacity-50"
+              aria-label={`Ajouter une tâche à ${title}`}
+              title={!canModify ? "Action non autorisée" : "Ajouter une tâche"}
+            >
+              <PlusIcon className="h-5 w-5" />
+            </button>
+          )}
         </div>
         <div className="p-3 space-y-3 overflow-y-auto h-[calc(100vh-250px)] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-          <SortableContext items={tasks.map(t => t.id)}>
+          <SortableContext items={canModify ? tasks.map(t => t.id) : []}>
             {tasks.map(task => (
               <TaskCard 
                 key={task.id} 
                 task={task} 
                 textColor={textColor}
                 hoverColor={hoverColor}
+                canModify={canModify}
               />
             ))}
           </SortableContext>
@@ -361,13 +434,14 @@ const Column = ({ id, title, tasks, color, borderColor, headerBg, onAddTask, isL
     );
 };
 
-const TaskCard = ({ task, isDragging, textColor, hoverColor }) => {
+const TaskCard = ({ task, isDragging, textColor, hoverColor, canModify = true }) => {
     const { setNodeRef, attributes, listeners, transform, transition, isDragging: dndIsDragging } = useSortable({
       id: task.id,
       data: {
         type: 'Task',
         task,
       },
+      disabled: !canModify, // Désactive le glisser-déposer si l'utilisateur n'a pas les droits
     });
   
     const style = {
@@ -393,9 +467,8 @@ const TaskCard = ({ task, isDragging, textColor, hoverColor }) => {
         style={style}
         {...attributes}
         {...listeners}
-        className={`group bg-white p-4 rounded-xl shadow-sm border border-gray-100 ${hoverColor} transition-all duration-200 cursor-grab active:cursor-grabbing ${
-          isDragging || dndIsDragging ? 'opacity-50 shadow-lg scale-95' : 'hover:shadow-md hover:-translate-y-0.5'
-        }`}
+        className={`p-4 rounded-lg shadow-sm border border-gray-200 mb-3 transition-all duration-200 ${canModify ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-80'} ${hoverColor} ${dndIsDragging || isDragging ? 'opacity-50' : ''}`}
+        title={!canModify ? "Seuls les administrateurs et les managers peuvent déplacer les tâches" : "Déplacer la tâche"}
       >
         <div className="flex justify-between items-start">
           <h3 className="font-semibold text-black text-base mb-1 w-full">

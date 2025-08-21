@@ -349,6 +349,39 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-gray-800 dark:text-gray-200 truncate">{user.name}</div>
                           <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.email}</div>
+                          <div className="flex items-center justify-between mt-2">
+                            <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
+                              user.role === 'admin' 
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
+                                : user.role === 'manager' 
+                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                  : user.role === 'observer'
+                                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            }`}>
+                              {user.role === 'admin' ? (
+                                <FaShieldAlt className="text-red-500" />
+                              ) : user.role === 'manager' ? (
+                                <FaCrown className="text-yellow-500" />
+                              ) : user.role === 'observer' ? (
+                                <FaEye className="text-purple-500" />
+                              ) : (
+                                <FaUser className="text-blue-500" />
+                              )}
+                              {user.role === 'admin' 
+                                ? 'Administrateur' 
+                                : user.role === 'manager' 
+                                  ? 'Chef de projet'
+                                  : user.role === 'observer'
+                                    ? 'Observateur'
+                                    : 'Membre'}
+                            </div>
+                            {user.pivot_created_at && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(user.pivot_created_at).toLocaleDateString('fr-FR')}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))
@@ -365,42 +398,57 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             {/* Actions Rapides */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Actions Rapides</h3>
-              <div className="flex flex-wrap gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <a 
+                  href={`/projects/${project.id}/suivi-global`}
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <FaFileAlt className="text-lg" />
+                  <span>Télécharger le suivi global</span>
+                </a>
+                
                 {(isAdmin || isManager) ? (
                   <>
                     <Link
                       href={route('project-users.create')}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
-                      <FaUserPlus /> Ajouter un membre
+                      <FaUserPlus className="text-lg" />
+                      <span>Ajouter un membre</span>
                     </Link>
                     <Link
                       href={`/project-users/${project.id}/edit`}
-                      className="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
-                      <FaUserFriends /> Modifier les membres
+                      <FaUserFriends className="text-lg" />
+                      <span>Modifier les membres</span>
                     </Link>
                     <Link
                       href={`/tasks/create?project_id=${project.id}`}
-                      className="bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
-                      <FaTasks /> Créer une tâche
+                      <FaTasks className="text-lg" />
+                      <span>Créer une tâche</span>
                     </Link>
                     <Link
                       href={`/projects/${project.id}/edit`}
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
-                      <FaEdit /> Modifier le projet
+                      <FaEdit className="text-lg" />
+                      <span>Modifier le projet</span>
                     </Link>
                     <button
                       onClick={() => setShowDeleteModal(true)}
-                      className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 w-full"
                     >
-                      <FaTrash /> Supprimer le projet
+                      <FaTrash className="text-lg" />
+                      <span>Supprimer le projet</span>
                     </button>
                   </>
                 ) : (
-                  <div className="text-gray-500 dark:text-gray-400 text-sm italic">
+                  <div className="col-span-full text-center text-gray-500 dark:text-gray-400 text-sm italic p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     Seuls les administrateurs et les gestionnaires peuvent effectuer des actions sur ce projet.
                   </div>
                 )}
