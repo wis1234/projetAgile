@@ -294,7 +294,7 @@ function Kanban({ tasks: initialTasks, auth }) {
       <div className="py-6 px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Tableau Kanban</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Suivi des tâches</h1>
             <p className="mt-1 text-sm text-gray-500">
               Glissez et déposez les tâches pour les organiser
             </p>

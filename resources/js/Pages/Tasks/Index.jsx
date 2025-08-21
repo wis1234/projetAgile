@@ -179,8 +179,8 @@ function Index({ tasks, filters }) {
             </Link>
             <Link href="/kanban" className="bg-green-600 hover:bg-green-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base">
               <KanbanIcon /> 
-              <span className="hidden sm:inline">Voir Kanban</span>
-              <span className="sm:hidden">Kanban</span>
+              <span className="hidden sm:inline">Suivi des tâches</span>
+              <span className="sm:hidden">Suivi</span>
             </Link>
           </div>
         </div>

@@ -52,7 +52,8 @@ class KanbanController extends Controller
             'tasks' => $tasks,
             'auth' => [
                 'user' => $userData
-            ]
+            ],
+            'title' => 'Suivi des tâches'
         ]);
     }
 
