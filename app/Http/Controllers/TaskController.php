@@ -421,6 +421,13 @@ class TaskController extends Controller
         // Récupérer le premier gestionnaire du projet
         $projectManager = $task->project->users->first();
 
+        if (!$projectManager) {
+            // Handle the case where no project manager is found
+            // For example, you could use the project creator or another default user
+            // Or simply abort with a more specific error message
+            abort(404, 'Aucun gestionnaire de projet trouvé pour cette tâche');
+        }
+
         // Générer le PDF
         $pdf = \PDF::loadView('receipts.task_payment', [
             'task' => $task,

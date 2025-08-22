@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import TaskTimer from '../../Components/TaskTimer';
 import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 
@@ -591,42 +590,27 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                     )}
                   </div>
 
-                  {/* Date d'échéance avec minuterie */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-4">
-                      <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Échéance :</span>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`${
-                            new Date(task.due_date) < new Date() && task.status !== 'done' 
-                              ? 'text-red-600 dark:text-red-400 font-medium' 
-                              : 'text-gray-600 dark:text-gray-400'
-                          }`}>
-                            {task.due_date ? new Date(task.due_date).toLocaleDateString('fr-FR', {
-                              weekday: 'long',
-                              day: '2-digit',
-                              month: 'long',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : 'Non définie'}
-                          </span>
-                          {task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && (
-                            <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-300">
-                              En retard
-                            </span>
-                          )}
-                        </div>
-                        {task.due_date && (
-                          <div className="mt-1">
-                            <TaskTimer 
-                              dueDate={task.due_date} 
-                              startDate={task.start_date || task.created_at} 
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                  {/* Date d'échéance */}
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Échéance :</span>
+                    <span className={`${
+                      new Date(task.due_date) < new Date() && task.status !== 'done' 
+                        ? 'text-red-600 dark:text-red-400 font-medium' 
+                        : 'text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {new Date(task.due_date).toLocaleDateString('fr-FR', {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                      {new Date(task.due_date) < new Date() && task.status !== 'done' && (
+                        <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-300">
+                          En retard
+                        </span>
+                      )}
+                    </span>
+                  </div>
 
                   {/* Dernière mise à jour */}
                   <div className="flex items-center gap-4">
