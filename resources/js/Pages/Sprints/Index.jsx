@@ -4,9 +4,13 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import { FaFlagCheckered, FaPlus, FaSearch, FaTable, FaTh, FaProjectDiagram, FaCalendarAlt, FaList } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
-const Index = ({ sprints: initialSprints, filters: initialFilters = {} }) => {
+const Index = ({ sprints, filters: initialFilters = {} }) => {
   const { flash = {} } = usePage().props;
-  const [sprints, setSprints] = useState(initialSprints);
+  
+  // Debug: Afficher la structure des données reçues
+  useEffect(() => {
+ 
+  }, [sprints]);
   const [search, setSearch] = useState(initialFilters.search || '');
   const [viewMode, setViewMode] = useState('table'); // 'table' par défaut
   const [notification, setNotification] = useState(null);
@@ -21,7 +25,10 @@ const Index = ({ sprints: initialSprints, filters: initialFilters = {} }) => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    router.get(route('sprints.index'), { search }, { preserveState: true, replace: true });
+    router.get(route('sprints.index'), { search }, { 
+      preserveState: true, 
+      replace: true
+    });
   };
 
   const formatDate = (date) => {
@@ -132,13 +139,13 @@ const Index = ({ sprints: initialSprints, filters: initialFilters = {} }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {sprints?.data?.length === 0 ? (
+                  {sprints.data?.length === 0 ? (
                     <tr>
                       <td colSpan="4" className="text-center py-10 text-gray-500 dark:text-gray-400 text-lg">
                         Aucun sprint trouvé.
                       </td>
                     </tr>
-                  ) : sprints?.data?.map(sprint => (
+                  ) : sprints.data?.map(sprint => (
                     <tr 
                       key={sprint.id} 
                       className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
@@ -187,12 +194,12 @@ const Index = ({ sprints: initialSprints, filters: initialFilters = {} }) => {
             animate={{ opacity: 1 }}
             transition={{ staggerChildren: 0.1 }}
           >
-            {sprints?.data?.length === 0 ? (
+            {sprints.data?.length === 0 ? (
               <div className="col-span-full text-center py-16">
                 <FaFlagCheckered className="mx-auto text-6xl text-gray-300 dark:text-gray-600 mb-4" />
                 <p className="text-xl text-gray-500 dark:text-gray-400">Aucun sprint trouvé</p>
               </div>
-            ) : sprints?.data?.map(sprint => (
+            ) : sprints.data?.map((sprint) => (
               <motion.div
                 key={sprint.id}
                 className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-105 transition-all duration-200 cursor-pointer group"
@@ -228,27 +235,39 @@ const Index = ({ sprints: initialSprints, filters: initialFilters = {} }) => {
           </motion.div>
         )}
 
-        {/* Pagination */}
-        {sprints?.links && sprints.links.length > 3 && (
-          <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
-              Affichage de {sprints.from || 0} à {sprints.to || 0} sur {sprints.total || 0} résultats
-            </div>
-            <div className="flex flex-wrap justify-center gap-1 sm:gap-2 order-1 sm:order-2">
-              {sprints.links.map((link, index) => (
-                <Link
-                  key={index}
-                  href={link.url}
-                  className={`px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 ${
-                    link.active
-                      ? 'bg-blue-600 text-white'
-                      : link.url
-                      ? 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                  }`}
-                  dangerouslySetInnerHTML={{ __html: link.label }}
-                />
-              ))}
+        {/* Pagination simplifiée */}
+        {sprints.links && sprints.links.length > 1 && (
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Indicateur de résultats */}
+            {sprints.total > 0 && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Affichage de <span className="font-medium">{sprints.from || 0}</span> à <span className="font-medium">{sprints.to || 0}</span> sur <span className="font-medium">{sprints.total || 0}</span> résultats
+              </div>
+            )}
+            
+            <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg p-2 shadow">
+              {sprints.links.map((link, index) => {
+                let label = link.label;
+                if (label.includes('Previous')) label = '«';
+                if (label.includes('Next')) label = '»';
+                
+                return (
+                  <Link
+                    key={index}
+                    href={link.url || '#'}
+                    className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-medium
+                      ${link.active 
+                        ? 'bg-blue-600 text-white' 
+                        : link.url 
+                          ? 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' 
+                          : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                      }`}
+                    disabled={!link.url}
+                  >
+                    <span dangerouslySetInnerHTML={{ __html: label }} />
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

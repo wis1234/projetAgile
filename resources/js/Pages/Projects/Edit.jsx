@@ -31,14 +31,40 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
     });
   };
 
-  // Format status options for the select
+  // Format status options for the select with all available statuses and visual indicators
   const statusOptions = [
-    { value: currentStatus, label: `${availableStatuses[currentStatus] || currentStatus} (actuel)` },
+    // Current status first
+    { 
+      value: currentStatus, 
+      label: `${availableStatuses[currentStatus] || currentStatus} (actuel)`,
+      disabled: true,
+      className: 'font-semibold bg-gray-100 dark:bg-gray-700'
+    },
+    // Next allowed statuses
     ...(Array.isArray(nextStatuses) ? nextStatuses.map(status => ({
       value: status,
-      label: availableStatuses[status] || status
-    })) : [])
+      label: `→ ${availableStatuses[status] || status}`,
+      className: 'pl-4 border-l-2 border-blue-400 my-1',
+      icon: '▶️'
+    })) : []),
+    // Divider if there are next statuses and other available statuses
+    ...(Array.isArray(nextStatuses) && nextStatuses.length > 0 ? [{
+      type: 'divider'
+    }] : []),
+    // All other available statuses (disabled if not in nextStatuses)
+    ...Object.entries(availableStatuses)
+      .filter(([key]) => key !== currentStatus && !(nextStatuses || []).includes(key))
+      .map(([key, value]) => ({
+        value: key,
+        label: value,
+        disabled: true,
+        className: 'opacity-50 cursor-not-allowed',
+        title: 'Transition non autorisée depuis le statut actuel'
+      }))
   ];
+  
+  // Filter out divider when mapping options
+  const filteredStatusOptions = statusOptions.filter(opt => opt.type !== 'divider');
 
   // Get status color for badge
   const getStatusColor = (status) => {
@@ -155,25 +181,38 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                     )}
                   </div>
                   
-                  {statusOptions.length > 1 && (
-                    <select 
-                      value={status} 
-                      onChange={(e) => setStatus(e.target.value)} 
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition"
-                    >
-                      {statusOptions.slice(1).map((option) => (
-                        <option key={option.value} value={option.value}>
+                  <select
+                    id="status"
+                    name="status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  >
+                    {filteredStatusOptions.map((option, index) => {
+                      // Handle divider
+                      if (option.type === 'divider') {
+                        return <hr key={`divider-${index}`} className="my-2 border-gray-200 dark:border-gray-600" />;
+                      }
+                      
+                      // Handle regular options
+                      return (
+                        <option 
+                          key={option.value} 
+                          value={option.value}
+                          disabled={option.disabled}
+                          className={option.className || ''}
+                          title={option.title || ''}
+                        >
+                          {option.icon && <span className="mr-2">{option.icon}</span>}
                           {option.label}
                         </option>
-                      ))}
-                    </select>
-                  )}
-                  
-                  {statusOptions.length <= 1 && (
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Aucun changement de statut disponible pour l'instant.
-                    </p>
-                  )}
+                      );
+                    })}
+                  </select>
+                  <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                    <FaInfoCircle className="mr-1 flex-shrink-0" />
+                    <span>Choisissez le nouveau statut du projet selon le flux de travail</span>
+                  </div>
                   
                   {status !== (project.status || 'nouveau') && (
                     <div className="mt-2">

@@ -327,37 +327,45 @@ class ProjectController extends Controller
                   ->whereIn('project_user.role', ['manager', 'admin']);
         })->findOrFail($id);
 
+        // Récupérer tous les statuts disponibles
+        $availableStatuses = Project::getAvailableStatuses();
+        
+        // Définir les transitions autorisées avec leur ordre chronologique
+        $allowedTransitions = [
+            'nouveau' => ['demarrage', 'suspendu'],
+            'demarrage' => ['en_cours', 'suspendu'],
+            'en_cours' => ['avance', 'suspendu', 'termine'],
+            'avance' => ['termine', 'suspendu'],
+            'termine' => ['en_cours', 'suspendu'],
+            'suspendu' => ['demarrage', 'en_cours', 'avance', 'termine'],
+        ];
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
             'status' => [
-                'required', 
-                'string', 
-                Rule::in(array_keys(Project::getAvailableStatuses()))
+                'required',
+                'string',
+                Rule::in(array_keys($availableStatuses)),
+                function ($attribute, $value, $fail) use ($project, $allowedTransitions) {
+                    $currentStatus = $project->status;
+                    
+                    // Si le statut ne change pas, pas besoin de vérifier la transition
+                    if ($currentStatus === $value) {
+                        return;
+                    }
+                    
+                    // Vérifier si la transition est autorisée
+                    if (!isset($allowedTransitions[$currentStatus]) || 
+                        !in_array($value, $allowedTransitions[$currentStatus])) {
+                        $fail("La transition de statut de '$currentStatus' vers '$value' n'est pas autorisée.");
+                    }
+                },
             ],
         ]);
 
-        // Vérifier si le statut est valide selon les transitions
-        $allowedTransitions = [
-            'nouveau' => ['demarrage', 'suspendu'],
-            'demarrage' => ['en_cours', 'suspendu'],
-            'en_cours' => ['avance', 'suspendu'],
-            'avance' => ['termine', 'suspendu'],
-            'termine' => ['en_cours'],
-            'suspendu' => ['demarrage', 'en_cours', 'avance'],
-        ];
-
         $currentStatus = $project->status;
         $newStatus = $validated['status'];
-
-        // Autoriser de rester sur le même statut
-        if ($currentStatus !== $newStatus && 
-            isset($allowedTransitions[$currentStatus]) && 
-            !in_array($newStatus, $allowedTransitions[$currentStatus])) {
-            return back()->withErrors([
-                'status' => 'Transition de statut non autorisée.'
-            ]);
-        }
 
         $oldStatus = $project->status;
         $project->update($validated);

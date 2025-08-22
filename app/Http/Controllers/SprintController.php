@@ -22,11 +22,39 @@ class SprintController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
-        $query = Sprint::with('project');
-        if ($request->search) {
-            $query->where('name', 'like', '%'.$request->search.'%');
-        }
-        $sprints = $query->orderBy('start_date', 'desc')->paginate(10)->withQueryString();
+        
+        // Récupération des sprints avec pagination
+        $perPage = $request->input('per_page', 10);
+        
+        // Récupération des données paginées
+        $sprints = Sprint::with(['project' => function($query) {
+                $query->select('id', 'name');
+            }])
+            ->when($request->search, function($query, $search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
+            ->orderBy('start_date', 'desc')
+            ->paginate($perPage)
+            ->withQueryString();
+            
+        // Transformation des données pour le frontend
+        $sprints->getCollection()->transform(function ($sprint) {
+            return [
+                'id' => $sprint->id,
+                'name' => $sprint->name,
+                'description' => $sprint->description,
+                'start_date' => $sprint->start_date,
+                'end_date' => $sprint->end_date,
+                'status' => $sprint->status,
+                'project' => $sprint->project ? [
+                    'id' => $sprint->project->id,
+                    'name' => $sprint->project->name,
+                ] : null,
+                'created_at' => $sprint->created_at,
+                'updated_at' => $sprint->updated_at,
+            ];
+        });
+            
         return Inertia::render('Sprints/Index', [
             'sprints' => $sprints,
             'filters' => $request->only('search'),
