@@ -514,10 +514,54 @@ class ProjectController extends Controller
      */
     protected function generatePdf($data)
     {
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.project-pdf', $data);
+        // Configuration avancée de DomPDF
+        $options = new \Dompdf\Options();
+        $options->set([
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true,
+            'isPhpEnabled' => true,
+            'isFontSubsettingEnabled' => true,
+            'defaultPaperSize' => 'a4',
+            'defaultFont' => 'dejavu sans',
+            'fontHeightRatio' => 1.1,
+            'dpi' => 150,
+            'enableCssFloat' => true,
+            'isJavascriptEnabled' => true,
+            'isHtml5Parser' => true,
+            'isRemoteEnabled' => true,
+        ]);
+
+        // Créer une nouvelle instance DomPDF avec les options
+        $dompdf = new \Dompdf\Dompdf($options);
+        
+        // Charger le contenu HTML
+        $html = view('exports.project-pdf', $data)->render();
+        
+        // Nettoyer et formater le HTML
+        $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
+        
+        // Charger le HTML dans DomPDF
+        $dompdf->loadHtml($html, 'UTF-8');
+        
+        // Configurer le format de page
+        $dompdf->setPaper('A4', 'portrait');
+        
+        // Rendre le PDF
+        $dompdf->render();
+        
+        // Ajouter le pied de page avec la numérotation
+        $canvas = $dompdf->getCanvas();
+        $font = $dompdf->getFontMetrics()->getFont('helvetica');
+        $canvas->page_text(540, 800, "Page {PAGE_NUM} sur {PAGE_COUNT}", $font, 8, [0.5, 0.5, 0.5]);
+        
+        // Générer le nom du fichier
         $filename = 'suivi_global_' . Str::slug($data['project']->name) . '_' . now()->format('Ymd_His') . '.pdf';
         
-        return $pdf->download($filename);
+        // Télécharger le PDF
+        return $dompdf->stream($filename, [
+            'Attachment' => true,
+            'compress' => true
+        ]);
     }
     
     /**

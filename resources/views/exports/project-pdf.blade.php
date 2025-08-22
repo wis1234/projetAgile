@@ -3,18 +3,46 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>Suivi Global - {{ $project->name }}</title>
-    <style>
-        body {
+    <style type="text/css">
+        /* Reset et configuration de base */
+        * { 
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+        
+        @page {
+            margin: 1.5cm 2cm 2.5cm 2cm;
             font-family: 'DejaVu Sans', sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
+            size: A4 portrait;
+        }
+        @page {
+            margin: 1.5cm 1.5cm 2cm 1.5cm;
+            font-family: 'DejaVu Sans', sans-serif;
+        }
+        
+        body {
+            font-family: 'DejaVu Sans', 'Helvetica', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
             color: #333;
+            margin: 0;
+            padding: 0;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            hyphens: auto;
         }
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             border-bottom: 2px solid #3490dc;
-            padding-bottom: 10px;
+            padding-bottom: 8px;
+            page-break-after: avoid;
         }
         .title {
             font-size: 24px;
@@ -41,6 +69,11 @@
         .task {
             margin-bottom: 15px;
             page-break-inside: avoid;
+            page-break-after: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 10px;
+            background: #fff;
         }
         .task-title {
             font-weight: bold;
@@ -53,30 +86,106 @@
             margin-bottom: 5px;
         }
         .task-description {
-            margin-top: 5px;
-            padding: 8px;
+            margin: 10px 0;
+            padding: 12px;
             background-color: #f8fafc;
-            border-radius: 4px;
-            font-size: 11px;
+            border-left: 4px solid #3490dc;
+            border-radius: 0 4px 4px 0;
+            font-size: 10pt;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+            page-break-inside: avoid;
         }
         .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             text-align: center;
-            font-size: 10px;
+            font-size: 9px;
             color: #a0aec0;
-            margin-top: 30px;
             border-top: 1px solid #e2e8f0;
-            padding-top: 10px;
+            padding: 5px 0;
+            background: white;
         }
         .page-break {
             page-break-after: always;
+            page-break-before: avoid;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+        
+        /* Éviter les coupures de mots */
+        p, div, span, td {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            -webkit-hyphens: auto;
+            -ms-hyphens: auto;
+            hyphens: auto;
+        }
+        
+        /* Style pour les images */
+        img {
+            max-width: 100%;
+            height: auto;
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        
+        /* Style pour les tableaux */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            page-break-inside: avoid;
+        }
+        
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 9pt;
+        }
+        
+        th {
+            background-color: #f7fafc;
+            font-weight: bold;
         }
         .files-list {
-            margin-top: 5px;
-            padding-left: 15px;
+            margin: 10px 0 5px 15px;
+            padding: 8px;
+            background: #f9fafb;
+            border-radius: 4px;
+            page-break-inside: avoid;
         }
         .file-item {
-            font-size: 10px;
+            font-size: 9pt;
             color: #4a5568;
+            margin: 5px 0;
+            padding: 4px 8px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 3px;
+            page-break-inside: avoid;
+        }
+        
+        /* Styles pour le contenu des fichiers texte */
+        .file-content {
+            margin: 10px 0 0 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px dashed #d1d5db;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 9pt;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow: auto;
+            page-break-inside: avoid;
         }
     </style>
 </head>
