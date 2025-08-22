@@ -4,8 +4,8 @@ import AdminLayout from '../../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
 import { FaEdit, FaProjectDiagram, FaArrowLeft, FaSave, FaChartLine, FaInfoCircle, FaHistory } from 'react-icons/fa';
 
-function Edit({ project }) {
-  const { errors = {}, flash = {}, availableStatuses = {} } = usePage().props;
+function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatus, userRole }) {
+  const { errors = {}, flash = {} } = usePage().props;
   const [name, setName] = useState(project.name || '');
   const [description, setDescription] = useState(project.description || '');
   const [status, setStatus] = useState(project.status || 'nouveau');
@@ -31,8 +31,17 @@ function Edit({ project }) {
     });
   };
 
-  // Fonction pour obtenir la couleur du badge de statut
-  const getStatusColor = (statusKey) => {
+  // Format status options for the select
+  const statusOptions = [
+    { value: currentStatus, label: `${availableStatuses[currentStatus] || currentStatus} (actuel)` },
+    ...(Array.isArray(nextStatuses) ? nextStatuses.map(status => ({
+      value: status,
+      label: availableStatuses[status] || status
+    })) : [])
+  ];
+
+  // Get status color for badge
+  const getStatusColor = (status) => {
     const colors = {
       'nouveau': 'bg-gray-100 text-gray-800 border-gray-300',
       'demarrage': 'bg-green-100 text-green-800 border-green-300',
@@ -41,24 +50,8 @@ function Edit({ project }) {
       'termine': 'bg-emerald-100 text-emerald-800 border-emerald-300',
       'suspendu': 'bg-red-100 text-red-800 border-red-300',
     };
-    return colors[statusKey] || colors['nouveau'];
+    return colors[status] || colors['nouveau'];
   };
-
-  // Fonction pour obtenir les statuts autorisés pour la transition
-  const getAllowedTransitions = (currentStatus) => {
-    const transitions = {
-      'nouveau': ['demarrage', 'suspendu', 'termine'],
-      'demarrage': ['en_cours', 'suspendu', 'termine'],
-      'en_cours': ['avance', 'suspendu', 'termine'],
-      'avance': ['termine', 'suspendu'],
-      'termine': ['en_cours'],
-      'suspendu': ['demarrage', 'en_cours', 'avance', 'termine'],
-    };
-    return transitions[currentStatus] || [];
-  };
-
-  const allowedStatuses = getAllowedTransitions(project.status || 'nouveau');
-  const canChangeStatus = allowedStatuses.length > 0;
 
   return (
     <>
@@ -88,9 +81,9 @@ function Edit({ project }) {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Statut actuel du projet :</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(project.status || 'nouveau')}`}>
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(currentStatus)}`}>
                         <FaChartLine className="text-xs" />
-                        {availableStatuses[project.status] || 'Nouveau'}
+                        {availableStatuses[currentStatus] || currentStatus}
                       </span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         Créé le {new Date(project.created_at).toLocaleDateString('fr-FR')}
@@ -147,61 +140,64 @@ function Edit({ project }) {
 
                 {/* Statut du projet */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <div className="flex items-center gap-2">
                       <FaChartLine className="text-blue-500" />
                       Statut du projet
                     </div>
                   </label>
-                  <div className="space-y-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(currentStatus)}`}>
+                      {availableStatuses[currentStatus] || currentStatus}
+                    </span>
+                    {statusOptions.length > 1 && (
+                      <span className="text-sm text-gray-500">→</span>
+                    )}
+                  </div>
+                  
+                  {statusOptions.length > 1 && (
                     <select 
                       value={status} 
-                      onChange={e => setStatus(e.target.value)} 
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition"
+                      onChange={(e) => setStatus(e.target.value)} 
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition"
                     >
-                      {/* Statut actuel toujours disponible */}
-                      <option value={project.status || 'nouveau'}>
-                        {availableStatuses[project.status] || 'Nouveau'} (actuel)
-                      </option>
-                      
-                      {/* Statuts autorisés pour la transition */}
-                      {canChangeStatus && allowedStatuses.map(statusKey => (
-                        <option key={statusKey} value={statusKey}>
-                          {availableStatuses[statusKey]}
+                      {statusOptions.slice(1).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
-                    
-                    {/* Aperçu du statut sélectionné */}
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Aperçu :</span>
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(status)}`}>
-                        <FaChartLine className="text-xs" />
-                        {availableStatuses[status] || 'Nouveau'}
+                  )}
+                  
+                  {statusOptions.length <= 1 && (
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Aucun changement de statut disponible pour l'instant.
+                    </p>
+                  )}
+                  
+                  {status !== (project.status || 'nouveau') && (
+                    <div className="mt-2">
+                      <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                        ⚠️ Changement de statut
                       </span>
-                      {status !== (project.status || 'nouveau') && (
-                        <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                          ⚠️ Changement de statut
-                        </span>
-                      )}
                     </div>
-                  </div>
+                  )}
                   {errors.status && (
                     <div className="text-red-600 text-sm mt-2 font-medium">{errors.status}</div>
                   )}
                 </div>
 
                 {/* Aide contextuelle pour les transitions */}
-                {canChangeStatus && (
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                {statusOptions.length > 1 && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mt-4">
                     <div className="flex items-start gap-3">
                       <FaInfoCircle className="text-yellow-500 text-lg flex-shrink-0 mt-0.5" />
                       <div className="text-sm text-yellow-700 dark:text-yellow-300">
                         <p className="font-semibold mb-2">Transitions de statut autorisées :</p>
                         <ul className="space-y-1 list-disc list-inside">
-                          {allowedStatuses.map(statusKey => (
-                            <li key={statusKey}>
-                              Passer à : <strong>{availableStatuses[statusKey]}</strong>
+                          {statusOptions.slice(1).map(option => (
+                            <li key={option.value}>
+                              Passer à : <strong>{option.label}</strong>
                             </li>
                           ))}
                         </ul>

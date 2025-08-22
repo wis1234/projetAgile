@@ -276,7 +276,7 @@ class ProjectController extends Controller
      */
     public function edit(string $id)
     {
-        // Only allow access if the user is a member of the project
+        // Only allow edit if the user is a member of the project
         $project = Project::whereHas('users', function($query) {
             $query->where('user_id', auth()->id());
         })->with(['users' => function($query) {
@@ -285,23 +285,33 @@ class ProjectController extends Controller
                   ->withPivot('role');
         }])->findOrFail($id);
         
-        // Check if the user has the required role to edit the project
         $userRole = $project->users->first()->pivot->role ?? null;
-        if (!$userRole || !in_array($userRole, ['manager', 'admin'])) {
-            return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        if (!in_array($userRole, ['manager', 'admin'])) {
+            return Inertia::render('Error403')
+                ->toResponse(request())
+                ->setStatusCode(403);
         }
         
-        // Get current status and available statuses
+        $availableStatuses = Project::getAvailableStatuses();
         $currentStatus = $project->status;
-        $availableStatuses = $project->getAvailableStatuses();
-        $nextStatuses = $project->getNextStatuses();
+        
+        // Définir les transitions autorisées
+        $allowedTransitions = [
+            'nouveau' => ['demarrage', 'suspendu'],
+            'demarrage' => ['en_cours', 'suspendu'],
+            'en_cours' => ['avance', 'suspendu'],
+            'avance' => ['termine', 'suspendu'],
+            'termine' => ['en_cours'],
+            'suspendu' => ['demarrage', 'en_cours', 'avance'],
+        ];
+        
+        $nextStatuses = $allowedTransitions[$currentStatus] ?? [];
         
         return Inertia::render('Projects/Edit', [
             'project' => $project,
-            'currentStatus' => $currentStatus,
             'availableStatuses' => $availableStatuses,
+            'currentStatus' => $currentStatus,
             'nextStatuses' => $nextStatuses,
-            'statusTransitions' => $project->getStatusTransitions(),
             'userRole' => $userRole,
         ]);
     }
@@ -311,48 +321,55 @@ class ProjectController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        // Only allow update if the user is a member of the project with manager or admin role
+        // Only allow update if the user is a manager or admin of the project
         $project = Project::whereHas('users', function($query) {
-            $query->where('user_id', auth()->id())
-                  ->whereIn('role', ['manager', 'admin']);
+            $query->where('users.id', auth()->id())
+                  ->whereIn('project_user.role', ['manager', 'admin']);
         })->findOrFail($id);
 
-        // Validate the request data
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
             'status' => [
                 'required', 
                 'string', 
-                Rule::in(array_keys(Project::getAvailableStatuses())),
-                function ($attribute, $value, $fail) use ($project) {
-                    // Check if status has changed
-                    if ($project->status !== $value) {
-                        // If status changed, validate the transition
-                        if (!$project->canChangeStatusTo($value)) {
-                            $fail('Transition de statut non autorisée.');
-                        }
-                    }
-                }
+                Rule::in(array_keys(Project::getAvailableStatuses()))
             ],
         ]);
 
-        // Check if status has changed
-        $statusChanged = $project->status !== $validated['status'];
+        // Vérifier si le statut est valide selon les transitions
+        $allowedTransitions = [
+            'nouveau' => ['demarrage', 'suspendu'],
+            'demarrage' => ['en_cours', 'suspendu'],
+            'en_cours' => ['avance', 'suspendu'],
+            'avance' => ['termine', 'suspendu'],
+            'termine' => ['en_cours'],
+            'suspendu' => ['demarrage', 'en_cours', 'avance'],
+        ];
+
+        $currentStatus = $project->status;
+        $newStatus = $validated['status'];
+
+        // Autoriser de rester sur le même statut
+        if ($currentStatus !== $newStatus && 
+            isset($allowedTransitions[$currentStatus]) && 
+            !in_array($newStatus, $allowedTransitions[$currentStatus])) {
+            return back()->withErrors([
+                'status' => 'Transition de statut non autorisée.'
+            ]);
+        }
+
         $oldStatus = $project->status;
-        
-        // Update the project
         $project->update($validated);
-        
-        // If status changed, log the activity and notify team members
-        if ($statusChanged) {
-            event(new ProjectUpdated($project));
+
+        // Journalisation et notifications
+        activity_log('update', 'Mise à jour du projet', $project, 
+            "Projet '{$project->name}' mis à jour par " . auth()->user()->name);
+
+        if ($oldStatus !== $project->status) {
+            activity_log('update', 'Changement de statut du projet', $project, 
+                "Statut changé de '{$oldStatus}' à '{$project->status}' par " . auth()->user()->name);
             
-            // Log the status change
-            activity_log('update', 'Mise à jour du statut du projet', $project, 
-                "Statut changé de {$oldStatus} à {$project->status}");
-            
-            // Notify all project members about the status change
             $project->notifyMembers('project_status_changed', [
                 'old_status' => $oldStatus,
                 'new_status' => $project->status,
@@ -371,8 +388,8 @@ class ProjectController extends Controller
     {
         // Only allow deletion if the user is a manager or admin of the project
         $project = Project::whereHas('users', function($query) {
-            $query->where('user_id', auth()->id())
-                  ->whereIn('role', ['manager', 'admin']);
+            $query->where('users.id', auth()->id())
+                  ->whereIn('project_user.role', ['manager', 'admin']);
         })->findOrFail($id);
         
         // Get project name before deletion for the log
