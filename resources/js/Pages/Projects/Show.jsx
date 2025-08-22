@@ -290,7 +290,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
 
   return (
     <>
-      <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-900 overflow-x-hidden">
+      <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
         {/* Header sticky */}
         <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800 shadow-sm">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-4 px-4">
@@ -306,8 +306,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             </Link>
           </div>
         </header>
-        <main className="w-full flex flex-col items-center px-4 md:px-0 py-8">
-          <div className="w-full max-w-7xl">
+        <main className="w-full flex flex-col items-center p-2 sm:p-4">
+          <div className="w-full max-w-full px-2 sm:px-4">
 
             {flash.success && (
               <div className="mb-6 px-4 py-3 rounded-lg bg-green-100 text-green-800 font-semibold border border-green-200">
@@ -316,9 +316,9 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             )}
 
             {/* Informations du projet */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
               {/* Carte principale du projet */}
-              <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+              <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
                     <FaProjectDiagram className="text-white text-2xl" />
@@ -347,7 +347,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               </div>
 
               {/* Carte des membres */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Membres ({project.users?.length || 0})</h3>
                   <Link 
@@ -420,7 +420,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             </div>
 
             {/* Actions Rapides */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Actions Rapides</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="relative group">
@@ -511,12 +511,12 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             </div>
 
             {/* Graphique d'évolution des tâches */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                   <FaChartLine className="text-blue-500" /> Évolution des tâches (30 derniers jours)
                 </h3>
-                <div className="flex items-center gap-4 mt-2 md:mt-0">
+                <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                   <div className="flex items-center gap-1 text-sm">
                     <span className="w-3 h-3 rounded-full bg-blue-500"></span>
                     <span className="text-gray-600 dark:text-gray-300">Total</span>
@@ -528,7 +528,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 </div>
               </div>
               
-              <div className="h-80 w-full">
+              <div className="h-64 sm:h-72 w-full">
                 <Line data={trendChartData} options={chartOptions} />
               </div>
               
@@ -554,23 +554,23 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             </div>
 
             {/* Tâches du projet */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                  <FaTasks className="text-blue-500" /> Tâches rattachées ({tasks?.total || 0})
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                  <FaTasks className="text-blue-500" /> Tâches ({tasks?.total || 0})
                 </h3>
                 
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3">
                   <Link 
                     href={route('tasks.create', { project_id: project.id })}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors duration-200 whitespace-nowrap"
                   >
-                    <FaPlus className="text-xs" />
+                    <FaPlus size={12} />
                     <span>Nouvelle tâche</span>
                   </Link>
                   
                   {tasks?.meta && (
-                    <div className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       <span className="font-medium">{tasks.meta.from || 0}-{tasks.meta.to || 0}</span> sur{' '}
                       <span className="font-medium">{tasks.meta.total || 0}</span> tâches
                     </div>
@@ -593,26 +593,23 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
                     <thead className="bg-gray-50 dark:bg-gray-700/50">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Tâche
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                           Responsable
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Statut
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Priorité
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                           Échéance
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Sprint
                         </th>
                       </tr>
                     </thead>
@@ -623,18 +620,20 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                           className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition cursor-pointer"
                           onClick={() => router.visit(route('tasks.show', task.id))}
                         >
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className={`flex-shrink-0 h-3 w-3 rounded-full ${getStatusColor(task.status)} mr-3`}></div>
                               <div className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
                                 {task.title}
                               </div>
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-md">
-                              {task.description || 'Aucune description'}
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs">
+                              {task.description ? 
+                                (task.description.split(' ').slice(0, 2).join(' ') + (task.description.split(' ').length > 2 ? '...' : '')) : 
+                                'Aucune description'}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
                             {task.assigned_user ? (
                               <div className="flex items-center">
                                 <img 
@@ -650,7 +649,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                               <span className="text-sm text-gray-500 dark:text-gray-400">Non assignée</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
                             <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(task.status)}`}>
                               {task.status === 'todo' ? 'À faire' :
                                task.status === 'in_progress' ? 'En cours' :
@@ -662,7 +661,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                                task.status === 'en_attente' ? 'En attente' : task.status}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
                             <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
                               task.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
                               task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
@@ -671,25 +670,12 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                               {task.priority === 'high' ? 'Haute' : task.priority === 'medium' ? 'Moyenne' : 'Basse'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {task.due_date ? new Date(task.due_date).toLocaleDateString('fr-FR', {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric'
                             }) : '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {task.sprint ? (
-                              <Link 
-                                href={`/sprints/${task.sprint.id}`} 
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {task.sprint.name}
-                              </Link>
-                            ) : (
-                              <span className="text-gray-400 text-sm">-</span>
-                            )}
                           </td>
                         </tr>
                       ))}
@@ -752,15 +738,15 @@ function Show({ project, tasks = [], auth, stats = {} }) {
           </div>
 
           {/* Statistiques et graphique */}
-          <div className="w-full max-w-7xl mx-auto mb-16">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+          <div className="w-full max-w-full px-2 sm:px-4 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 <StatCard icon={<FaCheckCircle className="text-green-500 text-3xl" />} label="Tâches terminées" value={stats.doneTasksCount ?? 0} />
                 <StatCard icon={<FaFileAlt className="text-blue-500 text-3xl" />} label="Fichiers" value={stats.filesCount ?? 0} />
                 <StatCard icon={<FaCommentDots className="text-purple-500 text-3xl" />} label="Commentaires" value={stats.commentsCount ?? 0} />
                 <StatCard icon={<FaUsers className="text-yellow-500 text-3xl" />} label="Membres" value={project.users?.length ?? 0} />
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                 <FaUsers /> Tâches terminées par membre
               </h3>
