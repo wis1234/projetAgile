@@ -53,17 +53,33 @@ import {
 Chart.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Title, Filler);
 import Modal from '../../Components/Modal';
 
+// Helper function to get status color class
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'todo':
+    case 'nouveau':
+      return 'bg-gray-400';
+    case 'in_progress':
+    case 'en_cours':
+      return 'bg-blue-500';
+    case 'done':
+    case 'termine':
+      return 'bg-green-500';
+    case 'pending':
+    case 'en_attente':
+      return 'bg-yellow-500';
+    default:
+      return 'bg-gray-300';
+  }
+};
+
 function Show({ project, tasks = [], auth, stats = {} }) {
   const { flash = {} } = usePage().props;
   
-  // Récupération des rôles de l'utilisateur
-  const userRoles = auth?.user?.roles || [];
+  // Sanitize and validate user roles
+  const userRoles = Array.isArray(auth?.user?.roles) ? auth.user.roles : [];
   const isAdmin = userRoles.includes('admin');
   const isManager = userRoles.includes('manager');
-  
-  // Logs de débogage
-  console.log('User roles from auth:', userRoles);
-  console.log('isAdmin:', isAdmin, 'isManager:', isManager);
 
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [deleteLoading, setDeleteLoading] = React.useState(false);
@@ -77,7 +93,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
 
   // Compter les tâches par date
   const taskCounts = last30Days.map(date => {
-    const tasksForDate = tasks.filter(task => {
+    const tasksData = tasks.data || []; // Handle paginated tasks data
+    const tasksForDate = tasksData.filter(task => {
       const taskDate = new Date(task.created_at).toISOString().split('T')[0];
       return taskDate === date;
     });
@@ -333,6 +350,13 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Membres ({project.users?.length || 0})</h3>
+                  <Link 
+                    href={route('project-users.show', project.id)}
+                    className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1"
+                  >
+                    <FaEye className="text-sm" />
+                    <span>Voir tout</span>
+                  </Link>
                 </div>
                 <div className="space-y-3">
                   {project.users && project.users.length > 0 ? (
@@ -515,79 +539,213 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               
               <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
                 <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{tasks.length}</span> tâches au total
-                </div>
-                <div className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{tasks.filter(t => t.status === 'done').length}</span> tâches terminées
+                  <span className="font-semibold">{stats.todoTasksCount || 0}</span> tâches à faire
                 </div>
                 <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{tasks.filter(t => t.status === 'in_progress').length}</span> en cours
+                  <span className="font-semibold">{stats.inProgressTasksCount || 0}</span> en cours
+                </div>
+                <div className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1 rounded-full">
+                  <span className="font-semibold">{stats.doneTasksCount || 0}</span> tâches terminées
+                </div>
+                <div className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full">
+                  <span className="font-semibold">{stats.totalTasks || 0}</span> tâches au total
                 </div>
               </div>
             </div>
 
             {/* Tâches du projet */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
-                <FaTasks /> Tâches rattachées ({tasks.length})
-              </h3>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-10 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                  <FaTasks className="text-blue-500" /> Tâches rattachées ({tasks?.total || 0})
+                </h3>
+                
+                <div className="flex flex-wrap items-center gap-4">
+                  <Link 
+                    href={route('tasks.create', { project_id: project.id })}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200"
+                  >
+                    <FaPlus className="text-xs" />
+                    <span>Nouvelle tâche</span>
+                  </Link>
+                  
+                  {tasks?.meta && (
+                    <div className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <span className="font-medium">{tasks.meta.from || 0}-{tasks.meta.to || 0}</span> sur{' '}
+                      <span className="font-medium">{tasks.meta.total || 0}</span> tâches
+                    </div>
+                  )}
+                </div>
+              </div>
               
-              {tasks.length === 0 ? (
-                <div className="text-center py-12 text-gray-400 dark:text-gray-500">
+              {(!tasks?.data || tasks.data.length === 0) ? (
+                <div className="text-center py-12 px-4">
                   <FaTasks className="text-5xl mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-semibold">Aucune tâche pour ce projet</p>
-                  <p className="text-sm">Les tâches créées pour ce projet apparaîtront ici</p>
+                  <p className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">Aucune tâche pour ce projet</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Créez votre première tâche pour commencer à organiser le travail</p>
+                  <Link 
+                    href={route('tasks.create', { project_id: project.id })}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200"
+                  >
+                    <FaPlus />
+                    <span>Créer une tâche</span>
+                  </Link>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-gray-100 dark:bg-gray-700">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700/50">
                       <tr>
-                        <th className="p-4 text-left font-bold text-gray-600 dark:text-gray-300">Tâche</th>
-                        <th className="p-4 text-left font-bold text-gray-600 dark:text-gray-300">Description</th>
-                        <th className="p-4 text-left font-bold text-gray-600 dark:text-gray-300">Statut</th>
-                        <th className="p-4 text-left font-bold text-gray-600 dark:text-gray-300">Priorité</th>
-                        <th className="p-4 text-left font-bold text-gray-600 dark:text-gray-300">Assignée à</th>
-                        <th className="p-4 text-left font-bold text-gray-600 dark:text-gray-300">Sprint</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Tâche
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Responsable
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Statut
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Priorité
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Échéance
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Sprint
+                        </th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {tasks.map(task => (
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {tasks.data && tasks.data.map(task => (
                         <tr 
                           key={task.id} 
-                          className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition cursor-pointer border-b border-gray-200 dark:border-gray-700"
-                          onClick={() => window.location.href = `/tasks/${task.id}`}
-                          tabIndex={0}
-                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') window.location.href = `/tasks/${task.id}`; }}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition cursor-pointer"
+                          onClick={() => router.visit(route('tasks.show', task.id))}
                         >
-                          <td className="p-4 align-middle">
-                            <div className="font-semibold text-gray-800 dark:text-gray-200">
-                              {task.title}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className={`flex-shrink-0 h-3 w-3 rounded-full ${getStatusColor(task.status)} mr-3`}></div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                {task.title}
+                              </div>
                             </div>
-                          </td>
-                          <td className="p-4 align-middle text-gray-600 dark:text-gray-300">
-                            <div className="max-w-xs truncate" title={task.description}>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-md">
                               {task.description || 'Aucune description'}
                             </div>
                           </td>
-                          <td className="p-4 align-middle">{getStatusBadge(task.status)}</td>
-                          <td className="p-4 align-middle">{getPriorityBadge(task.priority)}</td>
-                          <td className="p-4 align-middle text-gray-600 dark:text-gray-300">
-                            {task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">Non assignée</span>}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {task.assigned_user ? (
+                              <div className="flex items-center">
+                                <img 
+                                  className="h-8 w-8 rounded-full mr-3" 
+                                  src={task.assigned_user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_user.name)}&background=3b82f6&color=fff`} 
+                                  alt={task.assigned_user.name} 
+                                />
+                                <div className="text-sm text-gray-900 dark:text-gray-100">
+                                  {task.assigned_user.name}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500 dark:text-gray-400">Non assignée</span>
+                            )}
                           </td>
-                          <td className="p-4 align-middle text-gray-600 dark:text-gray-300">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(task.status)}`}>
+                              {task.status === 'todo' ? 'À faire' :
+                               task.status === 'in_progress' ? 'En cours' :
+                               task.status === 'done' ? 'Terminé' :
+                               task.status === 'pending' ? 'En attente' :
+                               task.status === 'nouveau' ? 'Nouveau' :
+                               task.status === 'en_cours' ? 'En cours' :
+                               task.status === 'termine' ? 'Terminé' :
+                               task.status === 'en_attente' ? 'En attente' : task.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              task.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                              'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            }`}>
+                              {task.priority === 'high' ? 'Haute' : task.priority === 'medium' ? 'Moyenne' : 'Basse'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {task.due_date ? new Date(task.due_date).toLocaleDateString('fr-FR', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            }) : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             {task.sprint ? (
-                              <Link href={`/sprints/${task.sprint.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                              <Link 
+                                href={`/sprints/${task.sprint.id}`} 
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 {task.sprint.name}
                               </Link>
                             ) : (
-                              <span className="text-gray-400">-</span>
+                              <span className="text-gray-400 text-sm">-</span>
                             )}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  
+                  {/* Pagination */}
+                  {tasks.links && tasks.links.length > 3 && (
+                    <div className="mt-6 flex items-center justify-between px-6 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 sm:px-6 rounded-b-lg">
+                      <div className="flex-1 flex justify-between sm:hidden">
+                        {tasks.links[0].url && (
+                          <Link 
+                            href={tasks.links[0].url} 
+                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700"
+                            preserveScroll
+                          >
+                            Précédent
+                          </Link>
+                        )}
+                        {tasks.links[tasks.links.length - 1].url && (
+                          <Link 
+                            href={tasks.links[tasks.links.length - 1].url} 
+                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700"
+                            preserveScroll
+                          >
+                            Suivant
+                          </Link>
+                        )}
+                      </div>
+                      <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            Affichage de <span className="font-medium">{tasks.meta.from}</span> à <span className="font-medium">{tasks.meta.to}</span> sur{' '}
+                            <span className="font-medium">{tasks.meta.total}</span> résultats
+                          </p>
+                        </div>
+                        <div>
+                          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            {tasks.links.map((link, index) => (
+                              <Link
+                                key={index}
+                                href={link.url || '#'}
+                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                  link.active
+                                    ? 'z-10 bg-blue-50 border-blue-500 text-blue-600 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-200'
+                                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+                                } ${!link.url ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                preserveScroll
+                                dangerouslySetInnerHTML={{ __html: link.label }}
+                              />
+                            ))}
+                          </nav>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -608,7 +766,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               </h3>
               <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                 {project.users?.map(user => {
-                  const userDoneTasks = tasks.filter(t => t.status === 'done' && t.assigned_to === user.id);
+                  const tasksData = tasks.data || [];
+                  const userDoneTasks = tasksData.filter(t => t.status === 'done' && t.assigned_to === user.id);
                   return (
                     <li key={user.id} className="flex flex-col md:flex-row md:items-center justify-between py-3 gap-2">
                       <span className="flex items-center gap-3 min-w-[180px]">

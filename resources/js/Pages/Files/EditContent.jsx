@@ -131,14 +131,11 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
     const applyFilters = useCallback(() => {
         if (!editor) return;
         
-        console.log('Applying filters:', filters);
-        
         // Reset all highlights first
         editor.commands.unsetHighlight();
         
         // If no filters are active, just return
         if (!filters.userId && !filters.date) {
-            console.log('No filters active, returning');
             return;
         }
         
@@ -148,8 +145,6 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
         let totalNodes = 0;
         let nodesWithMarks = 0;
         let nodesWithHighlights = 0;
-        
-        console.log('Scanning document for changes...');
         
         // First, collect all changes that match our filters
         doc.descendants((node, pos) => {
@@ -163,27 +158,23 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
             nodesWithMarks++;
             
             // Find all highlight marks on this node
-            const highlightMarks = node.marks.filter(mark => mark.type.name === 'highlight');
+            const highlightMarks = node.marks.filter(mark => mark.type && mark.type.name === 'highlight');
             
             if (highlightMarks.length === 0) return;
             
             nodesWithHighlights++;
-            console.log(`Node at position ${pos} has ${highlightMarks.length} highlight marks`);
             
             // Check each highlight mark against our filters
             const matchingMarks = highlightMarks.filter(mark => {
-                const userId = mark.attrs['data-user-id'];
-                const timestamp = mark.attrs['data-timestamp'];
+                const userId = mark.attrs && mark.attrs['data-user-id'];
+                const timestamp = mark.attrs && mark.attrs['data-timestamp'];
                 const changeDate = timestamp ? new Date(timestamp) : null;
-                
-                console.log(`Mark found - User: ${userId}, Timestamp: ${timestamp}`);
                 
                 // Check if this change matches the filters
                 let matches = true;
                 
                 // Filter by user if specified
                 if (filters.userId && userId !== filters.userId) {
-                    console.log(`User filter: ${userId} !== ${filters.userId} (filter)`);
                     matches = false;
                 }
                 
@@ -196,13 +187,8 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
                     const endOfDay = new Date(filterDate);
                     endOfDay.setHours(23, 59, 59, 999);
                     
-                    console.log(`Date check: ${changeDate} between ${startOfDay} and ${endOfDay}`);
-                    
                     if (changeDate < startOfDay || changeDate > endOfDay) {
-                        console.log('Date filter: no match');
                         matches = false;
-                    } else {
-                        console.log('Date filter: match');
                     }
                 }
                 
@@ -210,8 +196,7 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
             });
             
             // If we have matching marks, add them to our changes
-            if (matchingMarks.length > 0) {
-                console.log(`Found ${matchingMarks.length} matching marks at position ${pos}`);
+            if (matchingMarks.length > 0 && matchingMarks[0].attrs) {
                 changes.push({
                     from: pos,
                     to: pos + node.nodeSize,
@@ -219,13 +204,10 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
                     timestamp: matchingMarks[0].attrs['data-timestamp']
                 });
             } else {
-                console.log('No matching marks found for this node');
                 // If no marks matched our filters, unhighlight this node
                 editor.commands.unsetHighlight({ from: pos, to: pos + node.nodeSize });
             }
         });
-        
-        console.log(`Document scan complete: ${totalNodes} total nodes, ${nodesWithMarks} with marks, ${nodesWithHighlights} with highlights`);
         
         // Apply a special highlight to matching changes
         changes.forEach(change => {

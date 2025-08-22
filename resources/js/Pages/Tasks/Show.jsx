@@ -1,9 +1,75 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
+
+// Composant de compte à rebours réutilisable
+const CountdownTimer = ({ targetDate, onComplete }) => {
+  const calculateTimeLeft = useCallback(() => {
+    const difference = new Date(targetDate) - new Date();
+    
+    if (difference <= 0) {
+      if (onComplete) onComplete();
+      return { expired: true };
+    }
+
+    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+    const minutes = Math.floor((difference / 1000 / 60) % 60);
+    const seconds = Math.floor((difference / 1000) % 60);
+
+    return {
+      days,
+      hours,
+      minutes,
+      seconds,
+      expired: false
+    };
+  }, [targetDate, onComplete]);
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [calculateTimeLeft]);
+
+  if (timeLeft.expired) {
+    return (
+      <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+        <FaClock className="animate-pulse" />
+        <span>Délai dépassé</span>
+      </div>
+    );
+  }
+
+  const formatTimeUnit = (value, label) => (
+    <div className="flex flex-col items-center">
+      <span className="text-2xl font-bold bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg w-14 h-14 flex items-center justify-center shadow-md">
+        {value.toString().padStart(2, '0')}
+      </span>
+      <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{label}</span>
+    </div>
+  );
+
+  return (
+    <div className="flex items-center gap-2">
+      <FaClock className="text-blue-500" />
+      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Temps restant :</span>
+      <div className="flex items-center gap-2">
+        {timeLeft.days > 0 && formatTimeUnit(timeLeft.days, 'Jours')}
+        {formatTimeUnit(timeLeft.hours, 'H')}
+        {formatTimeUnit(timeLeft.minutes, 'Min')}
+        {formatTimeUnit(timeLeft.seconds, 'Sec')}
+      </div>
+    </div>
+  );
+};
 
 export default function Show({ task, payments, projectMembers, currentUserRole }) {
   const { auth } = usePage().props;
@@ -13,38 +79,46 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const isProjectManager = currentUserRole === 'manager';
   const canEditTask = isAdmin || isProjectManager;
 
-  // Logs de débogage
-  useEffect(() => {
-    console.log('=== DÉBOGAGE DROITS UTILISATEUR ===');
-    console.log('Utilisateur:', auth.user);
-    console.log('Rôle actuel:', currentUserRole);
-    console.log('Est admin:', isAdmin);
-    console.log('Est manager:', isProjectManager);
-    console.log('Peut modifier:', canEditTask);
-  }, [auth.user, currentUserRole, isAdmin, isProjectManager, canEditTask]);
-
-  // Debug logs
-  console.log('Auth user:', auth?.user);
-  console.log('Task project users:', task.project?.users);
-  console.log('Is admin:', isAdmin);
-  console.log('Is project manager:', isProjectManager);
-  console.log('Current user ID:', auth.user?.id);
-  console.log('Project users with roles:', task.project?.users?.map(u => ({
-    id: u.id,
-    name: u.name,
-    role: u.pivot?.role
-  })));
+  // Sanitize task data to prevent sensitive information exposure
+  const sanitizedTask = React.useMemo(() => {
+    if (!task) return {};
+    
+    // Create a clean copy of the task
+    const cleanTask = { ...task };
+    
+    // Remove sensitive fields from project users if they exist
+    if (cleanTask.project?.users) {
+      cleanTask.project.users = cleanTask.project.users.map(user => ({
+        id: user.id,
+        name: user.name,
+        email: user.email ? '[REDACTED]' : null,
+        profile_photo_url: user.profile_photo_url,
+        pivot: user.pivot ? { role: user.pivot.role } : null
+      }));
+    }
+    
+    return cleanTask;
+  }, [task]);
   
-  const isAssigned = auth?.user?.id === task.assigned_to;
-  const isProjectMember = task.project?.users?.some(u => u.id === auth.user.id);
+  // Use the sanitized task instead of the original
+  const taskToDisplay = sanitizedTask;
+  
+  const isAssigned = auth?.user?.id === task?.assigned_to;
+  const isProjectMember = task?.project?.users?.some(u => u.id === auth.user.id) || false;
 
   // For adding payment for other members
-  const [selectedMemberId, setSelectedMemberId] = useState(auth.user.id); // Default to current user
+  const [selectedMemberId, setSelectedMemberId] = useState(auth?.user?.id || null); // Default to current user
 
   // Derived state for the currently displayed payment info (either own or selected member's)
-  const displayedPayment = (isAdmin || isProjectManager) && selectedMemberId
-    ? payments.find(p => p.user_id == selectedMemberId)
-    : payments.find(p => p.user_id === auth.user.id);
+  const displayedPayment = React.useMemo(() => {
+    if (!payments || !Array.isArray(payments)) return null;
+    
+    if ((isAdmin || isProjectManager) && selectedMemberId) {
+      return payments.find(p => p?.user_id == selectedMemberId) || null;
+    }
+    
+    return payments.find(p => p?.user_id === auth?.user?.id) || null;
+  }, [payments, isAdmin, isProjectManager, selectedMemberId, auth.user?.id]);
 
   // Payment state
   const [paymentMethod, setPaymentMethod] = useState(displayedPayment?.payment_method || '');
@@ -503,17 +577,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                   </div>
                 </div>
 
-                {/* Status */}
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">Statut :</span> 
-                  {getStatusBadge(task.status)}
-                </div>
-
-                {/* Priority */}
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">Priorité :</span> 
-                  {getPriorityBadge(task.priority)}
-                </div>
+                {/* Ces informations sont déjà affichées plus bas dans la section détaillée */}
 
                 {/* Due Date */}
                 <div className="flex items-center gap-4">
@@ -521,17 +585,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                   <span className="text-gray-900 dark:text-gray-100">{task.due_date ? new Date(task.due_date).toLocaleDateString() : <span className="italic text-gray-400">Non définie</span>}</span>
                 </div>
                 
-                {/* Created At */}
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">Créée le :</span> 
-                  <span className="text-gray-900 dark:text-gray-100">{task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A'}</span>
-                </div>
-                
-                {/* Last Modified */}
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">Dernière modification :</span> 
-                  <span className="text-gray-900 dark:text-gray-100">{task.updated_at ? new Date(task.updated_at).toLocaleString() : 'N/A'}</span>
-                </div>
+                {/* Ces informations sont déjà affichées plus bas dans la section détaillée */}
               </div>
 
               {/* Détails de la tâche */}
@@ -569,6 +623,8 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                       })}
                     </span>
                   </div>
+
+                  {/* Cette section a été déplacée et fusionnée avec la date d'échéance */}
                 </div>
 
                 {/* Colonne de droite */}
@@ -590,27 +646,39 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                     )}
                   </div>
 
-                  {/* Date d'échéance */}
-                  <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Échéance :</span>
-                    <span className={`${
-                      new Date(task.due_date) < new Date() && task.status !== 'done' 
-                        ? 'text-red-600 dark:text-red-400 font-medium' 
-                        : 'text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {new Date(task.due_date).toLocaleDateString('fr-FR', {
-                        weekday: 'long',
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric'
-                      })}
-                      {new Date(task.due_date) < new Date() && task.status !== 'done' && (
-                        <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-300">
-                          En retard
-                        </span>
-                      )}
-                    </span>
-                  </div>
+                  {/* Compte à rebours et date d'échéance */}
+                  {task.due_date && (
+                    <div className="flex items-start gap-4">
+                      <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px] mt-1">Échéance :</span>
+                      <div className="flex-1">
+                        <div className={`mb-2 ${
+                          new Date(task.due_date) < new Date() && task.status !== 'done' 
+                            ? 'text-red-600 dark:text-red-400 font-medium' 
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {new Date(task.due_date).toLocaleString('fr-FR', {
+                            weekday: 'long',
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                          {new Date(task.due_date) < new Date() && task.status !== 'done' && (
+                            <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-300">
+                              En retard
+                            </span>
+                          )}
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+                          <CountdownTimer 
+                            targetDate={task.due_date}
+                            onComplete={() => console.log('Temps écoulé!')}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Dernière mise à jour */}
                   <div className="flex items-center gap-4">

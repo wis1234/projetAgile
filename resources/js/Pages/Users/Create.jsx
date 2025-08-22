@@ -6,6 +6,7 @@ import { FaPlus, FaUser, FaUsers, FaArrowLeft, FaEnvelope, FaLock, FaUserShield,
 
 function Create({ roles = [] }) {
   const { errors = {}, flash = {} } = usePage().props;
+  // Initialize form state with sanitized values
   const [values, setValues] = useState({
     name: '',
     email: '',
@@ -14,6 +15,26 @@ function Create({ roles = [] }) {
     role: 'user',
     profile_photo: null,
   });
+  
+  // Password strength requirements
+  const [passwordStrength, setPasswordStrength] = useState({
+    length: false,
+    uppercase: false,
+    lowercase: false,
+    number: false,
+    special: false,
+  });
+  
+  // Check password strength
+  const checkPasswordStrength = (password) => {
+    setPasswordStrength({
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+      special: /[^A-Za-z0-9]/.test(password),
+    });
+  };
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -21,7 +42,13 @@ function Create({ roles = [] }) {
   const fileInputRef = useRef(null);
 
   const handleChange = (e) => {
-    setValues(values => ({ ...values, [e.target.id]: e.target.value }));
+    const { id, value } = e.target;
+    setValues(prev => ({ ...prev, [id]: value }));
+    
+    // Check password strength when password field changes
+    if (id === 'password') {
+      checkPasswordStrength(value);
+    }
   };
 
   const handlePhotoChange = (e) => {
@@ -52,13 +79,34 @@ function Create({ roles = [] }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Validate password strength
+    const isPasswordStrong = Object.values(passwordStrength).every(Boolean);
+    if (!isPasswordStrong) {
+      alert('Veuillez choisir un mot de passe plus fort qui répond à toutes les exigences.');
+      return;
+    }
+    
+    // Validate password match
+    if (values.password !== values.password_confirmation) {
+      alert('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    
     setLoading(true);
+    
+    // Sanitize and prepare form data
+    const sanitizedData = {
+      ...values,
+      name: values.name.trim(),
+      email: values.email.toLowerCase().trim(),
+    };
     
     // Create FormData for file upload
     const formData = new FormData();
-    Object.keys(values).forEach(key => {
-      if (values[key] !== null) {
-        formData.append(key, values[key]);
+    Object.entries(sanitizedData).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        formData.append(key, value);
       }
     });
 
@@ -82,6 +130,35 @@ function Create({ roles = [] }) {
       }
     });
   };
+
+  // Password strength indicator component
+  const PasswordStrengthMeter = () => (
+    <div className="mt-2 space-y-1">
+      <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Exigences du mot de passe :</div>
+      <div className="space-y-1 text-sm">
+        <div className={`flex items-center ${passwordStrength.length ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+          <span className="mr-2">•</span>
+          <span>Au moins 8 caractères</span>
+        </div>
+        <div className={`flex items-center ${passwordStrength.uppercase ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+          <span className="mr-2">•</span>
+          <span>Au moins une majuscule</span>
+        </div>
+        <div className={`flex items-center ${passwordStrength.lowercase ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+          <span className="mr-2">•</span>
+          <span>Au moins une minuscule</span>
+        </div>
+        <div className={`flex items-center ${passwordStrength.number ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+          <span className="mr-2">•</span>
+          <span>Au moins un chiffre</span>
+        </div>
+        <div className={`flex items-center ${passwordStrength.special ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+          <span className="mr-2">•</span>
+          <span>Au moins un caractère spécial</span>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-950 p-0 m-0">
@@ -207,6 +284,7 @@ function Create({ roles = [] }) {
                       {showPassword ? <FaEyeSlash /> : <FaEye />}
                     </button>
                   </div>
+                  <PasswordStrengthMeter />
                   {errors.password && <div className="text-red-600 text-sm mt-1">{errors.password}</div>}
                 </div>
 

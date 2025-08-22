@@ -181,11 +181,30 @@ class ProjectController extends Controller
         
             $currentUser = auth()->user();
             
-            // Get tasks with assigned users and sprints
+            // Initialize stats array
+            $stats = [];
+            
+            // Get task statistics
+            $taskStats = [
+                'total' => $project->tasks()->count(),
+                'todo' => $project->tasks()->where('status', 'todo')->count(),
+                'in_progress' => $project->tasks()->where('status', 'in_progress')->count(),
+                'done' => $project->tasks()->where('status', 'done')->count(),
+            ];
+
+            // Get tasks with assigned users and sprints with pagination
             $tasks = $project->tasks()
                             ->with(['assignedUser', 'sprint'])
                             ->orderBy('created_at', 'desc')
-                            ->get();
+                            ->paginate(10);
+            
+            // Add task stats to the stats array
+            $stats = array_merge($stats, [
+                'totalTasks' => $taskStats['total'],
+                'todoTasksCount' => $taskStats['todo'],
+                'inProgressTasksCount' => $taskStats['in_progress'],
+                'doneTasksCount' => $taskStats['done'],
+            ]);
             
             // Prepare authenticated user data
             $authUser = [

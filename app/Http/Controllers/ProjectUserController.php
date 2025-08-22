@@ -28,15 +28,23 @@ class ProjectUserController extends Controller
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
         
-        // Get only projects where the authenticated user is a member
+        // Get only projects where the authenticated user is a member with pagination
+        $perPage = request('per_page', 10);
         $projects = Project::whereHas('users', function($query) {
             $query->where('user_id', auth()->id());
         })->with(['users' => function($query) {
             $query->withPivot('role');
-        }])->get();
+        }])
+        ->withCount('tasks')
+        ->orderBy('created_at', 'desc')
+        ->paginate($perPage);
 
+        // Get the pagination data
+        $paginationData = $projects->toArray();
+        
         return Inertia::render('ProjectUsers/Index', [
-            'projects' => $projects,
+            'projects' => $paginationData,
+            'filters' => request()->only(['search', 'per_page'])
         ]);
     }
 

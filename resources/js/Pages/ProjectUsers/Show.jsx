@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { 
@@ -16,7 +16,37 @@ import {
     FaInfoCircle
 } from 'react-icons/fa';
 
-export default function Show({ project }) {
+// Helper function to sanitize project data
+const sanitizeProjectData = (project) => {
+    if (!project) return null;
+    
+    const cleanProject = { ...project };
+    
+    // Sanitize users array if it exists
+    if (cleanProject.users) {
+        cleanProject.users = cleanProject.users.map(user => ({
+            id: user.id,
+            name: user.name,
+            email: user.email || '',
+            profile_photo_url: user.profile_photo_url,
+            pivot: user.pivot ? { 
+                role: user.pivot.role,
+                created_at: user.pivot.created_at
+            } : null,
+            created_at: user.created_at
+        }));
+    }
+    
+    // Keep creation date
+    cleanProject.created_at = project.created_at;
+    cleanProject.updated_at = project.updated_at;
+    
+    return cleanProject;
+};
+
+export default function Show({ project: initialProject }) {
+    // Sanitize project data
+    const project = useMemo(() => sanitizeProjectData(initialProject), [initialProject]);
     const { flash = {} } = usePage().props;
     const [notification, setNotification] = useState(null);
 
@@ -32,6 +62,24 @@ export default function Show({ project }) {
             return () => clearTimeout(timer);
         }
     }, [flash]);
+
+    if (!project) {
+        return (
+            <AdminLayout>
+                <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
+                    <div className="text-center">
+                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Projet non trouvé</h1>
+                        <Link 
+                            href={route('project-users.index')}
+                            className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            <FaArrowLeft className="mr-2" /> Retour à la liste
+                        </Link>
+                    </div>
+                </div>
+            </AdminLayout>
+        );
+    }
 
     const getRoleIcon = (role) => {
         switch (role) {
@@ -81,7 +129,6 @@ export default function Show({ project }) {
 
             <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
                 <div className="flex flex-col w-full max-w-6xl mx-auto mt-14 pt-4 px-4 sm:px-6 lg:px-8">
-                    
                     {/* Header */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
                         <div className="flex items-center gap-4">
@@ -113,7 +160,13 @@ export default function Show({ project }) {
                             </div>
                             <div className="flex-1">
                                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                    {project.name}
+                                    <Link 
+                                        href={route('projects.show', project.id)} 
+                                        className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {project.name}
+                                    </Link>
                                 </h2>
                                 <div className="flex items-center gap-6 mt-2 text-sm text-gray-600 dark:text-gray-400">
                                     <div className="flex items-center gap-1">
@@ -126,7 +179,13 @@ export default function Show({ project }) {
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <FaCalendarAlt />
-                                        <span>Créé le {new Date(project.created_at).toLocaleDateString('fr-FR')}</span>
+                                        <span>Créé le {new Date(project.created_at).toLocaleDateString('fr-FR', {
+                                            day: '2-digit',
+                                            month: 'long',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}</span>
                                     </div>
                                 </div>
                             </div>
@@ -172,20 +231,34 @@ export default function Show({ project }) {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {project.users.map(user => (
                                         <div key={user.id} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600">
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <img 
-                                                    src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} 
-                                                    alt={user.name} 
-                                                    className="w-12 h-12 rounded-full border-2 border-gray-300 dark:border-gray-600 shadow-sm" 
-                                                />
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-semibold text-gray-900 dark:text-white truncate">
-                                                        {user.name}
-                                                    </h4>
-                                                    <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
-                                                        <FaEnvelope className="text-xs" />
-                                                        <span className="truncate">{user.email}</span>
-                                                    </div>
+                                            <div className="flex items-center space-x-4">
+                                                <div className="flex-shrink-0">
+                                                    <img 
+                                                        className="h-12 w-12 rounded-full" 
+                                                        src={user.profile_photo_url} 
+                                                        alt={user.name || 'User'} 
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=0D8ABC&color=fff`;
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                                        {user.name || 'Utilisateur sans nom'}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                        {user.email || 'Email non disponible'}
+                                                    </p>
+                                                    {user.pivot?.created_at && (
+                                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                            Membre depuis {new Date(user.pivot.created_at).toLocaleDateString('fr-FR', {
+                                                                day: '2-digit',
+                                                                month: 'short',
+                                                                year: 'numeric'
+                                                            })}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                             
@@ -194,32 +267,15 @@ export default function Show({ project }) {
                                                     {getRoleIcon(user.pivot?.role)}
                                                     {getRoleLabel(user.pivot?.role)}
                                                 </div>
-                                                
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">
-                                                    Ajouté le {new Date(user.pivot?.created_at || user.created_at).toLocaleDateString('fr-FR')}
-                                                </div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-center py-12">
-                                    <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-                                        <FaUsers className="text-gray-400 text-2xl" />
-                                    </div>
-                                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                        Aucun membre assigné
-                                    </h3>
-                                    <p className="text-gray-500 dark:text-gray-400 mb-6">
-                                        Ce projet n'a pas encore de membres assignés.
+                                <div className="text-center p-4">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Aucun membre n'a été ajouté à ce projet.
                                     </p>
-                                    <Link
-                                        href={route('project-users.create')}
-                                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                                    >
-                                        <FaUsers />
-                                        Ajouter un membre
-                                    </Link>
                                 </div>
                             )}
                         </div>

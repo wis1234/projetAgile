@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { 
@@ -16,14 +16,73 @@ import {
     FaCalendarAlt
 } from 'react-icons/fa';
 
-export default function Index({ projects = [], filters = {} }) {
+// Helper function to sanitize project data
+const sanitizeProjectData = (project) => {
+    if (!project) return null;
+    
+    const cleanProject = { ...project };
+    
+    // Sanitize users array if it exists
+    if (cleanProject.users) {
+        cleanProject.users = cleanProject.users.map(user => ({
+            id: user.id,
+            name: user.name,
+            email: user.email || '',
+            profile_photo_url: user.profile_photo_url,
+            pivot: user.pivot ? { 
+                role: user.pivot.role,
+                created_at: user.pivot.created_at
+            } : null,
+            created_at: user.created_at
+        }));
+    }
+    
+    // Keep the dates
+    cleanProject.created_at = project.created_at;
+    cleanProject.updated_at = project.updated_at;
+    
+    return cleanProject;
+};
+
+export default function Index({ projects = {}, filters = {} }) {
     const { flash = {} } = usePage().props;
     const [viewMode, setViewMode] = useState('table');
     const [notification, setNotification] = useState(null);
 
-    // Pagination data - assuming projects is a paginated object
-    const paginationData = projects.data ? projects : { data: projects, links: [], meta: null };
-    const projectsList = paginationData.data || projects;
+    // Extract projects data and pagination info
+    const { 
+        data = [], 
+        links = [], 
+        meta = { 
+            from: 0, 
+            to: 0, 
+            total: 0, 
+            current_page: 1, 
+            last_page: 1,
+            per_page: 10
+        } 
+    } = projects;
+    
+    // Sanitize projects data
+    const projectsList = useMemo(() => {
+        const projectsData = Array.isArray(data) ? data : [];
+        return projectsData
+            .map(sanitizeProjectData)
+            .filter(Boolean);
+    }, [data]);
+    
+    // Prepare pagination data
+    const paginationData = {
+        links: Array.isArray(links) ? links : [],
+        meta: {
+            from: meta.from || 0,
+            to: meta.to || 0,
+            total: meta.total || 0,
+            current_page: meta.current_page || 1,
+            last_page: meta.last_page || 1,
+            per_page: meta.per_page || 10
+        }
+    };
 
     useEffect(() => {
         if (flash.success) {
@@ -168,21 +227,23 @@ export default function Index({ projects = [], filters = {} }) {
                             <>
                                 {/* Table View */}
                                 {viewMode === 'table' && (
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                            <thead className="bg-gray-50 dark:bg-gray-700">
-                                                <tr>
-                                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                        Projet
-                                                    </th>
-                                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                        Membres
-                                                    </th>
-                                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell">
-                                                        Statistiques
-                                                    </th>
-                                                </tr>
-                                            </thead>
+                                    <div className="overflow-x-auto -mx-4 sm:mx-0">
+                                        <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                                    <tr>
+                                                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sm:px-6">
+                                                            Projet
+                                                        </th>
+                                                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sm:px-6">
+                                                            <span className="hidden sm:inline">Membres</span>
+                                                            <span className="sm:hidden">Membres</span>
+                                                        </th>
+                                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden sm:table-cell">
+                                                            <span className="hidden lg:inline">Statistiques</span>
+                                                        </th>
+                                                    </tr>
+                                                </thead>
                                             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                                 {projectsList.map(project => (
                                                     <tr
@@ -240,9 +301,19 @@ export default function Index({ projects = [], filters = {} }) {
                                                                     <FaTasks className="text-xs" />
                                                                     <span>{project.tasks_count || 0} tâches</span>
                                                                 </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <FaCalendarAlt className="text-xs" />
-                                                                    <span>{new Date(project.created_at).toLocaleDateString('fr-FR')}</span>
+                                                                <div className="flex items-center gap-1 whitespace-nowrap">
+                                                                    <FaCalendarAlt className="text-xs flex-shrink-0" />
+                                                                    <span>{
+                                                                        project.created_at && !isNaN(new Date(project.created_at).getTime()) 
+                                                                            ? new Date(project.created_at).toLocaleDateString('fr-FR', {
+                                                                                day: '2-digit',
+                                                                                month: 'short',
+                                                                                year: 'numeric',
+                                                                                hour: '2-digit',
+                                                                                minute: '2-digit'
+                                                                            })
+                                                                            : 'Date inconnue'
+                                                                    }</span>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -251,16 +322,17 @@ export default function Index({ projects = [], filters = {} }) {
                                             </tbody>
                                         </table>
                                     </div>
-                                )}
+                                </div>
+                            )}
 
                                 {/* Cards View */}
                                 {viewMode === 'cards' && (
-                                    <div className="p-6">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    <div className="p-4 sm:p-6">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                                             {projectsList.map(project => (
                                                 <div
                                                     key={project.id}
-                                                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-105 transition-all duration-200 cursor-pointer group overflow-hidden"
+                                                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200 cursor-pointer group overflow-hidden h-full flex flex-col"
                                                     onClick={() => router.get(route('project-users.show', project.id))}
                                                 >
                                                     {/* Card Header */}
@@ -336,10 +408,30 @@ export default function Index({ projects = [], filters = {} }) {
                                                     {/* Card Footer */}
                                                     <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
                                                         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                                                            <span>Créé le {new Date(project.created_at).toLocaleDateString('fr-FR')}</span>
                                                             <div className="flex items-center gap-1">
-                                                                <FaCalendarAlt />
-                                                                <span>{new Date(project.updated_at).toLocaleDateString('fr-FR')}</span>
+                                                                <FaCalendarAlt className="flex-shrink-0" />
+                                                                <span>Créé le {
+                                                                    project.created_at && !isNaN(new Date(project.created_at).getTime())
+                                                                        ? new Date(project.created_at).toLocaleDateString('fr-FR', {
+                                                                            day: '2-digit',
+                                                                            month: 'short',
+                                                                            year: 'numeric'
+                                                                        })
+                                                                        : 'Date inconnue'
+                                                                }</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <span>Modifié le </span>
+                                                                <span>{
+                                                                    project.updated_at && !isNaN(new Date(project.updated_at).getTime())
+                                                                        ? new Date(project.updated_at).toLocaleDateString('fr-FR', {
+                                                                            day: '2-digit',
+                                                                            month: 'short',
+                                                                            hour: '2-digit',
+                                                                            minute: '2-digit'
+                                                                        })
+                                                                        : 'Date inconnue'
+                                                                }</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -353,17 +445,15 @@ export default function Index({ projects = [], filters = {} }) {
                     </div>
 
                     {/* Pagination */}
-                    {paginationData.links && paginationData.links.length > 3 && (
+                    {paginationData.links && paginationData.links.length > 1 && (
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 px-6 py-4 mt-6">
                             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                                 {/* Pagination Info */}
-                                {paginationData.meta && (
-                                    <div className="text-sm text-gray-700 dark:text-gray-300">
-                                        Affichage de <span className="font-semibold">{paginationData.meta.from || 0}</span> à{' '}
-                                        <span className="font-semibold">{paginationData.meta.to || 0}</span> sur{' '}
-                                        <span className="font-semibold">{paginationData.meta.total || 0}</span> résultats
-                                    </div>
-                                )}
+                                <div className="text-sm text-gray-700 dark:text-gray-300">
+                                    Affichage de <span className="font-semibold">{paginationData.meta.from || 0}</span> à {' '}
+                                    <span className="font-semibold">{paginationData.meta.to || projectsList.length}</span> sur {' '}
+                                    <span className="font-semibold">{paginationData.meta.total || projectsList.length}</span> résultats
+                                </div>
 
                                 {/* Pagination Links */}
                                 <div className="flex items-center gap-1">

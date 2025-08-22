@@ -178,9 +178,6 @@ function Kanban({ tasks: initialTasks, auth }) {
         position: task.position || 0, // Utiliser la position existante ou 0 par défaut
       }));
 
-      // Journalisation pour le débogage
-      console.log('Envoi des données au serveur:', { tasks: updatedTasks });
-
       try {
         // Envoyer les mises à jour au serveur
         const response = await axios.put(route('kanban.updateOrder'), {

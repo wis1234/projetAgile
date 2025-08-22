@@ -16,11 +16,21 @@ import { motion } from 'framer-motion';
 
 function Show({ user, auth }) {
   const { flash = {} } = usePage().props;
+  
+  // Sanitize user data
+  const sanitizedUser = React.useMemo(() => ({
+    ...user,
+    email: user?.email || '',
+    name: user?.name || 'Utilisateur sans nom',
+    role: ['admin', 'manager', 'user'].includes(user?.role) ? user.role : 'user',
+    created_at: user?.created_at || new Date().toISOString()
+  }), [user]);
+
   const userAuth = auth?.user || auth;
-  const isAdmin = userAuth && userAuth.role === 'admin';
-  const canEdit = userAuth && (userAuth.role === 'admin' || userAuth.id === user.id);
-  const canAssignRole = userAuth && userAuth.email === 'ronaldoagbohou@gmail.com';
-  const [role, setRole] = React.useState(user.role || 'user');
+  const isAdmin = userAuth?.role === 'admin';
+  const canEdit = userAuth && (isAdmin || userAuth.id === sanitizedUser.id);
+  const canAssignRole = userAuth?.email === 'ronaldoagbohou@gmail.com';
+  const [role, setRole] = React.useState(sanitizedUser.role);
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState('');
   const [error, setError] = React.useState('');
@@ -31,7 +41,7 @@ function Show({ user, auth }) {
     setSuccess('');
     setError('');
     try {
-      const res = await fetch(`/users/${user.id}/assign-role`, {
+      const res = await fetch(`/users/${sanitizedUser.id}/assign-role`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

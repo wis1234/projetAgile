@@ -136,7 +136,7 @@ export default function AdminLayout({ children }) {
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-colors">
       {globalLoading && <Loader />}
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-40 flex flex-col shadow-xl`}>
+      <aside className={`fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}>
         {/* Logo */}
         <div className="flex items-center justify-between h-20 px-6">
           <div className="flex items-center space-x-3">
@@ -187,12 +187,20 @@ export default function AdminLayout({ children }) {
         </div>
       </aside>
       {/* Overlay for mobile */}
-      {sidebarOpen && <div className="fixed inset-0 bg-black bg-opacity-30 z-30 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
+      {sidebarOpen && <div className="fixed inset-0 bg-black bg-opacity-30 z-40 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
         {/* Header */}
         <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white bg-opacity-100 border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 z-40 transition-all duration-300">
-          <button className="md:hidden text-2xl mr-2" onClick={() => setSidebarOpen(true)}>&#9776;</button>
+          <button 
+            className="md:hidden text-2xl mr-2 text-gray-600 dark:text-gray-200" 
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Ouvrir le menu"
+          >
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
           <div className="flex items-center">
             <span className="text-xl md:text-2xl font-light tracking-wider text-gray-700 dark:text-gray-200">
               DASHBOARD
