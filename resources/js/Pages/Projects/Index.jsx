@@ -344,30 +344,78 @@ export default function Index({ projects, filters }) {
                     </div>
                 )}
 
-                {/* Pagination - Super Responsive */}
-                {projects?.links && projects.links.length > 3 && (
-                    <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
-                            Affichage de {projects.from || 0} à {projects.to || 0} sur {projects.total || 0} résultats
+                {/* Pagination - Enhanced with Error Handling */}
+                <div className="mt-6 sm:mt-8">
+                    {projects?.data?.length > 0 && projects?.links?.length > 0 ? (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div className="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
+                                Affichage de {projects.from || 0} à {projects.to || 0} sur {projects.total || 0} résultat{projects.total !== 1 ? 's' : ''}
+                            </div>
+                            <div className="flex flex-wrap justify-center gap-1 sm:gap-2 order-1 sm:order-2">
+                                {projects.links.map((link, index) => {
+                                    // Skip if no URL (for previous/next disabled links)
+                                    if (!link.url) {
+                                        return (
+                                            <span 
+                                                key={index}
+                                                className="px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
+                                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                            />
+                                        );
+                                    }
+
+                                    // Handle previous/next buttons
+                                    if (link.label.includes('Previous') || link.label.includes('Suivant')) {
+                                        return (
+                                            <Link
+                                                key={index}
+                                                href={link.url}
+                                                className={`px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 ${
+                                                    link.active
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                                                }`}
+                                            >
+                                                {link.label.includes('Previous') ? 'Précédent' : 'Suivant'}
+                                            </Link>
+                                        );
+                                    }
+
+                                    // Handle page numbers
+                                    if (link.label.match(/^\d+$/)) {
+                                        return (
+                                            <Link
+                                                key={index}
+                                                href={link.url}
+                                                className={`px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 ${
+                                                    link.active
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                                                }`}
+                                            >
+                                                {link.label}
+                                            </Link>
+                                        );
+                                    }
+
+                                    // Handle ellipsis
+                                    return (
+                                        <span 
+                                            key={index}
+                                            className="px-2 py-1 sm:py-2 text-gray-500"
+                                        >
+                                            ...
+                                        </span>
+                                    );
+                                })}
+                            </div>
                         </div>
-                        <div className="flex flex-wrap justify-center gap-1 sm:gap-2 order-1 sm:order-2">
-                            {projects.links.map((link, index) => (
-                                <Link
-                                    key={index}
-                                    href={link.url}
-                                    className={`px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 ${
-                                        link.active
-                                            ? 'bg-blue-600 text-white'
-                                            : link.url
-                                            ? 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
-                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                                    }`}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
+                    ) : projects?.data?.length === 0 ? (
+                        <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                            Aucun projet trouvé. Essayez de modifier vos critères de recherche.
                         </div>
-                    </div>
-                )}
+                    ) : null}
+                </div>
 
                 {/* Notification - Responsive */}
                 {notification && (

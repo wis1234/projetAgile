@@ -20,31 +20,74 @@ class ProjectController extends Controller
      */
     public function index(Request $request)
     {
-        // Only show projects where the authenticated user is a member
-        $query = Project::whereHas('users', function($query) {
-            $query->where('user_id', auth()->id());
-        });
-        
-        if ($request->search) {
-            $query->where(function($q) use ($request) {
-                $q->where('name', 'like', '%'.$request->search.'%')
-                  ->orWhere('description', 'like', '%'.$request->search.'%');
+        try {
+            // Only show projects where the authenticated user is a member
+            $query = Project::query()->whereHas('users', function($query) {
+                $query->where('user_id', auth()->id());
             });
+            
+            // Search functionality
+            if ($request->has('search') && !empty($request->search)) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', '%'.$search.'%')
+                      ->orWhere('description', 'like', '%'.$search.'%');
+                });
+            }
+            
+            // Pagination with error handling
+            $perPage = $request->input('per_page', 10);
+            $projects = $query->withCount(['tasks', 'users'])
+                             ->with(['users' => function($query) {
+                                 $query->select('users.id', 'name', 'email')
+                                       ->withPivot('role');
+                             }])
+                             ->orderBy('created_at', 'desc')
+                             ->paginate($perPage)
+                             ->withQueryString()
+                             ->through(function ($project) {
+                                 return [
+                                     'id' => $project->id,
+                                     'name' => $project->name,
+                                     'description' => $project->description,
+                                     'status' => $project->status,
+                                     'created_at' => $project->created_at,
+                                     'updated_at' => $project->updated_at,
+                                     'users_count' => $project->users_count,
+                                     'tasks_count' => $project->tasks_count,
+                                     'users' => $project->users->map(function($user) {
+                                         return [
+                                             'id' => $user->id,
+                                             'name' => $user->name,
+                                             'email' => $user->email,
+                                             'role' => $user->pivot->role
+                                         ];
+                                     })
+                                 ];
+                             });
+            
+            return Inertia::render('Projects/Index', [
+                'projects' => $projects,
+                'filters' => $request->only('search'),
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error in ProjectController@index: ' . $e->getMessage());
+            
+            return Inertia::render('Projects/Index', [
+                'projects' => [
+                    'data' => [],
+                    'links' => [],
+                    'from' => 0,
+                    'to' => 0,
+                    'total' => 0,
+                    'current_page' => 1,
+                    'last_page' => 1,
+                ],
+                'filters' => $request->only('search'),
+                'error' => 'Une erreur est survenue lors du chargement des projets.'
+            ]);
         }
-        
-        $projects = $query->withCount(['tasks', 'users'])
-                         ->with(['users' => function($query) {
-                             $query->select('users.id', 'name', 'email')
-                                   ->withPivot('role');
-                         }])
-                         ->orderBy('created_at', 'desc')
-                         ->paginate(10)
-                         ->withQueryString();
-                         
-        return Inertia::render('Projects/Index', [
-            'projects' => $projects,
-            'filters' => $request->only('search'),
-        ]);
     }
 
     /**
