@@ -258,7 +258,7 @@ export default function Index({ projects = {}, filters = {} }) {
                                                                 </div>
                                                                 <div>
                                                                     <div className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                                                        {project.name}
+                                                                        {project.name.length > 20 ? `${project.name.substring(0, 20)}...` : project.name}
                                                                     </div>
                                                                     <div className="text-xs text-gray-500 dark:text-gray-400">
                                                                         {project.users?.length || 0} membre(s)
