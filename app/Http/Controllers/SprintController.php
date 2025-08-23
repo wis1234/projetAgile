@@ -25,11 +25,18 @@ class SprintController extends Controller
         
         // Récupération des sprints avec pagination
         $perPage = $request->input('per_page', 10);
+        $user = auth()->user();
         
         // Récupération des données paginées
         $sprints = Sprint::with(['project' => function($query) {
                 $query->select('id', 'name');
             }])
+            ->when(!$user->hasRole('admin'), function($query) use ($user) {
+                // Pour les non-admins, ne montrer que les sprints des projets où l'utilisateur est membre
+                $query->whereHas('project.users', function($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                });
+            })
             ->when($request->search, function($query, $search) {
                 $query->where('name', 'like', "%{$search}%");
             })
