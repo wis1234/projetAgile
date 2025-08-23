@@ -6,7 +6,16 @@ import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArr
 import Modal from '@/Components/Modal';
 
 // Composant de compte à rebours réutilisable
-const CountdownTimer = ({ targetDate, onComplete }) => {
+const formatTimeUnit = (value, label) => (
+  <div className="flex flex-col items-center">
+    <span className="text-2xl font-bold bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg w-14 h-14 flex items-center justify-center shadow-md">
+      {value.toString().padStart(2, '0')}
+    </span>
+    <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{label}</span>
+  </div>
+);
+
+const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt }) => {
   const calculateTimeLeft = useCallback(() => {
     const difference = new Date(targetDate) - new Date();
     
@@ -39,34 +48,58 @@ const CountdownTimer = ({ targetDate, onComplete }) => {
     return () => clearInterval(timer);
   }, [calculateTimeLeft]);
 
+  // If task is done, check if it was completed before or at the deadline
+  if (taskStatus === 'done') {
+    const updatedAt = new Date(taskUpdatedAt);
+    const dueDate = new Date(targetDate);
+    const now = new Date();
+    
+    // If current time is before deadline, show countdown
+    if (now < dueDate) {
+      return (
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center justify-end gap-1">
+            {timeLeft.days > 0 && formatTimeUnit(timeLeft.days, 'J')}
+            {formatTimeUnit(timeLeft.hours, 'H')}
+            {formatTimeUnit(timeLeft.minutes, 'M')}
+            {formatTimeUnit(timeLeft.seconds, 'S')}
+          </div>
+          <span className="text-xs text-gray-500 dark:text-gray-400">Temps restant</span>
+        </div>
+      );
+    }
+    
+    // After deadline, show if completed on time or late
+    const completedOnTime = updatedAt <= dueDate;
+    return (
+      <div className="flex items-center justify-end gap-2">
+        <FaClock className={completedOnTime ? 'text-green-500' : 'text-red-500 animate-pulse'} />
+        <span className={completedOnTime ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+          {completedOnTime ? 'Délai respecté' : 'Délai dépassé'}
+        </span>
+      </div>
+    );
+  }
+
+  // For tasks not done yet, always show countdown until deadline
   if (timeLeft.expired) {
     return (
-      <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+      <div className="flex items-center justify-end gap-2 text-red-600 dark:text-red-400">
         <FaClock className="animate-pulse" />
         <span>Délai dépassé</span>
       </div>
     );
   }
 
-  const formatTimeUnit = (value, label) => (
-    <div className="flex flex-col items-center">
-      <span className="text-2xl font-bold bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg w-14 h-14 flex items-center justify-center shadow-md">
-        {value.toString().padStart(2, '0')}
-      </span>
-      <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{label}</span>
-    </div>
-  );
-
   return (
-    <div className="flex items-center gap-2">
-      <FaClock className="text-blue-500" />
-      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Temps restant :</span>
-      <div className="flex items-center gap-2">
-        {timeLeft.days > 0 && formatTimeUnit(timeLeft.days, 'Jours')}
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center justify-end gap-1">
+        {timeLeft.days > 0 && formatTimeUnit(timeLeft.days, 'J')}
         {formatTimeUnit(timeLeft.hours, 'H')}
-        {formatTimeUnit(timeLeft.minutes, 'Min')}
-        {formatTimeUnit(timeLeft.seconds, 'Sec')}
+        {formatTimeUnit(timeLeft.minutes, 'M')}
+        {formatTimeUnit(timeLeft.seconds, 'S')}
       </div>
+      <span className="text-xs text-gray-500 dark:text-gray-400">Temps restant</span>
     </div>
   );
 };
@@ -671,10 +704,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                           )}
                         </div>
                         <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                          <CountdownTimer 
-                            targetDate={task.due_date}
-                            onComplete={() => console.log('Temps écoulé!')}
-                          />
+<div className="text-right">
+                            <CountdownTimer 
+                              targetDate={task.due_date}
+                              taskStatus={task.status}
+                              taskUpdatedAt={task.updated_at}
+                              onComplete={() => console.log('Temps écoulé!')}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
