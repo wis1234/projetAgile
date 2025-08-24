@@ -12,6 +12,12 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 class AuditLogController extends Controller
 {
     use AuthorizesRequests;
+
+    public function __construct()
+    {
+        $this->authorizeResource(AuditLog::class, 'audit_log');
+    }
+
     /**
      * Display a listing of the resource.
      */

@@ -11,6 +11,8 @@ class TaskCommentController extends Controller
     // Liste les commentaires d'une tâche
     public function index($taskId)
     {
+        $task = Task::findOrFail($taskId);
+        $this->authorize('viewAny', [TaskComment::class, $task]);
         $comments = TaskComment::with('user')
             ->where('task_id', $taskId)
             ->orderBy('created_at', 'asc')
@@ -21,6 +23,8 @@ class TaskCommentController extends Controller
     // Ajoute un commentaire à une tâche
     public function store(Request $request, $taskId)
     {
+        $task = Task::findOrFail($taskId);
+        $this->authorize('create', [TaskComment::class, $task]);
         $request->validate([
             'content' => 'required|string|max:2000',
         ]);
@@ -62,9 +66,7 @@ class TaskCommentController extends Controller
     public function destroy($taskId, $commentId)
     {
         $comment = TaskComment::findOrFail($commentId);
-        if ($comment->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $this->authorize('delete', $comment);
         $comment->delete();
         return response()->json(['success' => true]);
     }
@@ -73,9 +75,7 @@ class TaskCommentController extends Controller
     public function update(Request $request, $taskId, $commentId)
     {
         $comment = TaskComment::findOrFail($commentId);
-        if ($comment->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $this->authorize('update', $comment);
         $request->validate([
             'content' => 'required|string|max:2000',
         ]);

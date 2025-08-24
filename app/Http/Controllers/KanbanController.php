@@ -31,8 +31,8 @@ class KanbanController extends Controller
             ->orderBy('updated_at', 'desc');
 
         if (!$user->hasRole('admin')) {
-            // Pour les non-admins, ne montrer que les tâches des projets auxquels ils appartiennent
-            $projectIds = $user->projects()->pluck('projects.id');
+            // Pour les non-admins, ne montrer que les tâches des projets auxquels ils appartiennent et où ils ne sont pas en sourdine
+            $projectIds = $user->projects()->wherePivot('is_muted', '!=', true)->pluck('projects.id');
             $query->whereIn('project_id', $projectIds);
         }
 
@@ -190,9 +190,9 @@ class KanbanController extends Controller
             ->orderBy('position', 'asc') // Puis par position
             ->orderBy('updated_at', 'desc'); // Enfin par date de mise à jour
 
-        // Filtrer par projets auxquels l'utilisateur a accès
+        // Filtrer par projets auxquels l'utilisateur a accès et où il n'est pas en sourdine
         if (!$user->hasRole('admin')) {
-            $projectIds = $user->projects()->pluck('projects.id');
+            $projectIds = $user->projects()->wherePivot('is_muted', '!=', true)->pluck('projects.id');
             $query->whereIn('project_id', $projectIds);
         }
 

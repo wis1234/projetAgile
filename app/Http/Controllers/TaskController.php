@@ -197,6 +197,7 @@ class TaskController extends Controller
 
     public function savePaymentInfo(Request $request, Task $task)
     {
+        $this->authorize('create', [TaskPayment::class, $task]);
         $user = auth()->user();
 
         // Check if the authenticated user is part of the project associated with the task
@@ -228,6 +229,7 @@ class TaskController extends Controller
 
     public function validatePayment(Task $task, \App\Models\TaskPayment $taskPayment)
     {
+        $this->authorize('update', $taskPayment);
         try {
             $this->authorize('validatePayment', $task);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {

@@ -11,6 +11,8 @@ class FileCommentController extends Controller
     // Liste les commentaires d'un fichier
     public function index($fileId)
     {
+        $file = File::findOrFail($fileId);
+        $this->authorize('viewAny', [FileComment::class, $file]);
         $comments = FileComment::with('user')
             ->where('file_id', $fileId)
             ->orderBy('created_at', 'asc')
@@ -21,6 +23,8 @@ class FileCommentController extends Controller
     // Ajoute un commentaire à un fichier
     public function store(Request $request, $fileId)
     {
+        $file = File::findOrFail($fileId);
+        $this->authorize('create', [FileComment::class, $file]);
         $request->validate([
             'content' => 'required|string|max:2000',
         ]);
@@ -62,9 +66,7 @@ class FileCommentController extends Controller
     public function destroy($fileId, $commentId)
     {
         $comment = FileComment::findOrFail($commentId);
-        if ($comment->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $this->authorize('delete', $comment);
         $comment->delete();
         return response()->json(['success' => true]);
     }
@@ -73,9 +75,7 @@ class FileCommentController extends Controller
     public function update(Request $request, $fileId, $commentId)
     {
         $comment = FileComment::findOrFail($commentId);
-        if ($comment->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $this->authorize('update', $comment);
         $request->validate([
             'content' => 'required|string|max:2000',
         ]);

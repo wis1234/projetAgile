@@ -14,6 +14,9 @@ class SprintPolicy
 
     public function view(User $user, Sprint $sprint)
     {
+        if (is_user_muted_in_project($user, $sprint->project)) {
+            return false;
+        }
         return $user->hasRole('admin') || ($sprint->project && $sprint->project->users()->where('user_id', $user->id)->exists());
     }
 
@@ -24,11 +27,17 @@ class SprintPolicy
 
     public function update(User $user, Sprint $sprint)
     {
+        if (is_user_muted_in_project($user, $sprint->project)) {
+            return false;
+        }
         return $user->hasRole('admin') || ($sprint->project && $sprint->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists());
     }
 
     public function delete(User $user, Sprint $sprint)
     {
+        if (is_user_muted_in_project($user, $sprint->project)) {
+            return false;
+        }
         return $this->update($user, $sprint);
     }
 } 

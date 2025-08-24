@@ -14,6 +14,12 @@ use App\Notifications\UserActionMailNotification;
 class MessageController extends Controller
 {
     use AuthorizesRequests;
+
+    public function __construct()
+    {
+        $this->authorizeResource(Message::class, 'message');
+    }
+
     /**
      * Display a listing of the resource.
      */

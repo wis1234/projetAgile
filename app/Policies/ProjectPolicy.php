@@ -14,6 +14,9 @@ class ProjectPolicy
 
     public function view(User $user, Project $project)
     {
+        if (is_user_muted_in_project($user, $project)) {
+            return false;
+        }
         return $user->hasRole('admin') || $project->users()->where('user_id', $user->id)->exists();
     }
 
@@ -24,6 +27,9 @@ class ProjectPolicy
 
     public function update(User $user, Project $project)
     {
+        if (is_user_muted_in_project($user, $project)) {
+            return false;
+        }
         return $user->hasRole('admin') || $project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists();
     }
 
@@ -34,6 +40,9 @@ class ProjectPolicy
 
     public function manageMembers(User $user, Project $project)
     {
+        if (is_user_muted_in_project($user, $project)) {
+            return false;
+        }
         return $user->hasRole('admin') || $project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists();
     }
 } 

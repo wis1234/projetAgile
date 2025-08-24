@@ -15,6 +15,16 @@ use App\Models\School;
 use App\Policies\SchoolPolicy;
 use App\Models\File;
 use App\Policies\FilePolicy;
+use App\Models\Message;
+use App\Policies\MessagePolicy;
+use App\Models\AuditLog;
+use App\Policies\AuditLogPolicy;
+use App\Models\FileComment;
+use App\Policies\FileCommentPolicy;
+use App\Models\TaskComment;
+use App\Policies\TaskCommentPolicy;
+use App\Models\TaskPayment;
+use App\Policies\TaskPaymentPolicy;
 
 class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
 {
@@ -30,6 +40,11 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
         User::class => UserPolicy::class,
         School::class => SchoolPolicy::class,
         File::class => FilePolicy::class,
+        Message::class => MessagePolicy::class,
+        AuditLog::class => AuditLogPolicy::class,
+        FileComment::class => FileCommentPolicy::class,
+        TaskComment::class => TaskCommentPolicy::class,
+        TaskPayment::class => TaskPaymentPolicy::class,
     ];
 
     /**

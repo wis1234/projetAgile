@@ -79,6 +79,12 @@ class FileController extends Controller
     {
         $currentUser = auth()->user();
         $project = Project::findOrFail($request->project_id);
+
+        // Vérifier si l'utilisateur est en sourdine sur le projet
+        if (is_user_muted_in_project($currentUser, $project)) {
+            return Inertia::render('Error403', ['message' => "Vous avez été mis en sourdine sur ce projet et ne pouvez pas ajouter de fichiers."])->toResponse($request)->setStatusCode(403);
+        }
+
         if (!$currentUser->hasRole('admin') && !$project->users()->where('user_id', $currentUser->id)->exists()) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
@@ -254,6 +260,11 @@ class FileController extends Controller
     public function update(Request $request, File $file)
     {
         $currentUser = auth()->user();
+
+        if ($file->project && is_user_muted_in_project($currentUser, $file->project)) {
+            return \Inertia\Inertia::render('Error403', ['message' => 'Vous avez été mis en sourdine sur ce projet et ne pouvez pas modifier de fichiers.'])->toResponse($request)->setStatusCode(403);
+        }
+
         if (!$currentUser->hasRole('admin') && (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
@@ -354,6 +365,11 @@ class FileController extends Controller
     public function download(File $file)
     {
         $currentUser = auth()->user();
+
+        if ($file->project && is_user_muted_in_project($currentUser, $file->project)) {
+            abort(403, 'Vous avez été mis en sourdine sur ce projet et ne pouvez pas télécharger de fichiers.');
+        }
+
         if (!$currentUser->hasRole('admin') && (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())) {
             abort(403, 'Vous n\'êtes pas autorisé à télécharger ce fichier.');
         }

@@ -23,6 +23,10 @@ class FilePolicy
      */
     public function view(User $user, File $file): bool
     {
+        if ($file->project && is_user_muted_in_project($user, $file->project)) {
+            return false;
+        }
+
         // Les administrateurs peuvent tout voir
         if ($user->hasRole('admin')) {
             return true;
@@ -54,6 +58,10 @@ class FilePolicy
      */
     public function update(User $user, File $file): bool
     {
+        if ($file->project && is_user_muted_in_project($user, $file->project)) {
+            return false;
+        }
+
         // Les administrateurs peuvent tout modifier
         if ($user->hasRole('admin')) {
             return true;
@@ -77,6 +85,10 @@ class FilePolicy
      */
     public function delete(User $user, File $file): bool
     {
+        if ($file->project && is_user_muted_in_project($user, $file->project)) {
+            return false;
+        }
+
         // Mêmes règles que pour la mise à jour
         return $this->update($user, $file);
     }

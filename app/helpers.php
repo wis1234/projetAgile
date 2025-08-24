@@ -15,4 +15,15 @@ if (!function_exists('activity_log')) {
             'user_agent' => request()->userAgent(),
         ]);
     }
-} 
+}
+
+if (!function_exists('is_user_muted_in_project')) {
+    function is_user_muted_in_project($user, $project) {
+        if (!$user || !$project) {
+            return false;
+        }
+        $projectUser = $project->users()->where('user_id', $user->id)->first();
+        return $projectUser && $projectUser->pivot->is_muted;
+    }
+}
+ 

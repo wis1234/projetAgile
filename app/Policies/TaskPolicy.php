@@ -14,23 +14,35 @@ class TaskPolicy
 
     public function view(User $user, Task $task)
     {
+        if (is_user_muted_in_project($user, $task->project)) {
+            return false;
+        }
         return $user->hasRole('admin')
             || ($task->project && $task->project->users()->where('user_id', $user->id)->exists());
     }
 
     public function update(User $user, Task $task)
     {
+        if (is_user_muted_in_project($user, $task->project)) {
+            return false;
+        }
         return $user->hasRole('admin')
             || ($task->project && $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists());
     }
 
     public function delete(User $user, Task $task)
     {
+        if (is_user_muted_in_project($user, $task->project)) {
+            return false;
+        }
         return $this->update($user, $task);
     }
 
     public function comment(User $user, Task $task)
     {
+        if (is_user_muted_in_project($user, $task->project)) {
+            return false;
+        }
         return $user->hasRole('admin')
             || ($task->project && $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists())
             || $task->assigned_to == $user->id;
@@ -43,11 +55,17 @@ class TaskPolicy
 
     public function uploadFile(User $user, Task $task)
     {
+        if (is_user_muted_in_project($user, $task->project)) {
+            return false;
+        }
         return $this->comment($user, $task);
     }
 
     public function validatePayment(User $user, Task $task)
     {
+        if (is_user_muted_in_project($user, $task->project)) {
+            return false;
+        }
         return $user->hasRole('admin')
             || ($task->project && $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists());
     }
