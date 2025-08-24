@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, usePage } from '@inertiajs/react';
+import { Head, Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
+import MuteNotificationModal from '../../Components/MuteNotificationModal';
 import { 
-    FaUsers, 
-    FaUserEdit, 
-    FaArrowLeft, 
+    FaToggleOn,
+    FaToggleOff,
+    FaUsers,
+    FaUserEdit,
+    FaArrowLeft,
     FaProjectDiagram,
     FaUser,
     FaCrown,
@@ -12,8 +15,10 @@ import {
     FaCalendarAlt,
     FaTasks,
     FaEye,
-    FaEnvelope,
-    FaInfoCircle
+    FaInfoCircle,
+    FaExclamationTriangle,
+    FaBell,
+    FaBellSlash
 } from 'react-icons/fa';
 
 // Helper function to sanitize project data
@@ -31,7 +36,8 @@ const sanitizeProjectData = (project) => {
             profile_photo_url: user.profile_photo_url,
             pivot: user.pivot ? { 
                 role: user.pivot.role,
-                created_at: user.pivot.created_at
+                created_at: user.pivot.created_at,
+                is_muted: !!user.pivot.is_muted
             } : null,
             created_at: user.created_at
         }));
@@ -44,11 +50,207 @@ const sanitizeProjectData = (project) => {
     return cleanProject;
 };
 
-export default function Show({ project: initialProject }) {
-    // Sanitize project data
-    const project = useMemo(() => sanitizeProjectData(initialProject), [initialProject]);
+export default function Show({ project: initialProject, memberStats = [], auth, canManageMembers = false }) {
+    const [isMuting, setIsMuting] = useState({});
+    const [showMuteNotification, setShowMuteNotification] = useState(false);
+    const [currentUserMuted, setCurrentUserMuted] = useState(false);
+    const [managerName, setManagerName] = useState('');
+    const [showConfirmModal, setShowConfirmModal] = useState({
+        show: false,
+        userId: null,
+        isMuted: false,
+        message: ''
+    });
+    
     const { flash = {} } = usePage().props;
     const [notification, setNotification] = useState(null);
+    
+    // Sanitize project data and merge with member stats
+    const [project, setProject] = useState(() => sanitizeProjectData(initialProject));
+    useMemo(() => {
+        const sanitized = sanitizeProjectData(initialProject);
+        if (!sanitized?.users) return sanitized;
+        
+        // Find current user in project members
+        const currentUser = sanitized.users.find(user => user.id === auth.user.id);
+        if (currentUser) {
+            setCurrentUserMuted(!!currentUser.pivot?.is_muted);
+            
+            // Find manager for notification
+            const manager = sanitized.users.find(u => u.pivot?.role === 'manager');
+            if (manager) {
+                setManagerName(manager.name);
+            }
+        }
+        
+        // Merge member stats with users
+        return {
+            ...sanitized,
+            users: sanitized.users.map(user => ({
+                ...user,
+                tasks_count: memberStats[user.id]?.total_tasks || 0,
+                completed_tasks_count: memberStats[user.id]?.completed_tasks || 0
+            }))
+        };
+    }, [initialProject, memberStats, auth.user.id]);
+    
+    const handleToggleMute = (userId, currentStatus, userName) => {
+        setShowConfirmModal({
+            show: true,
+            userId,
+            userName,
+            isMuted: !currentStatus, // Inverser pour montrer le prochain état
+            message: !currentStatus 
+                ? `Êtes-vous sûr de vouloir mettre en sourdine ${userName} ?`
+                : `Êtes-vous sûr de vouloir réactiver les notifications pour ${userName} ?`
+        });
+    };
+
+    const confirmToggleMute = async () => {
+        const { userId, isMuted } = showConfirmModal;
+        if (!userId) return;
+
+        setIsMuting(prev => ({ ...prev, [userId]: true }));
+        setShowConfirmModal(prev => ({ ...prev, show: false }));
+        
+        // Mettre à jour l'état local immédiatement pour un retour visuel instantané
+        setProject(prev => {
+            const updatedUsers = prev.users.map(user => 
+                user.id === userId 
+                    ? { 
+                        ...user, 
+                        pivot: { 
+                            ...user.pivot, 
+                            is_muted: isMuted 
+                        } 
+                    } 
+                    : user
+            );
+            
+            // Mettre à jour également currentUserMuted si c'est l'utilisateur actuel
+            if (parseInt(userId) === auth.user.id) {
+                setCurrentUserMuted(isMuted);
+            }
+            
+            return {
+                ...prev,
+                users: updatedUsers
+            };
+        });
+        
+        try {
+            const response = await fetch(route('project-users.toggle-mute', {
+                project: project.id,
+                user: userId
+            }), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ _method: 'POST' })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                // Mettre à jour l'état local avec la réponse du serveur
+                setProject(prev => ({
+                    ...prev,
+                    users: prev.users.map(user => 
+                        user.id === userId 
+                            ? { 
+                                ...user, 
+                                pivot: { 
+                                    ...user.pivot,
+                                    is_muted: data.is_muted 
+                                } 
+                            } 
+                            : user
+                    )
+                }));
+                
+                // Mettre à jour l'état de l'utilisateur actuel si nécessaire
+                if (parseInt(userId) === auth.user.id) {
+                    setCurrentUserMuted(data.is_muted);
+                }
+                
+                // Afficher la notification
+                setNotification({
+                    type: 'success',
+                    message: data.is_muted 
+                        ? 'Membre mis en sourdine avec succès' 
+                        : 'Membre réactivé avec succès'
+                });
+            } else {
+                throw new Error(data.message || 'Une erreur est survenue lors de la mise à jour du statut');
+            }
+        } catch (error) {
+            console.error('Toggle mute error:', error);
+            setNotification({
+                type: 'error',
+                message: error.message || 'Une erreur est survenue lors de la mise à jour du statut de sourdine'
+            });
+        } finally {
+            setIsMuting(prev => ({ ...prev, [userId]: false }));
+        }
+    };
+    
+    // Show mute notification when component mounts if user is muted
+    useEffect(() => {
+        if (currentUserMuted) {
+            setShowMuteNotification(true);
+        }
+    }, [currentUserMuted]);
+
+    const ConfirmModal = () => (
+        <div className={`fixed inset-0 z-50 overflow-y-auto ${showConfirmModal.show ? 'block' : 'hidden'}`}>
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                    <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+                <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div className="sm:flex sm:items-start">
+                            <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 sm:mx-0 sm:h-10 sm:w-10">
+                                <FaExclamationTriangle className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                                <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                                    Confirmation requise
+                                </h3>
+                                <div className="mt-2">
+                                    <p className="text-sm text-gray-500 dark:text-gray-300">
+                                        {showConfirmModal.message}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button
+                            type="button"
+                            onClick={confirmToggleMute}
+                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                        >
+                            Confirmer
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowConfirmModal(prev => ({ ...prev, show: false }))}
+                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500"
+                        >
+                            Annuler
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+    
 
     useEffect(() => {
         if (flash.success) {
@@ -81,40 +283,55 @@ export default function Show({ project: initialProject }) {
         );
     }
 
-    const getRoleIcon = (role) => {
-        switch (role) {
-            case 'manager': return <FaCrown className="text-yellow-500" />;
-            case 'member': return <FaUser className="text-blue-500" />;
-            default: return <FaShieldAlt className="text-gray-500" />;
-        }
-    };
-
-    const getRoleColor = (role) => {
-        switch (role) {
-            case 'manager': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-            case 'member': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-        }
-    };
-
     const getRoleLabel = (role) => {
         switch (role) {
+            case 'admin': return 'Administrateur';
             case 'manager': return 'Chef de projet';
             case 'member': return 'Membre';
             case 'observer': return 'Observateur';
-            default: return 'Autre';
+            default: return 'Membre';
+        }
+    };
+    
+    const getRoleIcon = (role) => {
+        switch (role) {
+            case 'admin': return <FaShieldAlt className="w-3 h-3" />;
+            case 'manager': return <FaCrown className="w-3 h-3" />;
+            default: return <FaUser className="w-3 h-3" />;
+        }
+    };
+    
+    const getRoleColor = (role) => {
+        switch (role) {
+            case 'admin': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200';
+            case 'manager': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200';
+            case 'member': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200';
+            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
         }
     };
 
     return (
-        <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+        <div className={`flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0 transition-opacity duration-300 ${currentUserMuted ? 'opacity-75' : 'opacity-100'}`}>
+            {/* Mute Notification Modal */}
+            <MuteNotificationModal 
+                isOpen={showMuteNotification}
+                onClose={() => setShowMuteNotification(false)}
+                managerName={managerName}
+            />
+            <ConfirmModal />
             {/* Notification */}
             {notification && (
-                <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg transition-all duration-300 ${
-                    notification.type === 'success' 
-                        ? 'bg-green-100 text-green-800 border border-green-200' 
-                        : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
+                <div 
+                    className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg transition-all duration-300 ${
+                        notification.type === 'success' 
+                            ? 'bg-green-100 text-green-800 border border-green-200' 
+                            : 'bg-red-100 text-red-800 border border-red-200'
+                    }`}
+                    onAnimationEnd={() => {
+                        const timer = setTimeout(() => setNotification(null), 5000);
+                        return () => clearTimeout(timer);
+                    }}
+                >
                     <div className="flex items-center gap-2">
                         <span className="font-medium">{notification.message}</span>
                         <button 
@@ -231,43 +448,68 @@ export default function Show({ project: initialProject }) {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {project.users.map(user => (
                                         <div key={user.id} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600">
-                                            <div className="flex items-center space-x-4">
-                                                <div className="flex-shrink-0">
-                                                    <img 
-                                                        className="h-12 w-12 rounded-full" 
-                                                        src={user.profile_photo_url} 
-                                                        alt={user.name || 'User'} 
-                                                        onError={(e) => {
-                                                            e.target.onerror = null;
-                                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=0D8ABC&color=fff`;
+                                            {canManageMembers && user.pivot?.role !== 'manager' && (
+                                                <div className="flex items-center gap-2 ml-12 mt-1">
+                                                    <span className="text-sm text-gray-600 dark:text-gray-300">Sourdine</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleToggleMute(user.id, user.pivot?.is_muted, user.name || 'ce membre');
                                                         }}
-                                                    />
+                                                        disabled={isMuting[user.id]}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                                                            user.pivot?.is_muted 
+                                                                ? 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500'
+                                                                : 'bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700'
+                                                        } ${isMuting[user.id] ? 'opacity-75' : ''}`}
+                                                        title={user.pivot?.is_muted ? 'Réactiver les notifications' : 'Mettre en sourdine'}
+                                                    >
+                                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${
+                                                            user.pivot?.is_muted 
+                                                                ? 'translate-x-0.5' 
+                                                                : 'translate-x-6'
+                                                        }`}>
+                                                            {isMuting[user.id] && (
+                                                                <span className="absolute inset-0 flex items-center justify-center">
+                                                                    <span className="animate-spin">⟳</span>
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    </button>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                                        {user.name || 'Utilisateur sans nom'}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                        {user.email || 'Email non disponible'}
-                                                    </p>
-                                                    {user.pivot?.created_at && (
-                                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                                            Membre depuis {new Date(user.pivot.created_at).toLocaleDateString('fr-FR', {
-                                                                day: '2-digit',
-                                                                month: 'short',
-                                                                year: 'numeric'
-                                                            })}
-                                                        </p>
-                                                    )}
+                                            )}
+                                            <div className="flex-shrink-0">
+                                                <img 
+                                                    className="h-12 w-12 rounded-full" 
+                                                    src={user.profile_photo_url} 
+                                                    alt={user.name || 'User'} 
+                                                    onError={(e) => {
+                                                        e.target.onerror = null;
+                                                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=0D8ABC&color=fff`;
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                                    {user.name || 'Utilisateur sans nom'}
+                                                </p>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${getRoleColor(user.pivot?.role)}`}>
+                                                            {getRoleIcon(user.pivot?.role)}
+                                                            <span>{getRoleLabel(user.pivot?.role)}</span>
+                                                        </div>
+                                                        {user.pivot?.is_muted && (
+                                                            <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-100">
+                                                                <FaBellSlash className="w-3 h-3" />
+                                                                <span>Vous êtes en sourdine</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                             
-                                            <div className="flex items-center justify-between">
-                                                <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(user.pivot?.role)}`}>
-                                                    {getRoleIcon(user.pivot?.role)}
-                                                    {getRoleLabel(user.pivot?.role)}
-                                                </div>
-                                            </div>
                                         </div>
                                     ))}
                                 </div>

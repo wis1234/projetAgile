@@ -163,21 +163,26 @@ class ProjectController extends Controller
     public function show(string $id)
     {
         try {
-            // Only allow access if the user is a member of the project
-            $project = Project::whereHas('users', function($query) {
-                $query->where('user_id', auth()->id());
+            // Vérifier si l'utilisateur est membre du projet et récupérer son statut is_muted
+            $user = auth()->user();
+            $project = Project::whereHas('users', function($query) use ($user) {
+                $query->where('user_id', $user->id);
             })->with(['users' => function($query) {
                 $query->select('users.id', 'name', 'email', 'profile_photo_path')
-                      ->withPivot('role')
+                      ->withPivot(['role', 'is_muted'])
                       ->withCasts(['profile_photo_url' => 'string']);
             }])->findOrFail($id);
             
-            // Double check user is actually a member
-            if (!$project->users->contains(auth()->id())) {
+            // Vérifier si l'utilisateur est bien membre du projet
+            $userMembership = $project->users->find($user->id);
+            if (!$userMembership) {
                 return Inertia::render('Error403')
                     ->toResponse(request())
                     ->setStatusCode(403);
             }
+            
+            // Vérifier si l'utilisateur est en sourdine pour ce projet
+            $isMuted = $userMembership->pivot->is_muted ?? false;
         
             $currentUser = auth()->user();
             
@@ -206,8 +211,9 @@ class ProjectController extends Controller
                 'doneTasksCount' => $taskStats['done'],
             ]);
             
-            // Prepare authenticated user data
+            // Préparer les données de l'utilisateur authentifié avec le statut de sourdine
             $authUser = [
+                'isMuted' => $isMuted,
                 'id' => $currentUser->id,
                 'name' => $currentUser->name,
                 'email' => $currentUser->email,
@@ -264,8 +270,15 @@ class ProjectController extends Controller
                 ->orderBy('yearweek')
                 ->get();
 
+            // Préparer le message pour l'utilisateur en sourdine
+            $mutedMessage = $isMuted 
+                ? 'Vous êtes en mode lecture seule pour ce projet. Vous pouvez voir les informations mais pas les modifier.' 
+                : null;
+
             return Inertia::render('Projects/Show', [
-                'project' => $project,
+                'project' => $project->makeHidden(['users']), // Cacher les utilisateurs pour l'instant
+                'isMuted' => $isMuted,
+                'mutedMessage' => $mutedMessage,
                 'tasks' => $tasks,
                 'auth' => [
                     'user' => array_merge($authUser, [

@@ -269,8 +269,8 @@ export default function Index({ projects = {}, filters = {} }) {
                                                         <td className="px-6 py-4">
                                                             {project.users && project.users.length > 0 ? (
                                                                 <div className="flex flex-wrap gap-2">
-                                                                    {project.users.slice(0, 3).map(user => (
-                                                                        <div key={user.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2">
+                                                                    {project.users.slice(0, 3).map((user, index) => (
+                                                                        <div key={`user-${project.id}-${user.id}-${index}`} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2">
                                                                             <img 
                                                                                 src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} 
                                                                                 alt={user.name} 
@@ -376,8 +376,8 @@ export default function Index({ projects = {}, filters = {} }) {
                                                                     Membres assignés
                                                                 </h4>
                                                                 <div className="space-y-2 max-h-32 overflow-y-auto">
-                                                                    {project.users.map(user => (
-                                                                        <div key={user.id} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                                                    {project.users.map((user, index) => (
+                                                                        <div key={`member-${project.id}-${user.id}-${index}`} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
                                                                             <img 
                                                                                 src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`)} 
                                                                                 alt={user.name} 

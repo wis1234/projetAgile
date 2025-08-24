@@ -10,6 +10,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Notifications\UserActionMailNotification;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class ProjectUserController extends Controller
 {
@@ -169,16 +171,56 @@ class ProjectUserController extends Controller
         $project = Project::whereHas('users', function($query) {
             $query->where('user_id', auth()->id());
         })->with(['users' => function($query) {
-            $query->withPivot('role');
-        }])->findOrFail($id);
+            $query->withPivot(['role', 'is_muted']);
+        }, 'tasks'])
+        ->withCount('tasks')
+        ->findOrFail($id);
+        
+        // Check if the current user is muted
+        $currentUser = $project->users->firstWhere('id', auth()->id());
+        if ($currentUser->pivot->is_muted) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
+        
+        // Get active members (not muted)
+        $activeMembers = $project->users->filter(function($user) {
+            return !$user->pivot->is_muted;
+        });
+        
+        // Get muted users
+        $mutedUsers = $project->users->filter(function($user) {
+            return $user->pivot->is_muted;
+        });
         
         try {
             $this->authorize('view', $project);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
+
+        // Get task statistics for each member
+        $memberStats = [];
+        foreach ($activeMembers as $user) {
+            $totalTasks = $project->tasks()->where('assigned_to', $user->id)->count();
+            $completedTasks = $project->tasks()
+                ->where('assigned_to', $user->id)
+                ->where('status', 'done')
+                ->count();
+                
+            $memberStats[$user->id] = [
+                'total_tasks' => $totalTasks,
+                'completed_tasks' => $completedTasks
+            ];
+        }
+
         return Inertia::render('ProjectUsers/Show', [
             'project' => $project,
+            'memberStats' => $memberStats,
+            'mutedUsers' => $mutedUsers,
+            'canManageMembers' => $project->users()
+                ->where('user_id', auth()->id())
+                ->wherePivot('role', 'manager')
+                ->exists()
         ]);
     }
 
@@ -267,4 +309,5 @@ class ProjectUserController extends Controller
         return redirect()->route('project-users.index')
             ->with('success', 'Le membre a été retiré du projet avec succès.');
     }
+
 }

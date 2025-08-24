@@ -31,16 +31,43 @@ Route::middleware('auth')->group(function () {
         return auth()->user()->notifications()->orderBy('created_at', 'desc')->limit(20)->get();
     });
     
-    // Ressources principales
-    Route::resource('tasks', App\Http\Controllers\TaskController::class);
-    Route::resource('sprints', App\Http\Controllers\SprintController::class);
-    Route::resource('projects', App\Http\Controllers\ProjectController::class);
+    // Project-related routes with muted middleware
+    Route::middleware([\App\Http\Middleware\CheckMutedUser::class])->group(function () {
+        // Tasks - view only for muted users
+        Route::get('tasks', [App\Http\Controllers\TaskController::class, 'index'])->name('tasks.index');
+        Route::get('tasks/{task}', [App\Http\Controllers\TaskController::class, 'show'])->name('tasks.show');
+        
+        // Sprints - view only for muted users
+        Route::get('sprints', [App\Http\Controllers\SprintController::class, 'index'])->name('sprints.index');
+        Route::get('sprints/{sprint}', [App\Http\Controllers\SprintController::class, 'show'])->name('sprints.show');
+        
+        // Projects - view only for muted users
+        Route::get('projects', [App\Http\Controllers\ProjectController::class, 'index'])->name('projects.index');
+        Route::get('projects/{project}', [App\Http\Controllers\ProjectController::class, 'show'])->name('projects.show');
+    });
+    
+    // Full resource routes for non-muted users
+    Route::resource('tasks', App\Http\Controllers\TaskController::class)->except(['index', 'show']);
+    Route::resource('sprints', App\Http\Controllers\SprintController::class)->except(['index', 'show']);
+    Route::resource('projects', App\Http\Controllers\ProjectController::class)->except(['index', 'show']);
+    
+    // Files - restricted for muted users
     Route::resource('files', App\Http\Controllers\FileController::class);
     Route::post('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])
         ->name('files.update-content');
+        
+    // Messages - restricted for muted users
     Route::resource('messages', App\Http\Controllers\MessageController::class);
+    
+    // Audit logs - restricted for muted users
     Route::resource('audit-logs', App\Http\Controllers\AuditLogController::class);
+    
+    // Project users management - restricted for muted users
     Route::resource('project-users', App\Http\Controllers\ProjectUserController::class);
+    
+    // Route pour activer/désactiver la sourdine d'un membre du projet
+    Route::post('/project-users/toggle-mute/{project}/{user}', [App\Http\Controllers\ProjectUserController::class, 'toggleMute'])
+        ->name('project-users.toggle-mute');
     
     // Routes personnalisées pour les tâches
     Route::post('/tasks/{task}/payment', [App\Http\Controllers\TaskController::class, 'savePaymentInfo'])->name('tasks.payment.save');
@@ -59,18 +86,29 @@ Route::middleware('auth')->group(function () {
         ->defaults('format', 'txt')
         ->name('projects.suivi-global');
     
-    // Gestion des fichiers
-    Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])->name('files.edit-content');
-    Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])->name('files.updateContent');
-    Route::get('files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])->name('files.download');
-    Route::post('files/download-multiple', [App\Http\Controllers\FileController::class, 'downloadMultiple'])->name('files.downloadMultiple');
+    // File management - restricted for muted users
+    Route::middleware(['auth', \App\Http\Middleware\CheckMutedUser::class])->group(function () {
+        Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])
+            ->name('files.edit-content')
+            ->withoutMiddleware(\App\Http\Middleware\CheckMutedUser::class); // Explicitly allow this for muted users
+            
+        Route::get('files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])
+            ->name('files.download')
+            ->withoutMiddleware(\App\Http\Middleware\CheckMutedUser::class); // Explicitly allow this for muted users
+    });
+    
+    // File operations - restricted for muted users
+    Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])
+        ->name('files.updateContent');
+    Route::post('files/download-multiple', [App\Http\Controllers\FileController::class, 'downloadMultiple'])
+        ->name('files.downloadMultiple');
     
     // Téléchargement des fichiers de tâches
     Route::get('/tasks/{task}/files/{file}/download', [App\Http\Controllers\TaskController::class, 'downloadFile'])
         ->name('tasks.files.download');
     
-    // API endpoints
-    Route::prefix('api')->group(function () {
+    // API endpoints - apply muted middleware
+    Route::prefix('api')->middleware(\App\Http\Middleware\CheckMutedUser::class)->group(function () {
         // Projets et utilisateurs
         Route::get('/projects/{id}', [\App\Http\Controllers\ProjectController::class, 'apiShow']);
         Route::get('/users/{id}', [\App\Http\Controllers\UserController::class, 'apiShow']);

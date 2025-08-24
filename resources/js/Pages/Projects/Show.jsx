@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { 
@@ -16,6 +16,9 @@ import {
     FaFileAlt, 
     FaCommentDots, 
     FaCheckCircle,
+    FaVolumeMute,
+    FaVolumeUp,
+    FaEllipsisV,
     FaClock,
     FaExclamationTriangle,
     FaPlay,
@@ -73,8 +76,50 @@ const getStatusColor = (status) => {
   }
 };
 
-function Show({ project, tasks = [], auth, stats = {} }) {
+function Show({ project: initialProject, tasks = [], auth, stats = {}, isMuted = false, mutedMessage = '' }) {
   const { flash = {} } = usePage().props;
+  const [project, setProject] = useState(initialProject);
+  const [flashMessage, setFlashMessage] = useState(null);
+  
+  // Afficher un message permanent si en mode lecture seule
+  useEffect(() => {
+    if (isMuted && mutedMessage) {
+      setFlash({
+        type: 'warning',
+        message: 'Vous êtes en mode lecture seule pour ce projet. Vous pouvez voir les informations mais pas les modifier.'
+      });
+    }
+  }, [isMuted, mutedMessage]);
+  
+  // Fonction pour désactiver les interactions si en mode lecture seule
+  const getReadOnlyProps = useCallback(() => {
+    if (!isMuted) return {};
+    
+    const showMutedMessage = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      setFlashMessage({
+        type: 'warning',
+        message: 'Vous êtes en mode lecture seule pour ce projet.'
+      });
+      setTimeout(() => setFlashMessage(null), 5000);
+    };
+    
+    return {
+      onClick: showMutedMessage,
+      style: { cursor: 'not-allowed', opacity: 0.7 },
+      'aria-disabled': true
+    };
+  }, [isMuted]);
+  
+  // Gestion des notifications flash
+  const setFlash = (message) => {
+    setFlashMessage(message);
+    // Masquer automatiquement après 5 secondes
+    setTimeout(() => setFlashMessage(null), 5000);
+  };
   
   // Sanitize and validate user roles
   const userRoles = Array.isArray(auth?.user?.roles) ? auth.user.roles : [];
@@ -83,6 +128,82 @@ function Show({ project, tasks = [], auth, stats = {} }) {
 
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [deleteLoading, setDeleteLoading] = React.useState(false);
+  
+  // Gestion des membres
+  const [showMemberActions, setShowMemberActions] = useState({});
+  
+  // Fermer les menus déroulants quand on clique en dehors
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowMemberActions({});
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
+  // Fonction pour vérifier si l'utilisateur peut éditer le projet
+  const canEditProject = () => {
+    return (isAdmin || isManager) && !isMuted;
+  };
+
+  // Fonction pour supprimer un membre
+  const handleRemoveMember = (userId) => {
+
+    if (!canEditProject()) {
+      setFlash({
+        type: 'error',
+        message: 'Vous n\'avez pas les droits nécessaires pour supprimer un membre du projet.'
+      });
+      return;
+    }
+
+    // Empêcher l'utilisateur de se supprimer lui-même
+    if (auth.user.id === userId) {
+      setFlash({
+        type: 'error',
+        message: 'Vous ne pouvez pas vous supprimer vous-même du projet.'
+      });
+      return;
+    }
+
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce membre du projet ?')) return;
+    
+    // Utiliser la route de suppression standard du contrôleur
+    router.delete(route('project-users.destroy', project.id), {
+      data: { user_id: userId },
+      preserveScroll: true,
+      onSuccess: () => {
+        // Mettre à jour l'interface après suppression
+        router.reload({ only: ['project'] });
+        setFlash({
+          type: 'success',
+          message: 'Le membre a été supprimé du projet avec succès.'
+        });
+      },
+      onError: (errors) => {
+        setFlash({
+          type: 'error',
+          message: errors?.message || 'Une erreur est survenue lors de la suppression du membre.'
+        });
+      }
+    });
+  };
+  
+  // Fonction pour basculer l'affichage des actions d'un membre
+  const toggleMemberActions = (userId, e) => {
+    e.stopPropagation(); // Empêche la propagation du clic
+    
+    // Créer un nouvel objet d'état qui ferme tous les autres menus et bascule l'état actuel
+    setShowMemberActions(prevState => {
+      const newState = {};
+      // Si le menu est déjà ouvert, on le ferme, sinon on l'ouvre et on ferme les autres
+      newState[userId] = !prevState[userId];
+      return newState;
+    });
+  };
 
   // Préparation des données pour le graphique d'évolution (30 derniers jours)
   const last30Days = Array.from({length: 30}, (_, i) => {
@@ -308,12 +429,29 @@ function Show({ project, tasks = [], auth, stats = {} }) {
         </header>
         <main className="w-full flex flex-col items-center p-2 sm:p-4">
           <div className="w-full max-w-full px-2 sm:px-4">
-
             {flash.success && (
               <div className="mb-6 px-4 py-3 rounded-lg bg-green-100 text-green-800 font-semibold border border-green-200">
                 {flash.success}
               </div>
             )}
+            
+            {/* Notification flash personnalisée */}
+            <div className="fixed bottom-4 right-4 z-50">
+              {flashMessage && (
+                <div 
+                  className={`px-6 py-4 rounded-lg shadow-lg ${
+                    flashMessage.type === 'success' 
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                      : flashMessage.type === 'error' 
+                        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
+                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}
+                  style={isMuted ? { display: 'block' } : {}}
+                >
+                  {flashMessage.message}
+                </div>
+              )}
+            </div>
 
             {/* Informations du projet */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
@@ -368,12 +506,53 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                             alt={user.name} 
                             className="w-11 h-11 rounded-full border-2 border-blue-200 dark:border-blue-800 object-cover" 
                           />
-                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+                          
+                          {/* Menu d'actions pour les administrateurs et managers */}
+                          {(isAdmin || (isManager && auth.user.id !== user.id)) && (
+                            <div className="relative">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleMemberActions(user.id, e);
+                                }}
+                                className="absolute -top-2 -right-2 p-1 bg-white dark:bg-gray-700 rounded-full shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors z-50"
+                                aria-expanded={!!showMemberActions[user.id]}
+                                aria-haspopup="true"
+                                aria-label="Actions du membre"
+                              >
+                                <FaEllipsisV className="w-3 h-3 text-gray-500 dark:text-gray-300" />
+                              </button>
+                              
+                              {showMemberActions[user.id] && (
+                                <div 
+                                  className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-50 border border-gray-200 dark:border-gray-700"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Link
+                                    href={route('project-users.edit', { project: project.id, user: user.id })}
+                                    className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  >
+                                    <FaUserCog className="inline mr-2" />
+                                    Gérer le membre
+                                  </Link>
+                                  <button
+                                    onClick={() => handleRemoveMember(user.id)}
+                                    className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"
+                                  >
+                                    <FaUserMinus />
+                                    Retirer du projet
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-gray-800 dark:text-gray-200 truncate">{user.name}</div>
+                          <div className="font-semibold text-gray-800 dark:text-gray-200 truncate">
+                            {user.name}
+                          </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.email}</div>
-                          <div className="flex items-center justify-between mt-2">
+                          <div className="mt-2">
                             <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
                               user.role === 'admin' 
                                 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
@@ -400,11 +579,6 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                                     ? 'Observateur'
                                     : 'Membre'}
                             </div>
-                            {user.pivot_created_at && (
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {new Date(user.pivot_created_at).toLocaleDateString('fr-FR')}
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -423,47 +597,48 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Actions Rapides</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="relative group">
-                  <button 
-                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 w-full"
-                  >
-                    <FaFileAlt className="text-lg" />
-                    <span>Exporter le suivi</span>
-                    <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                  </button>
-                  <div className="absolute z-10 hidden group-hover:block w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden mt-1">
-                    <a 
-                      href={`/projects/${project.id}/suivi-global/txt`}
-                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                {!isMuted && (
+                  <div className="relative group">
+                    <button 
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 w-full"
                     >
-                      <span className="text-blue-500">📄</span>
-                      <span>Format TXT</span>
-                    </a>
-                    <a 
-                      href={`/projects/${project.id}/suivi-global/pdf`}
-                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <span className="text-red-500">📊</span>
-                      <span>Format PDF</span>
-                    </a>
-                    <a 
-                      href={`/projects/${project.id}/suivi-global/docx`}
-                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <span className="text-blue-700">📝</span>
-                      <span>Format Word</span>
-                    </a>
+                      <FaFileAlt className="text-lg" />
+                      <span>Exporter le suivi</span>
+                      <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                    </button>
+                    <div className="absolute z-10 hidden group-hover:block w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden mt-1">
+                      <a 
+                        href={`/projects/${project.id}/suivi-global/txt`}
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <span className="text-blue-500">📄</span>
+                        <span>Format TXT</span>
+                      </a>
+                      <a 
+                        href={`/projects/${project.id}/suivi-global/pdf`}
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <span className="text-red-500">📊</span>
+                        <span>Format PDF</span>
+                      </a>
+                      <a 
+                        href={`/projects/${project.id}/suivi-global/docx`}
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <span className="text-blue-700">📝</span>
+                        <span>Format Word</span>
+                      </a>
+                    </div>
                   </div>
-                </div>
-                
+                )}
                 {(isAdmin || isManager) ? (
                   <>
                     <Link
@@ -489,17 +664,37 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     </Link>
                     <Link
                       href={`/projects/${project.id}/edit`}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                      className={`inline-flex items-center px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+                        isMuted 
+                          ? 'bg-gray-400 text-gray-700 cursor-not-allowed opacity-70' 
+                          : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
+                      }`}
+                      {...getReadOnlyProps()}
                     >
-                      <FaEdit className="text-lg" />
-                      <span>Modifier le projet</span>
+                      <FaEdit className="mr-2" />
+                      {isMuted ? 'Lecture seule' : 'Modifier'}
                     </Link>
                     <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 w-full"
+                      onClick={(e) => {
+                        if (isMuted) {
+                          e.preventDefault();
+                          setFlash({
+                            type: 'warning',
+                            message: 'Vous êtes en mode lecture seule pour ce projet.'
+                          });
+                          return;
+                        }
+                        setShowDeleteModal(true);
+                      }}
+                      className={`inline-flex items-center px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+                        isMuted 
+                          ? 'bg-gray-400 text-gray-700 cursor-not-allowed opacity-70' 
+                          : 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
+                      }`}
+                      disabled={isMuted}
                     >
-                      <FaTrash className="text-lg" />
-                      <span>Supprimer le projet</span>
+                      <FaTrash className="mr-2" />
+                      Supprimer
                     </button>
                   </>
                 ) : (
@@ -560,13 +755,18 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                   <FaTasks className="text-blue-500" /> Tâches ({tasks?.total || 0})
                 </h3>
                 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                   <Link 
                     href={route('tasks.create', { project_id: project.id })}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors duration-200 whitespace-nowrap"
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors duration-200 whitespace-nowrap ${
+                      isMuted 
+                        ? 'bg-gray-400 text-gray-700 cursor-not-allowed opacity-70' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                    {...getReadOnlyProps()}
                   >
                     <FaPlus size={12} />
-                    <span>Nouvelle tâche</span>
+                    <span>{isMuted ? 'Lecture seule' : 'Nouvelle tâche'}</span>
                   </Link>
                   
                   {tasks?.meta && (
