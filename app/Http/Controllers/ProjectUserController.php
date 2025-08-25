@@ -10,6 +10,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Notifications\UserActionMailNotification;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\DB;
 
 class ProjectUserController extends Controller
 {
@@ -169,16 +170,30 @@ class ProjectUserController extends Controller
         $project = Project::whereHas('users', function($query) {
             $query->where('user_id', auth()->id());
         })->with(['users' => function($query) {
-            $query->withPivot('role');
-        }])->findOrFail($id);
+            $query->withPivot(['role', 'is_muted']);
+        }])->withCount('tasks')
+        ->findOrFail($id);
         
         try {
             $this->authorize('view', $project);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
+        
+        // Ensure is_muted is set for each user in the pivot table
+        $project->users->each(function($user) {
+            if (!isset($user->pivot->is_muted)) {
+                $user->pivot->is_muted = false;
+            }
+        });
+        
         return Inertia::render('ProjectUsers/Show', [
             'project' => $project,
+            'auth' => [
+                'user' => [
+                    'id' => auth()->id(),
+                ]
+            ]
         ]);
     }
 
@@ -266,5 +281,69 @@ class ProjectUserController extends Controller
         
         return redirect()->route('project-users.index')
             ->with('success', 'Le membre a été retiré du projet avec succès.');
+    }
+
+    /**
+     * Toggle mute status for a project member
+     */
+    public function toggleMute(Request $request, $projectId, $userId)
+    {
+        try {
+            // Vérifier que l'utilisateur connecté a les droits nécessaires
+            $project = Project::findOrFail($projectId);
+            $this->authorize('manageMembers', $project);
+
+            // Vérifier que l'utilisateur cible est bien membre du projet
+            $user = $project->users()->where('user_id', $userId)->firstOrFail();
+            
+            // Récupérer le statut actuel de sourdine
+            $currentStatus = $user->pivot->is_muted ?? false;
+            $newStatus = !$currentStatus;
+            
+            // Mettre à jour le statut dans la table pivot
+            $updated = DB::table('project_user')
+                ->where('project_id', $projectId)
+                ->where('user_id', $userId)
+                ->update([
+                    'is_muted' => $newStatus,
+                    'updated_at' => now()
+                ]);
+            
+            if ($updated) {
+                // Récupérer le statut mis à jour depuis la base de données
+                $updatedPivot = DB::table('project_user')
+                    ->where('project_id', $projectId)
+                    ->where('user_id', $userId)
+                    ->first();
+                    
+                $actualStatus = $updatedPivot ? (bool)$updatedPivot->is_muted : $newStatus;
+                
+                return response()->json([
+                    'success' => true,
+                    'is_muted' => $actualStatus,
+                    'message' => $actualStatus 
+                        ? 'Le membre a été mis en sourdine avec succès.' 
+                        : 'Le membre n\'est plus en sourdine.'
+                ]);
+            }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'La mise à jour du statut de sourdine a échoué.'
+            ], 500);
+            
+        } catch (\Exception $e) {
+            \Log::error('Erreur lors du basculement du mode sourdine: ' . $e->getMessage(), [
+                'project_id' => $projectId,
+                'user_id' => $userId,
+                'exception' => $e
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de la mise à jour du statut de sourdine.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

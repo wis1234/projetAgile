@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { 
     FaUsers, 
@@ -13,8 +13,11 @@ import {
     FaTasks,
     FaEye,
     FaEnvelope,
-    FaInfoCircle
+    FaInfoCircle,
+    FaVolumeMute,
+    FaVolumeUp
 } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 // Helper function to sanitize project data
 const sanitizeProjectData = (project) => {
@@ -31,6 +34,7 @@ const sanitizeProjectData = (project) => {
             profile_photo_url: user.profile_photo_url,
             pivot: user.pivot ? { 
                 role: user.pivot.role,
+                is_muted: user.pivot.is_muted || false,
                 created_at: user.pivot.created_at
             } : null,
             created_at: user.created_at
@@ -44,10 +48,68 @@ const sanitizeProjectData = (project) => {
     return cleanProject;
 };
 
-export default function Show({ project: initialProject }) {
+export default function Show({ project: initialProject, auth }) {
     // Sanitize project data
-    const project = useMemo(() => sanitizeProjectData(initialProject), [initialProject]);
+    const [project, setProject] = useState(() => sanitizeProjectData(initialProject));
     const { flash = {} } = usePage().props;
+    
+    // Mettre à jour le projet si les props changent
+    useEffect(() => {
+        setProject(sanitizeProjectData(initialProject));
+    }, [initialProject]);
+    
+    // Fonction pour basculer le statut mute d'un utilisateur
+    const toggleMuteUser = async (userId) => {
+        try {
+            const response = await axios.post(route('project-users.toggle-mute', [project.id, userId]), {}, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (response.data.success) {
+                // Mettre à jour l'état local avec la réponse du serveur
+                setProject(prevProject => ({
+                    ...prevProject,
+                    users: prevProject.users.map(user => 
+                        user.id === userId 
+                            ? {
+                                ...user,
+                                pivot: {
+                                    ...user.pivot,
+                                    is_muted: response.data.is_muted
+                                }
+                            }
+                            : user
+                    )
+                }));
+                
+                toast.success(response.data.message, {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+            }
+        } catch (error) {
+            console.error('Erreur lors du changement de statut mute:', error);
+            toast.error('Une erreur est survenue lors de la mise à jour du statut.', {
+                position: 'top-right',
+                autoClose: 3000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+            });
+        }
+    };
     const [notification, setNotification] = useState(null);
 
     useEffect(() => {
@@ -83,7 +145,6 @@ export default function Show({ project: initialProject }) {
 
     const getRoleIcon = (role) => {
         switch (role) {
-            case 'manager': return <FaCrown className="text-yellow-500" />;
             case 'member': return <FaUser className="text-blue-500" />;
             default: return <FaShieldAlt className="text-gray-500" />;
         }
@@ -160,18 +221,22 @@ export default function Show({ project: initialProject }) {
                             </div>
                             <div className="flex-1">
                                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                    <Link 
-                                        href={route('projects.show', project.id)} 
-                                        className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        {project.name}
-                                    </Link>
+                                    {project ? (
+                                        <Link 
+                                            href={route('project-users.show', project.id)}
+                                            className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            {project.name}
+                                        </Link>
+                                    ) : (
+                                        <span className="text-gray-400">Projet non trouvé</span>
+                                    )}
                                 </h2>
                                 <div className="flex items-center gap-6 mt-2 text-sm text-gray-600 dark:text-gray-400">
                                     <div className="flex items-center gap-1">
                                         <FaUsers />
-                                        <span>{project.users?.length || 0} membre(s)</span>
+                                        <span>{project?.users?.length || 0} membre(s)</span>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <FaTasks />
@@ -201,9 +266,22 @@ export default function Show({ project: initialProject }) {
                             </div>
                             <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center border border-green-200 dark:border-green-800">
                                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                    {project.tasks_count || 0}
+                                    {project.tasks_count ?? project.tasks?.length ?? 0}
                                 </div>
-                                <div className="text-sm text-green-600 dark:text-green-400 font-medium">Tâches</div>
+                                <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                                    Tâches
+                                    {project.tasks_by_status && (
+                                        <div className="text-xs mt-1">
+                                            {Object.entries(project.tasks_by_status).map(([status, count]) => (
+                                                count > 0 && (
+                                                    <span key={status} className="inline-block bg-white dark:bg-gray-700 rounded-full px-2 py-0.5 text-xs font-medium mr-1 mb-1">
+                                                        {count} {status.replace('_', ' ')}
+                                                    </span>
+                                                )
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 text-center border border-purple-200 dark:border-purple-800">
                                 <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
@@ -231,24 +309,25 @@ export default function Show({ project: initialProject }) {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {project.users.map(user => (
                                         <div key={user.id} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600">
-                                            <div className="flex items-center space-x-4">
-                                                <div className="flex-shrink-0">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="relative">
                                                     <img 
-                                                        className="h-12 w-12 rounded-full" 
                                                         src={user.profile_photo_url} 
-                                                        alt={user.name || 'User'} 
-                                                        onError={(e) => {
-                                                            e.target.onerror = null;
-                                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=0D8ABC&color=fff`;
-                                                        }}
+                                                        alt={user.name} 
+                                                        className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-600"
                                                     />
+                                                    {user.pivot?.is_muted && (
+                                                        <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1">
+                                                            <FaVolumeMute className="text-xs" />
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                                        {user.name || 'Utilisateur sans nom'}
-                                                    </p>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className={`text-sm font-medium ${user.id === auth.user.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'} truncate ${user.pivot?.is_muted ? 'opacity-50' : ''}`}>
+                                                        {user.id === auth.user.id ? 'Vous' : user.name}
+                                                    </h4>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                        {user.email || 'Email non disponible'}
+                                                        {user.id === auth.user.id ? auth.user.email : (user.email || 'Email non disponible')}
                                                     </p>
                                                     {user.pivot?.created_at && (
                                                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -262,11 +341,21 @@ export default function Show({ project: initialProject }) {
                                                 </div>
                                             </div>
                                             
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
                                                 <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(user.pivot?.role)}`}>
-                                                    {getRoleIcon(user.pivot?.role)}
+                                                    {user.pivot?.role !== 'manager' && getRoleIcon(user.pivot?.role)}
                                                     {getRoleLabel(user.pivot?.role)}
                                                 </div>
+                                                
+                                                {auth.user.id !== user.id && (
+                                                    <button
+                                                        onClick={() => toggleMuteUser(user.id)}
+                                                        className={`p-2 rounded-full ${user.pivot?.is_muted ? 'text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600'}`}
+                                                        title={user.pivot?.is_muted ? 'Activer les notifications' : 'Mettre en sourdine'}
+                                                    >
+                                                        {user.pivot?.is_muted ? <FaVolumeUp /> : <FaVolumeMute />}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

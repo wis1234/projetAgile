@@ -44,6 +44,10 @@ Route::middleware('auth')->group(function () {
     
     // Routes personnalisées pour les tâches
     Route::post('/tasks/{task}/payment', [App\Http\Controllers\TaskController::class, 'savePaymentInfo'])->name('tasks.payment.save');
+    
+    // Route pour la mise en sourdine des membres du projet
+    Route::post('/projects/{project}/users/{user}/toggle-mute', [App\Http\Controllers\ProjectUserController::class, 'toggleMute'])
+        ->name('project-users.toggle-mute');
     Route::post('/tasks/{task}/payment/validate/{taskPayment}', [App\Http\Controllers\TaskController::class, 'validatePayment'])->name('tasks.payment.validate');
     Route::get('/tasks/{task}/download-receipt', [App\Http\Controllers\TaskController::class, 'downloadReceipt'])->name('tasks.receipt.download');
     

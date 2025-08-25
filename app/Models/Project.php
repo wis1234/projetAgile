@@ -129,7 +129,7 @@ class Project extends Model
     }
 
     public function users() {
-        return $this->belongsToMany(User::class)->withPivot('role')->withTimestamps();
+        return $this->belongsToMany(User::class)->withPivot(['role', 'is_muted'])->withTimestamps();
     }
     public function sprints() {
         return $this->hasMany(Sprint::class);
