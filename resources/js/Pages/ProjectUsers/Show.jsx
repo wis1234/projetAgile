@@ -308,14 +308,26 @@ export default function Show({ project: initialProject, auth }) {
                             {project.users && project.users.length > 0 ? (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {project.users.map(user => (
-                                        <div key={user.id} className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600">
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <div className="relative">
-                                                    <img 
-                                                        src={user.profile_photo_url} 
-                                                        alt={user.name} 
-                                                        className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-600"
-                                                    />
+                                        <div key={user.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700">
+                                            <div className="flex items-start gap-4">
+                                                <div className="relative flex-shrink-0">
+                                                    <div className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden border-2 border-white dark:border-gray-700">
+                                                        {user.profile_photo_url ? (
+                                                            <img 
+                                                                src={user.profile_photo_url}
+                                                                alt={user.name}
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => {
+                                                                    e.target.onerror = null;
+                                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=random`;
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <span className="text-gray-600 dark:text-gray-300 font-medium text-xl">
+                                                                {(user.name || 'U').charAt(0).toUpperCase()}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     {user.pivot?.is_muted && (
                                                         <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1">
                                                             <FaVolumeMute className="text-xs" />
@@ -323,40 +335,60 @@ export default function Show({ project: initialProject, auth }) {
                                                     )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h4 className={`text-sm font-medium ${user.id === auth.user.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'} truncate ${user.pivot?.is_muted ? 'opacity-50' : ''}`}>
-                                                        {user.id === auth.user.id ? 'Vous' : user.name}
-                                                    </h4>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                        {user.id === auth.user.id ? auth.user.email : (user.email || 'Email non disponible')}
-                                                    </p>
-                                                    {user.pivot?.created_at && (
-                                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                                            Membre depuis {new Date(user.pivot.created_at).toLocaleDateString('fr-FR', {
-                                                                day: '2-digit',
-                                                                month: 'short',
-                                                                year: 'numeric'
-                                                            })}
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className={`text-base font-semibold ${user.pivot?.is_muted ? 'opacity-50' : ''} ${user.id === auth.user.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                                                            {user.name}
+                                                        </h4>
+                                                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.pivot?.role)}`}>
+                                                            {user.pivot?.role !== 'manager' && getRoleIcon(user.pivot?.role)}
+                                                            {getRoleLabel(user.pivot?.role)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-1 relative group">
+                                                        <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-[180px]" title={user.email || ''}>
+                                                            {user.email || 'Email non disponible'}
                                                         </p>
-                                                    )}
+                                                        {user.email && user.email.length > 25 && (
+                                                            <div className="absolute z-10 invisible group-hover:visible bg-gray-800 text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-1 whitespace-nowrap">
+                                                                {user.email}
+                                                                <div className="absolute w-2 h-2 bg-gray-800 transform rotate-45 -bottom-1 left-1/2 -ml-1"></div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                        <FaCalendarAlt className="inline mr-1" />
+                                                        Membre depuis {user.pivot?.created_at ? new Date(user.pivot.created_at).toLocaleDateString('fr-FR', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric'
+                                                        }) : 'Date inconnue'}
+                                                    </p>
                                                 </div>
                                             </div>
                                             
-                                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                                                <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(user.pivot?.role)}`}>
-                                                    {user.pivot?.role !== 'manager' && getRoleIcon(user.pivot?.role)}
-                                                    {getRoleLabel(user.pivot?.role)}
-                                                </div>
-                                                
-                                                {auth.user.id !== user.id && (
+                                            {auth.user.id !== user.id && user.pivot?.role !== 'manager' && user.pivot?.role !== 'admin' && (
+                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-right">
                                                     <button
                                                         onClick={() => toggleMuteUser(user.id)}
-                                                        className={`p-2 rounded-full ${user.pivot?.is_muted ? 'text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600'}`}
+                                                        className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${user.pivot?.is_muted 
+                                                            ? 'text-green-700 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50' 
+                                                            : 'text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}`}
                                                         title={user.pivot?.is_muted ? 'Activer les notifications' : 'Mettre en sourdine'}
                                                     >
-                                                        {user.pivot?.is_muted ? <FaVolumeUp /> : <FaVolumeMute />}
+                                                        {user.pivot?.is_muted ? (
+                                                            <>
+                                                                <FaVolumeUp className="text-xs" />
+                                                                <span>Activer</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <FaVolumeMute className="text-xs" />
+                                                                <span>Muet</span>
+                                                            </>
+                                                        )}
                                                     </button>
-                                                )}
-                                            </div>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

@@ -128,9 +128,14 @@ export default function AdminLayout({ children }) {
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
 
+  // Get user data from auth object (handles both auth.user and direct auth properties)
   const user = auth?.user || auth;
   const userName = user?.name || 'Utilisateur';
   const avatarUrl = user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0D8ABC&color=fff`;
+  
+  // Debug log to check user data
+  console.log('Auth data:', auth);
+  console.log('User data:', user);
 
   return (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-colors">

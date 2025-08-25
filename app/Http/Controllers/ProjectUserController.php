@@ -187,11 +187,17 @@ class ProjectUserController extends Controller
             }
         });
         
+        // Get the authenticated user with all necessary profile data
+        $authUser = auth()->user();
+        
         return Inertia::render('ProjectUsers/Show', [
             'project' => $project,
             'auth' => [
                 'user' => [
-                    'id' => auth()->id(),
+                    'id' => $authUser->id,
+                    'name' => $authUser->name,
+                    'email' => $authUser->email,
+                    'profile_photo_url' => $authUser->profile_photo_url ?? null,
                 ]
             ]
         ]);
