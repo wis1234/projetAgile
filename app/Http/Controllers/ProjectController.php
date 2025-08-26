@@ -47,7 +47,7 @@ class ProjectController extends Controller
                              ->withQueryString()
                              ->through(function ($project) {
                                  $currentUser = $project->users->find(auth()->id());
-                                 return [
+                                 $projectData = [
                                      'id' => $project->id,
                                      'name' => $project->name,
                                      'description' => $project->description,
@@ -56,7 +56,6 @@ class ProjectController extends Controller
                                      'updated_at' => $project->updated_at,
                                      'users_count' => $project->users_count,
                                      'tasks_count' => $project->tasks_count,
-                                     'is_muted' => $currentUser ? $currentUser->pivot->is_muted : false,
                                      'users' => $project->users->map(function($user) {
                                          return [
                                              'id' => $user->id,
@@ -66,6 +65,13 @@ class ProjectController extends Controller
                                          ];
                                      })
                                  ];
+                                 
+                                 // Ajouter is_muted uniquement si true
+                                 if ($currentUser && $currentUser->pivot->is_muted) {
+                                     $projectData['is_muted'] = true;
+                                 }
+                                 
+                                 return $projectData;
                              });
             
             return Inertia::render('Projects/Index', [
