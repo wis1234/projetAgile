@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { router, Link, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaProjectDiagram, FaPlus, FaUser, FaUsers, FaTasks, FaEye, FaSearch, FaCalendarAlt, FaUserFriends, FaTable, FaTh, FaClock, FaChartLine, FaList } from 'react-icons/fa';
+import { FaProjectDiagram, FaPlus, FaUser, FaUsers, FaTasks, FaEye, FaSearch, FaCalendarAlt, FaUserFriends, FaTable, FaTh, FaClock, FaChartLine, FaList, FaVolumeMute } from 'react-icons/fa';
 
 export default function Index({ projects, filters }) {
     const { flash = {} } = usePage().props;
@@ -226,8 +226,17 @@ export default function Index({ projects, filters }) {
                                                         </div>
                                                     </div>
                                                     <div>
-                                                        <div className="font-semibold text-gray-800 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-                                                            {project.name}
+                                                        <div className="font-semibold text-gray-800 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 flex items-center gap-2">
+                                                            <span>{project.name}</span>
+                                                            {project.is_muted && (
+                                                                <span 
+                                                                    className="px-2 py-0.5 text-xs font-semibold text-red-800 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-full flex items-center gap-1 border border-red-200 dark:border-red-800"
+                                                                    title="Vous êtes en sourdine dans ce projet"
+                                                                >
+                                                                    <FaVolumeMute className="text-red-500" />
+                                                                    <span>En sourdine</span>
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div className="text-xs text-gray-500 dark:text-gray-400">ID: {project.id}</div>
                                                     </div>
@@ -292,8 +301,12 @@ export default function Index({ projects, filters }) {
                                             <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 flex items-center">
                                                 <span className="truncate">{project.name}</span>
                                                 {project.is_muted && (
-                                                    <span className="ml-2 px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full flex-shrink-0">
-                                                        Sourdine
+                                                    <span 
+                                                        className="ml-2 px-2.5 py-1 text-xs font-semibold text-red-800 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-full flex-shrink-0 flex items-center gap-1.5 border border-red-200 dark:border-red-800"
+                                                        title="Vous êtes en sourdine dans ce projet"
+                                                    >
+                                                        <FaVolumeMute className="text-red-500" />
+                                                        <span>En sourdine</span>
                                                     </span>
                                                 )}
                                             </h3>
