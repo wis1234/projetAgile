@@ -26,12 +26,31 @@ class FileController extends Controller
      */
     public function index(Request $request)
     {
-        $query = File::with(['project', 'user', 'task']);
-        $currentUser = auth()->user();
-        if (!$currentUser->hasRole('admin')) {
-            $projectIds = $currentUser->projects()->pluck('projects.id');
-            $query->whereIn('project_id', $projectIds);
+        $user = auth()->user();
+        $query = File::with([
+            'project' => function($p) use ($user) {
+                $p->with(['users' => function($q) use ($user) {
+                    $q->where('user_id', $user->id)->withPivot('is_muted');
+                }]);
+            }, 
+            'user', 
+            'task.project' => function($p) use ($user) {
+                $p->with(['users' => function($q) use ($user) {
+                    $q->where('user_id', $user->id)->withPivot('is_muted');
+                }]);
+            }
+        ]);
+
+        if (!$user->hasRole('admin')) {
+            $projectIds = $user->projects()->wherePivot('is_muted', false)->pluck('projects.id');
+            $query->where(function($q) use ($projectIds) {
+                $q->whereIn('project_id', $projectIds)
+                  ->orWhereHas('task', function($q2) use ($projectIds) {
+                      $q2->whereIn('project_id', $projectIds);
+                  });
+            });
         }
+
         if ($request->search) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -42,7 +61,20 @@ class FileController extends Controller
                   });
             });
         }
-        $files = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
+
+        $files = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString()
+            ->through(function($file){
+                $is_muted = false;
+                $project = $file->project ?? ($file->task ? $file->task->project : null);
+                if ($project && $project->users->isNotEmpty()) {
+                    $is_muted = $project->users->first()->pivot->is_muted;
+                }
+                
+                $file->project_is_muted = $is_muted;
+
+                return $file;
+            });
+
         return Inertia::render('Files/Index', [
             'files' => $files,
             'filters' => $request->only('search'),

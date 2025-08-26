@@ -32,7 +32,7 @@ class KanbanController extends Controller
 
         if (!$user->hasRole('admin')) {
             // Pour les non-admins, ne montrer que les tâches des projets auxquels ils appartiennent
-            $projectIds = $user->projects()->pluck('projects.id');
+            $projectIds = $user->projects()->wherePivot('is_muted', false)->pluck('projects.id');
             $query->whereIn('project_id', $projectIds);
         }
 
@@ -192,7 +192,7 @@ class KanbanController extends Controller
 
         // Filtrer par projets auxquels l'utilisateur a accès
         if (!$user->hasRole('admin')) {
-            $projectIds = $user->projects()->pluck('projects.id');
+            $projectIds = $user->projects()->wherePivot('is_muted', false)->pluck('projects.id');
             $query->whereIn('project_id', $projectIds);
         }
 

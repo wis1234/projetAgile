@@ -174,11 +174,21 @@ class ProjectController extends Controller
                       ->withCasts(['profile_photo_url' => 'string']);
             }])->findOrFail($id);
             
-            // Double check user is actually a member
-            if (!$project->users->contains(auth()->id())) {
+            // Double check user is actually a member and not muted
+            $userMembership = $project->users()->where('user_id', auth()->id())->first();
+            
+            if (!$userMembership) {
                 return Inertia::render('Error403')
                     ->toResponse(request())
                     ->setStatusCode(403);
+            }
+            
+            // Check if user is muted in this project
+            if ($userMembership->pivot->is_muted) {
+                return Inertia::render('Error403', [
+                    'message' => 'You have been muted in this project and cannot access it.'
+                ])->toResponse(request())
+                  ->setStatusCode(403);
             }
         
             $currentUser = auth()->user();

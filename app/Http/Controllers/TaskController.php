@@ -25,16 +25,35 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
-        $query = Task::with(['assignedUser', 'project', 'sprint'])->whereHas('project', function ($q) {
-            $q->whereHas('users', function ($q2) {
-                $q2->where('user_id', auth()->id());
+        $user = auth()->user();
+        $query = Task::with([
+            'assignedUser', 
+            'project' => function($p) use ($user) {
+                $p->with(['users' => function($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                }]);
+            },
+            'sprint'
+        ])->whereHas('project', function ($q) use ($user) {
+            $q->whereHas('users', function ($q2) use ($user) {
+                $q2->where('user_id', $user->id);
             });
         });
 
         if ($request->search) {
             $query->where('title', 'like', '%' . $request->search . '%');
         }
-        $tasks = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
+        $tasks = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString()
+            ->through(function($task){
+                $is_muted = false;
+                if ($task->project && $task->project->users->isNotEmpty()) {
+                    $is_muted = $task->project->users->first()->pivot->is_muted;
+                }
+                
+                $task->project_is_muted = $is_muted;
+
+                return $task;
+            });
 
         return Inertia::render('Tasks/Index', [
             'tasks' => $tasks,

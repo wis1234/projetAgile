@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaFileAlt, FaPlus, FaSearch, FaDownload, FaTable, FaTh, FaImage, FaFilePdf, FaFileWord, FaFileExcel, FaFileCode, FaClock, FaDropbox } from 'react-icons/fa';
+import { FaFileAlt, FaPlus, FaSearch, FaDownload, FaTable, FaTh, FaImage, FaFilePdf, FaFileWord, FaFileExcel, FaFileCode, FaClock, FaDropbox, FaProjectDiagram } from 'react-icons/fa';
 
 export default function Index({ files, filters }) {
     const { flash = {} } = usePage().props;
@@ -251,6 +251,17 @@ export default function Index({ files, filters }) {
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
                                         {truncateFileType(file.type)}
                                     </p>
+                                    {file.project && (
+                                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center">
+                                            <FaProjectDiagram className="mr-1" />
+                                            <span>{file.project.name}</span>
+                                            {file.project_is_muted && (
+                                                <span className="ml-2 px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full flex-shrink-0">
+                                                    Sourdine
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                     
                                     <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                                         <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">

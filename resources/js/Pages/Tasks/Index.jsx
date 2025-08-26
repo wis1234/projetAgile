@@ -294,6 +294,11 @@ function Index({ tasks, filters }) {
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
                         {task.project.name}
                       </span>
+                      {task.project_is_muted && (
+                        <span className="ml-2 px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full flex-shrink-0">
+                            Sourdine
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}

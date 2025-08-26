@@ -30,6 +30,8 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
         User::class => UserPolicy::class,
         School::class => SchoolPolicy::class,
         File::class => FilePolicy::class,
+        Message::class => MessagePolicy::class,
+        AuditLog::class => AuditLogPolicy::class,
     ];
 
     /**

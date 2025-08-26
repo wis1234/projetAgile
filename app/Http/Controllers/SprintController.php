@@ -46,6 +46,10 @@ class SprintController extends Controller
             
         // Transformation des données pour le frontend
         $sprints->getCollection()->transform(function ($sprint) {
+            $is_muted = false;
+            if ($sprint->project && $sprint->project->users->isNotEmpty()) {
+                $is_muted = $sprint->project->users->first()->pivot->is_muted;
+            }
             return [
                 'id' => $sprint->id,
                 'name' => $sprint->name,
@@ -56,6 +60,7 @@ class SprintController extends Controller
                 'project' => $sprint->project ? [
                     'id' => $sprint->project->id,
                     'name' => $sprint->project->name,
+                    'is_muted' => $is_muted,
                 ] : null,
                 'created_at' => $sprint->created_at,
                 'updated_at' => $sprint->updated_at,
