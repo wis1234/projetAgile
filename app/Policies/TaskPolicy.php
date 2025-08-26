@@ -14,14 +14,35 @@ class TaskPolicy
 
     public function view(User $user, Task $task)
     {
-        return $user->hasRole('admin')
-            || ($task->project && $task->project->users()->where('user_id', $user->id)->exists());
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        if (!$task->project) {
+            return false;
+        }
+
+        return $task->project->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('is_muted', false)
+            ->exists();
     }
 
     public function update(User $user, Task $task)
     {
-        return $user->hasRole('admin')
-            || ($task->project && $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists());
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        if (!$task->project) {
+            return false;
+        }
+
+        return $task->project->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'manager')
+            ->wherePivot('is_muted', false)
+            ->exists();
     }
 
     public function delete(User $user, Task $task)
@@ -31,9 +52,21 @@ class TaskPolicy
 
     public function comment(User $user, Task $task)
     {
-        return $user->hasRole('admin')
-            || ($task->project && $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists())
-            || $task->assigned_to == $user->id;
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        if (!$task->project) {
+            return false;
+        }
+
+        $projectUser = $task->project->users()->where('user_id', $user->id)->first();
+
+        if (!$projectUser || $projectUser->pivot->is_muted) {
+            return false;
+        }
+
+        return $projectUser->pivot->role === 'manager' || $task->assigned_to === $user->id;
     }
 
     public function create(User $user)
@@ -48,7 +81,18 @@ class TaskPolicy
 
     public function validatePayment(User $user, Task $task)
     {
-        return $user->hasRole('admin')
-            || ($task->project && $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists());
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        if (!$task->project) {
+            return false;
+        }
+
+        return $task->project->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'manager')
+            ->wherePivot('is_muted', false)
+            ->exists();
     }
-} 
+}

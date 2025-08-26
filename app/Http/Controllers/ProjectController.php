@@ -40,12 +40,13 @@ class ProjectController extends Controller
             $projects = $query->withCount(['tasks', 'users'])
                              ->with(['users' => function($query) {
                                  $query->select('users.id', 'name', 'email')
-                                       ->withPivot('role');
+                                       ->withPivot('role', 'is_muted');
                              }])
                              ->orderBy('created_at', 'desc')
                              ->paginate($perPage)
                              ->withQueryString()
                              ->through(function ($project) {
+                                 $currentUser = $project->users->find(auth()->id());
                                  return [
                                      'id' => $project->id,
                                      'name' => $project->name,
@@ -55,6 +56,7 @@ class ProjectController extends Controller
                                      'updated_at' => $project->updated_at,
                                      'users_count' => $project->users_count,
                                      'tasks_count' => $project->tasks_count,
+                                     'is_muted' => $currentUser ? $currentUser->pivot->is_muted : false,
                                      'users' => $project->users->map(function($user) {
                                          return [
                                              'id' => $user->id,

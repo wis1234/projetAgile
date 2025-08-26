@@ -34,8 +34,8 @@ class DashboardController extends Controller
             'tasks' => $taskQuery->count(),
             'sprints' => $isAdmin ? Sprint::count() : Sprint::whereIn('project_id', $userProjectIds ?? [])->count(),
             'projects' => $projectQuery->count(),
-            'users' => $isAdmin ? User::count() : 0, // Hide user count for non-admins
-            'files' => $isAdmin ? File::count() : File::where('user_id', $user->id)->count(),
+            'users' => $isAdmin ? User::count() : DB::table('project_user')->whereIn('project_id', $userProjectIds)->distinct()->count('user_id'),
+            'files' => $isAdmin ? File::count() : File::whereIn('project_id', $userProjectIds)->orWhereIn('task_id', (clone $taskQuery)->pluck('id'))->count(),
             'auditLogs' => $isAdmin ? DB::table('audit_logs')->count() : 0, // Hide audit logs for non-admins
             'members' => $isAdmin ? DB::table('project_user')->count() : 0, // Hide member count for non-admins
             // Statistiques des tâches par statut

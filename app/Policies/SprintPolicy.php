@@ -14,7 +14,18 @@ class SprintPolicy
 
     public function view(User $user, Sprint $sprint)
     {
-        return $user->hasRole('admin') || ($sprint->project && $sprint->project->users()->where('user_id', $user->id)->exists());
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        if (!$sprint->project) {
+            return false;
+        }
+
+        return $sprint->project->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('is_muted', false)
+            ->exists();
     }
 
     public function create(User $user)
@@ -24,11 +35,23 @@ class SprintPolicy
 
     public function update(User $user, Sprint $sprint)
     {
-        return $user->hasRole('admin') || ($sprint->project && $sprint->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists());
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        if (!$sprint->project) {
+            return false;
+        }
+
+        return $sprint->project->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'manager')
+            ->wherePivot('is_muted', false)
+            ->exists();
     }
 
     public function delete(User $user, Sprint $sprint)
     {
         return $this->update($user, $sprint);
     }
-} 
+}

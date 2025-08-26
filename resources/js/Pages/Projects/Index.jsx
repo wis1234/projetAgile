@@ -289,8 +289,13 @@ export default function Index({ projects, filters }) {
                                             <FaProjectDiagram className="text-white text-lg" />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-                                                {project.name}
+                                            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 flex items-center">
+                                                <span className="truncate">{project.name}</span>
+                                                {project.is_muted && (
+                                                    <span className="ml-2 px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full flex-shrink-0">
+                                                        Sourdine
+                                                    </span>
+                                                )}
                                             </h3>
                                             <p className="text-xs text-gray-500 dark:text-gray-400">
                                                 ID: {project.id}

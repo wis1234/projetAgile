@@ -179,7 +179,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
       show: true
     },
     {
-      title: 'Utilisateurs',
+      title: 'Coéquipiers',
       count: stats.users || 0,
       color: 'bg-gradient-to-r from-purple-500 to-purple-600 text-white',
       link: '/users',
@@ -307,7 +307,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">Utilisateurs actifs</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">Coéquipiers actifs</h2>
             <div className="space-y-4">
               {topUsers && topUsers.length > 0 ? (
                 topUsers.map((user, index) => (
