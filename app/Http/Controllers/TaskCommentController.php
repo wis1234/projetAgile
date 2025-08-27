@@ -22,12 +22,24 @@ class TaskCommentController extends Controller
     public function store(Request $request, $taskId)
     {
         $request->validate([
-            'content' => 'required|string|max:2000',
+            'content' => 'nullable|string|max:2000',
+            'audio' => 'nullable|file|mimes:mp3,wav,ogg,webm|max:10240', // Max 10MB
         ]);
+
+        if (!$request->filled('content') && !$request->hasFile('audio')) {
+            return response()->json(['message' => 'Le contenu ou un fichier audio est requis.'], 422);
+        }
+
+        $audioPath = null;
+        if ($request->hasFile('audio')) {
+            $audioPath = $request->file('audio')->store('task_comments/audio', 'public');
+        }
+
         $comment = TaskComment::create([
             'task_id' => $taskId,
             'user_id' => Auth::id(),
             'content' => $request->content,
+            'audio_path' => $audioPath,
         ]);
         $comment->load('user');
 
@@ -36,7 +48,13 @@ class TaskCommentController extends Controller
         $projectUsers = $task->project->users ?? collect();
         $commentAuthorId = Auth::id();
         $subject = 'Nouveau commentaire sur une tâche';
-        $message = "Un nouveau commentaire a été ajouté à la tâche '{$task->title}' par {$comment->user->name} :\n\n\"{$comment->content}\"";
+        $message = "Un nouveau commentaire a été ajouté à la tâche '{$task->title}' par {$comment->user->name} :\n\n";
+        if ($comment->content) {
+            $message .= "\"{$comment->content}\"";
+        }
+        if ($comment->audio_path) {
+            $message .= " (Contient un message vocal)";
+        }
         $actionUrl = route('tasks.show', $task->id);
         $actionText = 'Voir le commentaire';
 

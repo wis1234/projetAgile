@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 
 // Composant de compte à rebours réutilisable
@@ -167,6 +167,113 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [showConfirmDeleteCommentModal, setShowConfirmDeleteCommentModal] = useState(false);
   const [commentToDeleteId, setCommentToDeleteId] = useState(null);
 
+  // Audio recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioChunks, setAudioChunks] = useState([]);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingInterval, setRecordingInterval] = useState(null);
+
+  const startRecording = async () => {
+    try {
+      // Clear any existing recording
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+        setAudioUrl(null);
+      }
+      setAudioBlob(null);
+      setAudioChunks([]);
+      setRecordingTime(0);
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        } 
+      });
+      
+      // Configure MediaRecorder with specific MIME type for better compatibility
+      const options = {
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 128000
+      };
+      
+      const recorder = new MediaRecorder(stream, options);
+      const chunks = [];
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        clearInterval(recordingInterval);
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setAudioChunks(chunks);
+        setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        setRecordingTime(0);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      // Start timer
+      clearInterval(recordingInterval);
+      const interval = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      setRecordingInterval(interval);
+      
+      recorder.start(100); // Request data every 100ms
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+        setError('Impossible d\'accéder au microphone. Veuillez vérifier les autorisations.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      clearInterval(recordingInterval);
+    }
+  };
+  
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [recordingInterval, audioUrl]);
+  
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [recordingInterval, audioUrl]);
+
   useEffect(() => {
     // When the component loads, if it's a manager/admin, default selected member to current user
     if (isAdmin || isProjectManager) {
@@ -224,20 +331,30 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
-    if (!commentContent.trim()) return;
+    if (!commentContent.trim() && !audioBlob) {
+      setError('Veuillez écrire un message ou enregistrer un message vocal.');
+      return;
+    }
     
     setPosting(true);
     setError('');
     
     try {
+      const formData = new FormData();
+      // Always ensure content has a value, even if it's just a space
+      formData.append('content', commentContent.trim() || 'Message vocal');
+      if (audioBlob) {
+        // Use the correct MIME type and extension
+        formData.append('audio', audioBlob, 'voice_message.webm');
+      }
+
       const res = await fetch(`/api/tasks/${task.id}/comments`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
         },
-        body: JSON.stringify({ content: commentContent }),
+        body: formData,
       });
       
       if (!res.ok) {
@@ -249,6 +366,8 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       const newComment = await res.json();
       setComments([...comments, newComment]);
       setCommentContent('');
+      setAudioBlob(null);
+      setAudioUrl(null);
     } catch (e) {
       setError(e.message || 'Erreur lors de l\'ajout du commentaire');
     } finally {
@@ -704,7 +823,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                           )}
                         </div>
                         <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-<div className="text-right">
+                            <div className="text-right">
                             <CountdownTimer 
                               targetDate={task.due_date}
                               taskStatus={task.status}
@@ -1273,9 +1392,16 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                               </form>
                             ) : (
                               <div className="prose max-w-none dark:prose-invert">
-                                <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
-                                  {comment.content}
-                                </p>
+                                {comment.content && (
+                                  <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words mb-2">
+                                    {comment.content}
+                                  </p>
+                                )}
+                                {comment.audio_path && (
+                                  <div className="mt-2">
+                                    <audio controls src={`/storage/${comment.audio_path}`} className="w-full"></audio>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1310,13 +1436,55 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                         onKeyDown={handleCommentKeyDown}
                         placeholder="Écrire votre message ici..."
                         className="border border-gray-300 rounded-lg p-4 w-full min-h-[120px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200 pr-12"
-                        disabled={posting}
-                        required
+                        disabled={posting || isRecording}
+                        required={!audioBlob} // Make required only if no audio is attached
                         maxLength={2000}
                       />
                       <div className="absolute bottom-3 right-3 text-xs text-gray-500 dark:text-gray-400">
                         {commentContent.length}/2000
                       </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        {isRecording ? (
+                          <>
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-lg">
+                              {formatTime(recordingTime)}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={stopRecording}
+                              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md"
+                              title="Arrêter l'enregistrement"
+                            >
+                              <FaStop className="animate-pulse" /> Arrêter
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={startRecording}
+                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={posting}
+                            title="Démarrer l'enregistrement vocal"
+                          >
+                            <FaMicrophone /> Enregistrer un message
+                          </button>
+                        )}
+                      </div>
+                      {audioUrl && (
+                        <div className="flex items-center gap-2">
+                          <audio controls src={audioUrl} className="w-64"></audio>
+                          <button
+                            type="button"
+                            onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
+                            className="text-red-500 hover:text-red-700"
+                            title="Supprimer l'enregistrement vocal"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     {error && (
                       <div className="bg-red-50 border-l-4 border-red-400 p-4">
@@ -1336,10 +1504,10 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         Appuyez sur Ctrl+Entrée pour envoyer
                       </div>
-                      <button 
-                        type="submit" 
-                        className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-md flex items-center gap-2 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed" 
-                        disabled={posting || !commentContent.trim()}
+                      <button
+                        type="submit"
+                        className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-md flex items-center gap-2 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={posting || (!commentContent.trim() && !audioBlob)}
                       >
                         {posting ? (
                           <>
