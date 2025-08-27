@@ -178,6 +178,11 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
   const startRecording = async () => {
     try {
+      // Vérifier si le navigateur supporte l'enregistrement audio
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Votre navigateur ne supporte pas l\'enregistrement audio');
+      }
+
       // Clear any existing recording
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
@@ -186,18 +191,46 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       setAudioBlob(null);
       setAudioChunks([]);
       setRecordingTime(0);
+      setError('');
       
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      // Demander la permission d'accéder au micro
+      const constraints = {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           sampleRate: 44100
-        } 
-      });
+        }
+      };
+
+      // Sur mobile, utiliser des paramètres plus compatibles
+      if (/Mobi|Android/i.test(navigator.userAgent)) {
+        delete constraints.audio.sampleRate; // Laisser le navigateur mobile choisir le taux d'échantillonnage
+      }
       
-      // Configure MediaRecorder with specific MIME type for better compatibility
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        .catch(err => {
+          if (err.name === 'NotAllowedError') {
+            throw new Error('Accès au microphone refusé. Veuillez autoriser l\'accès au micro dans les paramètres de votre navigateur.');
+          } else if (err.name === 'NotFoundError') {
+            throw new Error('Aucun microphone détecté. Vérifiez votre connexion micro.');
+          } else {
+            throw new Error(`Erreur d'accès au microphone: ${err.message}`);
+          }
+        });
+      
+      // Configurer le MediaRecorder avec un format compatible
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
+        ? 'audio/webm' 
+        : MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : '';
+      
+      if (!mimeType) {
+        throw new Error('Format audio non supporté par votre navigateur');
+      }
+      
       const options = {
-        mimeType: 'audio/webm;codecs=opus',
+        mimeType: mimeType,
         audioBitsPerSecond: 128000
       };
       
@@ -210,24 +243,40 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         }
       };
 
-      recorder.onstop = () => {
-        clearInterval(recordingInterval);
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        setAudioChunks(chunks);
-        setAudioBlob(blob);
-        setAudioUrl(URL.createObjectURL(blob));
-        setRecordingTime(0);
-        stream.getTracks().forEach(track => track.stop());
+      recorder.onerror = (event) => {
+        console.error('Erreur lors de l\'enregistrement:', event.error);
+        setError('Erreur lors de l\'enregistrement. Veuillez réessayer.');
+        stopRecording();
       };
 
-      // Start timer
+      recorder.onstop = () => {
+        clearInterval(recordingInterval);
+        try {
+          const blob = new Blob(chunks, { type: mimeType });
+          setAudioChunks(chunks);
+          setAudioBlob(blob);
+          setAudioUrl(URL.createObjectURL(blob));
+        } catch (err) {
+          console.error('Erreur lors de la création du blob audio:', err);
+          setError('Impossible de traiter l\'enregistrement audio.');
+        } finally {
+          setRecordingTime(0);
+          stream.getTracks().forEach(track => {
+            track.stop();
+            stream.removeTrack(track);
+          });
+        }
+      };
+
+      // Démarrer le minuteur
       clearInterval(recordingInterval);
       const interval = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
       setRecordingInterval(interval);
       
-      recorder.start(100); // Request data every 100ms
+      // Démarrer l'enregistrement avec un intervalle de 1 seconde pour une meilleure réactivité
+      recorder.start(1000);
       setMediaRecorder(recorder);
       setIsRecording(true);
     } catch (err) {
@@ -1398,8 +1447,32 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                                   </p>
                                 )}
                                 {comment.audio_path && (
-                                  <div className="mt-2">
-                                    <audio controls src={`/storage/${comment.audio_path}`} className="w-full"></audio>
+                                  <div className="mt-3">
+                                    <div className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                                      <div className="flex-shrink-0 text-blue-600 dark:text-blue-400">
+                                        <FaMicrophone size={24} />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <audio 
+                                          controls 
+                                          src={`/storage/${comment.audio_path}`} 
+                                          className="w-full"
+                                          onError={(e) => {
+                                            console.error('Erreur de lecture audio:', e);
+                                            const errorMsg = document.createElement('div');
+                                            errorMsg.className = 'text-red-500 text-sm mt-1';
+                                            errorMsg.textContent = 'Impossible de lire le message audio. Votre appareil ou navigateur ne prend peut-être pas en charge ce format.';
+                                            e.target.parentNode.appendChild(errorMsg);
+                                            e.target.remove();
+                                          }}
+                                        >
+                                          Votre navigateur ne supporte pas la lecture audio.
+                                          <a href={`/storage/${comment.audio_path}`} className="text-blue-600 dark:text-blue-400 hover:underline ml-2" download>">
+                                            Télécharger
+                                          </a>
+                                        </audio>
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
                               </div>
