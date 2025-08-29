@@ -204,10 +204,10 @@ export default function Show({ project: initialProject, auth }) {
                             </div>
                             <div>
                                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
-                                    Détails du projet
+                                    Gestion des membres du projet
                                 </h1>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                    Consultez les membres et les informations du projet "{project.name}"
+                                    Consultez les informations des membres du projet "{project.name}"
                                 </p>
                             </div>
                         </div>
@@ -223,7 +223,7 @@ export default function Show({ project: initialProject, auth }) {
                                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                                     {project ? (
                                         <Link 
-                                            href={route('project-users.show', project.id)}
+                                            href={route('projects.show', project.id)}
                                             className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                             onClick={(e) => e.stopPropagation()}
                                         >

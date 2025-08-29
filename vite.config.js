@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => ({
             '@Hooks': path.resolve(__dirname, './resources/js/Hooks'),
             '@Utils': path.resolve(__dirname, './resources/js/Utils'),
             '@Models': path.resolve(__dirname, './resources/js/Models'),
+            '@contexts': path.resolve(__dirname, './resources/js/contexts'),
             '~bootstrap': path.resolve(__dirname, 'node_modules/bootstrap'),
         },
     },

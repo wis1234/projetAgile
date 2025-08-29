@@ -6,6 +6,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { useEffect } from 'react';
 import CsrfErrorModal from '@/Components/CsrfErrorModal';
+import { TutorialProvider } from '@/contexts/TutorialContext';
 import './lib/axios';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Proja';
@@ -28,9 +29,11 @@ const createInertiaApp = (options) => {
             const root = createRoot(el);
 
             root.render(
-                <AppWithCsrfErrorModal>
-                    <App {...props} />
-                </AppWithCsrfErrorModal>
+                <TutorialProvider>
+                    <AppWithCsrfErrorModal>
+                        <App {...props} />
+                    </AppWithCsrfErrorModal>
+                </TutorialProvider>
             );
         },
     });

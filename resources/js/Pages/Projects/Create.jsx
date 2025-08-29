@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
 import { FaPlus, FaProjectDiagram, FaArrowLeft, FaChartLine, FaInfoCircle } from 'react-icons/fa';
+import Tutorial from '@/Components/Tutorial';
+import { projectCreationTutorial } from '@/tutorials/projectTutorials';
+import TutorialSettings from '@/Components/TutorialSettings';
 
 function Create() {
   const { errors = {}, flash = {}, availableStatuses = {} } = usePage().props;
@@ -12,6 +15,7 @@ function Create() {
   const [notification, setNotification] = useState(flash.success || flash.error || '');
   const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
   const [loading, setLoading] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(true);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -48,6 +52,15 @@ function Create() {
   };
 
   return (
+    <div>
+      <Tutorial
+        id={projectCreationTutorial.id}
+        title={projectCreationTutorial.title}
+        steps={projectCreationTutorial.steps}
+        showTutorials={showTutorial}
+        onComplete={() => setShowTutorial(false)}
+      />
+      <TutorialSettings />
     <div className="min-h-screen bg-white dark:bg-gray-900">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="pt-16">
@@ -185,8 +198,29 @@ function Create() {
         </div>
       </div>
     </div>
+    </div>
   );
 }
 
-Create.layout = page => <AdminLayout children={page} />;
+// Composant de section de formulaire réutilisable
+const FormSection = ({ title, description, children }) => (
+  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div className="mb-4">
+      <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+      {description && (
+        <p className="mt-1 text-sm text-gray-500">{description}</p>
+      )}
+    </div>
+    <div className="space-y-4">
+      {children}
+    </div>
+  </div>
+);
+
+Create.layout = page => (
+  <AdminLayout>
+    {page}
+  </AdminLayout>
+);
+
 export default Create;

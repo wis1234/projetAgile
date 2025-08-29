@@ -142,7 +142,7 @@ function Index({ tasks, filters }) {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
           <div className="flex items-center gap-4">
             <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" />
-            <h1 className="text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">Gestion des Tâches</h1>
+            <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">Gestion des Tâches</h1>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
