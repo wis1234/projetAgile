@@ -1467,7 +1467,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                                           }}
                                         >
                                           Votre navigateur ne supporte pas la lecture audio.
-                                          <a href={`/storage/${comment.audio_path}`} className="text-blue-600 dark:text-blue-400 hover:underline ml-2" download>">
+                                          <a href={`/storage/${comment.audio_path}`} className="text-blue-600 dark:text-blue-400 hover:underline ml-2" download>
                                             Télécharger
                                           </a>
                                         </audio>
