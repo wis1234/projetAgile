@@ -364,6 +364,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
   // Commentaires
   const [comments, setComments] = useState([]);
+  // Charger les commentaires lus depuis le localStorage
+  const [readComments, setReadComments] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`readComments_${task.id}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    }
+    return new Set();
+  });
   const [loadingComments, setLoadingComments] = useState(true);
   const [commentContent, setCommentContent] = useState('');
   const [posting, setPosting] = useState(false);
@@ -595,6 +603,45 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
   const [activeTab, setActiveTab] = useState('details');
 
+  // Function to mark all comments as read
+  const markCommentsAsRead = useCallback(() => {
+    if (comments.length > 0) {
+      const newReadComments = new Set(readComments);
+      let hasNewReads = false;
+      
+      comments.forEach(comment => {
+        if (comment.id && !newReadComments.has(comment.id)) {
+          newReadComments.add(comment.id);
+          hasNewReads = true;
+        }
+      });
+      
+      if (hasNewReads) {
+        // Sauvegarder dans le localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(
+            `readComments_${task.id}`, 
+            JSON.stringify(Array.from(newReadComments))
+          );
+        }
+        setReadComments(newReadComments);
+      }
+    }
+  }, [comments, readComments, task.id]);
+
+  // Mark comments as read when Discussions tab is clicked
+  const handleTabClick = (tab) => {
+    if (tab === 'comments') {
+      markCommentsAsRead();
+    }
+    setActiveTab(tab);
+  };
+
+  // Calculate unread comments count
+  const unreadCommentsCount = comments.filter(comment => 
+    comment.id && !readComments.has(comment.id)
+  ).length;
+
   return (
     <div className="flex flex-col w-full bg-white dark:bg-gray-950 p-0 m-0 min-h-screen">
       <div className="flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
@@ -645,53 +692,83 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
           </div>
         </div>
 
-        {/* Tabs Navigation */}
-        <div className="mb-8 border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+        {/* Enhanced Tabs Navigation with Beautiful Buttons */}
+        <div className="mb-8">
+          <nav className="flex flex-wrap gap-2 sm:gap-3" aria-label="Tabs">
             <button
               onClick={() => setActiveTab('details')}
-              className={`${
+              className={`group relative px-4 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out overflow-hidden ${
                 activeTab === 'details'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30 transform hover:scale-105'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md hover:shadow-lg'
+              }`}
             >
-              Détails
+              <div className="flex items-center gap-2">
+                <FaInfoCircle className="text-lg" />
+                <span>Détails</span>
+              </div>
+              {activeTab === 'details' && (
+                <span className="absolute bottom-0 left-0 w-full h-1 bg-white/50"></span>
+              )}
             </button>
             
             {/* Onglet Rémunération - Uniquement si la tâche est rémunérée */}
             {task.is_paid && (
               <button
                 onClick={() => setActiveTab('payment')}
-                className={`${
+                className={`group relative px-4 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out overflow-hidden ${
                   activeTab === 'payment'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 transform hover:scale-105'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md hover:shadow-lg'
+                }`}
               >
-                Rémunération
+                <div className="flex items-center gap-2">
+                  <FaDollarSign className="text-lg" />
+                  <span>Rémunération</span>
+                </div>
+                {activeTab === 'payment' && (
+                  <span className="absolute bottom-0 left-0 w-full h-1 bg-white/50"></span>
+                )}
               </button>
             )}
             
             <button
               onClick={() => setActiveTab('files')}
-              className={`${
+              className={`group relative px-4 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out overflow-hidden ${
                 activeTab === 'files'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/30 transform hover:scale-105'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md hover:shadow-lg'
+              }`}
             >
-              Ressources
+              <div className="flex items-center gap-2">
+                <FaFileUpload className="text-lg" />
+                <span>Ressources</span>
+              </div>
+              {activeTab === 'files' && (
+                <span className="absolute bottom-0 left-0 w-full h-1 bg-white/50"></span>
+              )}
             </button>
+            
             <button
-              onClick={() => setActiveTab('comments')}
-              className={`${
+              onClick={() => handleTabClick('comments')}
+              className={`group relative px-4 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out overflow-hidden ${
                 activeTab === 'comments'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/30 transform hover:scale-105'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md hover:shadow-lg'
+              }`}
             >
-              Discussions
+              <div className="flex items-center gap-2">
+                <FaCommentDots className="text-lg" />
+                <span>Discussions</span>
+                {unreadCommentsCount > 0 && (
+                  <span className="flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-red-500 text-white">
+                    {unreadCommentsCount}
+                  </span>
+                )}
+              </div>
+              {activeTab === 'comments' && (
+                <span className="absolute bottom-0 left-0 w-full h-1 bg-white/50"></span>
+              )}
             </button>
           </nav>
         </div>
