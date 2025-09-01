@@ -330,107 +330,107 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
         <AdminLayout>
             <Head title={`Édition de ${file.name}`} />
             <div className="flex flex-col h-screen bg-white overflow-hidden">
-                <div className="sticky top-0 z-10 bg-white shadow-md">
-                    <div className="flex items-center justify-between p-2 border-b">
+                {/* Barre d'outils fixe en haut */}
+                <div className="fixed top-0 left-64 right-0 z-50 bg-white shadow-md">
+                    <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between border-b">
                         <div className="flex items-center space-x-2">
-                            <div className="text-sm font-mono text-gray-500 border-r border-gray-200 pr-3 mr-2">
+                            <div className="text-sm font-mono text-gray-500">
                                 {file.name}
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <button 
-                                    onClick={handleSave} 
-                                    disabled={isSaving || !isDirty}
-                                    className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1 ${isSaving || !isDirty ? 'bg-blue-300 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                                >
-                                    {isSaving ? <FaSpinner className="animate-spin mr-1" /> : <FaSave className="mr-1" />}
-                                    {isSaving ? 'Enregistrement...' : 'Enregistrer'}
-                                </button>
-                                <button 
-                                    onClick={handleClose}
-                                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md font-medium hover:bg-gray-300"
-                                >
-                                    Fermer
-                                </button>
-                            </div>
-                            {editor && (
-                                <>
-                                    <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                                    <MenuBar editor={editor} />
-                                    <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                                    <button
-                                        onClick={() => editor.chain().focus().setTextAlign('left').run()}
-                                        className={`p-2 rounded-md ${editor.isActive({ textAlign: 'left' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
-                                        title="Aligner à gauche"
-                                    >
-                                        <FaAlignLeft />
-                                    </button>
-                                    <button
-                                        onClick={() => editor.chain().focus().setTextAlign('center').run()}
-                                        className={`p-2 rounded-md ${editor.isActive({ textAlign: 'center' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
-                                        title="Centrer"
-                                    >
-                                        <FaAlignCenter />
-                                    </button>
-                                    <button
-                                        onClick={() => editor.chain().focus().setTextAlign('right').run()}
-                                        className={`p-2 rounded-md ${editor.isActive({ textAlign: 'right' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
-                                        title="Aligner à droite"
-                                    >
-                                        <FaAlignRight />
-                                    </button>
-                                    <button
-                                        onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-                                        className={`p-2 rounded-md ${editor.isActive({ textAlign: 'justify' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
-                                        title="Justifier"
-                                    >
-                                        <FaAlignJustify />
-                                    </button>
-                                </>
-                            )}
                         </div>
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-6">
-                    {success && <div className="p-3 mb-4 bg-green-100 text-green-700 rounded-md">{success}</div>}
-                    {error && <div className="p-3 mb-4 bg-red-100 text-red-700 rounded-md">{error}</div>}
-                    <div className="prose max-w-none min-h-[400px] p-4 border rounded-lg">
-                        <EditorContent editor={editor} className="min-h-[300px]" />
+                        
+                        <div className="flex items-center space-x-2">
+                            <button 
+                                onClick={handleSave} 
+                                disabled={isSaving || !isDirty}
+                                className={`px-3 py-1.5 rounded-md flex items-center space-x-1 text-sm font-medium ${isSaving || !isDirty ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <FaSpinner className="animate-spin mr-1" />
+                                        <span>Enregistrement...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <FaSave className="mr-1" />
+                                        <span>Enregistrer</span>
+                                    </>
+                                )}
+                            </button>
+                            
+                            <button 
+                                onClick={handleClose}
+                                className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md border border-gray-300"
+                            >
+                                <FaTimes className="mr-1 inline" />
+                                <span>Fermer</span>
+                            </button>
+                        </div>
                     </div>
                     
-                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center text-sm text-gray-600">
-                            <FaUserEdit className="mr-2 text-gray-400" />
-                            <span>Vous éditez en tant que <span className="font-medium">{auth.user.name}</span></span>
-                        </div>
-                        {lastModifiedBy && (
-                            <div className="mt-2 text-xs text-gray-500">
-                                Dernière modification par {lastModifiedBy.name} le {new Date(file.updated_at).toLocaleString('fr-FR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
+                    {/* Barre d'outils de formatage */}
+                    <div className="bg-gray-50 border-b px-4 py-1 flex items-center justify-between">
+                        <MenuBar editor={editor} />
+                        
+                        {editor && (
+                            <div className="flex items-center space-x-1">
+                                <button
+                                    onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                                    className={`p-2 rounded-md ${editor.isActive({ textAlign: 'left' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+                                    title="Aligner à gauche"
+                                >
+                                    <FaAlignLeft />
+                                </button>
+                                <button
+                                    onClick={() => editor.chain().focus().setTextAlign('center').run()}
+                                    className={`p-2 rounded-md ${editor.isActive({ textAlign: 'center' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+                                    title="Centrer"
+                                >
+                                    <FaAlignCenter />
+                                </button>
+                                <button
+                                    onClick={() => editor.chain().focus().setTextAlign('right').run()}
+                                    className={`p-2 rounded-md ${editor.isActive({ textAlign: 'right' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+                                    title="Aligner à droite"
+                                >
+                                    <FaAlignRight />
+                                </button>
+                                <button
+                                    onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+                                    className={`p-2 rounded-md ${editor.isActive({ textAlign: 'justify' }) ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+                                    title="Justifier"
+                                >
+                                    <FaAlignJustify />
+                                </button>
                             </div>
                         )}
                     </div>
                 </div>
                 
-                {/* Pied de page avec informations de dernière modification */}
-                <footer className="border-t border-gray-200 bg-white py-2 px-4">
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                        <div className="flex items-center">
-                            <FaUserEdit className="mr-2 text-gray-400" />
-                            <span>
-                                Dernière modification par <span className="font-medium">{lastModifiedBy?.name || 'Système'}</span> le {new Date(file.updated_at).toLocaleDateString('fr-FR', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                })}
-                            </span>
-                        </div>
-                        <div className="text-xs text-gray-400">
-                            Version: {new Date(file.updated_at).getTime()}
+                {/* Contenu principal avec marge pour la barre d'outils fixe */}
+                <div className="flex-1 overflow-y-auto pt-24 px-8">
+                    {success && <div className="p-3 mb-2 bg-green-100 text-green-700 rounded-t-md w-full">{success}</div>}
+                    {error && <div className="p-3 mb-2 bg-red-100 text-red-700 rounded-t-md w-full">{error}</div>}
+                    
+                    <div className="prose max-w-none w-full min-h-[calc(100vh-6rem)] bg-white">
+                        <EditorContent editor={editor} className="min-h-[300px]" />
+                    </div>
+                    
+                    {/* Section d'informations sur le document */}
+                    <div className="w-full p-4 bg-gray-50 mt-2">
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center text-sm text-gray-600">
+                                <FaUserEdit className="mr-2 text-gray-400" />
+                                <span>Vous éditez en tant que <span className="font-medium">{auth.user.name}</span></span>
+                            </div>
+                            {lastModifiedBy && (
+                                <div className="mt-2 text-xs text-gray-500">
+                                    Dernière modification par {lastModifiedBy.name} le {new Date(file.updated_at).toLocaleString('fr-FR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
+                                </div>
+                            )}
                         </div>
                     </div>
-                </footer>
+                </div>
             </div>
         </AdminLayout>
     );
