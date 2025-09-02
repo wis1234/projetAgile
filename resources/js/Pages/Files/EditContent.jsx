@@ -71,7 +71,15 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
                 alignments: ['left', 'center', 'right', 'justify'],
                 defaultAlignment: 'left',
             }),
-            Link.configure({ openOnClick: false }),
+            Link.configure({ 
+                openOnClick: false,
+                HTMLAttributes: {
+                    class: 'editor-link',
+                },
+                validate: href => /^https?:\/\//.test(href),
+                autolink: true,
+                linkOnPaste: true,
+            }),
             // S'assurer que Highlight est chargée avant TrackChanges
             Highlight.configure({
                 multicolor: true,
@@ -88,6 +96,66 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
             setIsDirty(true);
         },
     });
+
+    // Effet pour détecter et styliser les liens et mentions d'auteur
+    useEffect(() => {
+        if (!editor) return;
+
+        const handleUpdate = () => {
+            // Détecter et styliser les liens
+            const links = document.querySelectorAll('.ProseMirror a');
+            links.forEach(link => {
+                if (!link.classList.contains('styled-link')) {
+                    link.classList.add('styled-link');
+                    link.setAttribute('target', '_blank');
+                    link.setAttribute('rel', 'noopener noreferrer');
+                }
+            });
+
+            // Détecter et styliser les mentions d'auteur
+            const mentions = document.querySelectorAll('.ProseMirror p, .ProseMirror div');
+            mentions.forEach(element => {
+                const text = element.textContent || '';
+                const mentionRegex = /@(\w+)/g;
+                let match;
+                
+                while ((match = mentionRegex.exec(text)) !== null) {
+                    const username = match[1];
+                    const user = projectMembers.find(u => 
+                        u.name.toLowerCase() === username.toLowerCase() || 
+                        u.email.split('@')[0].toLowerCase() === username.toLowerCase()
+                    );
+                    
+                    if (user) {
+                        const mentionSpan = document.createElement('span');
+                        mentionSpan.className = 'mention';
+                        mentionSpan.textContent = `@${username}`;
+                        mentionSpan.title = user.email;
+                        mentionSpan.dataset.userId = user.id;
+                        
+                        // Remplacer le texte par le span stylisé
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = element.innerHTML;
+                        tempDiv.innerHTML = tempDiv.innerHTML.replace(
+                            new RegExp(`@${username}`, 'g'), 
+                            mentionSpan.outerHTML
+                        );
+                        element.innerHTML = tempDiv.innerHTML;
+                    }
+                }
+            });
+        };
+
+        // Ajouter un écouteur pour les mises à jour de l'éditeur
+        editor.on('update', handleUpdate);
+        
+        // Exécuter une première fois au chargement
+        handleUpdate();
+
+        return () => {
+            editor.off('update', handleUpdate);
+        };
+    }, [editor, projectMembers]);
 
     useEffect(() => {
         if (flash?.success) {

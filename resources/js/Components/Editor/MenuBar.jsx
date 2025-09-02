@@ -131,6 +131,24 @@ const MenuBar = ({ editor, colors = COLORS, onTrackChanges }) => {
 
       <div className="border-l border-gray-300 h-6 mx-1"></div>
 
+      {/* Liens et Images */}
+      <button
+        onClick={setLink}
+        className={`p-2 rounded hover:bg-gray-100 ${editor.isActive('link') ? 'bg-gray-200' : ''}`}
+        title="Insérer un lien"
+      >
+        <FaLink className="w-5 h-5" />
+      </button>
+      <button
+        onClick={addImage}
+        className={`p-2 rounded hover:bg-gray-100`}
+        title="Insérer une image"
+      >
+        <FaImage className="w-5 h-5" />
+      </button>
+
+      <div className="border-l border-gray-300 h-6 mx-1"></div>
+
       {/* Font Size */}
       <div className="relative">
         <button
@@ -284,15 +302,46 @@ const MenuBar = ({ editor, colors = COLORS, onTrackChanges }) => {
         <FaCode className="w-5 h-5" />
       </button>
 
-      {onTrackChanges && (
+      <div className="flex items-center ml-auto">
         <button
-          onClick={onTrackChanges}
-          className="ml-auto p-2 text-blue-600 hover:bg-blue-50 rounded"
-          title="Suivi des modifications"
+          onClick={() => {
+            // Aller en haut du document
+            editor.chain().focus().setTextSelection(0).run();
+            // Faire défiler vers le haut
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className="p-2 text-gray-600 hover:bg-gray-100 rounded"
+          title="Aller en haut du document"
         >
-          <FaHistory className="w-5 h-5" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+          </svg>
         </button>
-      )}
+        <button
+          onClick={() => {
+            // Aller en bas du document
+            const endPos = editor.state.doc.content.size;
+            editor.chain().focus().setTextSelection(endPos).run();
+            // Faire défiler vers le bas
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+          }}
+          className="p-2 text-gray-600 hover:bg-gray-100 rounded"
+          title="Aller en bas du document"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+        {onTrackChanges && (
+          <button
+            onClick={onTrackChanges}
+            className="p-2 text-blue-600 hover:bg-blue-50 rounded ml-1"
+            title="Suivi des modifications"
+          >
+            <FaHistory className="w-5 h-5" />
+          </button>
+        )}
+      </div>
     </div>
   );
 };

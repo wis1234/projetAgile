@@ -1,4 +1,43 @@
 import { Extension } from '@tiptap/core';
+import { Plugin, PluginKey } from 'prosemirror-state';
+import { Decoration, DecorationSet } from 'prosemirror-view';
+
+// Styles pour les liens et mentions
+document.head.insertAdjacentHTML('beforeend', `
+  <style>
+    /* Style des liens dans l'éditeur */
+    .ProseMirror a {
+      color: #3b82f6;
+      text-decoration: none;
+      border-bottom: 1px solid #93c5fd;
+      transition: all 0.2s ease;
+    }
+    
+    .ProseMirror a:hover, .ProseMirror a:focus {
+      color: #1d4ed8;
+      border-bottom-color: #3b82f6;
+      background-color: #eff6ff;
+      border-radius: 3px;
+      outline: none;
+      box-shadow: 0 0 0 2px #bfdbfe;
+    }
+    
+    /* Style des mentions d'auteur */
+    .mention {
+      color: #8b5cf6;
+      background-color: #f5f3ff;
+      padding: 0.1em 0.3em;
+      border-radius: 3px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    
+    .mention:hover {
+      background-color: #ede9fe;
+      box-shadow: 0 0 0 2px #ddd6fe;
+    }
+  </style>
+`);
 
 export const TrackChanges = Extension.create({
   name: 'trackChanges',
