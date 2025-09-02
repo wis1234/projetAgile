@@ -404,6 +404,24 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
         saveRef.current = handleSave;
     }, [handleSave]);
     
+    // Gestion des raccourcis clavier
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Ctrl+S ou Cmd+S pour sauvegarder
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                if (saveRef.current) {
+                    saveRef.current();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
+
     // Gestion de la sauvegarde avant fermeture
     useEffect(() => {
         if (!editor || !file?.id) return;

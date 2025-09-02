@@ -119,9 +119,39 @@ class TaskController extends Controller
 
         $task = Task::create($validated);
         
-        // Envoyer une notification à tous les membres du projet
+        // Créer un fichier de suivi pour la tâche
         $project = Project::find($validated['project_id']);
+        
         if ($project) {
+            // Créer le dossier du projet s'il n'existe pas
+            $projectPath = 'projects/' . Str::slug($project->name) . '/tasks';
+            Storage::disk('public')->makeDirectory($projectPath, 0755, true);
+            
+            // Créer le fichier de suivi
+            $fileName = 'Fichier de suivi de la tâche ' . Str::slug($task->title) ;
+            $filePath = $projectPath . '/' . $fileName;
+            
+            $content = "Ce fichier est destiné au suivi de la tâche " . $task->title . "\n\n";
+            $content .= "Vous pouvez utiliser ce fichier pour noter les mises à jour, les commentaires ou toute information utile concernant cette tâche.\n";
+            $content .= "Tous les membres de l'équipe peuvent collaborer sur ce document.\n";
+            
+            Storage::disk('public')->put($filePath, $content);
+            
+            // Enregistrer le fichier dans la base de données
+            \App\Models\File::create([
+                'name' => $fileName,
+                'file_path' => $filePath,
+                'type' => 'text/plain',
+                'size' => Storage::disk('public')->size($filePath),
+                'user_id' => auth()->id(),
+                'project_id' => $project->id,
+                'task_id' => $task->id,
+                'description' => 'Fichier de suivi pour la tâche : ' . $task->title,
+                'status' => 'active',
+                'uploaded_by' => auth()->id()
+            ]);
+            
+            // Envoyer une notification à tous les membres du projet
             $project->notifyMembers('task_created', [
                 'task_id' => $task->id,
                 'task_title' => $task->title,
