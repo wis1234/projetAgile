@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { FaSave, FaSpinner, FaArrowLeft, FaCode, FaUserEdit, FaFilter, FaTimes, FaAlignLeft, FaAlignCenter, FaAlignRight, FaAlignJustify } from 'react-icons/fa';
+import { FaSave, FaSpinner, FaArrowLeft, FaCode, FaUserEdit, FaFilter, FaTimes, FaAlignLeft, FaAlignCenter, FaAlignRight, FaAlignJustify, FaCheckCircle } from 'react-icons/fa';
 import { isPdfFile, formatFileSize } from '@/utils/fileUtils';
 import MenuBar from '@/Components/Editor/MenuBar';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -26,7 +26,8 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
     const [error, setError] = useState('');
     const [lastSaved, setLastSaved] = useState(null);
     const [autoSaved, setAutoSaved] = useState(false);
-    const [success, setSuccess] = useState('');
+    const [showToast, setShowToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
         userId: '',
@@ -378,7 +379,13 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
             onSuccess: () => {
                 setIsSaving(false);
                 setIsDirty(false);
-                setSuccess('Fichier enregistré avec succès!');
+                setToastMessage('Modifications enregistrées avec succès');
+                setShowToast(true);
+                
+                // Cacher le toast après 3 secondes
+                setTimeout(() => {
+                    setShowToast(false);
+                }, 3000);
                 
                 // Supprimer la sauvegarde locale après un enregistrement réussi
                 if (file?.id) {
@@ -639,7 +646,6 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
                 
                 {/* Contenu principal avec marge pour la barre d'outils fixe et le pied de page */}
                 <div className="flex-1 overflow-y-auto pt-24 pb-20 px-8">
-                    {success && <div className="p-3 mb-2 bg-green-100 text-green-700 rounded-t-md w-full">{success}</div>}
                     {error && <div className="p-3 mb-2 bg-red-100 text-red-700 rounded-t-md w-full">{error}</div>}
                     
                     <div className="prose max-w-none w-full bg-white">
@@ -664,8 +670,40 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
                     </div>
                 </div>
             </div>
+            
+            {/* Toast de confirmation */}
+            {showToast && (
+                <div className="fixed bottom-4 right-4 z-50">
+                    <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-fade-in-up">
+                        <FaCheckCircle className="text-xl" />
+                        <span>{toastMessage}</span>
+                    </div>
+                </div>
+            )}
         </AdminLayout>
     );
 };
+
+// Ajout de l'animation pour le toast
+const styles = `
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    .animate-fade-in-up {
+        animation: fadeInUp 0.3s ease-out forwards;
+    }
+`;
+
+// Ajout des styles globaux
+const styleElement = document.createElement('style');
+styleElement.textContent = styles;
+document.head.appendChild(styleElement);
 
 export default EditContent;
