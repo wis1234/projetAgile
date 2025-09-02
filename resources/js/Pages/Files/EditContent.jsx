@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { FaSave, FaSpinner, FaArrowLeft, FaCode, FaUserEdit, FaFilter, FaTimes, FaAlignLeft, FaAlignCenter, FaAlignRight, FaAlignJustify } from 'react-icons/fa';
@@ -7,6 +7,7 @@ import MenuBar from '@/Components/Editor/MenuBar';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
+// Import des extensions pour configuration personnalisée
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import Highlight from '@tiptap/extension-highlight';
@@ -23,6 +24,8 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [error, setError] = useState('');
+    const [lastSaved, setLastSaved] = useState(null);
+    const [autoSaved, setAutoSaved] = useState(false);
     const [success, setSuccess] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
@@ -59,19 +62,22 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
                         class: 'code-block',
                     },
                 },
+                // On désactive les extensions qui seront configurées séparément
+                underline: false,
+                link: false
             }),
             TextStyle,
             FontFamily,
             FontSize.configure({
                 types: ['textStyle'],
             }),
-            Underline,
+            Underline,  // Extension underline configurée séparément
             TextAlign.configure({
                 types: ['heading', 'paragraph'],
                 alignments: ['left', 'center', 'right', 'justify'],
                 defaultAlignment: 'left',
             }),
-            Link.configure({ 
+            Link.configure({  // Extension link configurée séparément
                 openOnClick: false,
                 HTMLAttributes: {
                     class: 'editor-link',
@@ -342,37 +348,175 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
             date: ''
         });
         setActiveFilters(false);
-        
     }, [editor]);
     
+    // Référence pour la fonction de sauvegarde
+    const saveRef = useRef();
+    
+    // Définir handleSave avant tout effet qui l'utilise
     const handleSave = useCallback(() => {
         if (!editor || isSaving) return;
 
         const htmlContent = editor.getHTML();
-        router.put(route('files.update-content', file.id), {
-            content: htmlContent,
-        }, {
+        
+        // Sauvegarder localement avant l'envoi au serveur
+        if (file?.id) {
+            const backup = {
+                content: htmlContent,
+                fileId: file.id,
+                timestamp: new Date().toISOString(),
+                version: '1.0'
+            };
+            localStorage.setItem(`file_autosave_${file.id}`, JSON.stringify(backup));
+            setLastSaved(new Date().toISOString());
+        }
+        
+        // Envoyer la requête au serveur
+        const options = {
             preserveScroll: true,
             onStart: () => setIsSaving(true),
             onSuccess: () => {
+                setIsSaving(false);
                 setIsDirty(false);
+                setSuccess('Fichier enregistré avec succès!');
+                
+                // Supprimer la sauvegarde locale après un enregistrement réussi
+                if (file?.id) {
+                    localStorage.removeItem(`file_autosave_${file.id}`);
+                }
             },
-            onFinish: () => setIsSaving(false),
-        });
-    }, [editor, isSaving, file.id]);
-
-    useEffect(() => {
-        const handleKeyDown = (event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-                event.preventDefault();
-                handleSave();
+            onError: (errors) => {
+                setIsSaving(false);
+                setError('Erreur lors de l\'enregistrement du fichier');
+                console.error('Erreur lors de la sauvegarde:', errors);
             }
         };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
+        
+        return router.put(
+            route('files.update-content', file.id),
+            { content: htmlContent },
+            options
+        );
+    }, [editor, isSaving, file?.id]);
+    
+    // Mise à jour de la référence quand handleSave change
+    useEffect(() => {
+        saveRef.current = handleSave;
+    }, [handleSave]);
+    
+    // Gestion de la sauvegarde avant fermeture
+    useEffect(() => {
+        if (!editor || !file?.id) return;
+
+        const handleBeforeUnload = (e) => {
+            if (isDirty) {
+                e.preventDefault();
+                const confirmationMessage = 'Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir quitter ?';
+                
+                // Sauvegarde immédiate dans le stockage local
+                const htmlContent = editor.getHTML();
+                localStorage.setItem(`file_autosave_${file.id}`, JSON.stringify({
+                    content: htmlContent,
+                    fileId: file.id,
+                    timestamp: new Date().toISOString(),
+                    version: '1.0'
+                }));
+                
+                // Tenter une sauvegarde serveur en arrière-plan
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon(route('files.update-content', file.id), 
+                        new Blob([JSON.stringify({
+                            content: htmlContent,
+                            _method: 'PUT',
+                            _token: document.querySelector('meta[name="csrf-token"]').content
+                        })], { type: 'application/json' })
+                    );
+                }
+                
+                // Retourner le message de confirmation
+                e.returnValue = confirmationMessage;
+                return confirmationMessage;
+            }
         };
-    }, [handleSave, applyFilters, clearFilters]);
+        
+        // Sauvegarde automatique périodique
+        const autoSaveInterval = setInterval(() => {
+            if (isDirty && editor) {
+                const content = editor.getHTML();
+                // Sauvegarde locale directe sans dépendre de saveToLocalStorage
+                localStorage.setItem(`file_autosave_${file.id}`, JSON.stringify({
+                    content,
+                    fileId: file.id,
+                    timestamp: new Date().toISOString(),
+                    version: '1.0'
+                }));
+                
+                // Mettre à jour l'état de dernière sauvegarde
+                setLastSaved(new Date().toISOString());
+                setAutoSaved(true);
+                setTimeout(() => setAutoSaved(false), 5000);
+                
+                // Sauvegarder sur le serveur toutes les 5 minutes
+                if (Date.now() - (lastSaved ? new Date(lastSaved).getTime() : 0) > 5 * 60 * 1000) {
+                    if (saveRef.current) {
+                        saveRef.current();
+                    }
+                }
+            }
+        }, 30000); // Vérification toutes les 30 secondes
+        
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            clearInterval(autoSaveInterval);
+        };
+    }, [isDirty, editor, file.id, lastSaved]); // Retiré saveToLocalStorage des dépendances
+
+    // Sauvegarde automatique dans le stockage local
+    const saveToLocalStorage = useCallback((content) => {
+        if (!file?.id) return;
+        
+        const backup = {
+            content,
+            fileId: file.id,
+            timestamp: new Date().toISOString(),
+            version: '1.0'
+        };
+        
+        try {
+            localStorage.setItem(`file_autosave_${file.id}`, JSON.stringify(backup));
+            setLastSaved(new Date().toISOString());
+            setAutoSaved(true);
+            
+            // Masquer la notification après 5 secondes
+            setTimeout(() => setAutoSaved(false), 5000);
+        } catch (e) {
+            console.error('Erreur lors de la sauvegarde locale:', e);
+        }
+    }, [file?.id]);
+    
+    // Vérifier s'il existe une sauvegarde locale au chargement
+    useEffect(() => {
+        if (!file?.id) return;
+        
+        const savedData = localStorage.getItem(`file_autosave_${file.id}`);
+        if (savedData) {
+            try {
+                const { content, timestamp } = JSON.parse(savedData);
+                if (confirm(`Une sauvegarde non enregistrée du ${new Date(timestamp).toLocaleString()} a été trouvée. Voulez-vous la charger ?`)) {
+                    editor?.commands.setContent(content);
+                    setIsDirty(true);
+                }
+                // Nettoyer la sauvegarde après l'avoir proposée
+                localStorage.removeItem(`file_autosave_${file.id}`);
+            } catch (e) {
+                console.error('Erreur lors de la récupération de la sauvegarde:', e);
+            }
+        }
+    }, [file?.id, editor]);
+
+    // handleSave a été déplacé plus haut pour éviter les références circulaires
 
     const handleClose = () => {
         if (isDirty) {
@@ -475,24 +619,26 @@ const EditContent = ({ file, lastModifiedBy, auth }) => {
                     </div>
                 </div>
                 
-                {/* Contenu principal avec marge pour la barre d'outils fixe */}
-                <div className="flex-1 overflow-y-auto pt-24 px-8">
+                {/* Contenu principal avec marge pour la barre d'outils fixe et le pied de page */}
+                <div className="flex-1 overflow-y-auto pt-24 pb-20 px-8">
                     {success && <div className="p-3 mb-2 bg-green-100 text-green-700 rounded-t-md w-full">{success}</div>}
                     {error && <div className="p-3 mb-2 bg-red-100 text-red-700 rounded-t-md w-full">{error}</div>}
                     
-                    <div className="prose max-w-none w-full min-h-[calc(100vh-6rem)] bg-white">
-                        <EditorContent editor={editor} className="min-h-[300px]" />
+                    <div className="prose max-w-none w-full bg-white">
+                        <EditorContent editor={editor} className="min-h-[300px] pb-8" />
                     </div>
-                    
-                    {/* Section d'informations sur le document */}
-                    <div className="w-full p-4 bg-gray-50 mt-2">
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center text-sm text-gray-600">
+                </div>
+                
+                {/* Pied de page fixe */}
+                <div className="fixed bottom-0 left-64 right-0 bg-white border-t border-gray-200 shadow-inner">
+                    <div className="max-w-7xl mx-auto px-4 py-2">
+                        <div className="flex items-center justify-between text-sm text-gray-600">
+                            <div className="flex items-center">
                                 <FaUserEdit className="mr-2 text-gray-400" />
                                 <span>Vous éditez en tant que <span className="font-medium">{auth.user.name}</span></span>
                             </div>
                             {lastModifiedBy && (
-                                <div className="mt-2 text-xs text-gray-500">
+                                <div className="text-xs text-gray-500">
                                     Dernière modification par {lastModifiedBy.name} le {new Date(file.updated_at).toLocaleString('fr-FR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
                                 </div>
                             )}
