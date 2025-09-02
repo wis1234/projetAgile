@@ -128,7 +128,7 @@ class TaskController extends Controller
             Storage::disk('public')->makeDirectory($projectPath, 0755, true);
             
             // Créer le fichier de suivi
-            $fileName = 'Fichier de suivi de la tâche ' . Str::slug($task->title) ;
+            $fileName = 'Suivi de la tâche ' . Str::slug($task->title) ;
             $filePath = $projectPath . '/' . $fileName;
             
             $content = "Ce fichier est destiné au suivi de la tâche " . $task->title . "\n\n";
