@@ -7,7 +7,8 @@ use App\Models\Sprint;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\File;
-use App\Models\Activity; 
+use App\Models\Activity;
+use App\Models\Recruitment; 
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -45,6 +46,9 @@ class DashboardController extends Controller
                 'done' => (clone $taskQuery)->where('status', 'done')->count(),
                 'en_attente' => (clone $taskQuery)->where('status', 'en_attente')->count(),
             ],
+            // Statistiques de recrutement
+            'recruitments' => $isAdmin ? Recruitment::count() : 0,
+            'active_recruitments' => $isAdmin ? Recruitment::where('status', 'published')->count() : 0,
         ];
 
         // Activités récentes (depuis la table activities)

@@ -29,6 +29,12 @@ class Kernel extends ConsoleKernel
                  ->everyMinute()
                  ->withoutOverlapping()
                  ->sendOutputTo(storage_path('logs/queue-worker.log'));
+                 
+        // Vérifie et ferme les offres expirées toutes les 5 minutes
+        $schedule->command('recruitments:close-expired')
+                 ->everyFiveMinutes()
+                 ->withoutOverlapping()
+                 ->sendOutputTo(storage_path('logs/recruitments-close.log'));
     }
 
     /**

@@ -15,6 +15,8 @@ use App\Models\School;
 use App\Policies\SchoolPolicy;
 use App\Models\File;
 use App\Policies\FilePolicy;
+use App\Models\Recruitment;
+use App\Policies\RecruitmentPolicy;
 
 class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
 {
@@ -32,6 +34,7 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
         File::class => FilePolicy::class,
         Message::class => MessagePolicy::class,
         AuditLog::class => AuditLogPolicy::class,
+        Recruitment::class => RecruitmentPolicy::class,
     ];
 
     /**

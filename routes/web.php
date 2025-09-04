@@ -18,6 +18,40 @@ Route::get('/', function () {
 
 // Routes protégées par authentification
 Route::middleware('auth')->group(function () {
+    // Routes pour le module de recrutement
+    Route::resource('recruitment', App\Http\Controllers\RecruitmentController::class);
+    
+    // Routes pour les candidatures
+    Route::prefix('recruitment/{recruitment}')->group(function () {
+        Route::get('applications', [App\Http\Controllers\RecruitmentApplicationController::class, 'index'])
+            ->name('recruitment.applications.index');
+        Route::get('applications/create', [App\Http\Controllers\RecruitmentApplicationController::class, 'create'])
+            ->name('recruitment.applications.create');
+        Route::post('applications', [App\Http\Controllers\RecruitmentApplicationController::class, 'store'])
+            ->name('recruitment.applications.store');
+        
+        // Routes pour une candidature spécifique
+        Route::prefix('applications/{application}')->group(function () {
+            Route::get('/', [App\Http\Controllers\RecruitmentApplicationController::class, 'show'])
+                ->name('recruitment.applications.show');
+            Route::put('status', [App\Http\Controllers\RecruitmentApplicationController::class, 'updateStatus'])
+                ->name('recruitment.applications.status');
+            Route::get('download', [App\Http\Controllers\RecruitmentApplicationController::class, 'downloadResume'])
+                ->name('recruitment.applications.download');
+            Route::get('download/{fieldName}', [App\Http\Controllers\RecruitmentApplicationController::class, 'downloadCustomFile'])
+                ->name('recruitment.applications.download.custom');
+            Route::delete('/', [App\Http\Controllers\RecruitmentApplicationController::class, 'destroy'])
+                ->name('recruitment.applications.destroy');
+        });
+    });
+    
+    // Routes API pour le recrutement
+    Route::prefix('api')->group(function () {
+        Route::get('/recruitment/statuses', [\App\Http\Controllers\RecruitmentController::class, 'getStatuses']);
+        Route::get('/recruitment/types', [\App\Http\Controllers\RecruitmentController::class, 'getTypes']);
+        Route::get('/recruitment/experience-levels', [\App\Http\Controllers\RecruitmentController::class, 'getExperienceLevels']);
+        Route::get('/recruitment/education-levels', [\App\Http\Controllers\RecruitmentController::class, 'getEducationLevels']);
+    });
     // Tableau de bord et profil
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/', [App\Http\Controllers\DashboardController::class, 'index']);

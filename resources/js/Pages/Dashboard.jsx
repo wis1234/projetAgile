@@ -3,7 +3,7 @@ import AdminLayout from '../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
 import { Line, Bar, Pie } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
-import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload } from 'react-icons/fa';
+import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload, FaUserPlus } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler);
@@ -45,6 +45,7 @@ const QuickAccess = () => (
           { icon: <FaProjectDiagram />, label: 'Nouveau projet', link: '/projects/create' },
           { icon: <FaUsers />, label: 'Ajouter un membre', link: '/users/create' },
           { icon: <FaFileAlt />, label: 'Importer un fichier', link: '/files/upload' },
+          { icon: <FaUserPlus />, label: 'Offres de recrutement', link: '/recruitment' },
         ].map((item, index) => (
           <Link
             key={index}
@@ -180,7 +181,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
     },
     {
       title: 'Coéquipiers',
-      count: stats.users || 0,
+      count: stats.members || 0,
       color: 'bg-gradient-to-r from-purple-500 to-purple-600 text-white',
       link: '/users',
       icon: <FaUsers className="text-3xl opacity-80" />,
@@ -193,7 +194,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
       link: '/files',
       icon: <FaFileAlt className="text-3xl opacity-80" />,
       show: true
-    }
+    },
   ];
 
   // Filter out widgets based on visibility rules and count
@@ -250,7 +251,16 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           transition={{ duration: 0.5 }}
           className="mb-8"
         >
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Tableau de bord</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Tableau de bord</h1>
+            <Link 
+              href="/recruitment" 
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-pink-500 to-pink-600 rounded-lg hover:from-pink-600 hover:to-pink-700 transition-colors shadow-md hover:shadow-lg"
+            >
+              <FaUserPlus className="w-4 h-4" />
+              <span>Recrutement</span>
+            </Link>
+          </div>
           <p className="mt-2 text-gray-500 dark:text-gray-400">
             Aperçu de l'activité et des statistiques de votre espace de travail
           </p>
