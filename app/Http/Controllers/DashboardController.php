@@ -38,8 +38,14 @@ class DashboardController extends Controller
             'users' => $isAdmin ? User::count() : DB::table('project_user')->whereIn('project_id', $userProjectIds)->distinct()->count('user_id'),
             'files' => $isAdmin ? File::count() : File::whereIn('project_id', $userProjectIds)->orWhereIn('task_id', (clone $taskQuery)->pluck('id'))->count(),
             'auditLogs' => $isAdmin ? DB::table('audit_logs')->count() : 0, // Hide audit logs for non-admins
-            // Compter les membres uniques sur tous les projets (sans doublons)
-            'members' => $isAdmin ? DB::table('project_user')->distinct('user_id')->count('user_id') : 0,
+            // Compter les membres uniques sur les projets de l'utilisateur (sans doublons)
+            'members' => $isAdmin 
+                ? DB::table('project_user')->distinct('user_id')->count('user_id')
+                : DB::table('project_user')
+                    ->whereIn('project_id', $userProjectIds)
+                    ->where('user_id', '!=', $user->id) // Exclure l'utilisateur connecté
+                    ->distinct('user_id')
+                    ->count('user_id'),
             // Statistiques des tâches par statut
             'tasksByStatus' => [
                 'todo' => (clone $taskQuery)->where('status', 'todo')->count(),
