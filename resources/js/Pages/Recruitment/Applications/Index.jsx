@@ -1,7 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { FaArrowLeft, FaDownload, FaSearch, FaFilter, FaUser, FaEnvelope, FaPhone, FaCalendarAlt, FaFilePdf, FaFileWord, FaSpinner } from 'react-icons/fa';
+import { FaArrowLeft, FaDownload, FaSearch, FaFilter, FaUser, FaEnvelope, FaPhone, FaCalendarAlt, FaFilePdf, FaFileWord, FaSpinner, FaFileExcel } from 'react-icons/fa';
 
 export default function ApplicationsIndex({ recruitment, applications, filters: initialFilters = {} }) {
     const [search, setSearch] = useState(initialFilters.search || '');
@@ -150,7 +150,7 @@ export default function ApplicationsIndex({ recruitment, applications, filters: 
                                 </div>
                                 
                                 <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
-                                <form onSubmit={handleSearchSubmit} className="flex space-x-2 w-full sm:w-auto">
+                                    <form onSubmit={handleSearchSubmit} className="flex space-x-2 w-full sm:w-auto">
                                     <div className="relative flex-grow">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                             <FaSearch className="h-4 w-4 text-gray-400" />
@@ -193,8 +193,16 @@ export default function ApplicationsIndex({ recruitment, applications, filters: 
                                             Réinitialiser
                                         </button>
                                     )}
-                                </form>
-                            </div>
+                                    </form>
+                                    
+                                    <a 
+                                        href={route('recruitment.applications.export', recruitment.id)}
+                                        className="inline-flex items-center justify-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 active:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150 whitespace-nowrap"
+                                    >
+                                        <FaFileExcel className="mr-2" />
+                                        Exporter en Excel
+                                    </a>
+                                </div>
                             </div>
                             
                             {notification && (

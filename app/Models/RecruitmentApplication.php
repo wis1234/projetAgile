@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Notifications\Notification;
 
 class RecruitmentApplication extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, Notifiable;
 
     protected $fillable = [
         'recruitment_id',
@@ -20,13 +22,26 @@ class RecruitmentApplication extends Model
         'resume_path',
         'status',
         'notes',
+        'status',
         'custom_fields',
         'source'
     ];
 
     protected $casts = [
-        'custom_fields' => 'array'
+        'custom_fields' => 'array',
+        'personality_profile' => 'array',
     ];
+
+    /**
+     * Route notifications for the mail channel.
+     *
+     * @param  \Illuminate\Notifications\Notification  $notification
+     * @return array|string
+     */
+    public function routeNotificationForMail($notification)
+    {
+        return $this->email;
+    }
 
     // Constantes pour les statuts
     const STATUS_PENDING = 'pending';

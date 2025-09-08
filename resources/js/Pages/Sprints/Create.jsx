@@ -5,14 +5,18 @@ import { FaFlagCheckered, FaProjectDiagram, FaArrowLeft, FaSave, FaCalendarAlt, 
 import { Link } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-function Create({ projects }) {
+function Create({ projects, selectedProjectId }) {
   const { errors = {}, flash = {} } = usePage().props;
+  
+  // Utiliser le projet présélectionné si disponible, sinon prendre le premier de la liste
+  const defaultProjectId = selectedProjectId || (projects.length > 0 ? projects[0].id : '');
+  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     start_date: '',
     end_date: '',
-    project_id: projects.length > 0 ? projects[0].id : ''
+    project_id: defaultProjectId
   });
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(false);

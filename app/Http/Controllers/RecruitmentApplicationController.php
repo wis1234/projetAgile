@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Recruitment;
 use App\Models\RecruitmentApplication;
+use App\Models\RecruitmentCustomField;
+use App\Exports\ApplicationsExport;
+use App\Notifications\ApplicationStatusChanged;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -312,12 +316,33 @@ class RecruitmentApplicationController extends Controller
             'notes' => 'nullable|string',
         ]);
 
+        $oldStatus = $application->status;
+        $newStatus = $validated['status'];
+        $notes = $validated['notes'] ?? $application->notes;
+
         $application->update([
-            'status' => $validated['status'],
-            'notes' => $validated['notes'] ?? $application->notes,
+            'status' => $newStatus,
+            'notes' => $notes,
         ]);
 
-        return back()->with('success', 'Le statut de la candidature a été mis à jour.');
+        $application->refresh();
+
+        // Envoyer une notification uniquement si le statut a changé
+        if ($oldStatus !== $newStatus) {
+            try {
+                $application->notify(
+                    new ApplicationStatusChanged($application, $newStatus, $notes)
+                );
+            } catch (\Exception $e) {
+                \Log::error('Erreur lors de l\'envoi de la notification de changement de statut : ' . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Le statut de la candidature a été mis à jour.',
+            'application' => $application->fresh()
+        ]);
     }
 
     /**
@@ -336,5 +361,17 @@ class RecruitmentApplicationController extends Controller
 
         return redirect()->route('recruitment.applications.index', $recruitment)
             ->with('success', 'La candidature a été supprimée avec succès.');
+    }
+
+    /**
+     * Exporte les candidatures au format Excel
+     */
+    public function export(Recruitment $recruitment)
+    {
+        $this->authorize('viewAny', [RecruitmentApplication::class, $recruitment]);
+        
+        $fileName = 'candidatures-' . $recruitment->slug . '-' . now()->format('Y-m-d-His') . '.xlsx';
+        
+        return Excel::download(new ApplicationsExport($recruitment->id), $fileName);
     }
 }

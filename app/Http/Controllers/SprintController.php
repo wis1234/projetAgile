@@ -91,6 +91,29 @@ class SprintController extends Controller
             'projects' => $projects,
         ]);
     }
+    
+    /**
+     * Show the form for creating a new sprint for a specific project.
+     */
+    public function createForProject(Project $project)
+    {
+        try {
+            $this->authorize('create', Sprint::class);
+            
+            // Vérifier que l'utilisateur a accès au projet
+            if (!auth()->user()->hasRole('admin') && !$project->users->contains(auth()->id())) {
+                return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+            }
+            
+            return Inertia::render('Sprints/Create', [
+                'projects' => [$project->only(['id', 'name'])],
+                'selectedProjectId' => $project->id,
+            ]);
+            
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        }
+    }
 
     /**
      * Store a newly created resource in storage.

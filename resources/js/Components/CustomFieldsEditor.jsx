@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPlus, FaTrash, FaGripVertical, FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
@@ -17,21 +17,29 @@ const fieldTypes = [
 
 export default function CustomFieldsEditor({ fields = [], onChange }) {
   const [expandedField, setExpandedField] = useState(null);
-  const [localFields, setLocalFields] = useState(fields);
+  const [localFields, setLocalFields] = useState(() => fields);
+  const prevFieldsRef = useRef(fields);
 
-  // Sync local state with parent
+  // Sync local state with parent only when fields prop changes meaningfully
   useEffect(() => {
-    setLocalFields(fields);
+    // Compare les champs précédents avec les nouveaux pour éviter des mises à jour inutiles
+    const fieldsChanged = JSON.stringify(prevFieldsRef.current) !== JSON.stringify(fields);
+    
+    if (fieldsChanged) {
+      setLocalFields(fields);
+      prevFieldsRef.current = fields;
+    }
   }, [fields]);
 
-  // Notify parent of changes
+  // Notifier le parent des changements de manière optimisée
   useEffect(() => {
-    if (onChange) {
+    if (onChange && JSON.stringify(prevFieldsRef.current) !== JSON.stringify(localFields)) {
       onChange(localFields);
+      prevFieldsRef.current = localFields;
     }
   }, [localFields, onChange]);
 
-  const addField = () => {
+  const addField = useCallback(() => {
     const newField = {
       id: `field-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       field_name: `champ_${Date.now()}`,
@@ -53,34 +61,53 @@ export default function CustomFieldsEditor({ fields = [], onChange }) {
         input.select();
       }
     }, 50);
-  };
+  }, [localFields, setLocalFields]);
 
-  const removeField = (id) => {
-    setLocalFields(localFields.filter(field => field.id !== id));
-    if (expandedField === id) {
-      setExpandedField(null);
-    }
-  };
-
-  const updateField = (id, updates) => {
-    // Utiliser la forme fonctionnelle pour s'assurer d'avoir le dernier état
-    setLocalFields(prevFields => 
-      prevFields.map(field => 
-        field.id === id ? { ...field, ...updates } : field
-      )
-    );
-  };
-
-  const toggleFieldExpand = (id) => {
-    setExpandedField(expandedField === id ? null : id);
-  };
-
-  const addOption = (fieldId) => {
-    const field = localFields.find(f => f.id === fieldId);
-    if (!field) return;
+  const removeField = useCallback((fieldId) => {
+    setLocalFields(prevFields => {
+      const newFields = prevFields.filter(field => field.id !== fieldId);
+      return newFields;
+    });
     
-    const newOptions = [...(field.options || []), ''];
-    updateField(fieldId, { options: newOptions });
+    // Fermer le panneau si le champ supprimé était celui qui était ouvert
+    setExpandedField(prev => prev === fieldId ? null : prev);
+  }, []);
+
+  const updateField = useCallback((fieldId, updates) => {
+    setLocalFields(prevFields => {
+      return prevFields.map(field => {
+        if (field.id !== fieldId) return field;
+        
+        // Si on met à jour les options, s'assurer que c'est un tableau
+        if (updates.options) {
+          return {
+            ...field,
+            ...updates,
+            options: Array.isArray(updates.options) ? updates.options : (field.options || [])
+          };
+        }
+        
+        return { ...field, ...updates };
+      });
+    });
+  }, []);
+
+  const toggleFieldExpand = useCallback((fieldId) => {
+    setExpandedField(prev => prev === fieldId ? null : fieldId);
+  }, []);
+
+  const addOption = useCallback((fieldId) => {
+    setLocalFields(prevFields => {
+      return prevFields.map(field => {
+        if (field.id !== fieldId) return field;
+        
+        const newOptions = [...(field.options || []), ''];
+        return {
+          ...field,
+          options: newOptions
+        };
+      });
+    });
     
     // Focus sur le nouvel input après le rendu
     setTimeout(() => {
@@ -89,10 +116,10 @@ export default function CustomFieldsEditor({ fields = [], onChange }) {
         const lastInput = inputs[inputs.length - 1];
         lastInput.focus();
       }
-    }, 10);
-  };
+    }, 100);
+  }, []);
 
-  const updateOption = (fieldId, optionIndex, value) => {
+  const updateOption = useCallback((fieldId, optionIndex, value) => {
     // Utiliser la forme fonctionnelle pour s'assurer d'avoir le dernier état
     setLocalFields(prevFields => {
       return prevFields.map(field => {
@@ -107,9 +134,9 @@ export default function CustomFieldsEditor({ fields = [], onChange }) {
         };
       });
     });
-  };
+  }, [setLocalFields]);
 
-  const removeOption = (fieldId, optionIndex, e) => {
+  const removeOption = useCallback((fieldId, optionIndex, e) => {
     // Empêcher la propagation pour éviter de déclencher d'autres événements
     if (e) {
       e.stopPropagation();
@@ -128,27 +155,27 @@ export default function CustomFieldsEditor({ fields = [], onChange }) {
         };
       });
     });
-  };
+  }, [setLocalFields]);
 
-  const onDragEnd = (result) => {
+  const onDragEnd = useCallback((result) => {
     // Ne rien faire si la destination est la même que la source
     if (!result.destination || result.source.index === result.destination.index) return;
     
-    // Créer une copie du tableau des champs
-    const newFields = Array.from(localFields);
-    // Supprimer l'élément déplacé de son ancienne position
-    const [movedField] = newFields.splice(result.source.index, 1);
-    // Insérer l'élément à sa nouvelle position
-    newFields.splice(result.destination.index, 0, movedField);
-    
-    // Mettre à jour l'ordre des champs
-    const reorderedFields = newFields.map((field, index) => ({
-      ...field,
-      order: index
-    }));
-    
-    setLocalFields(reorderedFields);
-  };
+    setLocalFields(prevFields => {
+      // Créer une copie du tableau des champs
+      const newFields = Array.from(prevFields);
+      // Supprimer l'élément déplacé de son ancienne position
+      const [movedField] = newFields.splice(result.source.index, 1);
+      // Insérer l'élément à sa nouvelle position
+      newFields.splice(result.destination.index, 0, movedField);
+      
+      // Mettre à jour l'ordre des champs
+      return newFields.map((field, index) => ({
+        ...field,
+        order: index
+      }));
+    });
+  }, [setLocalFields]);
 
   const renderFieldOptions = (field) => {
     if (!['select', 'checkbox', 'radio'].includes(field.field_type)) return null;
@@ -198,16 +225,8 @@ export default function CustomFieldsEditor({ fields = [], onChange }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">Champs personnalisés</h3>
-        <button
-          type="button"
-          onClick={addField}
-          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <FaPlus className="mr-1.5 h-3.5 w-3.5" />
-          Ajouter un champ
-        </button>
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Champs personnalisés</h3>
       </div>
 
       {localFields.length === 0 ? (
@@ -223,11 +242,13 @@ export default function CustomFieldsEditor({ fields = [], onChange }) {
           </button>
         </div>
       ) : (
-        <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="fields">
-            {(provided) => (
-              <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
-                {localFields.map((field, index) => (
+        <div className="relative">
+          <div className="max-h-[500px] overflow-y-auto pr-2 -mr-2">
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="fields">
+                {(provided) => (
+                  <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                    {localFields.map((field, index) => (
                   <Draggable key={field.id} draggableId={field.id} index={index}>
                     {(provided) => (
                       <div
@@ -362,9 +383,23 @@ export default function CustomFieldsEditor({ fields = [], onChange }) {
                 ))}
                 {provided.placeholder}
               </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+                )}
+              </Droppable>
+            </DragDropContext>
+          </div>
+          
+          {/* Bouton Ajouter un champ fixé en bas à droite */}
+          <div className="mt-4 pt-4 border-t border-gray-200 sticky bottom-0 bg-white z-10 flex justify-end">
+            <button
+              type="button"
+              onClick={addField}
+              className="w-auto inline-flex justify-center items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <FaPlus className="mr-2 h-4 w-4" />
+              Ajouter un champ
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

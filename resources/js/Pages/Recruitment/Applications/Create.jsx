@@ -25,7 +25,7 @@ function CustomFieldInput({ field, value, onChange, error }) {
             
         case 'select':
         case 'radio':
-            const options = field.options || [];
+            const selectOptions = field.options || [];
             if (field.field_type === 'select') {
                 return (
                     <select
@@ -36,7 +36,7 @@ function CustomFieldInput({ field, value, onChange, error }) {
                         required={field.is_required}
                     >
                         <option value="">Sélectionnez une option</option>
-                        {options.map((option, index) => (
+                        {selectOptions.map((option, index) => (
                             <option key={index} value={option}>
                                 {option}
                             </option>
@@ -46,7 +46,7 @@ function CustomFieldInput({ field, value, onChange, error }) {
             } else {
                 return (
                     <div className="space-y-2">
-                        {options.map((option, index) => (
+                        {selectOptions.map((option, index) => (
                             <div key={index} className="flex items-center">
                                 <input
                                     id={`field-${field.id}-${index}`}
@@ -68,25 +68,71 @@ function CustomFieldInput({ field, value, onChange, error }) {
             }
 
         case 'checkbox':
-            return (
-                <div className="flex items-center">
-                    <input
-                        id={`field-${field.id}`}
-                        type="checkbox"
-                        checked={!!value}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        required={field.is_required}
-                    />
-                    <label htmlFor={`field-${field.id}`} className="ml-2 block text-sm text-gray-700">
-                        {field.field_label}
-                        {field.is_required && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    {field.help_text && (
-                        <p className="mt-1 text-xs text-gray-500">{field.help_text}</p>
-                    )}
-                </div>
-            );
+            const options = field.options || [];
+            if (options.length > 0) {
+                // Si le champ a des options, afficher une liste de cases à cocher
+                return (
+                    <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                            {field.field_label}
+                            {field.is_required && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        {field.help_text && (
+                            <p className="mb-2 text-xs text-gray-500">{field.help_text}</p>
+                        )}
+                        <div className="space-y-2">
+                            {options.map((option, index) => (
+                                <div key={index} className="flex items-center">
+                                    <input
+                                        id={`field-${field.id}-${index}`}
+                                        name={`field-${field.id}`}
+                                        type="checkbox"
+                                        value={option}
+                                        checked={Array.isArray(value) ? value.includes(option) : false}
+                                        onChange={(e) => {
+                                            const newValue = Array.isArray(value) ? [...value] : [];
+                                            if (e.target.checked) {
+                                                newValue.push(option);
+                                            } else {
+                                                const index = newValue.indexOf(option);
+                                                if (index > -1) {
+                                                    newValue.splice(index, 1);
+                                                }
+                                            }
+                                            onChange(field.id, newValue);
+                                        }}
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    />
+                                    <label htmlFor={`field-${field.id}-${index}`} className="ml-2 block text-sm text-gray-700">
+                                        {option}
+                                    </label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            } else {
+                // Si pas d'options, afficher une seule case à cocher
+                return (
+                    <div className="flex items-center">
+                        <input
+                            id={`field-${field.id}`}
+                            type="checkbox"
+                            checked={!!value}
+                            onChange={handleChange}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            required={field.is_required}
+                        />
+                        <label htmlFor={`field-${field.id}`} className="ml-2 block text-sm text-gray-700">
+                            {field.field_label}
+                            {field.is_required && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        {field.help_text && (
+                            <p className="mt-1 text-xs text-gray-500">{field.help_text}</p>
+                        )}
+                    </div>
+                );
+            }
 
         case 'date':
             return (
@@ -98,6 +144,33 @@ function CustomFieldInput({ field, value, onChange, error }) {
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     required={field.is_required}
                 />
+            );
+
+        case 'file':
+            return (
+                <div>
+                    <input
+                        type="file"
+                        id={`field-${field.id}`}
+                        onChange={(e) => {
+                            onChange(field.id, e.target.files[0]);
+                        }}
+                        className="mt-1 block w-full text-sm text-gray-500
+                                  file:mr-4 file:py-2 file:px-4
+                                  file:rounded-md file:border-0
+                                  file:text-sm file:font-semibold
+                                  file:bg-blue-50 file:text-blue-700
+                                  hover:file:bg-blue-100"
+                        required={field.is_required}
+                        accept={field.accept || '.pdf,.doc,.docx,.jpg,.jpeg,.png'}
+                    />
+                    {value && typeof value === 'string' && (
+                        <p className="mt-1 text-sm text-gray-500">Fichier actuel : {value}</p>
+                    )}
+                    {value && value instanceof File && (
+                        <p className="mt-1 text-sm text-gray-500">Nouveau fichier : {value.name}</p>
+                    )}
+                </div>
             );
 
         default: // text, email, number, etc.
@@ -147,9 +220,13 @@ export default function ApplicationCreate({ recruitment, fieldTypes }) {
 
     // Mettre à jour les champs personnalisés
     const updateCustomField = (fieldId, value) => {
+        // Si c'est un champ de type fichier, on stocke l'objet File directement
+        const field = recruitment.custom_fields?.find(f => f.id == fieldId);
+        const newValue = field?.field_type === 'file' ? value : value;
+        
         setData('custom_fields', {
             ...data.custom_fields,
-            [fieldId]: value
+            [fieldId]: newValue
         });
     };
 
@@ -215,20 +292,50 @@ export default function ApplicationCreate({ recruitment, fieldTypes }) {
             return;
         }
         
-        // Créer un FormData pour gérer le fichier
+        // Créer un FormData pour gérer les fichiers
         const formData = new FormData();
-        Object.keys(data).forEach(key => {
-            if (key === 'custom_fields') {
-                formData.append(key, JSON.stringify(data[key]));
-            } else if (key === 'resume' && data[key] instanceof File) {
-                formData.append(key, data[key]);
-            } else if (data[key] !== null) {
-                formData.append(key, data[key]);
-            }
-        });
         
-        // Envoyer le formulaire
-        post(route('recruitment.applications.store', recruitment.id), formData);
+        // Ajouter les champs principaux
+        formData.append('first_name', data.first_name);
+        formData.append('last_name', data.last_name);
+        formData.append('email', data.email);
+        formData.append('phone', data.phone);
+        formData.append('cover_letter', data.cover_letter);
+        
+        // Ajouter le CV
+        if (data.resume instanceof File) {
+            formData.append('resume', data.resume);
+        }
+        
+        // Traiter les champs personnalisés
+        const customFieldsData = { ...data.custom_fields };
+        
+        // Parcourir les champs personnalisés pour gérer les fichiers
+        if (recruitment.custom_fields) {
+            recruitment.custom_fields.forEach(field => {
+                if (field.field_type === 'file' && customFieldsData[field.id] instanceof File) {
+                    // Pour les fichiers, on les ajoute directement au FormData
+                    formData.append(`custom_fields[${field.id}]`, customFieldsData[field.id]);
+                    // On supprime le fichier de l'objet customFieldsData pour ne pas le sérialiser
+                    delete customFieldsData[field.id];
+                }
+            });
+        }
+        
+        // Ajouter les autres champs personnalisés (non-fichiers)
+        if (Object.keys(customFieldsData).length > 0) {
+            formData.append('custom_fields', JSON.stringify(customFieldsData));
+        }
+        
+        // Configurer les en-têtes pour le téléchargement de fichiers
+        const config = {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        };
+        
+        // Envoyer le formulaire avec la configuration
+        post(route('recruitment.applications.store', recruitment.id), formData, config);
     };
 
     const removeFile = () => {
@@ -357,7 +464,7 @@ export default function ApplicationCreate({ recruitment, fieldTypes }) {
                                                 
                                                 <div className="sm:col-span-6 space-y-1">
                                                     <label htmlFor="cover_letter" className="block text-sm font-medium text-gray-700">
-                                                        Lettre de motivation <span className="text-red-500">*</span>
+                                                        Motivation <span className="text-red-500">*</span>
                                                     </label>
                                                     <div>
                                                         <textarea

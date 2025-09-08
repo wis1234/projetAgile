@@ -451,7 +451,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Bouton Ajouter un Sprint */}
                 <Link
-                  href={`/projects/${project.id}/sprints/create`}
+                  href={route('projects.sprints.create', { project: project.id })}
                   className="group relative overflow-hidden bg-gradient-to-br from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white p-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center justify-center text-center h-full min-h-[120px]"
                 >
                   <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>

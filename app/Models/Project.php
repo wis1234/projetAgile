@@ -42,10 +42,20 @@ class Project extends Model
             'project_url' => route('projects.show', $this->id),
         ], $data);
 
-        // Récupérer tous les utilisateurs du projet sauf celui qui a déclenché l'action
-        $users = $this->users()
-            ->where('users.id', '!=', Auth::id())
-            ->get();
+        // Récupérer l'ID de l'utilisateur concerné par la notification (s'il y en a un)
+        $concernedUserId = $data['user_id'] ?? null;
+
+        // Construire la requête pour les utilisateurs à notifier
+        $query = $this->users()
+            ->where('users.id', '!=', Auth::id()); // Exclure l'utilisateur qui a déclenché l'action
+
+        // Exclure l'utilisateur concerné par la notification (s'il y en a un)
+        if ($concernedUserId) {
+            $query->where('users.id', '!=', $concernedUserId);
+        }
+
+        // Récupérer les utilisateurs à notifier
+        $users = $query->get();
 
         // Envoyer la notification à chaque utilisateur
         foreach ($users as $user) {

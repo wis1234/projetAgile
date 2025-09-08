@@ -31,6 +31,10 @@ Route::middleware('auth')->group(function () {
             ->name('recruitment.applications.store');
         
         // Routes pour une candidature spécifique
+        // Route pour l'exportation Excel des candidatures
+        Route::get('applications/export', [App\Http\Controllers\RecruitmentApplicationController::class, 'export'])
+            ->name('recruitment.applications.export');
+            
         Route::prefix('applications/{application}')->group(function () {
             Route::get('/', [App\Http\Controllers\RecruitmentApplicationController::class, 'show'])
                 ->name('recruitment.applications.show');
@@ -92,6 +96,9 @@ Route::middleware('auth')->group(function () {
     
     // Gestion des projets
     Route::patch('/projects/{id}/status', [App\Http\Controllers\ProjectController::class, 'changeStatus'])->name('projects.change-status');
+    
+    // Créer un sprint pour un projet spécifique
+    Route::get('/projects/{project}/sprints/create', [App\Http\Controllers\SprintController::class, 'createForProject'])->name('projects.sprints.create');
     Route::get('/projects/{id}/suivi-global/{format?}', [App\Http\Controllers\ProjectController::class, 'generateSuiviGlobal'])
         ->where('format', 'txt|pdf|docx')
         ->defaults('format', 'txt')

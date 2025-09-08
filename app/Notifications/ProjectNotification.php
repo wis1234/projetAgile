@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use App\Notifications\UserActionMailNotification;
@@ -46,53 +47,268 @@ class ProjectNotification extends Notification implements ShouldQueue
      */
     public function toMail($notifiable)
     {
-        $subject = "Nouvelle notification pour le projet : " . ($this->data['project_name'] ?? 'Projet');
-        $greeting = "Bonjour {$notifiable->name},";
-        $messageContent = '';
+        $projectName = $this->data['project_name'] ?? 'Projet';
+        $subject = "Projet {$projectName} Notification de mise à jour";
 
+        $greeting = "Salut {$notifiable->name},";
+        $messageContent = '';
+        $showActionButton = true; // Par défaut, on affiche le bouton d'action
+
+        // Styles CSS pour l'email
+        $styles = "
+            .card { background: #ffffff; border-radius: 8px; border-left: 4px solid #4F46E5; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; margin: 20px 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+            .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-right: 8px; }
+            .divider { border-top: 1px solid #e5e7eb; margin: 20px 0; }
+            .footer { color: #6b7280; font-size: 12px; margin-top: 20px; }
+            .action-button { background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 15px 0; }
+        ";
+
+        // Construction du contenu en fonction du type de notification
         switch ($this->type) {
             case 'user_added':
-                $messageContent = "Nous sommes heureux de vous informer que vous avez été ajouté(e) au projet <strong>" . ($this->data['project_name'] ?? 'Nouveau projet') . "</strong> en tant que <strong>" . ($this->data['role'] ?? 'membre de l\'équipe') . "</strong> par <strong>" . ($this->data['added_by'] ?? 'un administrateur') . "</strong> le " . now()->format('d/m/Y à H:i') . ".";
-                $messageContent .= "<br><br>Vous avez désormais accès à toutes les fonctionnalités de ce projet. Pour commencer à collaborer, cliquez sur le bouton ci-dessous.";
+                // Notification pour l'utilisateur ajouté
+                $role = $this->data['role'] ?? 'membre';
+                $addedBy = $this->data['added_by'] ?? 'un administrateur';
+                $date = now()->format('d/m/Y \à H:i');
+                $projectId = $this->data['project_id'];
+                
+                $messageContent = "
+                    <div style='margin-bottom: 15px;'>
+                        <h2 style='color: #1f2937; margin-top: 0;'>Bienvenue sur le projet <strong>{$projectName}</strong></h2>
+                        <p>Vous avez été ajouté(e) en tant que <strong>" . ucfirst($role) . "</strong> par <strong>{$addedBy}</strong> le {$date}.</p>
+                        <p>Vous avez désormais accès à toutes les fonctionnalités de ce projet.</p>
+                        <p>Pour commencer à collaborer, cliquez sur le bouton ci-dessous :</p>
+                        <div style='margin: 20px 0; text-align: center;'>
+                            <a href='".route('projects.show', $projectId)."' style='background-color: #4F46E5; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; display: inline-block;'>
+                                Accéder au projet
+                            </a>
+                        </div>
+                    </div>";
+                
+                // On désactive le bouton d'action supplémentaire
+                $showActionButton = false;
                 $actionText = 'Accéder au projet';
-                $actionUrl = route('projects.show', $this->data['project_id']);
+                $actionUrl = route('projects.show', $projectId);
                 break;
 
             case 'user_added_to_project':
-                $messageContent = "Un nouveau membre a rejoint le projet <strong>" . ($this->data['project_name'] ?? '') . "</strong>.";
-                $messageContent .= "<br><br><strong>Nouveau membre :</strong> " . ($this->data['user_name'] ?? '') . ' (' . ($this->data['user_email'] ?? '') . ')';
-                $messageContent .= "<br><strong>Rôle :</strong> " . ($this->data['role'] ?? 'membre de l\'équipe');
-                $messageContent .= "<br><strong>Ajouté par :</strong> " . ($this->data['added_by'] ?? 'un administrateur');
+                // Notification pour les membres existants du projet
+                $userName = $this->data['user_name'] ?? 'Nouveau membre';
+                $userEmail = $this->data['user_email'] ?? '';
+                $role = $this->data['role'] ?? 'membre de l\'équipe';
+                $addedBy = $this->data['added_by'] ?? 'un administrateur';
+                $projectId = $this->data['project_id'];
+                $date = now()->format('d/m/Y \à H:i');
+                
+                $messageContent = "
+                    <style>{$styles}</style>
+                    <div class='card'>
+                        <h2 style='color: #1f2937; margin-top: 0;'>Nouveau membre dans le projet <strong>{$projectName}</strong></h2>
+                        
+                        <div style='background: #f9fafb; padding: 15px; border-radius: 8px; margin: 15px 0;'>
+                            <p style='margin: 5px 0;'><strong>👤 Membre :</strong> {$userName} ({$userEmail})</p>
+                            <p style='margin: 5px 0;'><strong>🎯 Rôle :</strong> {$role}</p>
+                            <p style='margin: 5px 0;'><strong>👥 Ajouté par :</strong> {$addedBy}</p>
+                            <p style='margin: 5px 0;'><strong>📅 Date :</strong> ".now()->format('d/m/Y à H:i')."</p>
+                        </div>
+                        
+                        <p>Bienvenue à {$userName} dans l'équipe !</p>
+                        
+                        <div style='margin: 20px 0;'>
+                            <a href='".route('projects.show', $projectId)."' 
+                               style='background-color: #4F46E5; color: white; padding: 10px 20px; 
+                                      text-decoration: none; border-radius: 6px; display: inline-block;'>
+                                Voir le projet
+                            </a>
+                        </div>
+                        
+                        <div class='footer'>
+                            <p>Ceci est une notification automatique, merci de ne pas y répondre.</p>
+                        </div>
+                    </div>
+                ";
+                
                 $actionText = 'Voir le projet';
-                $actionUrl = route('projects.show', $this->data['project_id']);
+                $actionUrl = route('projects.show', $projectId);
                 break;
 
             case 'task_created':
-                $messageContent = "Une nouvelle tâche a été créée dans le projet <strong>" . ($this->data['project_name'] ?? '') . "</strong>.";
-                $messageContent .= "<br><br><strong>📌 Tâche :</strong> " . ($this->data['task_title'] ?? 'Nouvelle tâche');
-                $messageContent .= "<br><strong>📝 Description :</strong> " . ($this->data['task_description'] ?? 'Aucune description fournie');
-                $messageContent .= "<br><strong>📊 Statut :</strong> " . ($this->getStatusText($this->data['task_status'] ?? '') ?? 'Non défini');
-                $messageContent .= "<br><strong>🏷️ Priorité :</strong> " . ($this->getPriorityText($this->data['task_priority'] ?? '') ?? 'Non définie');
-                $messageContent .= "<br><strong>👤 Assignée à :</strong> " . ($this->data['assigned_to'] ?? 'Non assigné');
-                $messageContent .= "<br><strong>📅 Échéance :</strong> " . ($this->data['due_date'] ?? 'Non définie');
-                $messageContent .= "<br><strong>👤 Créée par :</strong> " . ($this->data['created_by'] ?? 'Système');
+                $taskTitle = $this->data['task_title'] ?? 'Nouvelle tâche';
+                $taskDescription = $this->data['task_description'] ?? 'Aucune description fournie';
+                $taskStatus = $this->getStatusText($this->data['task_status'] ?? '') ?? 'Non défini';
+                $taskPriority = $this->getPriorityText($this->data['task_priority'] ?? '') ?? 'Non définie';
+                $assignedTo = $this->data['assigned_to'] ?? 'Non assigné';
+                $dueDate = $this->data['due_date'] ?? 'Non définie';
+                $createdBy = $this->data['created_by'] ?? 'Système';
+                $taskId = $this->data['task_id'] ?? null;
+                
+                $priorityBadgeColor = [
+                    'Basse' => 'background-color: #10B981; color: white;',
+                    'Moyenne' => 'background-color: #F59E0B; color: white;',
+                    'Haute' => 'background-color: #EF4444; color: white;',
+                    'Non définie' => 'background-color: #9CA3AF; color: white;'
+                ][$taskPriority] ?? 'background-color: #9CA3AF; color: white;';
+                
+                $statusBadgeColor = [
+                    'À faire' => 'background-color: #9CA3AF;',
+                    'En cours' => 'background-color: #3B82F6;',
+                    'Terminé' => 'background-color: #10B981;',
+                    'Nouveau' => 'background-color: #8B5CF6;',
+                    'En attente' => 'background-color: #F59E0B;'
+                ][$taskStatus] ?? 'background-color: #9CA3AF;';
+                
+                $messageContent = "
+                    <style>{$styles}</style>
+                    <div class='card'>
+                        <h2 style='color: #1f2937; margin-top: 0;'>Nouvelle tâche dans le projet <strong>{$projectName}</strong></h2>
+                        <h3 style='color: #374151;'>{$taskTitle}</h3>
+                        
+                        <div style='background: #f9fafb; padding: 15px; border-radius: 8px; margin: 15px 0;'>
+                            <p style='margin: 8px 0;'><strong>📝 Description :</strong> {$taskDescription}</p>
+                            
+                            <div style='display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0;'>
+                                <span style='padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 500; {$statusBadgeColor} color: white;'>
+                                    {$taskStatus}
+                                </span>
+                                <span style='padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 500; {$priorityBadgeColor}'>
+                                    {$taskPriority}
+                                </span>
+                            </div>
+                            
+                            <div style='margin-top: 10px;'>
+                                <p style='margin: 5px 0;'><strong>👤 Assignée à :</strong> {$assignedTo}</p>
+                                <p style='margin: 5px 0;'><strong>📅 Échéance :</strong> {$dueDate}</p>
+                                <p style='margin: 5px 0;'><strong>👤 Créée par :</strong> {$createdBy}</p>
+                            </div>
+                        </div>
+                        
+                        <div style='margin: 20px 0;'>
+                            <a href='".($taskId ? route('tasks.show', $taskId) : route('projects.show', $this->data['project_id']))."' 
+                               style='background-color: #4F46E5; color: white; padding: 10px 20px; 
+                                      text-decoration: none; border-radius: 6px; display: inline-block;'>
+                                👀 Voir la tâche
+                            </a>
+                        </div>
+                        
+                        <div class='footer'>
+                            <p>Ceci est une notification automatique, merci de ne pas y répondre.</p>
+                        </div>
+                    </div>
+                ";
+                
                 $actionText = '👀 Voir la tâche';
-                $actionUrl = isset($this->data['task_id']) ? route('tasks.show', $this->data['task_id']) : null;
+                $actionUrl = $taskId ? route('tasks.show', $taskId) : route('projects.show', $this->data['project_id']);
                 break;
 
             case 'task_updated':
-                $messageContent = "La tâche suivante a été mise à jour dans le projet <strong>" . ($this->data['project_name'] ?? '') . "</strong>.";
-                $messageContent .= "<br><br><strong>📌 Tâche :</strong> " . ($this->data['task_title'] ?? 'Tâche mise à jour');
-                $messageContent .= "<br><strong>📊 Nouveau statut :</strong> " . ($this->getStatusText($this->data['task_status'] ?? '') ?? 'Non défini');
-                if (isset($this->data['old_status'])) {
-                    $messageContent .= "<br><strong>🔄 Ancien statut :</strong> " . $this->getStatusText($this->data['old_status']);
+                $taskTitle = $this->data['task_title'] ?? 'Tâche mise à jour';
+                $newStatus = $this->getStatusText($this->data['task_status'] ?? '') ?? 'Non défini';
+                $oldStatus = isset($this->data['old_status']) ? $this->getStatusText($this->data['old_status']) : null;
+                $taskPriority = $this->getPriorityText($this->data['task_priority'] ?? '') ?? 'Non définie';
+                $assignedTo = $this->data['assigned_to'] ?? 'Non assigné';
+                $dueDate = $this->data['due_date'] ?? 'Non définie';
+                $updatedBy = $this->data['updated_by'] ?? 'Système';
+                $taskId = $this->data['task_id'] ?? null;
+                $projectId = $this->data['project_id'];
+                
+                $priorityBadgeColor = [
+                    'Basse' => 'background-color: #10B981; color: white;',
+                    'Moyenne' => 'background-color: #F59E0B; color: white;',
+                    'Haute' => 'background-color: #EF4444; color: white;',
+                    'Non définie' => 'background-color: #9CA3AF; color: white;'
+                ][$taskPriority] ?? 'background-color: #9CA3AF; color: white;';
+                
+                $statusBadgeColor = [
+                    'À faire' => 'background-color: #9CA3AF;',
+                    'En cours' => 'background-color: #3B82F6;',
+                    'Terminé' => 'background-color: #10B981;',
+                    'Nouveau' => 'background-color: #8B5CF6;',
+                    'En attente' => 'background-color: #F59E0B;'
+                ][$newStatus] ?? 'background-color: #9CA3AF;';
+                
+                $messageContent = "
+                    <style>{$styles}</style>
+                    <div class='card'>
+                        <h2 style='color: #1f2937; margin-top: 0;'>Tâche mise à jour dans le projet <strong>{$projectName}</strong></h2>
+                        <h3 style='color: #374151;'>{$taskTitle}</h3>
+                        
+                        <div style='background: #f9fafb; padding: 15px; border-radius: 8px; margin: 15px 0;'>
+                            <div style='margin-bottom: 15px;'>
+                                <p style='margin: 5px 0; font-weight: 500;'>Statut :</p>";
+                
+                // Afficher l'ancien et le nouveau statut si disponible
+                if ($oldStatus) {
+                    $messageContent .= "
+                        <div style='display: flex; align-items: center; margin: 5px 0 15px 0;'>
+                            <span style='padding: 4px 12px; border-radius: 12px; font-size: 13px; background-color: #e5e7eb; color: #4b5563;'>
+                                {$oldStatus}
+                            </span>
+                            <span style='margin: 0 10px; color: #6b7280;'>→</span>
+                            <span style='padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 500; {$statusBadgeColor} color: white;'>
+                                {$newStatus}
+                            </span>
+                        </div>";
+                } else {
+                    $messageContent .= "
+                        <div style='margin: 5px 0 15px 0;'>
+                            <span style='padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 500; {$statusBadgeColor} color: white;'>
+                                {$newStatus}
+                            </span>
+                        </div>";
                 }
-                $messageContent .= "<br><strong>🏷️ Priorité :</strong> " . ($this->getPriorityText($this->data['task_priority'] ?? '') ?? 'Non définie');
-                $messageContent .= "<br><strong>👤 Assignée à :</strong> " . ($this->data['assigned_to'] ?? 'Non assigné');
-                $messageContent .= "<br><strong>📅 Échéance :</strong> " . ($this->data['due_date'] ?? 'Non définie');
-                $messageContent .= "<br><strong>🔄 Mise à jour par :</strong> " . ($this->data['updated_by'] ?? 'Système');
+                
+                $messageContent .= "
+                            <div style='display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0;'>
+                                <span style='padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 500; {$priorityBadgeColor}'>
+                                    {$taskPriority}
+                                </span>
+                            </div>
+                            
+                            <div style='margin-top: 10px;'>
+                                <p style='margin: 5px 0;'><strong>👤 Assignée à :</strong> {$assignedTo}</p>
+                                <p style='margin: 5px 0;'><strong>📅 Échéance :</strong> {$dueDate}</p>
+                                <p style='margin: 5px 0;'><strong>🔄 Mise à jour par :</strong> {$updatedBy}</p>
+                            </div>
+                        </div>";
+                
+                // Bouton d'action
+                $messageContent .= "
+                        <div style='margin: 20px 0;'>
+                            <a href='".($taskId ? route('tasks.show', $taskId) : route('projects.show', $projectId))."' 
+                               style='background-color: #4F46E5; color: white; padding: 10px 20px; 
+                                      text-decoration: none; border-radius: 6px; display: inline-block;'>
+                                👀 Voir la tâche
+                            </a>
+                        </div>";
+                
+                // Pied de page
+                $messageContent .= "
+                        <div class='footer'>
+                            <p>Ceci est une notification automatique, merci de ne pas y répondre.</p>";
+                
+                // Lien de désabonnement si l'utilisateur est connecté
+                if (isset($notifiable->id)) {
+                    $unsubscribeUrl = route('profile.notifications.unsubscribe', [
+                        'user' => $notifiable->id,
+                        'type' => 'task_updates',
+                        'token' => $notifiable->email_verification_token
+                    ]);
+                    
+                    $messageContent .= "
+                            <p style='margin-top: 10px; font-size: 11px; color: #9CA3AF;'>
+                                <a href='{$unsubscribeUrl}' style='color: #6B7280;'>
+                                    Se désabonner des notifications pour cette tâche
+                                </a>
+                            </p>";
+                }
+                
+                $messageContent .= "
+                        </div>
+                    </div>
+                ";
+                
                 $actionText = '👀 Voir la tâche';
-                $actionUrl = isset($this->data['task_id']) ? route('tasks.show', $this->data['task_id']) : null;
+                $actionUrl = $taskId ? route('tasks.show', $taskId) : route('projects.show', $projectId);
                 break;
 
             default:
@@ -102,14 +318,21 @@ class ProjectNotification extends Notification implements ShouldQueue
                 break;
         }
 
-        $userActionNotification = new UserActionMailNotification(
-            $subject,
-            $messageContent,
-            $actionUrl,
-            $actionText
-        );
-
-        return $userActionNotification->toMail($notifiable);
+        // Création du message MailMessage
+        $mailMessage = (new MailMessage)
+            ->subject($subject)
+            ->greeting($greeting)
+            ->line('') // Ligne vide pour l'espacement
+            ->view('emails.notification', [
+                'content' => $messageContent,
+                'actionText' => $actionText,
+                'actionUrl' => $actionUrl,
+                'styles' => $styles,
+                'footer' => "Ceci est une notification automatique, merci de ne pas y répondre.",
+                'showActionButton' => $showActionButton // Contrôle l'affichage du bouton dans la vue
+            ]);
+        
+        return $mailMessage;
     }
 
     /**
