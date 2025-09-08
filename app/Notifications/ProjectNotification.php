@@ -127,7 +127,7 @@ class ProjectNotification extends Notification implements ShouldQueue
                         </div>
                     </div>
                 ";
-                
+                $showActionButton = false;
                 $actionText = 'Voir le projet';
                 $actionUrl = route('projects.show', $projectId);
                 break;
@@ -195,7 +195,7 @@ class ProjectNotification extends Notification implements ShouldQueue
                         </div>
                     </div>
                 ";
-                
+                $showActionButton = false;
                 $actionText = '👀 Voir la tâche';
                 $actionUrl = $taskId ? route('tasks.show', $taskId) : route('projects.show', $this->data['project_id']);
                 break;
@@ -306,7 +306,7 @@ class ProjectNotification extends Notification implements ShouldQueue
                         </div>
                     </div>
                 ";
-                
+                $showActionButton = false;
                 $actionText = '👀 Voir la tâche';
                 $actionUrl = $taskId ? route('tasks.show', $taskId) : route('projects.show', $projectId);
                 break;
