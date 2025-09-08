@@ -72,74 +72,7 @@
     <div class="email-container">
         <!-- En-tête avec logo -->
         <div class="header">
-            <!-- <img src="{{ asset('images/logo.png') }}" alt="Logo" class="logo"> -->
-
-            <svg viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg">
-  <!-- Arrière-plan blanc -->
-  <rect width="300" height="120" fill="white" rx="8"/>
-  
-  <!-- Forme géométrique moderne à gauche -->
-  <g transform="translate(20, 20)">
-    <!-- Hexagone stylisé -->
-    <path d="M35 15 L55 25 L55 45 L35 55 L15 45 L15 25 Z" 
-          fill="#1e3a8a" 
-          opacity="0.1"/>
-    
-    <!-- Triangle central -->
-    <path d="M35 25 L45 35 L35 45 L25 35 Z" 
-          fill="#1e3a8a"/>
-    
-    <!-- Lignes de connexion -->
-    <line x1="35" y1="15" x2="35" y2="25" 
-          stroke="#1e3a8a" 
-          stroke-width="2"/>
-    <line x1="35" y1="45" x2="35" y2="55" 
-          stroke="#1e3a8a" 
-          stroke-width="2"/>
-    <line x1="15" y1="35" x2="25" y2="35" 
-          stroke="#1e3a8a" 
-          stroke-width="2"/>
-    <line x1="45" y1="35" x2="55" y2="35" 
-          stroke="#1e3a8a" 
-          stroke-width="2"/>
-  </g>
-  
-  <!-- Texte ProJA -->
-  <g transform="translate(100, 30)">
-    <!-- "Pro" -->
-    <text x="0" y="35" 
-          font-family="'Segoe UI', Arial, sans-serif" 
-          font-size="32" 
-          font-weight="700" 
-          fill="#1e3a8a">Pro</text>
-    
-    <!-- "JA" avec style différent -->
-    <text x="65" y="35" 
-          font-family="'Segoe UI', Arial, sans-serif" 
-          font-size="32" 
-          font-weight="300" 
-          fill="#1e3a8a">JA</text>
-    
-    <!-- Ligne de soulignement -->
-    <rect x="0" y="45" width="110" height="2" fill="#1e3a8a" opacity="0.3"/>
-    
-    <!-- Tagline -->
-    <text x="0" y="65" 
-          font-family="'Segoe UI', Arial, sans-serif" 
-          font-size="10" 
-          font-weight="400" 
-          fill="#1e3a8a" 
-          opacity="0.7"
-          letter-spacing="1px">PROJET AGILE</text>
-  </g>
-  
-  <!-- Élément décoratif -->
-  <g transform="translate(230, 25)">
-    <circle cx="15" cy="15" r="3" fill="#1e3a8a" opacity="0.6"/>
-    <circle cx="30" cy="20" r="2" fill="#1e3a8a" opacity="0.4"/>
-    <circle cx="20" cy="30" r="2" fill="#1e3a8a" opacity="0.4"/>
-  </g>
-</svg>
+            <img src="{{ asset('logo-proja.png') }}" alt="Logo" class="logo">
         </div>
         
         <!-- Carte de contenu -->
