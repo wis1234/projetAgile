@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class ApplicationStatusChanged extends Notification implements ShouldQueue
 {
@@ -47,49 +48,17 @@ class ApplicationStatusChanged extends Notification implements ShouldQueue
             'rejected' => 'refusée',
         ];
 
-        $statusLabel = $statusLabels[$this->status] ?? $this->status;
         $subject = "Mise à jour de votre candidature - " . $this->application->recruitment->title;
         
-        $mail = (new MailMessage)
+        return (new MailMessage())
             ->subject($subject)
-            ->greeting('Bonjour ' . $this->application->first_name . ',')
-            ->line('Nous vous informons que le statut de votre candidature pour le poste de **' . $this->application->recruitment->title . '** a été mis à jour.')
-            ->line('**Nouveau statut :** Votre candidature est ' . $statusLabel . '.');
-
-        // Ajouter des informations supplémentaires en fonction du statut
-        switch ($this->status) {
-            case 'interviewed':
-                $mail->line('**Prochaine étape :** Notre équipe vous contactera bientôt pour planifier un entretien.');
-                break;
-                
-            case 'accepted':
-                $mail->line('**Félicitations !** Nous sommes ravis de vous annoncer que votre profil a retenu toute notre attention.')
-                     ->line('Notre équipe des ressources humaines prendra contact avec vous sous peu pour les démarches à suivre.');
-                break;
-                
-            case 'rejected':
-                $mail->line('Nous tenons à vous remercier pour l\'intérêt que vous avez porté à notre entreprise.')
-                     ->line('Malheureusement, votre profil ne correspond pas exactement à nos attentes pour ce poste.');
-                break;
-        }
-
-        // Ajouter les notes supplémentaires si elles existent
-        if (!empty($this->notes)) {
-            $mail->line('')
-                 ->line('**Message complémentaire :**')
-                 ->line($this->notes);
-        }
-
-        // Pied de page standard
-        $mail->line('')
-             ->line('Nous vous remercions pour votre confiance et l\'intérêt que vous portez à notre entreprise.')
-             ->salutation('Cordialement,')
-             ->line('Le service des Ressources Humaines')
-             ->line(config('app.name'))
-             ->line('')
-             ->line('*Ceci est un message automatique, merci de ne pas y répondre directement.*');
-
-        return $mail;
+            ->view('emails.application-status', [
+                'application' => $this->application,
+                'status' => $this->status,
+                'statusLabel' => $statusLabels[$this->status] ?? $this->status,
+                'notes' => $this->notes,
+                'subject' => $subject
+            ]);
     }
 
     /**

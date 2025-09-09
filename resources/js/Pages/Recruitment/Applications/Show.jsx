@@ -641,41 +641,47 @@ export default function ApplicationShow({ recruitment, application, customFields
         
         setIsUpdating(true);
         
-        axios.put(route('recruitment.applications.status', [
+        // Use Inertia's router for form submission which handles CSRF and proper headers automatically
+        router.put(route('recruitment.applications.status', [
             recruitment.id, 
             application.id
         ]), {
             status: pendingStatus,
-            notes: data.notes || application.notes || '',
-            _method: 'put'
-        })
-        .then(response => {
-            if (response.data.success) {
-                // Mettre à jour l'application avec les données fraîches du serveur
+            notes: data.notes || application.notes || ''
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                // Update the application data with the fresh data from the server
                 const oldStatus = application.status;
-                Object.assign(application, response.data.application);
                 
-                // Mettre à jour les données du formulaire
-                setData({
-                    status: response.data.application.status,
-                    notes: response.data.application.notes || ''
-                });
+                // Update the application status in the UI
+                application.status = pendingStatus;
                 
-                // Afficher une notification de succès
+                // Close the modal and reset states
+                setShowStatusModal(false);
+                setPendingStatus('');
+                setIsUpdating(false);
+                
+                // Show success message
                 toast.success(`Statut mis à jour avec succès de "${statusIcons[oldStatus]?.label || oldStatus}" à "${statusIcons[pendingStatus]?.label || pendingStatus}"`);
+            },
+            onError: (errors) => {
+                console.error('Erreur lors de la mise à jour du statut:', errors);
+                
+                if (errors.status) {
+                    toast.error(errors.status);
+                } else if (errors.message) {
+                    toast.error(errors.message);
+                } else {
+                    toast.error('Une erreur est survenue lors de la mise à jour du statut');
+                }
+                
+                // Revert to the original status and close the modal
+                setData('status', application.status);
+                setShowStatusModal(false);
+                setPendingStatus('');
+                setIsUpdating(false);
             }
-        })
-        .catch(error => {
-            console.error('Erreur lors de la mise à jour du statut:', error);
-            // En cas d'erreur, afficher une notification d'erreur
-            toast.error('Une erreur est survenue lors de la mise à jour du statut');
-            // Revenir à l'ancien statut
-            setData('status', application.status);
-        })
-        .finally(() => {
-            setIsUpdating(false);
-            setShowStatusModal(false);
-            setPendingStatus('');
         });
     };
 
