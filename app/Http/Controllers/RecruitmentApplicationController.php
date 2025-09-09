@@ -338,9 +338,8 @@ class RecruitmentApplicationController extends Controller
             }
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Le statut de la candidature a été mis à jour.',
+        return back()->with([
+            'success' => 'Le statut de la candidature a été mis à jour.',
             'application' => $application->fresh()
         ]);
     }
