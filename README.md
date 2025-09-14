@@ -9,7 +9,52 @@
 
 ## About Proja
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Proja est une application de gestion de projets agile basée sur Laravel et Inertia.js. Elle permet de gérer des projets, des tâches, des sprints et des équipes de manière efficace et intuitive.
+
+## Configuration de reCAPTCHA
+
+L'application utilise reCAPTCHA v3 pour sécuriser les formulaires sensibles comme l'inscription et la connexion.
+
+### Configuration requise
+
+1. Obtenez vos clés reCAPTCHA v3 sur la [Console d'administration reCAPTCHA](https://www.google.com/recaptcha/admin)
+2. Ajoutez ces variables d'environnement à votre fichier `.env` :
+
+```env
+RECAPTCHA_SITE_KEY=votre_clé_site
+RECAPTCHA_SECRET_KEY=votre_clé_secrète
+```
+
+### Configuration avancée
+
+Vous pouvez personnaliser le comportement de reCAPTCHA en modifiant le fichier `config/recaptcha.php` :
+
+- `score_threshold` : Score minimum requis pour valider une action (0.0 à 1.0)
+- `action_thresholds` : Scores minimums par type d'action (login, register, etc.)
+- `debug` : Active/désactive le mode débogage (utile en développement)
+
+### Désactivation en développement
+
+En mode développement, si aucune clé n'est définie, la validation reCAPTCHA est automatiquement désactivée.
+
+## Fonctionnalités
+
+L'application offre les fonctionnalités suivantes :
+- Gestion des projets et des tâches
+- Tableaux Kanban
+- Suivi des sprints
+- Gestion des équipes et des rôles
+- Tableaux de bord personnalisés
+- Et bien plus encore...
+
+## Technologies utilisées
+
+- Laravel 10.x
+- Inertia.js
+- React
+- Tailwind CSS
+- reCAPTCHA v3
+- Et d'autres packages essentiels...
 
 - [Simple, fast routing engine](https://laravel.com/docs/routing).
 - [Powerful dependency injection container](https://laravel.com/docs/container).

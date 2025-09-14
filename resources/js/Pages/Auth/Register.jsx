@@ -1,151 +1,176 @@
-import { Head, Link, useForm } from '@inertiajs/react';
-import { useRef, useState } from 'react';
-import { FaUser, FaEnvelope, FaLock, FaPhone, FaBuilding, FaIdBadge, FaCamera } from 'react-icons/fa';
-import ApplicationLogo from '@/Components/ApplicationLogo';
-import TextInput from '@/Components/TextInput';
-import InputError from '@/Components/InputError';
+import { Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
+import { FaUser, FaEnvelope, FaLock } from 'react-icons/fa';
+import { InputError, PrimaryButton, TextInput } from '@/Components';
+import ReCAPTCHA from 'react-google-recaptcha';
+
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6Lc3FfcpAAAAAH7mzqLwY9N8QZ8Q3qQ9YQhQZ5Q5';
 
 export default function Register() {
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors } = useForm({
         name: '',
         email: '',
         password: '',
         password_confirmation: '',
-        profile_photo: null,
-        phone: '',
-        job_title: '',
-        company: '',
-        bio: '',
+        recaptcha_token: '',
     });
-    const photoInput = useRef();
-    const [photoPreview, setPhotoPreview] = useState(null);
 
-    const handlePhotoChange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        setPhotoPreview(URL.createObjectURL(file));
-        setData('profile_photo', file);
+    const [recaptchaValue, setRecaptchaValue] = useState(null);
+    const [recaptchaError, setRecaptchaError] = useState('');
+
+    const handleRecaptchaChange = (token) => {
+        setRecaptchaValue(token);
+        setData('recaptcha_token', token);
+        setRecaptchaError('');
     };
 
     const submit = (e) => {
         e.preventDefault();
-        post(route('register'), {
-            forceFormData: true,
-            onFinish: () => reset('password', 'password_confirmation'),
-        });
+        
+        if (!recaptchaValue) {
+            setRecaptchaError('Veuvez vérifier que vous n\'êtes pas un robot');
+            return;
+        }
+        
+        post(route('register'));
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 font-sans p-4">
-            <Head title="Inscription" />
-
-            <div className="flex flex-col md:flex-row w-full max-w-5xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-
-                {/* Left Panel: Branding */}
-                <div className="hidden md:flex flex-col justify-center items-center w-full md:w-2/5 bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-white text-center">
-                    <ApplicationLogo className="text-6xl mb-4" />
-                    <h1 className="text-3xl font-bold mb-2">Rejoignez ProjA</h1>
-                    <p className="text-blue-200">Créez votre compte et commencez à gérer vos projets plus efficacement.</p>
+        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 font-sans p-4 sm:p-6 overflow-hidden">
+            <div className="flex flex-col md:flex-row w-full max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+                {/* Left Panel: Branding - Visible uniquement sur desktop */}
+                <div className="hidden md:flex flex-col justify-center items-center w-full md:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-white text-center">
+                    <h1 className="text-4xl font-bold mb-4">Bienvenue sur ProjA</h1>
+                    <p className="text-blue-100 text-lg">Intégrez notre communauté, optimisez la gestion de vos projets et saisissez des opportunités de collaboration.</p>
+                    <div className="mt-8">
+                        <p className="text-blue-200">Déjà membre ?</p>
+                        <Link 
+                            href={route('login')} 
+                            className="mt-2 inline-flex items-center px-6 py-2 border border-transparent text-base font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                            Se connecter
+                        </Link>
+                    </div>
                 </div>
 
                 {/* Right Panel: Form */}
-                <div className="w-full md:w-3/5 p-8 md:p-12">
+                <div className="w-full md:w-1/2 p-8 sm:p-10">
                     <div className="md:hidden text-center mb-8">
-                        <ApplicationLogo className="text-5xl" />
+                        <h4 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent mb-4">Rejoignez ProjA</h4>
+                        <p className="text-gray-600 dark:text-gray-300">Créez votre compte et commencez à gérer vos projets plus efficacement.</p>
                     </div>
 
-                    <h2 className="text-3xl font-bold text-center text-blue-800 dark:text-blue-200 mb-2">
-                        Créer un compte
-                    </h2>
-                    <p className="text-center text-gray-500 dark:text-gray-400 mb-8">
-                        C'est rapide et facile.
-                    </p>
-
-                    <form onSubmit={submit} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Name */}
+                    <form onSubmit={submit} className="space-y-6 max-w-md mx-auto">
+                        <div>
                             <div className="relative">
-                                <FaUser className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                                <TextInput id="name" name="name" value={data.name} onChange={(e) => setData('name', e.target.value)} className="w-full pl-12" placeholder="Nom complet" autoComplete="name" required isFocused />
-                                <InputError message={errors.name} className="mt-2" />
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <FaUser className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <TextInput
+                                    type="text"
+                                    name="name"
+                                    value={data.name}
+                                    className="pl-10 w-full"
+                                    placeholder="Nom complet"
+                                    onChange={(e) => setData('name', e.target.value)}
+                                    required
+                                    autoComplete="name"
+                                    isFocused
+                                />
                             </div>
-
-                            {/* Email */}
-                            <div className="relative">
-                                <FaEnvelope className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                                <TextInput id="email" type="email" name="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="w-full pl-12" placeholder="Adresse email" autoComplete="username" required />
-                                <InputError message={errors.email} className="mt-2" />
-                            </div>
-
-                            {/* Password */}
-                            <div className="relative">
-                                <FaLock className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                                <TextInput id="password" type="password" name="password" value={data.password} onChange={(e) => setData('password', e.target.value)} className="w-full pl-12" placeholder="Mot de passe" autoComplete="new-password" required />
-                                <InputError message={errors.password} className="mt-2" />
-                            </div>
-
-                            {/* Confirm Password */}
-                            <div className="relative">
-                                <FaLock className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                                <TextInput id="password_confirmation" type="password" name="password_confirmation" value={data.password_confirmation} onChange={(e) => setData('password_confirmation', e.target.value)} className="w-full pl-12" placeholder="Confirmer le mot de passe" autoComplete="new-password" required />
-                                <InputError message={errors.password_confirmation} className="mt-2" />
-                            </div>
-
-                             {/* Phone */}
-                             <div className="relative">
-                                <FaPhone className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                                <TextInput id="phone" type="tel" name="phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className="w-full pl-12" placeholder="Téléphone (optionnel)" autoComplete="tel" />
-                                <InputError message={errors.phone} className="mt-2" />
-                            </div>
-
-                            {/* Job Title */}
-                            <div className="relative">
-                                <FaIdBadge className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                                <TextInput id="job_title" type="text" name="job_title" value={data.job_title} onChange={(e) => setData('job_title', e.target.value)} className="w-full pl-12" placeholder="Poste (optionnel)" autoComplete="organization-title" />
-                                <InputError message={errors.job_title} className="mt-2" />
-                            </div>
+                            <InputError message={errors.name} className="mt-1" />
                         </div>
 
-                        {/* Company */}
-                        <div className="relative">
-                            <FaBuilding className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                            <TextInput id="company" type="text" name="company" value={data.company} onChange={(e) => setData('company', e.target.value)} className="w-full pl-12" placeholder="Entreprise (optionnel)" autoComplete="organization" />
-                            <InputError message={errors.company} className="mt-2" />
+                        <div>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <FaEnvelope className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <TextInput 
+                                    type="email" 
+                                    name="email" 
+                                    value={data.email} 
+                                    className="pl-10 w-full"
+                                    placeholder="Adresse email" 
+                                    onChange={(e) => setData('email', e.target.value)}
+                                    required
+                                    autoComplete="username"
+                                />
+                            </div>
+                            <InputError message={errors.email} className="mt-1" />
                         </div>
 
-                        {/* Profile Photo & Bio */}
-                        <div className="flex flex-col sm:flex-row items-start gap-4 pt-2">
-                            <div className="flex-shrink-0 flex flex-col items-center gap-2">
-                                <img src={photoPreview || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || 'A')}&background=0D8ABC&color=fff&size=128`} alt="Aperçu" className="w-24 h-24 rounded-full object-cover border-4 border-gray-200 dark:border-gray-600" />
-                                <button type="button" onClick={() => photoInput.current.click()} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
-                                    Photo de profil
-                                </button>
-                                <input type="file" ref={photoInput} onChange={handlePhotoChange} className="hidden" accept="image/*" />
-                                <InputError message={errors.profile_photo} className="mt-2" />
+                        <div>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <FaLock className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <TextInput 
+                                    type="password" 
+                                    name="password" 
+                                    value={data.password} 
+                                    className="pl-10 w-full"
+                                    placeholder="Mot de passe" 
+                                    onChange={(e) => setData('password', e.target.value)}
+                                    required
+                                    autoComplete="new-password"
+                                />
                             </div>
-                            <div className="relative w-full">
-                                <textarea id="bio" name="bio" value={data.bio} onChange={(e) => setData('bio', e.target.value)} className="w-full h-full min-h-[96px] p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Une courte biographie (optionnel)"></textarea>
-                                <InputError message={errors.bio} className="mt-2" />
-                            </div>
+                            <InputError message={errors.password} className="mt-1" />
                         </div>
 
-                        {/* Submit button */}
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="w-full flex items-center justify-center gap-3 bg-blue-700 text-white text-base font-bold py-3 px-4 rounded-lg shadow-md hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105 disabled:opacity-50"
-                        >
-                            Créer le compte
-                        </button>
+                        <div>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <FaLock className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <TextInput 
+                                    type="password" 
+                                    name="password_confirmation" 
+                                    value={data.password_confirmation} 
+                                    className="pl-10 w-full"
+                                    placeholder="Confirmer le mot de passe" 
+                                    onChange={(e) => setData('password_confirmation', e.target.value)}
+                                    required
+                                    autoComplete="new-password"
+                                />
+                            </div>
+                            <InputError message={errors.password_confirmation} className="mt-1" />
+                        </div>
 
-                        {/* Login link */}
-                        <div className="text-center text-sm text-gray-600 dark:text-gray-400 pt-2">
-                            Déjà un compte ?{' '}
-                            <Link href={route('login')} className="font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition">
-                                Se connecter
-                            </Link>
+                        <div className="py-2">
+                            <ReCAPTCHA
+                                sitekey={RECAPTCHA_SITE_KEY}
+                                onChange={handleRecaptchaChange}
+                                className="flex justify-center"
+                            />
+                            {recaptchaError && (
+                                <p className="mt-2 text-sm text-red-600 text-center">
+                                    {recaptchaError}
+                                </p>
+                            )}
+                        </div>
+
+                        <div>
+                            <PrimaryButton 
+                                type="submit" 
+                                className="w-full justify-center py-3 px-4 text-base sm:text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                                disabled={processing}
+                            >
+                                {processing ? 'Inscription en cours...' : "S'inscrire"}
+                            </PrimaryButton>
+                            
                         </div>
                     </form>
+
+                    <div className="mt-6 text-center md:hidden">
+                        <p className="text-sm text-gray-600">
+                            Vous avez déjà un compte ?{' '}
+                            <Link href={route('login')} className="font-medium text-blue-600 hover:text-blue-500">
+                                Connectez-vous
+                            </Link>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
