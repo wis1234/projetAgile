@@ -52,7 +52,6 @@ class RegisteredUserController extends Controller
             'job_title' => 'nullable|string|max:100',
             'company' => 'nullable|string|max:100',
             'bio' => 'nullable|string|max:1000',
-            'recaptcha_token' => ['required', new \App\Rules\RecaptchaRule],
         ]);
 
         try {

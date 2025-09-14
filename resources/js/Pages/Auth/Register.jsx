@@ -1,10 +1,7 @@
 import { Link, useForm } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { FaUser, FaEnvelope, FaLock } from 'react-icons/fa';
 import { InputError, PrimaryButton, TextInput } from '@/Components';
-import ReCAPTCHA from 'react-google-recaptcha';
-
-const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6Lc3FfcpAAAAAH7mzqLwY9N8QZ8Q3qQ9YQhQZ5Q5';
 
 export default function Register() {
     const { data, setData, post, processing, errors } = useForm({
@@ -15,53 +12,8 @@ export default function Register() {
         recaptcha_token: '',
     });
 
-    const [recaptchaValue, setRecaptchaValue] = useState(null);
-    const [recaptchaError, setRecaptchaError] = useState('');
-    const [isReCAPTCHALoaded, setIsReCAPTCHALoaded] = useState(false);
-
-    // Load reCAPTCHA script
-    useEffect(() => {
-        // Check if reCAPTCHA script is already loaded
-        if (window.grecaptcha) {
-            setIsReCAPTCHALoaded(true);
-            return;
-        }
-
-        // Add reCAPTCHA script
-        const script = document.createElement('script');
-        script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-            setIsReCAPTCHALoaded(true);
-        };
-        script.onerror = () => {
-            console.error('Failed to load reCAPTCHA script');
-            setRecaptchaError('Impossible de charger le système de vérification. Veuillez réessayer plus tard.');
-        };
-        document.body.appendChild(script);
-
-        return () => {
-            // Cleanup
-            if (document.body.contains(script)) {
-                document.body.removeChild(script);
-            }
-        };
-    }, []);
-
-    const handleRecaptchaChange = (token) => {
-        setRecaptchaValue(token);
-        setData('recaptcha_token', token);
-        setRecaptchaError('');
-    };
-
     const submit = (e) => {
         e.preventDefault();
-        
-        if (!recaptchaValue) {
-            setRecaptchaError('Veuvez vérifier que vous n\'êtes pas un robot');
-            return;
-        }
         
         post(route('register'));
     };
@@ -169,26 +121,6 @@ export default function Register() {
                             <InputError message={errors.password_confirmation} className="mt-1" />
                         </div>
 
-                        <div className="py-2">
-                            {isReCAPTCHALoaded ? (
-                                <ReCAPTCHA
-                                    sitekey={RECAPTCHA_SITE_KEY}
-                                    onChange={handleRecaptchaChange}
-                                    className="flex justify-center"
-                                    theme="light"
-                                />
-                            ) : (
-                                <div className="text-center py-4">
-                                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                    <p className="mt-2 text-sm text-gray-600">Chargement de la vérification...</p>
-                                </div>
-                            )}
-                            {recaptchaError && (
-                                <p className="mt-2 text-sm text-red-600 text-center">
-                                    {recaptchaError}
-                                </p>
-                            )}
-                        </div>
 
                         <div>
                             <PrimaryButton 
