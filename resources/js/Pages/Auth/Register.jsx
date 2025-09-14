@@ -1,35 +1,12 @@
 import { Link, useForm } from '@inertiajs/react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { FaUser, FaEnvelope, FaLock } from 'react-icons/fa';
 import { InputError, PrimaryButton, TextInput } from '@/Components';
-// Chargement du script reCAPTCHA Enterprise
-const loadReCaptcha = () => {
-    return new Promise((resolve) => {
-        const script = document.createElement('script');
-        script.src = 'https://www.google.com/recaptcha/enterprise.js?render=explicit';
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-            resolve(window.grecaptcha);
-        };
-        document.head.appendChild(script);
-    });
-};
+import ReCAPTCHA from 'react-google-recaptcha';
 
-// Vérification de la clé reCAPTCHA
-const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '';
-
-if (!RECAPTCHA_SITE_KEY) {
-    console.error('Erreur: VITE_RECAPTCHA_SITE_KEY non définie dans les variables d\'environnement');
-    console.log('Valeurs d\'environnement disponibles:', JSON.stringify(import.meta.env, null, 2));
-}
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6Lc3FfcpAAAAAH7mzqLwY9N8QZ8Q3qQ9YQhQZ5Q5';
 
 export default function Register() {
-    const recaptchaRef = useRef(null);
-    const [recaptchaReady, setRecaptchaReady] = useState(false);
-    const [recaptchaValue, setRecaptchaValue] = useState(null);
-    const [recaptchaError, setRecaptchaError] = useState('');
-    
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         email: '',
@@ -38,34 +15,45 @@ export default function Register() {
         recaptcha_token: '',
     });
 
-    const handleRecaptchaChange = useCallback((token) => {
+    const [recaptchaValue, setRecaptchaValue] = useState(null);
+    const [recaptchaError, setRecaptchaError] = useState('');
+    const [isReCAPTCHALoaded, setIsReCAPTCHALoaded] = useState(false);
+
+    // Load reCAPTCHA script
+    useEffect(() => {
+        // Check if reCAPTCHA script is already loaded
+        if (window.grecaptcha) {
+            setIsReCAPTCHALoaded(true);
+            return;
+        }
+
+        // Add reCAPTCHA script
+        const script = document.createElement('script');
+        script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+            setIsReCAPTCHALoaded(true);
+        };
+        script.onerror = () => {
+            console.error('Failed to load reCAPTCHA script');
+            setRecaptchaError('Impossible de charger le système de vérification. Veuillez réessayer plus tard.');
+        };
+        document.body.appendChild(script);
+
+        return () => {
+            // Cleanup
+            if (document.body.contains(script)) {
+                document.body.removeChild(script);
+            }
+        };
+    }, []);
+
+    const handleRecaptchaChange = (token) => {
         setRecaptchaValue(token);
         setData('recaptcha_token', token);
         setRecaptchaError('');
-    }, [setData]);
-
-    // Initialisation de reCAPTCHA Enterprise
-    useEffect(() => {
-        loadReCaptcha().then(() => {
-            if (window.grecaptcha && window.grecaptcha.enterprise) {
-                setRecaptchaReady(true);
-            }
-        });
-    }, []);
-
-    // Initialisation du widget reCAPTCHA
-    useEffect(() => {
-        if (recaptchaReady && recaptchaRef.current) {
-            window.grecaptcha.enterprise.ready(() => {
-                window.grecaptcha.enterprise.render(recaptchaRef.current, {
-                    sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
-                    callback: handleRecaptchaChange,
-                    'expired-callback': () => setRecaptchaValue(null),
-                    'error-callback': () => setRecaptchaError('Erreur reCAPTCHA. Veuillez réessayer.')
-                });
-            });
-        }
-    }, [recaptchaReady, handleRecaptchaChange]);
+    };
 
     const submit = (e) => {
         e.preventDefault();
@@ -182,20 +170,19 @@ export default function Register() {
                         </div>
 
                         <div className="py-2">
-                            <div className="flex justify-center">
-                                <div 
-                                    ref={recaptchaRef}
-                                    className="g-recaptcha"
-                                    data-sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                                    data-action="REGISTER"
-                                >
-                                    {!recaptchaReady && (
-                                        <div className="text-center p-4 bg-yellow-50 text-yellow-600 rounded">
-                                            Chargement de la vérification de sécurité...
-                                        </div>
-                                    )}
+                            {isReCAPTCHALoaded ? (
+                                <ReCAPTCHA
+                                    sitekey={RECAPTCHA_SITE_KEY}
+                                    onChange={handleRecaptchaChange}
+                                    className="flex justify-center"
+                                    theme="light"
+                                />
+                            ) : (
+                                <div className="text-center py-4">
+                                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                    <p className="mt-2 text-sm text-gray-600">Chargement de la vérification...</p>
                                 </div>
-                            </div>
+                            )}
                             {recaptchaError && (
                                 <p className="mt-2 text-sm text-red-600 text-center">
                                     {recaptchaError}
