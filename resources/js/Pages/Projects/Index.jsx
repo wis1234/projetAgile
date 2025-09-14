@@ -157,7 +157,7 @@ export default function Index({ projects, filters }) {
                 </div>
 
                 {/* Search and Filters Section - Super Responsive */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-200 dark:border-gray-700 transition duration-200">
                     <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
                         <div className="lg:col-span-3">
                             <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

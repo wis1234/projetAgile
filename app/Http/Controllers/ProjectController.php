@@ -135,6 +135,7 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
+            'meeting_link' => 'nullable|url|max:1000',
             'status' => [
                 'nullable', 
                 'string', 
@@ -162,7 +163,8 @@ class ProjectController extends Controller
         activity_log('create', 'Création du projet', $project, "Projet '{$project->name}' créé par " . auth()->user()->name);
         
         return redirect()->route('projects.show', $project->id)
-            ->with('success', 'Projet créé avec succès !');
+            ->with('success', 'Projet créé avec succès !')
+            ->with('project', ['id' => $project->id]);
     }
 
     /**
@@ -380,6 +382,7 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
+            'meeting_link' => 'nullable|url|max:1000',
             'status' => [
                 'required',
                 'string',

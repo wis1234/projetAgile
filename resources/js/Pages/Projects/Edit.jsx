@@ -8,6 +8,7 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
   const { errors = {}, flash = {} } = usePage().props;
   const [name, setName] = useState(project.name || '');
   const [description, setDescription] = useState(project.description || '');
+  const [meetingLink, setMeetingLink] = useState(project.meeting_link || '');
   const [status, setStatus] = useState(project.status || 'nouveau');
   const [notification, setNotification] = useState(flash.success || flash.error || '');
   const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
@@ -16,12 +17,12 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    router.put(`/projects/${project.id}`, { name, description, status }, {
+    router.put(`/projects/${project.id}`, { name, description, meeting_link: meetingLink, status }, {
       onSuccess: () => {
         setNotification('Projet mis à jour avec succès');
         setNotificationType('success');
         setLoading(false);
-        setTimeout(() => router.visit('/projects'), 1200);
+        setTimeout(() => router.visit(`/projects/${project.id}`), 1200);
       },
       onError: () => {
         setNotification('Erreur lors de la mise à jour');
@@ -161,6 +162,26 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                   />
                   {errors.description && (
                     <div className="text-red-600 text-sm mt-2 font-medium">{errors.description}</div>
+                  )}
+                </div>
+
+                {/* Lien de réunion */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                    Lien de réunion (optionnel)
+                  </label>
+                  <input 
+                    type="url" 
+                    value={meetingLink} 
+                    onChange={e => setMeetingLink(e.target.value)} 
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" 
+                    placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Lien vers une salle de réunion virtuelle (Google Meet, Zoom, etc.)
+                  </p>
+                  {errors.meeting_link && (
+                    <div className="text-red-600 text-sm mt-2 font-medium">{errors.meeting_link}</div>
                   )}
                 </div>
 

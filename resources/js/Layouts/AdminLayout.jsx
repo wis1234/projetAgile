@@ -38,25 +38,47 @@ const navLinks = [
   ) },
 ];
 
-const Loader = () => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
-    <div className="relative">
-      <div className="flex flex-col items-center">
-        <div className="relative w-20 h-20">
-          {/* Animation de cercle extérieur */}
-          <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-blue-400 border-b-blue-300 border-l-blue-400 animate-spin"></div>
-          
-          {/* Logo ou initiale au centre */}
-          <div className="absolute inset-2 flex items-center justify-center">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              PROJA
-            </div>
-          </div>
-        </div>
+const Loader = () => {
+  const letters = ['P', 'r', 'o', 'J', 'A'];
+  
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
+      <div className="flex space-x-1 mb-8">
+        {letters.map((letter, index) => (
+          <span 
+            key={index}
+            className="text-4xl font-bold text-blue-600 dark:text-blue-400 inline-block"
+            style={{
+              animation: `bounce 0.6s ease-in-out infinite`,
+              animationDelay: `${index * 0.1}s`,
+              transformOrigin: 'bottom center'
+            }}
+          >
+            {letter}
+          </span>
+        ))}
       </div>
+      
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Chargement...
+      </p>
+      
+      <style jsx>{`
+        @keyframes bounce {
+          0%, 100% { 
+            transform: translateY(0) scale(1);
+            color: #2563eb;
+          }
+          50% { 
+            transform: translateY(-15px) scale(1.2);
+            color: #1d4ed8;
+            text-shadow: 0 5px 10px rgba(37, 99, 235, 0.3);
+          }
+        }
+      `}</style>
     </div>
-  </div>
-);
+  );
+};
 
 export default function AdminLayout({ children }) {
   const { auth, flash = {}, appName } = usePage().props;
@@ -213,7 +235,7 @@ export default function AdminLayout({ children }) {
           </button>
           <div className="flex items-center">
             <span className="text-xl md:text-2xl font-light tracking-wider text-gray-700 dark:text-gray-200">
-              DASHBOARD
+              PROJA DASHBOARD
             </span>
             <span className="ml-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-medium rounded-full border border-blue-100 dark:border-blue-800">
               v1.0

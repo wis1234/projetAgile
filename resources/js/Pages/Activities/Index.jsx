@@ -53,14 +53,14 @@ export default function Index({ activities, users, filters = {}, types = [], fla
             <h1 className="text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">Journal d'activité</h1>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <button type="button" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap" onClick={handleExport}>
+            <button type="button" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200" onClick={handleExport}>
               <FaFileAlt /> Exporter Excel
             </button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200">
           <form className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end" onSubmit={handleFilter}>
             <div>
               <label htmlFor="user-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Utilisateur</label>
@@ -87,7 +87,7 @@ export default function Index({ activities, users, filters = {}, types = [], fla
         </div>
 
         {/* Tableau activités */}
-        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition duration-200 hover:shadow-lg mb-8">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition duration-200 mb-8">
           <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
             <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
               <tr>

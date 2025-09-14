@@ -64,32 +64,29 @@ function Create({ projects, selectedProjectId }) {
     <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={{ duration: 0.3 }}>
       <div className="min-h-screen bg-white dark:bg-gray-900">
         
-        {/* Sticky Header */}
-        <header className="sticky top-0 bg-white dark:bg-gray-800/50 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 z-30">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center gap-4">
-                <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
-                  <FaFlagCheckered className="h-6 w-6" />
+        {/* En-tête avec bouton retour */}
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Link 
+                  href={route('sprints.index')} 
+                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                  title="Retour à la liste des sprints"
+                >
+                  <FaArrowLeft className="h-5 w-5" />
+                </Link>
+                <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300">
+                  <FaFlagCheckered className="h-5 w-5" />
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Créer un Sprint</h1>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Remplissez les détails pour le nouveau sprint.</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Link href={route('sprints.index')} className="hidden sm:inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                  <FaArrowLeft className="mr-2 h-4 w-4" />
-                  Annuler
-                </Link>
-                <button onClick={handleSubmit} disabled={loading} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
-                  {loading ? <FaSpinner className="animate-spin mr-2" /> : <FaSave className="mr-2" />}
-                  Enregistrer
-                </button>
-              </div>
             </div>
           </div>
-        </header>
+        </div>
 
         {/* Notification */}
         <AnimatePresence>
@@ -210,6 +207,37 @@ function Create({ projects, selectedProjectId }) {
               </div>
             </div>
           </form>
+          {/* Boutons d'action en bas du formulaire */}
+          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 max-w-4xl mx-auto w-full">
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <Link 
+                  href={route('sprints.index')} 
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <FaArrowLeft className="mr-2 h-4 w-4" />
+                  Annuler
+                </Link>
+                <button 
+                  type="submit"
+                  disabled={loading} 
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <FaSpinner className="animate-spin mr-2" />
+                      Création...
+                    </>
+                  ) : (
+                    <>
+                      <FaSave className="mr-2" />
+                      Créer le sprint
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </main>
       </div>
     </motion.div>

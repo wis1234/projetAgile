@@ -44,7 +44,8 @@ import {
     FaGlobe,
     FaCode,
     FaBug,
-    FaLightbulb
+    FaLightbulb,
+    FaExternalLinkAlt
 } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
 import { 
@@ -315,7 +316,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
     <>
       <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
         {/* Header sticky */}
-        <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800 shadow-sm">
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-4 px-4">
             <div className="flex items-center gap-3">
                 <FaProjectDiagram className="text-2xl text-blue-600" />
@@ -341,9 +342,9 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             {/* Informations du projet */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
               {/* Carte principale du projet */}
-              <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+              <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                     <FaProjectDiagram className="text-white text-2xl" />
                   </div>
                   <div>
@@ -362,15 +363,37 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                       <FaClipboardList className="text-blue-500" /> Description
                     </h3>
-                    <p className="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-100 dark:border-gray-600">
+                    <p className="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-100 dark:border-gray-600 mb-4">
                       {project.description || 'Aucune description fournie'}
                     </p>
                   </div>
+                  
+                  {project.meeting_link && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FaGlobe className="text-blue-500" /> Lien de réunion
+                      </h3>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
+                        <a 
+                          href={project.meeting_link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 break-all flex items-center gap-2"
+                        >
+                          <FaExternalLinkAlt className="flex-shrink-0" />
+                          {project.meeting_link}
+                        </a>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                          Cliquez pour rejoindre la réunion
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Carte des membres */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Membres ({project.users?.length || 0})</h3>
                   <Link 
@@ -443,7 +466,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             </div>
 
             {/* Actions Rapides */}
-            <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-6 shadow-md hover:shadow-xl transition-all duration-300">
+            <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
               <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
                 <FaBolt className="text-yellow-500" />
                 <span>Actions Rapides</span>
@@ -452,7 +475,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 {/* Bouton Ajouter un Sprint */}
                 <Link
                   href={route('projects.sprints.create', { project: project.id })}
-                  className="group relative overflow-hidden bg-gradient-to-br from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white p-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center justify-center text-center h-full min-h-[120px]"
+                  className="group relative overflow-hidden bg-gradient-to-br from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white p-4 rounded-xl flex flex-col items-center justify-center text-center h-full min-h-[120px]"
                 >
                   <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   <div className="relative z-10">
@@ -468,7 +491,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 {(isAdmin || isManager) && (
                   <Link
                     href={route('project-users.create')}
-                    className="group relative overflow-hidden bg-gradient-to-br from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white p-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center justify-center text-center h-full min-h-[120px]"
+                    className="group relative overflow-hidden bg-gradient-to-br from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white p-4 rounded-xl flex flex-col items-center justify-center text-center h-full min-h-[120px]"
                   >
                     <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     <div className="relative z-10">
@@ -484,7 +507,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 {/* Bouton Ajouter une Tâche */}
                 <Link
                   href={route('tasks.create', { project_id: project.id })}
-                  className="group relative overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white p-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center justify-center text-center h-full min-h-[120px]"
+                  className="group relative overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white p-4 rounded-xl flex flex-col items-center justify-center text-center h-full min-h-[120px]"
                 >
                   <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   <div className="relative z-10">
@@ -499,7 +522,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 {/* Bouton Exporter le suivi */}
                 <div className="relative group h-full">
                   <button 
-                    className="w-full h-full group relative overflow-hidden bg-gradient-to-br from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white p-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center justify-center text-center min-h-[120px]"
+                    className="w-full h-full group relative overflow-hidden bg-gradient-to-br from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white p-4 rounded-xl flex flex-col items-center justify-center text-center min-h-[120px]"
                   >
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3 mx-auto">
                       <FaFileExport className="text-2xl text-white" />
@@ -509,10 +532,10 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     <FaChevronDown className="absolute bottom-2 right-2 text-white/50 group-hover:text-white transition-colors" />
                   </button>
                   
-                  <div className="absolute z-20 hidden group-hover:block w-full bg-white dark:bg-gray-800 rounded-xl shadow-2xl overflow-hidden mt-2 border border-gray-200 dark:border-gray-700">
+                  <div className="absolute z-20 hidden group-hover:block w-full bg-white dark:bg-gray-800 rounded-xl overflow-hidden mt-2 border border-gray-200 dark:border-gray-700">
                     <a 
                       href={`/projects/${project.id}/suivi-global/txt`}
-                      className="block px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                      className="block px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -558,7 +581,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                   <>
                     <Link
                       href={`/tasks/create?project_id=${project.id}`}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-3 rounded-lg font-medium"
                     >
                       <FaTasks className="text-lg" />
                       <span>Créer une tâche</span>
@@ -566,7 +589,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
 
                     <Link
                      href={route('project-users.show', project.id)}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-3 rounded-lg font-medium"
                     >
                       <FaUserFriends className="text-lg" />
                       <span>Voir les membres</span>
@@ -574,14 +597,14 @@ function Show({ project, tasks = [], auth, stats = {} }) {
 
                     <Link
                       href={`/projects/${project.id}/edit`}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-3 rounded-lg font-medium"
                     >
                       <FaEdit className="text-lg" />
                       <span>Modifier le projet</span>
                     </Link>
                     <button
                       onClick={() => setShowDeleteModal(true)}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 w-full"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-3 rounded-lg font-medium w-full"
                     >
                       <FaTrash className="text-lg" />
                       <span>Supprimer le projet</span>
@@ -596,7 +619,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             </div>
 
             {/* Graphique d'évolution des tâches */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                   <FaChartLine className="text-blue-500" /> Évolution des tâches (30 derniers jours)
@@ -639,7 +662,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             </div>
 
             {/* Tâches du projet */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                   <FaTasks className="text-blue-500" /> Tâches ({tasks?.total || 0})
@@ -831,7 +854,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 <StatCard icon={<FaUsers className="text-yellow-500 text-3xl" />} label="Membres" value={project.users?.length ?? 0} />
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                 <FaUsers /> Tâches terminées par membre
               </h3>

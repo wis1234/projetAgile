@@ -220,7 +220,7 @@ export default function Index({ users, filters, roles = [], auth }) {
                 </div>
 
                 {/* Search and Filters Section */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200">
                     <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                         <div className="md:col-span-3">
                             <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recherche par nom ou email</label>
@@ -244,7 +244,7 @@ export default function Index({ users, filters, roles = [], auth }) {
 
                 {/* Table View */}
                 {viewMode === 'table' && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg mb-8 overflow-hidden">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 transition duration-200 mb-8 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
                                 <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">

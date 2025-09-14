@@ -11,6 +11,7 @@ function Create() {
   const { errors = {}, flash = {}, availableStatuses = {} } = usePage().props;
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [meetingLink, setMeetingLink] = useState('');
   const [status, setStatus] = useState('nouveau'); // Statut par défaut
   const [notification, setNotification] = useState(flash.success || flash.error || '');
   const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
@@ -20,15 +21,18 @@ function Create() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    router.post('/projects', { name, description, status }, {
-      onSuccess: () => {
+    router.post('/projects', { name, description, meeting_link: meetingLink, status }, {
+      onSuccess: (page) => {
+        const projectId = page.props.flash.project?.id;
         setNotification('Projet créé avec succès');
         setNotificationType('success');
-        setName('');
-        setDescription('');
-        setStatus('nouveau');
         setLoading(false);
-        setTimeout(() => router.visit('/projects'), 1200);
+        if (projectId) {
+          setTimeout(() => router.visit(`/projects/${projectId}`), 1200);
+        } else {
+          // Fallback si l'ID du projet n'est pas disponible
+          setTimeout(() => router.visit('/projects'), 1200);
+        }
       },
       onError: () => {
         setNotification('Erreur lors de la création');
@@ -116,6 +120,26 @@ function Create() {
                   />
                   {errors.description && (
                     <div className="text-red-600 text-sm mt-2 font-medium">{errors.description}</div>
+                  )}
+                </div>
+
+                {/* Lien de réunion */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                    Lien de réunion (optionnel)
+                  </label>
+                  <input 
+                    type="url" 
+                    value={meetingLink} 
+                    onChange={e => setMeetingLink(e.target.value)} 
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" 
+                    placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Lien vers une salle de réunion virtuelle (Google Meet, Zoom, etc.)
+                  </p>
+                  {errors.meeting_link && (
+                    <div className="text-red-600 text-sm mt-2 font-medium">{errors.meeting_link}</div>
                   )}
                 </div>
 

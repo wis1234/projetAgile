@@ -50,6 +50,13 @@ const Show = ({ sprint }) => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
+            <Link 
+              href={route('sprints.index')}
+              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+              title="Retour à la liste des sprints"
+            >
+              <FaArrowLeft className="h-6 w-6" />
+            </Link>
             <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400">
               <FaFlagCheckered className="h-8 w-8" />
             </div>
@@ -61,7 +68,7 @@ const Show = ({ sprint }) => {
           <div className="flex items-center gap-3">
             <Link
               href={route('sprints.edit', sprint.id)}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md"
             >
               <FaEdit />
               <span className="hidden sm:inline">Modifier</span>

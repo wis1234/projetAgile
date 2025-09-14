@@ -649,7 +649,13 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         {/* Section En-tête */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
-            <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" />
+            {/* <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" /> */}
+            <Link 
+                href="/tasks" 
+                className="bg-white-600 hover:bg-blue-200 text-blue text-4xl text-blue-600 dark:text-blue-400 px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+              >
+                <FaArrowLeft className="text-lg sm:text-xl" />
+              </Link>
             <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
               Détail de la tâche
               {process.env.NODE_ENV !== 'production' && (
@@ -666,7 +672,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                 <>
                   <Link 
                     href={`/tasks/${task.id}/edit`} 
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
                   >
                     <FaEdit /> 
                     <span>Modifier</span>
@@ -681,97 +687,99 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                 </>
               )}
               
-              <Link 
-                href="/tasks" 
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
-              >
-                <FaArrowLeft /> 
-                <span>Retour</span>
-              </Link>
+
             </div>
           </div>
         </div>
 
         {/* Enhanced Tabs Navigation with Beautiful Buttons */}
         <div className="mb-8">
-          <nav className="flex flex-wrap gap-2 sm:gap-3" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab('details')}
-              className={`group relative px-4 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out overflow-hidden ${
-                activeTab === 'details'
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30 transform hover:scale-105'
-                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md hover:shadow-lg'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FaInfoCircle className="text-lg" />
-                <span>Détails</span>
-              </div>
-              {activeTab === 'details' && (
-                <span className="absolute bottom-0 left-0 w-full h-1 bg-white/50"></span>
-              )}
-            </button>
-            
-            {/* Onglet Rémunération - Uniquement si la tâche est rémunérée */}
-            {task.is_paid && (
-              <button
-                onClick={() => setActiveTab('payment')}
-                className={`group relative px-4 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out overflow-hidden ${
-                  activeTab === 'payment'
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 transform hover:scale-105'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md hover:shadow-lg'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <FaDollarSign className="text-lg" />
-                  <span>Rémunération</span>
-                </div>
-                {activeTab === 'payment' && (
-                  <span className="absolute bottom-0 left-0 w-full h-1 bg-white/50"></span>
-                )}
-              </button>
-            )}
-            
-            <button
-              onClick={() => setActiveTab('files')}
-              className={`group relative px-4 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out overflow-hidden ${
-                activeTab === 'files'
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/30 transform hover:scale-105'
-                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md hover:shadow-lg'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FaFileUpload className="text-lg" />
-                <span>Ressources</span>
-              </div>
-              {activeTab === 'files' && (
-                <span className="absolute bottom-0 left-0 w-full h-1 bg-white/50"></span>
-              )}
-            </button>
-            
-            <button
-              onClick={() => handleTabClick('comments')}
-              className={`group relative px-4 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out overflow-hidden ${
-                activeTab === 'comments'
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/30 transform hover:scale-105'
-                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md hover:shadow-lg'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FaCommentDots className="text-lg" />
-                <span>Discussions</span>
-                {unreadCommentsCount > 0 && (
-                  <span className="flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-red-500 text-white">
-                    {unreadCommentsCount}
-                  </span>
-                )}
-              </div>
-              {activeTab === 'comments' && (
-                <span className="absolute bottom-0 left-0 w-full h-1 bg-white/50"></span>
-              )}
-            </button>
-          </nav>
+
+  {/* Bande d'arrière-plan avec ombre douce */}
+  <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-300 dark:border-gray-800 p-2">
+     {/* Identification de la barre */}
+  <h2 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wide">
+    Onglets de navigation
+  </h2>
+    <nav className="flex flex-wrap gap-2 sm:gap-3" aria-label="Tabs">
+      <button
+        onClick={() => setActiveTab('details')}
+        className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
+          activeTab === 'details'
+            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/20'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <FaInfoCircle className="text-lg" />
+          <span>Détails</span>
         </div>
+        {activeTab === 'details' && (
+          <span className="absolute bottom-0 left-0 w-full h-1 bg-blue-400 rounded-full"></span>
+        )}
+      </button>
+
+      {task.is_paid && (
+        <button
+          onClick={() => setActiveTab('payment')}
+          className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
+            activeTab === 'payment'
+              ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md shadow-green-500/20'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FaDollarSign className="text-lg" />
+            <span>Rémunération</span>
+          </div>
+          {activeTab === 'payment' && (
+            <span className="absolute bottom-0 left-0 w-full h-1 bg-green-400 rounded-full"></span>
+          )}
+        </button>
+      )}
+
+      <button
+        onClick={() => setActiveTab('files')}
+        className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
+          activeTab === 'files'
+            ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md shadow-purple-500/20'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <FaFileUpload className="text-lg" />
+          <span>Ressources</span>
+        </div>
+        {activeTab === 'files' && (
+          <span className="absolute bottom-0 left-0 w-full h-1 bg-purple-400 rounded-full"></span>
+        )}
+      </button>
+
+      <button
+        onClick={() => handleTabClick('comments')}
+        className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
+          activeTab === 'comments'
+            ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20'
+            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <FaCommentDots className="text-lg" />
+          <span>Discussions</span>
+          {unreadCommentsCount > 0 && (
+            <span className="flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-red-500 text-white">
+              {unreadCommentsCount}
+            </span>
+          )}
+        </div>
+        {activeTab === 'comments' && (
+          <span className="absolute bottom-0 left-0 w-full h-1 bg-orange-400 rounded-full"></span>
+        )}
+      </button>
+    </nav>
+  </div>
+</div>
+
 
         {/* Tab Content */}
         <div>
