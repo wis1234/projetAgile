@@ -1,12 +1,35 @@
 import { Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { FaUser, FaEnvelope, FaLock } from 'react-icons/fa';
 import { InputError, PrimaryButton, TextInput } from '@/Components';
-import ReCAPTCHA from 'react-google-recaptcha';
+// Chargement du script reCAPTCHA Enterprise
+const loadReCaptcha = () => {
+    return new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://www.google.com/recaptcha/enterprise.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+            resolve(window.grecaptcha);
+        };
+        document.head.appendChild(script);
+    });
+};
 
-const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6Lc3FfcpAAAAAH7mzqLwY9N8QZ8Q3qQ9YQhQZ5Q5';
+// Vérification de la clé reCAPTCHA
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '';
+
+if (!RECAPTCHA_SITE_KEY) {
+    console.error('Erreur: VITE_RECAPTCHA_SITE_KEY non définie dans les variables d\'environnement');
+    console.log('Valeurs d\'environnement disponibles:', JSON.stringify(import.meta.env, null, 2));
+}
 
 export default function Register() {
+    const recaptchaRef = useRef(null);
+    const [recaptchaReady, setRecaptchaReady] = useState(false);
+    const [recaptchaValue, setRecaptchaValue] = useState(null);
+    const [recaptchaError, setRecaptchaError] = useState('');
+    
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         email: '',
@@ -15,14 +38,34 @@ export default function Register() {
         recaptcha_token: '',
     });
 
-    const [recaptchaValue, setRecaptchaValue] = useState(null);
-    const [recaptchaError, setRecaptchaError] = useState('');
-
-    const handleRecaptchaChange = (token) => {
+    const handleRecaptchaChange = useCallback((token) => {
         setRecaptchaValue(token);
         setData('recaptcha_token', token);
         setRecaptchaError('');
-    };
+    }, [setData]);
+
+    // Initialisation de reCAPTCHA Enterprise
+    useEffect(() => {
+        loadReCaptcha().then(() => {
+            if (window.grecaptcha && window.grecaptcha.enterprise) {
+                setRecaptchaReady(true);
+            }
+        });
+    }, []);
+
+    // Initialisation du widget reCAPTCHA
+    useEffect(() => {
+        if (recaptchaReady && recaptchaRef.current) {
+            window.grecaptcha.enterprise.ready(() => {
+                window.grecaptcha.enterprise.render(recaptchaRef.current, {
+                    sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
+                    callback: handleRecaptchaChange,
+                    'expired-callback': () => setRecaptchaValue(null),
+                    'error-callback': () => setRecaptchaError('Erreur reCAPTCHA. Veuillez réessayer.')
+                });
+            });
+        }
+    }, [recaptchaReady, handleRecaptchaChange]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -139,11 +182,20 @@ export default function Register() {
                         </div>
 
                         <div className="py-2">
-                            <ReCAPTCHA
-                                sitekey={RECAPTCHA_SITE_KEY}
-                                onChange={handleRecaptchaChange}
-                                className="flex justify-center"
-                            />
+                            <div className="flex justify-center">
+                                <div 
+                                    ref={recaptchaRef}
+                                    className="g-recaptcha"
+                                    data-sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                    data-action="REGISTER"
+                                >
+                                    {!recaptchaReady && (
+                                        <div className="text-center p-4 bg-yellow-50 text-yellow-600 rounded">
+                                            Chargement de la vérification de sécurité...
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                             {recaptchaError && (
                                 <p className="mt-2 text-sm text-red-600 text-center">
                                     {recaptchaError}
