@@ -206,38 +206,39 @@ function Create({ projects, selectedProjectId }) {
                 </div>
               </div>
             </div>
-          </form>
-          {/* Boutons d'action en bas du formulaire */}
-          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex flex-col sm:flex-row justify-end gap-3 max-w-4xl mx-auto w-full">
-              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                <Link 
-                  href={route('sprints.index')} 
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  <FaArrowLeft className="mr-2 h-4 w-4" />
-                  Annuler
-                </Link>
-                <button 
-                  type="submit"
-                  disabled={loading} 
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  {loading ? (
-                    <>
-                      <FaSpinner className="animate-spin mr-2" />
-                      Création...
-                    </>
-                  ) : (
-                    <>
-                      <FaSave className="mr-2" />
-                      Créer le sprint
-                    </>
-                  )}
-                </button>
+            
+            {/* Boutons d'action en bas du formulaire */}
+            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 max-w-4xl mx-auto w-full">
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <Link 
+                    href={route('sprints.index')} 
+                    className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <FaArrowLeft className="mr-2 h-4 w-4" />
+                    Annuler
+                  </Link>
+                  <button 
+                    type="submit"
+                    disabled={loading} 
+                    className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <>
+                        <FaSpinner className="animate-spin mr-2" />
+                        Création...
+                      </>
+                    ) : (
+                      <>
+                        <FaSave className="mr-2" />
+                        Créer le sprint
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </form>
         </main>
       </div>
     </motion.div>
