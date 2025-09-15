@@ -20,7 +20,7 @@ export default function Register() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 font-sans p-4 sm:p-6 overflow-hidden">
-            <div className="flex flex-col md:flex-row w-full max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex flex-col md:flex-row w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
                 {/* Left Panel: Branding - Visible uniquement sur desktop */}
                 <div className="hidden md:flex flex-col justify-center items-center w-full md:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-white text-center">
                     <h1 className="text-4xl font-bold mb-4">Bienvenue sur ProjA</h1>
@@ -45,16 +45,20 @@ export default function Register() {
 
                     <form onSubmit={submit} className="space-y-6 max-w-md mx-auto">
                         <div>
-                            <div className="relative">
+                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Nom complet
+                            </label>
+                            <div className="relative mt-1">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <FaUser className="h-5 w-5 text-gray-400" />
                                 </div>
                                 <TextInput
+                                    id="name"
                                     type="text"
                                     name="name"
                                     value={data.name}
                                     className="pl-10 w-full"
-                                    placeholder="Nom complet"
+                                    placeholder="Votre nom complet"
                                     onChange={(e) => setData('name', e.target.value)}
                                     required
                                     autoComplete="name"
@@ -65,16 +69,20 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <div className="relative">
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Adresse email
+                            </label>
+                            <div className="relative mt-1">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <FaEnvelope className="h-5 w-5 text-gray-400" />
                                 </div>
                                 <TextInput 
+                                    id="email"
                                     type="email" 
                                     name="email" 
                                     value={data.email} 
                                     className="pl-10 w-full"
-                                    placeholder="Adresse email" 
+                                    placeholder="votre@email.com" 
                                     onChange={(e) => setData('email', e.target.value)}
                                     required
                                     autoComplete="username"
@@ -84,16 +92,20 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <div className="relative">
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Mot de passe
+                            </label>
+                            <div className="relative mt-1">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <FaLock className="h-5 w-5 text-gray-400" />
                                 </div>
                                 <TextInput 
+                                    id="password"
                                     type="password" 
                                     name="password" 
                                     value={data.password} 
                                     className="pl-10 w-full"
-                                    placeholder="Mot de passe" 
+                                    placeholder="••••••••" 
                                     onChange={(e) => setData('password', e.target.value)}
                                     required
                                     autoComplete="new-password"
@@ -103,16 +115,20 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <div className="relative">
+                            <label htmlFor="password_confirmation" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Confirmer le mot de passe
+                            </label>
+                            <div className="relative mt-1">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <FaLock className="h-5 w-5 text-gray-400" />
                                 </div>
                                 <TextInput 
+                                    id="password_confirmation"
                                     type="password" 
                                     name="password_confirmation" 
                                     value={data.password_confirmation} 
                                     className="pl-10 w-full"
-                                    placeholder="Confirmer le mot de passe" 
+                                    placeholder="••••••••" 
                                     onChange={(e) => setData('password_confirmation', e.target.value)}
                                     required
                                     autoComplete="new-password"
@@ -123,13 +139,15 @@ export default function Register() {
 
 
                         <div>
-                            <PrimaryButton 
-                                type="submit" 
-                                className="w-full justify-center py-3 px-4 text-base sm:text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                                disabled={processing}
-                            >
-                                {processing ? 'Inscription en cours...' : "S'inscrire"}
-                            </PrimaryButton>
+                            <div className="flex justify-center">
+                                <PrimaryButton 
+                                    type="submit" 
+                                    className="w-auto justify-center py-2 px-8 text-base sm:text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                                    disabled={processing}
+                                >
+                                    {processing ? 'Inscription en cours...' : "S'inscrire"}
+                                </PrimaryButton>
+                            </div>
                             
                         </div>
                     </form>
