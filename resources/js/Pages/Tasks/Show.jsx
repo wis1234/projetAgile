@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaReply } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 
 // Composant de compte à rebours réutilisable
@@ -376,6 +376,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [commentContent, setCommentContent] = useState('');
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
+  const [replyingTo, setReplyingTo] = useState(null);
 
   const handleCommentKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -398,11 +399,16 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     
     try {
       const formData = new FormData();
-      // Always ensure content has a value, even if it's just a space
+      // Toujours s'assurer que le contenu a une valeur, même si c'est juste un espace
       formData.append('content', commentContent.trim() || 'Message vocal');
       if (audioBlob) {
-        // Use the correct MIME type and extension
+        // Utiliser le bon type MIME et extension
         formData.append('audio', audioBlob, 'voice_message.webm');
+      }
+
+      // Si on répond à un commentaire, ajouter le parent_id
+      if (replyingTo) {
+        formData.append('parent_id', replyingTo);
       }
 
       const res = await fetch(`/api/tasks/${task.id}/comments`, {
@@ -421,10 +427,43 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       }
       
       const newComment = await res.json();
-      setComments([...comments, newComment]);
+      
+      // Si c'est une réponse, on met à jour le commentaire parent
+      if (replyingTo) {
+        setComments(prevComments => {
+          const updateComments = (comments) => {
+            return comments.map(comment => {
+              // Si c'est le commentaire parent, on ajoute la réponse
+              if (comment.id === replyingTo) {
+                return {
+                  ...comment,
+                  replies: [...(comment.replies || []), newComment]
+                };
+              }
+              
+              // Sinon, on vérifie les réponses de ce commentaire
+              if (comment.replies && comment.replies.length > 0) {
+                return {
+                  ...comment,
+                  replies: updateComments(comment.replies)
+                };
+              }
+              
+              return comment;
+            });
+          };
+          
+          return updateComments(prevComments);
+        });
+      } else {
+        // Sinon, on ajoute un nouveau commentaire
+        setComments(prevComments => [newComment, ...prevComments]);
+      }
+      
       setCommentContent('');
       setAudioBlob(null);
       setAudioUrl(null);
+      setReplyingTo(null);
     } catch (e) {
       setError(e.message || 'Erreur lors de l\'ajout du commentaire');
     } finally {
@@ -511,7 +550,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   useEffect(() => {
     fetch(`/api/tasks/${task.id}/comments`)
       .then(res => res.json())
-      .then(setComments)
+      .then(comments => {
+        // S'assurer que chaque commentaire a un tableau de réponses
+        const processedComments = comments.map(comment => ({
+          ...comment,
+          replies: comment.replies || []
+        }));
+        setComments(processedComments);
+      })
       .catch(() => setComments([]))
       .finally(() => setLoadingComments(false));
   }, [task.id]);
@@ -523,17 +569,51 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
   const confirmDeleteComment = async () => {
     if (!commentToDeleteId) return;
-    const res = await fetch(`/api/tasks/${task.id}/comments/${commentToDeleteId}`, {
-      method: 'DELETE',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-      },
-    });
-    if (res.ok) {
-      setComments(comments.filter(c => c.id !== commentToDeleteId));
-      setShowConfirmDeleteCommentModal(false);
-      setCommentToDeleteId(null);
+    
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/comments/${commentToDeleteId}`, {
+        method: 'DELETE',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+        },
+      });
+      
+      if (res.ok) {
+        setComments(prevComments => {
+          const removeComment = (comments) => {
+            return comments.reduce((acc, comment) => {
+              // Si c'est le commentaire à supprimer, on le saute
+              if (comment.id === commentToDeleteId) {
+                return acc;
+              }
+              
+              // Si le commentaire a des réponses, on les filtre aussi
+              if (comment.replies && comment.replies.length > 0) {
+                return [
+                  ...acc,
+                  {
+                    ...comment,
+                    replies: removeComment(comment.replies)
+                  }
+                ];
+              }
+              
+              return [...acc, comment];
+            }, []);
+          };
+          
+          return removeComment(prevComments);
+        });
+        
+        setShowConfirmDeleteCommentModal(false);
+        setCommentToDeleteId(null);
+      } else {
+        const errorData = await res.json();
+        setError(errorData.message || 'Erreur lors de la suppression du commentaire');
+      }
+    } catch (e) {
+      setError('Erreur lors de la suppression du commentaire');
     }
   };
 
@@ -543,6 +623,18 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const handleEditComment = (comment) => {
     setEditingId(comment.id);
     setEditContent(comment.content);
+  };
+
+  const handleReplyComment = (commentId) => {
+    setReplyingTo(prevId => prevId === commentId ? null : commentId);
+    // Faire défiler jusqu'au formulaire de réponse
+    setTimeout(() => {
+      document.querySelector('#comment-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
+  const cancelReply = () => {
+    setReplyingTo(null);
   };
   
   const handleUpdateComment = async (e) => {
@@ -1494,8 +1586,8 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                               <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap ml-2">
                                 {new Date(comment.created_at).toLocaleString('fr-FR', {
                                   day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
+                                  month: '2-digit',
+                                  year: '2-digit',
                                   hour: '2-digit',
                                   minute: '2-digit'
                                 })}
@@ -1563,30 +1655,130 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                               </div>
                             )}
                           </div>
-                          {comment.user?.id === auth.user.id && editingId !== comment.id && (
-                            <div className="flex flex-col gap-2 ml-2">
-                              <button 
-                                onClick={() => handleEditComment(comment)} 
-                                className="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 rounded-full hover:bg-blue-50 dark:hover:bg-gray-600"
-                                title="Modifier le commentaire"
-                              >
-                                <FaEdit className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteComment(comment.id)} 
-                                className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200 rounded-full hover:bg-red-50 dark:hover:bg-gray-600"
-                                title="Supprimer le commentaire"
-                              >
-                                <FaTrash className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+                          <div className="flex flex-col gap-2 ml-2">
+                            {/* Bouton de réponse - visible pour tous les utilisateurs */}
+                            <button 
+                              type="button"
+                              onClick={() => handleReplyComment(comment.id)} 
+                              className={`p-2 ${replyingTo === comment.id ? 'text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300' : 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300'} transition-colors duration-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600`}
+                              title="Répondre au commentaire"
+                            >
+                              <FaReply className="w-4 h-4" />
+                            </button>
+                            
+                            {/* Boutons d'édition et de suppression - uniquement pour l'auteur du commentaire */}
+                            {comment.user?.id === auth.user.id && (
+                              <>
+                                <button 
+                                  type="button"
+                                  onClick={() => handleEditComment(comment)} 
+                                  className="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 rounded-full hover:bg-blue-50 dark:hover:bg-gray-600"
+                                  title="Modifier le commentaire"
+                                >
+                                  <FaEdit className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  type="button"
+                                  onClick={() => handleDeleteComment(comment.id)} 
+                                  className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200 rounded-full hover:bg-red-50 dark:hover:bg-gray-600"
+                                  title="Supprimer le commentaire"
+                                >
+                                  <FaTrash className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        
+                        
+                        {/* Afficher les réponses si elles existent */}
+                        {comment.replies && comment.replies.length > 0 && (
+                          <div className="ml-8 mt-4 pl-4 border-l-2 border-gray-200 dark:border-gray-600">
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center">
+                              <FaReply className="mr-2" /> Réponses
+                            </h4>
+                            <ul className="space-y-4">
+                              {comment.replies.map(reply => (
+                                <li key={reply.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                                  <div className="flex gap-3">
+                                    <div className="flex-shrink-0">
+                                      <img 
+                                        src={reply.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user?.name || '')}&background=0D8ABC&color=fff`} 
+                                        alt={reply.user?.name} 
+                                        className="w-8 h-8 rounded-full border-2 border-blue-300 dark:border-blue-600"
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="font-medium text-blue-700 dark:text-blue-300">
+                                          {reply.user?.name || 'Utilisateur inconnu'}
+                                        </span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {new Date(reply.created_at).toLocaleString('fr-FR', {
+                                            day: 'numeric',
+                                            month: '2-digit',
+                                            year: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                        </span>
+                                      </div>
+                                      <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                                        {reply.content}
+                                      </p>
+                                      {reply.audio_path && (
+                                        <div className="mt-2">
+                                          <audio 
+                                            controls 
+                                            src={`/storage/${reply.audio_path}`}
+                                            className="w-full max-w-xs"
+                                          >
+                                            Votre navigateur ne supporte pas l'élément audio.
+                                          </audio>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {reply.user?.id === auth.user.id && (
+                                      <div className="flex flex-col gap-1">
+                                        <button 
+                                          type="button"
+                                          onClick={() => handleDeleteComment(reply.id)}
+                                          className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1"
+                                          title="Supprimer la réponse"
+                                        >
+                                          <FaTrash className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                   )}
-                  <form onSubmit={handleCommentSubmit} className="flex flex-col gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Ajouter une nouvelle discussion</h3>
+                  
+                  <form
+                    id="comment-form"
+                    onSubmit={handleCommentSubmit} 
+                    className={`flex flex-col gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 ${replyingTo ? 'bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg' : ''}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        {replyingTo ? 'Répondre au commentaire' : 'Ajouter une nouvelle discussion'}
+                      </h3>
+                      {replyingTo && (
+                        <button
+                          type="button"
+                          onClick={cancelReply}
+                          className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        >
+                          Annuler la réponse
+                        </button>
+                      )}
+                    </div>
                     <div className="relative">
                       <textarea
                         value={commentContent}
@@ -1629,6 +1821,11 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                             <FaMicrophone /> Enregistrer un message
                           </button>
                         )}
+                        {replyingTo && (
+                          <span className="text-sm text-blue-600 dark:text-blue-400 ml-2 flex items-center">
+                            <FaReply className="mr-1" /> En réponse à un commentaire
+                          </span>
+                        )}
                       </div>
                       {audioUrl && (
                         <div className="flex items-center gap-2">
@@ -1664,7 +1861,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                       </div>
                       <button
                         type="submit"
-                        className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-md flex items-center gap-2 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`${replyingTo ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-700 hover:bg-blue-800'} text-white px-6 py-3 rounded-lg font-semibold hover:shadow-md flex items-center gap-2 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed`}
                         disabled={posting || (!commentContent.trim() && !audioBlob)}
                       >
                         {posting ? (
@@ -1678,7 +1875,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                         ) : (
                           <>
                             <FaCommentDots />
-                            Envoyer le message
+                            {replyingTo ? 'Publier la réponse' : 'Publier le commentaire'}
                           </>
                         )}
                       </button>
