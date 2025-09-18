@@ -431,21 +431,26 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       
       const newComment = await res.json();
       
-      // Si c'est une réponse, on met à jour le commentaire parent
       if (replyingTo) {
+        // Si c'est une réponse, on met à jour le commentaire parent
         setComments(prevComments => {
           const updateComments = (comments) => {
             return comments.map(comment => {
-              // Si c'est le commentaire parent, on ajoute la réponse
+              // Si c'est le commentaire parent, on ajoute la réponse et on trie
               if (comment.id === replyingTo) {
+                const updatedReplies = [
+                  ...(comment.replies || []), 
+                  { ...newComment, formatted_date: formatDate(newComment.created_at) }
+                ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                
                 return {
                   ...comment,
-                  replies: [...(comment.replies || []), newComment]
+                  replies: updatedReplies
                 };
               }
               
               // Sinon, on vérifie les réponses de ce commentaire
-              if (comment.replies && comment.replies.length > 0) {
+              if (comment.replies?.length > 0) {
                 return {
                   ...comment,
                   replies: updateComments(comment.replies)
@@ -459,8 +464,11 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
           return updateComments(prevComments);
         });
       } else {
-        // Sinon, on ajoute un nouveau commentaire
-        setComments(prevComments => [newComment, ...prevComments]);
+        // Sinon, on ajoute un nouveau commentaire en haut de la liste
+        setComments(prevComments => [
+          { ...newComment, formatted_date: formatDate(newComment.created_at) },
+          ...prevComments
+        ]);
       }
       
       setCommentContent('');
@@ -550,15 +558,36 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     });
   };
 
+  // Fonction utilitaire pour formater les dates
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
   useEffect(() => {
     fetch(`/api/tasks/${task.id}/comments`)
       .then(res => res.json())
       .then(comments => {
-        // S'assurer que chaque commentaire a un tableau de réponses
-        const processedComments = comments.map(comment => ({
+        // Trier les commentaires par date de création (du plus récent au plus ancien)
+        const sortedComments = [...comments].sort((a, b) => 
+          new Date(b.created_at) - new Date(a.created_at)
+        );
+        
+        // S'assurer que chaque commentaire a un tableau de réponses trié
+        const processedComments = sortedComments.map(comment => ({
           ...comment,
-          replies: comment.replies || []
+          replies: (comment.replies || []).sort((a, b) => 
+            new Date(b.created_at) - new Date(a.created_at)
+          ),
+          formatted_date: formatDate(comment.created_at)
         }));
+        
         setComments(processedComments);
       })
       .catch(() => setComments([]))
@@ -653,7 +682,12 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     });
     if (res.ok) {
       const updated = await res.json();
-      setComments(comments.map(c => c.id === updated.id ? updated : c));
+      setComments(prevComments => 
+        prevComments.map(c => c.id === updated.id 
+          ? { ...updated, formatted_date: formatDate(updated.updated_at || updated.created_at) } 
+          : c
+        )
+      );
       setEditingId(null);
       setEditContent('');
     }
@@ -1541,6 +1575,136 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       )}
     </h2>
     
+    {/* Formulaire de commentaire en haut */}
+    <div className={`mb-8 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 ${replyingTo ? 'ring-2 ring-blue-500/30' : ''}`}>
+      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+        {replyingTo ? (
+          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+            <FaReply className="w-4 h-4" />
+            <span>Répondre à un commentaire</span>
+            <button
+              type="button"
+              onClick={cancelReply}
+              className="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              title="Annuler la réponse"
+            >
+              <FaTimes className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : 'Écrire un commentaire'}
+      </h3>
+      
+      <form onSubmit={handleCommentSubmit} className="space-y-4">
+        <div className="relative">
+          <textarea
+            value={commentContent}
+            onChange={e => setCommentContent(e.target.value)}
+            onKeyDown={handleCommentKeyDown}
+            placeholder="Écrivez votre message ici..."
+            className="w-full min-h-[100px] p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700/50 dark:text-white transition-colors duration-200"
+            disabled={posting || isRecording}
+            required={!audioBlob}
+            maxLength={2000}
+          />
+          <div className="absolute bottom-3 right-3 text-xs text-gray-400">
+            {commentContent.length}/2000
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isRecording ? (
+              <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                  </span>
+                  <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                    Enregistrement en cours...
+                  </span>
+                </div>
+                <div className="text-sm font-mono bg-white dark:bg-gray-700 px-2 py-1 rounded">
+                  {formatTime(recordingTime)}
+                </div>
+                <button
+                  type="button"
+                  onClick={stopRecording}
+                  className="text-red-600 hover:text-white hover:bg-red-600 p-1.5 rounded-full transition-colors"
+                  title="Arrêter l'enregistrement"
+                >
+                  <FaStop className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                disabled={posting}
+                title="Enregistrer un message vocal"
+              >
+                <FaMicrophone className="text-red-500" />
+                <span>Message vocal</span>
+              </button>
+            )}
+
+            {audioUrl && (
+              <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                <audio controls src={audioUrl} className="h-8"></audio>
+                <button
+                  type="button"
+                  onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
+                  className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  title="Supprimer l'enregistrement"
+                >
+                  <FaTimes className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={posting || (!commentContent.trim() && !audioBlob)}
+            className={`px-5 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              posting 
+                ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed' 
+                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
+            }`}
+          >
+            {posting ? (
+              <>
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Publication...
+              </>
+            ) : (
+              <>
+                <FaPaperPlane className="w-3.5 h-3.5" />
+                {replyingTo ? 'Publier la réponse' : 'Publier le commentaire'}
+              </>
+            )}
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-200 text-sm rounded-r">
+            <div className="flex items-center gap-2">
+              <FaInfoCircle className="flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="text-xs text-gray-500 dark:text-gray-400 text-center sm:text-right mt-2">
+          Appuyez sur <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">Entrée</kbd> pour envoyer
+        </div>
+      </form>
+    </div>
+    
     {loadingComments ? (
       <div className="flex justify-center items-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -1763,147 +1927,174 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
           </div>
         )}
 
-        {/* Formulaire de commentaire */}
-        <div className={`mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 ${replyingTo ? 'bg-blue-50 dark:bg-blue-900/20 p-5 rounded-xl' : ''}`}>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
-            {replyingTo ? 'Répondre au commentaire' : 'Ajouter une discussion'}
-          </h3>
-          
-          <form onSubmit={handleCommentSubmit} className="space-y-4">
-            <div className="relative">
-              <textarea
-                value={commentContent}
-                onChange={e => setCommentContent(e.target.value)}
-                onKeyDown={handleCommentKeyDown}
-                placeholder="Écrivez votre message ici..."
-                className="w-full min-h-[120px] p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white transition-colors duration-200"
-                disabled={posting || isRecording}
-                required={!audioBlob}
-                maxLength={2000}
-              />
-              <div className="absolute bottom-3 right-3 text-xs text-gray-400">
-                {commentContent.length}/2000
-              </div>
-            </div>
+        {/* Modal de réponse aux commentaires */}
+        {replyingTo && (
+          <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              {/* Overlay */}
+              <div 
+                className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+                aria-hidden="true"
+                onClick={cancelReply}
+              ></div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                {isRecording ? (
-                  <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                      </span>
-                      <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                        Enregistrement en cours...
-                      </span>
+              {/* Centrer le contenu de la modale */}
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              
+              {/* Contenu de la modale */}
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                        <FaReply className="mr-2 text-blue-500" />
+                        Répondre à {replyingTo.user?.name || 'ce commentaire'}
+                      </h3>
+                      
+                      <div className="mt-2 w-full">
+                        <div className="relative">
+                          <textarea
+                            value={commentContent}
+                            onChange={e => setCommentContent(e.target.value)}
+                            onKeyDown={handleCommentKeyDown}
+                            placeholder={`Écrire votre réponse à ${replyingTo.user?.name || 'ce commentaire'}...`}
+                            className="w-full min-h-[120px] p-4 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700/50 dark:text-white transition-colors duration-200 resize-none"
+                            disabled={posting || isRecording}
+                            required={!audioBlob}
+                            maxLength={2000}
+                            autoFocus
+                          />
+                          <div className="absolute bottom-3 right-3 text-xs text-gray-400 bg-white/80 dark:bg-gray-700/80 px-2 py-0.5 rounded-full backdrop-blur-sm shadow-sm">
+                            {commentContent.length}/2000
+                          </div>
+                        </div>
+
+                        {/* Barre d'outils */}
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            {/* Bouton d'enregistrement vocal */}
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={isRecording ? stopRecording : startRecording}
+                                disabled={posting}
+                                className={`p-2 rounded-full transition-colors ${
+                                  isRecording
+                                    ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                                    : 'text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                                }`}
+                                title={isRecording ? "Arrêter l'enregistrement" : "Message vocal"}
+                              >
+                                <FaMicrophone className={`w-5 h-5 ${isRecording ? 'animate-pulse' : ''}`} />
+                              </button>
+                              {isRecording && (
+                                <button
+                                  type="button"
+                                  onClick={stopRecording}
+                                  className="p-2 text-white bg-red-500 rounded-full hover:bg-red-600 transition-colors"
+                                  title="Arrêter l'enregistrement"
+                                >
+                                  <FaStop className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Aperçu audio */}
+                            {audioUrl && (
+                              <div className="flex items-center gap-2 bg-white dark:bg-gray-700 p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
+                                <audio controls src={audioUrl} className="h-8 w-32 sm:w-40" />
+                                <button
+                                  type="button"
+                                  onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
+                                  className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                  title="Supprimer l'enregistrement"
+                                >
+                                  <FaTimes className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={cancelReply}
+                              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 transition-colors"
+                            >
+                              Annuler
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleCommentSubmit}
+                              disabled={posting || (!commentContent.trim() && !audioBlob)}
+                              className={`px-5 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
+                                posting || (!commentContent.trim() && !audioBlob)
+                                  ? 'bg-gray-200 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
+                                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
+                              }`}
+                            >
+                              {posting ? (
+                                <>
+                                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  <span>Publication...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <FaPaperPlane className="w-3.5 h-3.5" />
+                                  <span>Publier</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Indicateur d'enregistrement */}
+                        {isRecording && (
+                          <div className="mt-3 flex items-center gap-3 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg animate-pulse">
+                            <div className="flex items-center gap-2">
+                              <span className="relative flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                              </span>
+                              <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                                Enregistrement en cours...
+                              </span>
+                            </div>
+                            <div className="text-sm font-mono bg-white dark:bg-gray-700 px-2 py-0.5 rounded">
+                              {formatTime(recordingTime)}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Message d'erreur */}
+                        {error && (
+                          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-200 text-sm rounded-r-lg">
+                            <div className="flex items-center gap-2">
+                              <FaInfoCircle className="flex-shrink-0" />
+                              <span>{error}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-sm font-mono bg-white dark:bg-gray-800 px-2 py-1 rounded">
-                      {formatTime(recordingTime)}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={stopRecording}
-                      className="text-red-600 hover:text-white hover:bg-red-600 p-1.5 rounded-full transition-colors"
-                      title="Arrêter l'enregistrement"
-                    >
-                      <FaStop className="w-4 h-4" />
-                    </button>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={startRecording}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 dark:border-gray-600 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    disabled={posting}
-                    title="Enregistrer un message vocal"
-                  >
-                    <FaMicrophone className="text-red-500" />
-                    <span>Message vocal</span>
-                  </button>
-                )}
-
-                {audioUrl && (
-                  <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg">
-                    <audio controls src={audioUrl} className="h-8"></audio>
-                    <button
-                      type="button"
-                      onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
-                      className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                      title="Supprimer l'enregistrement"
-                    >
-                      <FaTimes className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                {replyingTo && (
-                  <div className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full flex items-center gap-1">
-                    <FaReply className="w-3.5 h-3.5" />
-                    <span>Réponse à un commentaire</span>
-                    <button
-                      type="button"
-                      onClick={cancelReply}
-                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 ml-1"
-                      title="Annuler la réponse"
-                    >
-                      <FaTimes className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-                
-                <button
-                  type="submit"
-                  disabled={posting || (!commentContent.trim() && !audioBlob)}
-                  className={`px-5 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                    posting 
-                      ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed' 
-                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
-                  }`}
-                >
-                  {posting ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Publication...
-                    </>
-                  ) : (
-                    <>
-                      <FaPaperPlane className="w-3.5 h-3.5" />
-                      {replyingTo ? 'Publier la réponse' : 'Publier'}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-200 text-sm rounded-r">
-                <div className="flex items-center gap-2">
-                  <FaExclamationCircle className="flex-shrink-0" />
-                  <span>{error}</span>
                 </div>
               </div>
-            )}
-
-            <div className="text-xs text-gray-500 dark:text-gray-400 text-center sm:text-right mt-2">
-              Appuyez sur <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">Entrée</kbd> pour envoyer
             </div>
-          </form>
-        </div>
+          </div>
+        )}
       </div>
     )}
-  </div>
-)}
-        </div>
+          </div>
+        )}
+      </div>
 
-        {/* Confirmation Modal */}
-        <Modal show={showConfirmValidationModal} onClose={() => setShowConfirmValidationModal(false)} maxWidth="md">
+      {/* Confirmation Modal */}
+      <Modal show={showConfirmValidationModal} onClose={() => setShowConfirmValidationModal(false)} maxWidth="md">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
               Confirmer la validation du paiement
