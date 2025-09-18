@@ -33,7 +33,12 @@ const navLinks = [
   ) },
   { href: '/recruitment', label: 'Recrutement', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V9m18 0V9a2.25 2.25 0 0 0-2.25-2.25H15M3 9l9-6 9 6m-18 0a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 9m-18 0V9a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 9v1.5m-18 0V9a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 9v1.5m-9-3h.008v.008H12V7.5zm0 3h.008v.008H12v-.008zm0 3h.008v.008H12v-.008z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V9m18 0V9a2.25 2.25 0 0 0-2.25-2.25H15M3 9l9-6 9 6m-18 0a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 9m-18 0V9a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 9v1.5m-9-3h.008v.008H12V7.5zm0 3h.008v.008H12v-.008zm0 3h.008v.008H12v-.008z" />
+    </svg>
+  ) },
+  { href: '/subscription/plans', label: 'Mon abonnement', icon: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
     </svg>
   ) },
 ];
@@ -91,6 +96,18 @@ export default function AdminLayout({ children }) {
   const [selectedNotif, setSelectedNotif] = useState(null);
   const profileRef = useRef();
   const [globalLoading, setGlobalLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    // Vérifier si l'utilisateur est admin via différentes méthodes
+    const userIsAdmin = 
+      auth.user?.email === 'ronaldoagbohou@gmail.com' || // Email spécifique
+      auth.user?.role === 'admin' ||                    // Colonne 'role' de la table users
+      (Array.isArray(auth.user?.roles) && auth.user.roles.includes('admin')) || // Tableau de rôles
+      auth.user?.is_admin === true;                     // Colonne 'is_admin' si elle existe
+      
+    setIsAdmin(userIsAdmin);
+  }, [auth.user]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -155,6 +172,13 @@ export default function AdminLayout({ children }) {
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
 
+  useEffect(() => {
+    document.body.classList.add('bg-white');
+    return () => {
+      document.body.classList.remove('bg-white');
+    };
+  }, []);
+
   // Get user data from auth object (handles both auth.user and direct auth properties)
   const user = auth?.user || auth;
   const userName = user?.name || 'Utilisateur';
@@ -165,7 +189,7 @@ export default function AdminLayout({ children }) {
   console.log('User data:', user);
 
   return (
-    <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-colors">
+    <div className="flex min-h-screen bg-white">
       {globalLoading && <Loader />}
       {/* Sidebar */}
       <aside className={`fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}>
@@ -266,7 +290,7 @@ export default function AdminLayout({ children }) {
                         }}
                       >
                         <div className={`font-semibold text-gray-700 dark:text-gray-200`}>{n.message}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(n.created_at).toLocaleString()}</div>
+                        <div className="px-4 py-6 mx-auto bg-white max-w-7xl sm:px-6 md:px-8">{new Date(n.created_at).toLocaleString()}</div>
                       </li>
                     ))}
                   </ul>
@@ -305,9 +329,58 @@ export default function AdminLayout({ children }) {
               </button>
               {profileDropdown && (
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded shadow-lg z-50">
-                  <Link href="/profile" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">Mon profil</Link>
-                  <Link href="/profile" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">Paramètres</Link>
-                  <Link href="/logout" method="post" as="button" className="block w-full text-left px-4 py-3 text-red-700 dark:text-red-200 hover:bg-red-50 dark:hover:bg-red-900">Déconnexion</Link>
+                  <Link href="/profile" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Mon profil
+                    </div>
+                  </Link>
+                  <Link href="/profile" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Paramètres
+                    </div>
+                  </Link>
+                  {isAdmin && (
+                    <Link 
+                      href="/subscription/manage" 
+                      className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200"
+                    >
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Gestion des abonnements
+                      </div>
+                    </Link>
+                  )}
+                  <Link href="/subscription/plans" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 3v2m3-2v2m3-2v2m3-2v2m3-2v2m-18 8h18M7 17v-2m3 2v-2m3 2v-2m3 2v-2m3 2v-2" />
+                      </svg>
+                      Mon abonnement
+                    </div>
+                  </Link>
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                  <Link 
+                    href="/logout" 
+                    method="post" 
+                    as="button" 
+                    className="block w-full text-left px-4 py-3 text-red-700 dark:text-red-200 hover:bg-red-50 dark:hover:bg-red-900"
+                  >
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Déconnexion
+                    </div>
+                  </Link>
                 </div>
               )}
             </div>

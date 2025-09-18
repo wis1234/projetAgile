@@ -576,12 +576,12 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           </div>
         </motion.div>
 
-        {/* Pied de page */}
+{/* Pied de page */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1 }}
-          className="text-center text-sm text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-200 dark:border-gray-700"
+          className="text-center text-sm text-gray-500 dark:text-gray-400 pt-8 border-t border-gray-200 dark:border-gray-700 mt-8"
         >
           <p> {new Date().getFullYear()} ProjA - Tous droits réservés</p>
         </motion.div>

@@ -41,4 +41,10 @@ return [
         'score_threshold' => 0.5,
     ],
 
+    'fedapay' => [
+        'public_key' => env('FEDAPAY_PUBLIC_KEY', 'pk_live_NVw62EiQ_Yu6mvPq13vuUapq'),
+        'secret_key' => env('FEDAPAY_SECRET_KEY'),
+        'environment' => env('FEDAPAY_ENV', 'live'), // 'live' ou 'sandbox'
+    ],
+
 ];

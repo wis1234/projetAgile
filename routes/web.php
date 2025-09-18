@@ -197,6 +197,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/roles/{role}', [\App\Http\Controllers\UserController::class, 'deleteRole'])->name('roles.destroy');
 });
 
+// Gestion des abonnements
+Route::middleware(['auth', 'verified'])->prefix('subscription')->name('subscription.')->group(function () {
+    Route::get('/manage', [\App\Http\Controllers\SubscriptionController::class, 'manage'])->name('manage');
+    Route::get('/plans', [\App\Http\Controllers\SubscriptionController::class, 'index'])->name('plans');
+    Route::get('/checkout/{id}', [\App\Http\Controllers\SubscriptionController::class, 'checkout'])->name('checkout');
+    Route::post('/subscribe/{id}', [\App\Http\Controllers\SubscriptionController::class, 'subscribe'])->name('subscribe');
+    Route::get('/success', [\App\Http\Controllers\SubscriptionController::class, 'success'])->name('success');
+});
+
 // Fichiers : accès direct à la vue
 Route::get('/fichiers', function () {
     return Inertia::render('Files/Index');

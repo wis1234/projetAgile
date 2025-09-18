@@ -49,9 +49,26 @@
             background-color: #4F46E5;
             color: white !important;
             text-decoration: none;
-            border-radius: 6px;
+            border-radius: 4px;
             font-weight: 500;
             margin: 15px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn:hover {
+            background-color: #4338CA;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         
         /* Pied de page */
@@ -79,7 +96,7 @@
         <div class="card">
             <!-- Salutation -->
             @if(isset($greeting) && $greeting)
-                <h1 style="margin-top: 0; color: #1f2937;">{{ $greeting }}</h1>
+                <h4 style="margin-top: 0; color: #1f2937;">{{ $greeting }}</h4>
             @endif
             
             <!-- Contenu du message -->

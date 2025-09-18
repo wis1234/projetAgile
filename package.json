@@ -69,6 +69,7 @@
         "chart.js": "^4.5.0",
         "date-fns": "^4.1.0",
         "dropbox": "^10.34.0",
+        "fedapay-reactjs": "^1.1.2",
         "framer-motion": "^12.23.12",
         "highlight.js": "^11.11.1",
         "laravel-echo": "^2.1.6",

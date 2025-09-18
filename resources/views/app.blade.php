@@ -16,6 +16,16 @@
         @viteReactRefresh
         @vite(['resources/js/app.jsx', "resources/js/Pages/{$page['component']}.jsx"])
         @inertiaHead
+        
+        <!-- FedaPay Checkout Script -->
+        @if(env('MIX_FEDAPAY_ENV') === 'sandbox')
+            <script src="https://s3-us-west-2.amazonaws.com/cdn.fedapay.com/checkout.js?v=1.1.7"></script>
+        @else
+            <script src="https://cdn.fedapay.com/checkout.js?v=1.1.7"></script>
+        @endif
+        <script>
+            window.FedaPayEnvironment = '{{ env('MIX_FEDAPAY_ENV', 'sandbox') }}';
+        </script>
     </head>
     <body class="font-sans antialiased">
         @inertia

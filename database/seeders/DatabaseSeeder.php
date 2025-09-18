@@ -3,8 +3,12 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\Project;
+use App\Models\Sprint;
+use App\Models\Task;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,38 +17,58 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(RoleSeeder::class);
-
-        \App\Models\User::factory()->create([
-            'name' => 'Admin',
-            'email' => 'admin@example.com',
-            'password' => bcrypt('password'),
-            'role' => 'admin',
+        // Appel des seeders nécessaires
+        $this->call([
+            RoleSeeder::class,
+            SchoolSeeder::class,
+            SubscriptionPlansTableSeeder::class,
         ]);
-        // Utilisateurs
-        \App\Models\User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'role' => 'user',
-        ]);
-        $users = \App\Models\User::factory(10)->create();
-
-        // Projets
-        $projects = \App\Models\Project::factory(5)->create();
-
-        // Sprints (kanbans)
-        $projects->each(function ($project) {
-            $sprints = \App\Models\Sprint::factory(2)->create([
-                'project_id' => $project->id,
+        
+        // Création d'un admin par défaut si nécessaire
+        if (!User::where('email', 'admin@proja.com')->exists()) {
+            $admin = User::create([
+                'name' => 'Administrateur',
+                'email' => 'admin@proja.com',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+                'role' => 'admin',
             ]);
-            // Tâches pour chaque sprint
-            $sprints->each(function ($sprint) use ($project) {
-                $tasks = \App\Models\Task::factory(5)->create([
+            
+            $admin->assignRole('admin');
+        }
+        
+        // Création d'utilisateurs de test si en environnement local
+        if (app()->environment('local')) {
+            // Création d'un utilisateur test
+            User::create([
+                'name' => 'Utilisateur Test',
+                'email' => 'test@proja.com',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+                'role' => 'user',
+            ]);
+            
+            // Création d'utilisateurs aléatoires
+            $users = User::factory(10)->create();
+            
+            // Création de projets
+            $projects = Project::factory(5)->create();
+            
+            // Création de sprints et tâches pour chaque projet
+            $projects->each(function ($project) use ($users) {
+                $sprints = Sprint::factory(2)->create([
                     'project_id' => $project->id,
-                    'sprint_id' => $sprint->id,
-                    'assigned_to' => \App\Models\User::inRandomOrder()->first()->id,
                 ]);
+                
+                // Tâches pour chaque sprint
+                $sprints->each(function ($sprint) use ($project, $users) {
+                    Task::factory(5)->create([
+                        'project_id' => $project->id,
+                        'sprint_id' => $sprint->id,
+                        'assigned_to' => $users->random()->id,
+                    ]);
+                });
             });
-        });
+        }
     }
 }

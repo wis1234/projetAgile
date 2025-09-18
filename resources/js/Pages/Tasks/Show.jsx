@@ -2,8 +2,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaReply } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaReply, FaStar, FaPaperPlane } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
+// Ajout de FaSave à la liste des icônes importées
+import {FaSave, FaTimes } from 'react-icons/fa';
 
 // Composant de compte à rebours réutilisable
 const formatTimeUnit = (value, label) => (
@@ -14,6 +16,7 @@ const formatTimeUnit = (value, label) => (
     <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{label}</span>
   </div>
 );
+
 
 const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt }) => {
   const calculateTimeLeft = useCallback(() => {
@@ -1527,364 +1530,376 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
             </div>
           )}
 
-          {activeTab === 'comments' && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-              <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">
-                <FaCommentDots /> Discussions
-                {loadingComments && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
-                    Chargement...
-                  </span>
-                )}
-              </h2>
-              {loadingComments ? (
-                <div className="flex justify-center items-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                </div>
-              ) : (
-                <div>
-                  {comments.length === 0 ? (
-                    <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3 mb-6">
-                      <FaInfoCircle className="text-blue-600 dark:text-blue-300 text-xl flex-shrink-0" />
-                      <p className="text-blue-800 dark:text-blue-200 italic">Aucune discussion pour l'instant. Soyez le premier à commenter !</p>
-                    </div>
-                  ) : (
-                    <ul className="space-y-6 mb-6">
-                      {comments.map(comment => (
-                        <li key={comment.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 flex gap-4 transition duration-200 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500">
-                          <div className="relative group">
-                            <img 
-                              src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}&background=0D8ABC&color=fff`} 
-                              alt={comment.user?.name} 
-                              className="w-12 h-12 rounded-full border-2 border-blue-300 dark:border-blue-600 object-cover transition-transform duration-200 group-hover:scale-110"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || 'U')}&background=0D8ABC&color=fff`;
-                              }}
-                            />
-                            <span className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white dark:border-gray-700">
-                              {comment.user?.name?.charAt(0).toUpperCase() || '?'}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-blue-800 dark:text-blue-200 text-lg truncate">
-                                  {comment.user?.name || 'Utilisateur inconnu'}
-                                </span>
-                                {comment.user?.role === 'admin' && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                    Admin
-                                  </span>
-                                )}
-                                {comment.user?.role === 'manager' && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                    Manager
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap ml-2">
-                                {new Date(comment.created_at).toLocaleString('fr-FR', {
-                                  day: 'numeric',
-                                  month: '2-digit',
-                                  year: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </span>
-                            </div>
-                            {editingId === comment.id ? (
-                              <form onSubmit={handleUpdateComment} className="flex flex-col gap-3 mt-2">
-                                <textarea 
-                                  value={editContent} 
-                                  onChange={e => setEditContent(e.target.value)} 
-                                  className="border border-gray-300 rounded-lg p-3 w-full min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200" 
-                                  required 
-                                  maxLength={2000}
-                                  autoFocus
-                                />
-                                <div className="flex gap-3 justify-end">
-                                  <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 hover:shadow-md flex items-center gap-2">
-                                    <FaEdit /> Enregistrer
-                                  </button>
-                                  <button 
-                                    type="button" 
-                                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium transition-colors duration-200 hover:shadow-md flex items-center gap-2" 
-                                    onClick={() => setEditingId(null)}
-                                  >
-                                    Annuler
-                                  </button>
-                                </div>
-                              </form>
-                            ) : (
-                              <div className="prose max-w-none dark:prose-invert">
-                                {comment.content && (
-                                  <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words mb-2">
-                                    {comment.content}
-                                  </p>
-                                )}
-                                {comment.audio_path && (
-                                  <div className="mt-3">
-                                    <div className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                                      <div className="flex-shrink-0 text-blue-600 dark:text-blue-400">
-                                        <FaMicrophone size={24} />
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <audio 
-                                          controls 
-                                          src={`/storage/${comment.audio_path}`} 
-                                          className="w-full"
-                                          onError={(e) => {
-                                            console.error('Erreur de lecture audio:', e);
-                                            const errorMsg = document.createElement('div');
-                                            errorMsg.className = 'text-red-500 text-sm mt-1';
-                                            errorMsg.textContent = 'Impossible de lire le message audio. Votre appareil ou navigateur ne prend peut-être pas en charge ce format.';
-                                            e.target.parentNode.appendChild(errorMsg);
-                                            e.target.remove();
-                                          }}
-                                        >
-                                          Votre navigateur ne supporte pas la lecture audio.
-                                          <a href={`/storage/${comment.audio_path}`} className="text-blue-600 dark:text-blue-400 hover:underline ml-2" download>
-                                            Télécharger
-                                          </a>
-                                        </audio>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-2 ml-2">
-                            {/* Bouton de réponse - visible pour tous les utilisateurs */}
-                            <button 
-                              type="button"
-                              onClick={() => handleReplyComment(comment.id)} 
-                              className={`p-2 ${replyingTo === comment.id ? 'text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300' : 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300'} transition-colors duration-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600`}
-                              title="Répondre au commentaire"
-                            >
-                              <FaReply className="w-4 h-4" />
-                            </button>
-                            
-                            {/* Boutons d'édition et de suppression - uniquement pour l'auteur du commentaire */}
-                            {comment.user?.id === auth.user.id && (
-                              <>
-                                <button 
-                                  type="button"
-                                  onClick={() => handleEditComment(comment)} 
-                                  className="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 rounded-full hover:bg-blue-50 dark:hover:bg-gray-600"
-                                  title="Modifier le commentaire"
-                                >
-                                  <FaEdit className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  type="button"
-                                  onClick={() => handleDeleteComment(comment.id)} 
-                                  className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200 rounded-full hover:bg-red-50 dark:hover:bg-gray-600"
-                                  title="Supprimer le commentaire"
-                                >
-                                  <FaTrash className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        
-                        
-                        {/* Afficher les réponses si elles existent */}
-                        {comment.replies && comment.replies.length > 0 && (
-                          <div className="ml-8 mt-4 pl-4 border-l-2 border-gray-200 dark:border-gray-600">
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center">
-                              <FaReply className="mr-2" /> Réponses
-                            </h4>
-                            <ul className="space-y-4">
-                              {comment.replies.map(reply => (
-                                <li key={reply.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                                  <div className="flex gap-3">
-                                    <div className="flex-shrink-0">
-                                      <img 
-                                        src={reply.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user?.name || '')}&background=0D8ABC&color=fff`} 
-                                        alt={reply.user?.name} 
-                                        className="w-8 h-8 rounded-full border-2 border-blue-300 dark:border-blue-600"
-                                      />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center justify-between mb-1">
-                                        <span className="font-medium text-blue-700 dark:text-blue-300">
-                                          {reply.user?.name || 'Utilisateur inconnu'}
-                                        </span>
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                          {new Date(reply.created_at).toLocaleString('fr-FR', {
-                                            day: 'numeric',
-                                            month: '2-digit',
-                                            year: '2-digit',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          })}
-                                        </span>
-                                      </div>
-                                      <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
-                                        {reply.content}
-                                      </p>
-                                      {reply.audio_path && (
-                                        <div className="mt-2">
-                                          <audio 
-                                            controls 
-                                            src={`/storage/${reply.audio_path}`}
-                                            className="w-full max-w-xs"
-                                          >
-                                            Votre navigateur ne supporte pas l'élément audio.
-                                          </audio>
-                                        </div>
-                                      )}
-                                    </div>
-                                    {reply.user?.id === auth.user.id && (
-                                      <div className="flex flex-col gap-1">
-                                        <button 
-                                          type="button"
-                                          onClick={() => handleDeleteComment(reply.id)}
-                                          className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1"
-                                          title="Supprimer la réponse"
-                                        >
-                                          <FaTrash className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                  )}
-                  
-                  <form
-                    id="comment-form"
-                    onSubmit={handleCommentSubmit} 
-                    className={`flex flex-col gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 ${replyingTo ? 'bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg' : ''}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                        {replyingTo ? 'Répondre au commentaire' : 'Ajouter une nouvelle discussion'}
-                      </h3>
-                      {replyingTo && (
-                        <button
-                          type="button"
-                          onClick={cancelReply}
-                          className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        >
-                          Annuler la réponse
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <textarea
-                        value={commentContent}
-                        onChange={e => setCommentContent(e.target.value)}
-                        onKeyDown={handleCommentKeyDown}
-                        placeholder="Écrire votre message ici..."
-                        className="border border-gray-300 rounded-lg p-4 w-full min-h-[120px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200 pr-12"
-                        disabled={posting || isRecording}
-                        required={!audioBlob} // Make required only if no audio is attached
-                        maxLength={2000}
-                      />
-                      <div className="absolute bottom-3 right-3 text-xs text-gray-500 dark:text-gray-400">
-                        {commentContent.length}/2000
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        {isRecording ? (
-                          <>
-                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-lg">
-                              {formatTime(recordingTime)}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={stopRecording}
-                              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md"
-                              title="Arrêter l'enregistrement"
-                            >
-                              <FaStop className="animate-pulse" /> Arrêter
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={startRecording}
-                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={posting}
-                            title="Démarrer l'enregistrement vocal"
-                          >
-                            <FaMicrophone /> Enregistrer un message
-                          </button>
-                        )}
-                        {replyingTo && (
-                          <span className="text-sm text-blue-600 dark:text-blue-400 ml-2 flex items-center">
-                            <FaReply className="mr-1" /> En réponse à un commentaire
+         {activeTab === 'comments' && (
+  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 md:p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+    <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">
+      <FaCommentDots /> Discussions
+      {loadingComments && (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
+          Chargement...
+        </span>
+      )}
+    </h2>
+    
+    {loadingComments ? (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    ) : (
+      <div className="space-y-6">
+        {comments.length === 0 ? (
+          <div className="bg-blue-50 dark:bg-blue-900/50 rounded-lg p-6 border border-blue-200 dark:border-blue-800 flex items-center gap-4">
+            <FaInfoCircle className="text-blue-500 dark:text-blue-300 text-2xl flex-shrink-0" />
+            <p className="text-blue-800 dark:text-blue-200">Aucune discussion pour l'instant. Soyez le premier à commenter !</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {comments.map(comment => (
+              <div key={comment.id} className="relative group">
+                {/* Commentaire principal */}
+                <div className="bg-gray-50 dark:bg-gray-700/70 rounded-xl p-5 border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 transition-all duration-200">
+                  <div className="flex gap-4">
+                    {/* Avatar utilisateur */}
+                    <div className="flex-shrink-0">
+                      <div className="relative group">
+                        <img 
+                          src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}&background=0D8ABC&color=fff`} 
+                          alt={comment.user?.name} 
+                          className="w-12 h-12 rounded-full border-2 border-blue-300 dark:border-blue-600 object-cover transition-transform duration-200 group-hover:scale-110"
+                        />
+                        {comment.user?.role === 'admin' && (
+                          <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white dark:border-gray-700">
+                            <FaStar className="w-3 h-3" />
                           </span>
                         )}
                       </div>
-                      {audioUrl && (
+                    </div>
+
+                    {/* Contenu du commentaire */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
-                          <audio controls src={audioUrl} className="w-64"></audio>
+                          <span className="font-medium text-blue-700 dark:text-blue-300">
+                            {comment.user?.name || 'Utilisateur inconnu'}
+                          </span>
+                          {comment.user?.role === 'manager' && (
+                            <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200 px-2 py-0.5 rounded-full">
+                              Manager
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(comment.created_at).toLocaleString('fr-FR', {
+                            day: 'numeric',
+                            month: '2-digit',
+                            year: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+
+                      {editingId === comment.id ? (
+                        <form onSubmit={handleUpdateComment} className="mt-2">
+                          <textarea 
+                            value={editContent} 
+                            onChange={e => setEditContent(e.target.value)} 
+                            className="w-full min-h-[100px] p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+                            required 
+                            maxLength={2000}
+                            autoFocus
+                          />
+                          <div className="flex justify-end gap-2 mt-2">
+                            <button 
+                              type="button" 
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 rounded-lg"
+                              onClick={() => setEditingId(null)}
+                            >
+                              Annuler
+                            </button>
+                            <button 
+                              type="submit" 
+                              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2"
+                            >
+                              <FaSave /> Enregistrer
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <div className="prose dark:prose-invert max-w-none">
+                            <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+                              {comment.content}
+                            </p>
+                          </div>
+
+                          {comment.audio_path && (
+                            <div className="mt-3">
+                              <div className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-800/50 rounded-lg">
+                                <FaMicrophone className="text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                                <audio 
+                                  controls 
+                                  src={`/storage/${comment.audio_path}`}
+                                  className="w-full max-w-md"
+                                >
+                                  Votre navigateur ne supporte pas la lecture audio.
+                                </audio>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
-                            className="text-red-500 hover:text-red-700"
-                            title="Supprimer l'enregistrement vocal"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReplyComment(comment.id);
+                            }}
+                            className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
                           >
-                            <FaTrash />
+                            <FaReply className="w-3.5 h-3.5" /> Répondre
                           </button>
                         </div>
-                      )}
-                    </div>
-                    {error && (
-                      <div className="bg-red-50 border-l-4 border-red-400 p-4">
-                        <div className="flex">
-                          <div className="flex-shrink-0">
-                            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                            </svg>
+                        
+                        {comment.user?.id === auth.user.id && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditComment(comment);
+                              }}
+                              className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                              title="Modifier"
+                            >
+                              <FaEdit className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteComment(comment.id);
+                              }}
+                              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                              title="Supprimer"
+                            >
+                              <FaTrash className="w-4 h-4" />
+                            </button>
                           </div>
-                          <div className="ml-3">
-                            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Réponses */}
+                  {comment.replies && comment.replies.length > 0 && (
+                    <div className="mt-4 pl-4 border-l-2 border-gray-200 dark:border-gray-600 space-y-4">
+                      {comment.replies.map(reply => (
+                        <div key={reply.id} className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                          <div className="flex gap-3">
+                            <div className="flex-shrink-0">
+                              <img 
+                                src={reply.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user?.name || '')}&background=0D8ABC&color=fff`} 
+                                alt={reply.user?.name} 
+                                className="w-10 h-10 rounded-full border-2 border-blue-200 dark:border-blue-700"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
+                                <span className="font-medium text-sm text-blue-600 dark:text-blue-400">
+                                  {reply.user?.name || 'Utilisateur inconnu'}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {new Date(reply.created_at).toLocaleString('fr-FR', {
+                                    day: 'numeric',
+                                    month: '2-digit',
+                                    year: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                              <p className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-wrap">
+                                {reply.content}
+                              </p>
+                              {reply.audio_path && (
+                                <div className="mt-2">
+                                  <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800/30 rounded">
+                                    <FaMicrophone className="text-blue-400 dark:text-blue-500 text-xs" />
+                                    <audio 
+                                      controls 
+                                      src={`/storage/${reply.audio_path}`}
+                                      className="h-8 max-w-[200px]"
+                                    >
+                                      Votre navigateur ne supporte pas l'audio.
+                                    </audio>
+                                  </div>
+                                </div>
+                              )}
+                              {reply.user?.id === auth.user.id && (
+                                <div className="flex justify-end mt-2">
+                                  <button
+                                    onClick={() => handleDeleteComment(reply.id)}
+                                    className="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400"
+                                    title="Supprimer"
+                                  >
+                                    <FaTrash className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        Appuyez sur Ctrl+Entrée pour envoyer
-                      </div>
-                      <button
-                        type="submit"
-                        className={`${replyingTo ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-700 hover:bg-blue-800'} text-white px-6 py-3 rounded-lg font-semibold hover:shadow-md flex items-center gap-2 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed`}
-                        disabled={posting || (!commentContent.trim() && !audioBlob)}
-                      >
-                        {posting ? (
-                          <>
-                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Envoi en cours...
-                          </>
-                        ) : (
-                          <>
-                            <FaCommentDots />
-                            {replyingTo ? 'Publier la réponse' : 'Publier le commentaire'}
-                          </>
-                        )}
-                      </button>
+                      ))}
                     </div>
-                  </form>
+                  )}
                 </div>
-              )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Formulaire de commentaire */}
+        <div className={`mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 ${replyingTo ? 'bg-blue-50 dark:bg-blue-900/20 p-5 rounded-xl' : ''}`}>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+            {replyingTo ? 'Répondre au commentaire' : 'Ajouter une discussion'}
+          </h3>
+          
+          <form onSubmit={handleCommentSubmit} className="space-y-4">
+            <div className="relative">
+              <textarea
+                value={commentContent}
+                onChange={e => setCommentContent(e.target.value)}
+                onKeyDown={handleCommentKeyDown}
+                placeholder="Écrivez votre message ici..."
+                className="w-full min-h-[120px] p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white transition-colors duration-200"
+                disabled={posting || isRecording}
+                required={!audioBlob}
+                maxLength={2000}
+              />
+              <div className="absolute bottom-3 right-3 text-xs text-gray-400">
+                {commentContent.length}/2000
+              </div>
             </div>
-          )}
+
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                {isRecording ? (
+                  <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      </span>
+                      <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                        Enregistrement en cours...
+                      </span>
+                    </div>
+                    <div className="text-sm font-mono bg-white dark:bg-gray-800 px-2 py-1 rounded">
+                      {formatTime(recordingTime)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={stopRecording}
+                      className="text-red-600 hover:text-white hover:bg-red-600 p-1.5 rounded-full transition-colors"
+                      title="Arrêter l'enregistrement"
+                    >
+                      <FaStop className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 dark:border-gray-600 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    disabled={posting}
+                    title="Enregistrer un message vocal"
+                  >
+                    <FaMicrophone className="text-red-500" />
+                    <span>Message vocal</span>
+                  </button>
+                )}
+
+                {audioUrl && (
+                  <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg">
+                    <audio controls src={audioUrl} className="h-8"></audio>
+                    <button
+                      type="button"
+                      onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
+                      className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                      title="Supprimer l'enregistrement"
+                    >
+                      <FaTimes className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                {replyingTo && (
+                  <div className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full flex items-center gap-1">
+                    <FaReply className="w-3.5 h-3.5" />
+                    <span>Réponse à un commentaire</span>
+                    <button
+                      type="button"
+                      onClick={cancelReply}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 ml-1"
+                      title="Annuler la réponse"
+                    >
+                      <FaTimes className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                
+                <button
+                  type="submit"
+                  disabled={posting || (!commentContent.trim() && !audioBlob)}
+                  className={`px-5 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                    posting 
+                      ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
+                  }`}
+                >
+                  {posting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Publication...
+                    </>
+                  ) : (
+                    <>
+                      <FaPaperPlane className="w-3.5 h-3.5" />
+                      {replyingTo ? 'Publier la réponse' : 'Publier'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-200 text-sm rounded-r">
+                <div className="flex items-center gap-2">
+                  <FaExclamationCircle className="flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="text-xs text-gray-500 dark:text-gray-400 text-center sm:text-right mt-2">
+              Appuyez sur <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">Entrée</kbd> pour envoyer
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+  </div>
+)}
         </div>
 
         {/* Confirmation Modal */}

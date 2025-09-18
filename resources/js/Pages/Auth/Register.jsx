@@ -29,7 +29,7 @@ export default function Register() {
                         <p className="text-blue-200">Déjà membre ?</p>
                         <Link 
                             href={route('login')} 
-                            className="mt-2 inline-flex items-center px-6 py-2 border border-transparent text-base font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            className="mt-2 inline-flex items-center px-6 py-2 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
                         >
                             Se connecter
                         </Link>
@@ -155,7 +155,7 @@ export default function Register() {
                     <div className="mt-6 text-center md:hidden">
                         <p className="text-sm text-gray-600">
                             Vous avez déjà un compte ?{' '}
-                            <Link href={route('login')} className="font-medium text-blue-600 hover:text-blue-500">
+                            <Link href={route('login')} className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
                                 Connectez-vous
                             </Link>
                         </p>
