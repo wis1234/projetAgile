@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\RemunerationController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -18,6 +19,12 @@ Route::get('/', function () {
 
 // Routes protégées par authentification
 Route::middleware('auth')->group(function () {
+    // Profile routes
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/profile/bank-details', [ProfileController::class, 'showBankDetails'])->name('profile.bank-details');
+    Route::put('/profile/bank-details', [ProfileController::class, 'updateBankDetails'])->name('profile.update-bank-details');
     // Routes pour le module de recrutement
     Route::resource('recruitment', App\Http\Controllers\RecruitmentController::class);
     
@@ -93,6 +100,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/kanban', [App\Http\Controllers\KanbanController::class, 'index'])->name('kanban.index');
     Route::put('/kanban/update-order', [App\Http\Controllers\KanbanController::class, 'updateOrder'])->name('kanban.updateOrder');
     Route::get('/api/kanban/tasks', [App\Http\Controllers\KanbanController::class, 'apiTasks'])->name('kanban.api.tasks');
+    
+    // Gestion des rémunérations
+    Route::get('remunerations/dashboard', [RemunerationController::class, 'dashboard'])->name('remunerations.dashboard');
+    Route::resource('remunerations', RemunerationController::class)->except(['create', 'edit']);
+    Route::post('remunerations/{remuneration}/mark-as-paid', [RemunerationController::class, 'markAsPaid'])->name('remunerations.mark-as-paid');
+    Route::post('remunerations/{remuneration}/cancel', [RemunerationController::class, 'cancel'])->name('remunerations.cancel');
     
     // Gestion des projets
     Route::patch('/projects/{id}/status', [App\Http\Controllers\ProjectController::class, 'changeStatus'])->name('projects.change-status');
@@ -177,6 +190,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
     Route::get('/activities/export', [ActivityController::class, 'export'])->name('activities.export');
     Route::get('/activities/{activity}', [ActivityController::class, 'show'])->name('activities.show');
+});
+
+// Rémunérations
+Route::middleware(['auth'])->group(function () {
+    Route::get('/remunerations', [\App\Http\Controllers\RemunerationController::class, 'index'])->name('remunerations.index');
+    Route::get('/remunerations/dashboard', [\App\Http\Controllers\RemunerationController::class, 'dashboard'])->name('remunerations.dashboard');
+    Route::get('/remunerations/{remuneration}', [\App\Http\Controllers\RemunerationController::class, 'show'])->name('remunerations.show');
+    Route::post('/remunerations/{remuneration}/mark-as-paid', [\App\Http\Controllers\RemunerationController::class, 'markAsPaid'])->name('remunerations.markAsPaid');
+    Route::post('/remunerations/{remuneration}/cancel', [\App\Http\Controllers\RemunerationController::class, 'cancel'])->name('remunerations.cancel');
 });
 
 // Gestion des établissements scolaires

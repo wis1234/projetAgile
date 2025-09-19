@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\Remuneration;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -44,6 +45,22 @@ class User extends Authenticatable
     public function latestSubscription(): HasOne
     {
         return $this->hasOne(Subscription::class)->latest();
+    }
+
+    /**
+     * Obtenez les paiements de tâches associés à l'utilisateur.
+     */
+    public function taskPayments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\TaskPayment::class, 'user_id');
+    }
+
+    /**
+     * Obtenez les rémunérations de l'utilisateur.
+     */
+    public function remunerations(): HasMany
+    {
+        return $this->hasMany(Remuneration::class);
     }
 
     /**
@@ -196,6 +213,11 @@ class User extends Authenticatable
         'billing_country',
         'billing_postal_code',
         'tax_id',
+        'bank_name',
+        'account_holder_name',
+        'account_number',
+        'iban',
+        'swift_code',
     ];
 
     /**
@@ -230,6 +252,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'subscription_ends_at' => 'datetime',
         'is_subscribed' => 'boolean',
+        'bank_details_verified_at' => 'datetime',
     ];
 
     /**

@@ -41,6 +41,11 @@ const navLinks = [
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
     </svg>
   ) },
+  { href: '/remunerations/dashboard', label: 'Rémunérations', icon: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ) },
 ];
 
 const Loader = () => {
@@ -68,19 +73,21 @@ const Loader = () => {
         Chargement...
       </p>
       
-      <style jsx>{`
-        @keyframes bounce {
-          0%, 100% { 
-            transform: translateY(0) scale(1);
-            color: #2563eb;
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes bounce {
+            0%, 100% { 
+              transform: translateY(0) scale(1);
+              color: #2563eb;
+            }
+            50% { 
+              transform: translateY(-15px) scale(1.2);
+              color: #1d4ed8;
+              text-shadow: 0 5px 10px rgba(37, 99, 235, 0.3);
+            }
           }
-          50% { 
-            transform: translateY(-15px) scale(1.2);
-            color: #1d4ed8;
-            text-shadow: 0 5px 10px rgba(37, 99, 235, 0.3);
-          }
-        }
-      `}</style>
+        `
+      }} />
     </div>
   );
 };
@@ -365,6 +372,14 @@ export default function AdminLayout({ children }) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 3v2m3-2v2m3-2v2m3-2v2m3-2v2m-18 8h18M7 17v-2m3 2v-2m3 2v-2m3 2v-2m3 2v-2" />
                       </svg>
                       Mon abonnement
+                    </div>
+                  </Link>
+                  <Link href="/remunerations/dashboard" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Mes rémunérations
                     </div>
                   </Link>
                   <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
