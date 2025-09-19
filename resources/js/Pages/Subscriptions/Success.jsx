@@ -5,6 +5,45 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle, faEnvelope, faHome, faCog } from '@fortawesome/free-solid-svg-icons';
 
 export default function SubscriptionSuccess({ subscription }) {
+    // Si aucune donnée d'abonnement n'est disponible, afficher un message d'erreur
+    if (!subscription) {
+        return (
+            <AuthenticatedLayout>
+                <Head title="Paiement en cours de traitement" />
+                <div className="py-12">
+                    <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                        <div className="overflow-hidden bg-white shadow sm:rounded-lg">
+                            <div className="px-4 py-5 text-center sm:p-6">
+                                <div className="flex justify-center">
+                                    <div className="flex items-center justify-center w-16 h-16 mx-auto rounded-full bg-yellow-100">
+                                        <svg className="w-10 h-10 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                
+                                <h2 className="mt-4 text-2xl font-bold text-gray-900">Paiement en cours de traitement</h2>
+                                
+                                <p className="max-w-md mx-auto mt-3 text-base text-gray-500">
+                                    Votre paiement est en cours de traitement. Vous recevrez bientôt une confirmation par email.
+                                </p>
+                                
+                                <div className="flex flex-col justify-center mt-8 space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3">
+                                    <Link
+                                        href="/dashboard"
+                                        className="inline-flex items-center justify-center px-6 py-3 text-base font-medium text-white border border-transparent rounded-md shadow-sm bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                    >
+                                        <FontAwesomeIcon icon={faHome} className="w-5 h-5 mr-2 -ml-1" />
+                                        Retour à l'accueil
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </AuthenticatedLayout>
+        );
+    }
     return (
         <AuthenticatedLayout>
             <Head title="Paiement réussi" />
@@ -25,7 +64,7 @@ export default function SubscriptionSuccess({ subscription }) {
                             <h2 className="mt-4 text-2xl font-bold text-gray-900">Paiement réussi !</h2>
                             
                             <p className="max-w-md mx-auto mt-3 text-base text-gray-500">
-                                Merci pour votre achat. Votre abonnement <span className="font-medium">{subscription.plan.name}</span> a été activé avec succès.
+                                Merci pour votre achat. Votre abonnement <span className="font-medium">{subscription.plan?.name || 'a été activé avec succès'}</span>.
                             </p>
                             
                             <div className="max-w-md p-6 mx-auto mt-8 bg-gray-50 rounded-lg">
@@ -45,14 +84,14 @@ export default function SubscriptionSuccess({ subscription }) {
                                     <div className="flex justify-between">
                                         <dt className="text-sm font-medium text-gray-500">Période</dt>
                                         <dd className="text-sm text-gray-900">
-                                            {new Date(subscription.starts_at).toLocaleDateString('fr-FR')} - {new Date(subscription.ends_at).toLocaleDateString('fr-FR')}
+                                            {subscription.starts_at ? new Date(subscription.starts_at).toLocaleDateString('fr-FR') : 'Aujourd\'hui'} - {subscription.ends_at ? new Date(subscription.ends_at).toLocaleDateString('fr-FR') : '1 mois'}
                                         </dd>
                                     </div>
                                     
                                     <div className="flex justify-between pt-4 border-t border-gray-200">
                                         <dt className="text-base font-medium text-gray-900">Total payé</dt>
                                         <dd className="text-base font-medium text-gray-900">
-                                            {subscription.amount_paid.toLocaleString('fr-FR')} FCFA
+                                            {subscription.amount_paid ? subscription.amount_paid.toLocaleString('fr-FR') : '0'} FCFA
                                         </dd>
                                     </div>
                                 </dl>

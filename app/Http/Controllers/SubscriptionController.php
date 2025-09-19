@@ -217,8 +217,61 @@ class SubscriptionController extends Controller
     /**
      * Affiche la page de succès après souscription
      */
-    public function success()
+    public function success(Request $request)
     {
-        return Inertia::render('Subscriptions/Success');
+        $transactionId = $request->query('transaction_id');
+        $subscription = null;
+        
+        if ($transactionId) {
+            try {
+                // Récupérer la transaction depuis FedaPay
+                \FedaPay\FedaPay::setApiKey(config('services.fedapay.secret_key'));
+                \FedaPay\FedaPay::setEnvironment('live');
+                
+                $transaction = \FedaPay\Transaction::retrieve($transactionId);
+                
+                if ($transaction && $transaction->status === 'approved') {
+                    // Récupérer l'ID du plan depuis les métadonnées ou les paramètres
+                    $planId = $request->query('plan_id');
+                    
+                    // Créer ou mettre à jour l'abonnement
+                    $subscription = \App\Models\Subscription::updateOrCreate(
+                        ['transaction_id' => $transactionId],
+                        [
+                            'user_id' => auth()->id(),
+                            'plan_id' => $planId,
+                            'amount_paid' => $transaction->amount / 100,
+                            'status' => 'active',
+                            'starts_at' => now(),
+                            'ends_at' => now()->addMonth(),
+                            'metadata' => json_encode($transaction->toArray())
+                        ]
+                    );
+                }
+            } catch (\Exception $e) {
+                \Log::error('Erreur lors de la récupération de la transaction FedaPay: ' . $e->getMessage());
+            }
+        }
+        
+        // Récupérer les informations du plan pour l'affichage
+        $plan = null;
+        if ($subscription && $subscription->plan_id) {
+            $plan = $this->getPlanById($subscription->plan_id);
+        } elseif ($request->query('plan_id')) {
+            $plan = $this->getPlanById($request->query('plan_id'));
+        }
+        
+        return Inertia::render('Subscriptions/Success', [
+            'subscription' => $subscription ? [
+                'id' => $subscription->id,
+                'plan' => [
+                    'name' => $plan['name'] ?? 'Abonnement',
+                    'price' => $plan['price'] ?? 0,
+                ],
+                'starts_at' => $subscription->starts_at,
+                'ends_at' => $subscription->ends_at,
+                'amount_paid' => $subscription->amount_paid,
+            ] : null
+        ]);
     }
 }

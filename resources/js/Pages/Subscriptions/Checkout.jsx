@@ -23,7 +23,12 @@ export default function Checkout({ plan, paymentMethods }) {
         transaction: {
             amount: plan.price,
             description: `Abonnement ${plan.name}`,
-            callback_url: route('subscription.success')
+            callback_url: `${window.location.origin}${route('subscription.success')}?plan_id=${plan.id}`,
+            metadata: {
+                user_id: auth.user.id,
+                plan_id: plan.id,
+                plan_name: plan.name
+            }
         },
         customer: {
             firstname: auth.user.name.split(' ')[0],
@@ -43,7 +48,12 @@ export default function Checkout({ plan, paymentMethods }) {
             disabled: !acceptedTerms || isLoading
         },
         onComplete: (response) => {
-            if (response.reason === 'completed') {
+            console.log('Réponse FedaPay complète:', response);
+            if (response && response.transaction && response.transaction.id) {
+                // Rediriger vers la page de succès avec l'ID de la transaction
+                router.visit(`${route('subscription.success')}?transaction_id=${response.transaction.id}&plan_id=${plan.id}`);
+            } else if (response && response.reason === 'completed') {
+                // Si on a une confirmation de complétion mais pas d'ID de transaction
                 router.visit(route('subscription.success'));
             } else {
                 setError('Le paiement a été annulé ou a échoué');
@@ -53,6 +63,11 @@ export default function Checkout({ plan, paymentMethods }) {
         onError: (error) => {
             console.error('Erreur FedaPay:', error);
             setError(`Erreur de paiement: ${error?.message || 'Une erreur est survenue'}`);
+            setIsLoading(false);
+        },
+        onClose: () => {
+            // Appelé lorsque le popup de paiement est fermé
+            if (!isLoading) return;
             setIsLoading(false);
         }
     };
