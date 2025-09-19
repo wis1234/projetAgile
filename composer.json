@@ -17,7 +17,7 @@
         "phpoffice/phpword": "^1.4",
         "spatie/flysystem-dropbox": "^3.0",
         "spatie/laravel-activitylog": "^4.10",
-        "spatie/laravel-permission": "^6.20",
+        "spatie/laravel-permission": "^6.21",
         "tightenco/ziggy": "^2.0"
     },
     "require-dev": {

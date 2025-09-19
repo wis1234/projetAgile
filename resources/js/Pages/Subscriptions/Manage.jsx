@@ -104,13 +104,22 @@ export default function Manage({ subscriptions }) {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center mb-6">
                         <h1 className="text-2xl font-bold text-gray-900">Gestion des abonnements</h1>
-                        <Link
-                            href={route('subscription.plans')}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                            <FontAwesomeIcon icon={faPlus} className="mr-2" />
-                            Nouvel abonnement
-                        </Link>
+                        <div className="flex space-x-3">
+                            <Link
+                                href={route('admin.subscription-plans.index')}
+                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                                <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                                Nouveau plan
+                            </Link>
+                            <Link
+                                href={route('subscription.plans')}
+                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                                <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                                Nouvel abonnement
+                            </Link>
+                        </div>
                     </div>
 
                     {/* Stats */}

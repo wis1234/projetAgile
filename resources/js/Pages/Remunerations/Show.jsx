@@ -33,11 +33,10 @@ export default function RemunerationShow({ remuneration, auth }) {
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('fr-FR', { 
-      style: 'currency', 
-      currency: 'EUR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
+      style: 'decimal',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount) + ' XOF';
   };
 
   const getStatusBadge = (status) => {

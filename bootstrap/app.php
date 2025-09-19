@@ -12,6 +12,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         \App\Providers\DropboxServiceProvider::class,
+        \Spatie\Permission\PermissionServiceProvider::class,
     ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',

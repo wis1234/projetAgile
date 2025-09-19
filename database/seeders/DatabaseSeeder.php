@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             SchoolSeeder::class,
             SubscriptionPlansTableSeeder::class,
+            SubscriptionsTableSeeder::class,
         ]);
         
         // Création d'un admin par défaut si nécessaire

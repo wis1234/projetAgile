@@ -19,6 +19,12 @@ Route::get('/', function () {
 
 // Routes protégées par authentification
 Route::middleware('auth')->group(function () {
+    // Subscription routes
+    Route::get('/subscriptions', [App\Http\Controllers\SubscriptionController::class, 'index'])->name('subscriptions.index');
+    Route::get('/subscriptions/checkout/{plan}', [App\Http\Controllers\SubscriptionController::class, 'checkout'])->name('subscriptions.checkout');
+    Route::post('/subscriptions/subscribe', [App\Http\Controllers\SubscriptionController::class, 'subscribe'])->name('subscriptions.subscribe');
+    Route::get('/subscriptions/success', [App\Http\Controllers\SubscriptionController::class, 'success'])->name('subscriptions.success');
+    Route::get('/subscriptions/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancel'])->name('subscriptions.cancel');
     // Profile routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -78,6 +84,17 @@ Route::middleware('auth')->group(function () {
     
     // Ressources principales
     Route::resource('tasks', App\Http\Controllers\TaskController::class);
+    
+    // Gestion des plans d'abonnement
+    Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
+        // Routes pour la gestion des plans d'abonnement accessibles à tous les utilisateurs authentifiés
+        Route::get('subscription-plans', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'index'])->name('subscription-plans.index');
+        Route::get('subscription-plans/create', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'create'])->name('subscription-plans.create');
+        Route::post('subscription-plans', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'store'])->name('subscription-plans.store');
+        Route::get('subscription-plans/{subscription_plan}/edit', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'edit'])->name('subscription-plans.edit');
+        Route::put('subscription-plans/{subscription_plan}', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'update'])->name('subscription-plans.update');
+        Route::delete('subscription-plans/{subscription_plan}', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'destroy'])->name('subscription-plans.destroy');
+    });
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
     Route::resource('files', App\Http\Controllers\FileController::class);

@@ -12,26 +12,59 @@ class SubscriptionController extends Controller
      */
     public function manage()
     {
-        // Récupérer tous les abonnements avec les utilisateurs associés
+        // Récupérer tous les abonnements avec les utilisateurs et les plans associés
         $subscriptions = \App\Models\Subscription::with(['user' => function($query) {
-            $query->select('id', 'name', 'email');
-        }])->latest()->get()->map(function($subscription) {
+            $query->select('id', 'name', 'email', 'profile_photo_path');
+        }, 'plan'])->latest()->get()->map(function($subscription) {
+            $interval = 'month';
+            if ($subscription->plan) {
+                $interval = $subscription->plan->duration_in_months >= 12 ? 'year' : 'month';
+            }
+            
             return [
                 'id' => $subscription->id,
                 'user' => $subscription->user,
-                'plan_name' => $subscription->name,
-                'amount' => $subscription->stripe_price ? $subscription->stripe_price / 100 : 0,
-                'status' => $subscription->stripe_status,
-                'interval' => $subscription->stripe_plan ? 'month' : 'year', // À adapter selon votre logique
-                'starts_at' => $subscription->created_at,
+                'plan_name' => $subscription->plan ? $subscription->plan->name : 'Plan inconnu',
+                'amount' => $subscription->amount_paid ?? 0,
+                'status' => $subscription->status,
+                'interval' => $interval,
+                'starts_at' => $subscription->starts_at,
                 'ends_at' => $subscription->ends_at,
                 'created_at' => $subscription->created_at,
                 'updated_at' => $subscription->updated_at,
             ];
         });
 
+        // Calculer les statistiques
+        $now = now();
+        $endOfMonth = now()->endOfMonth();
+        
+        // Calcul du revenu mensuel récurrent (abonnements mensuels actifs)
+        $monthlyRevenue = \App\Models\Subscription::where('status', 'active')
+            ->join('subscription_plans', 'subscriptions.subscription_plan_id', '=', 'subscription_plans.id')
+            ->where('subscription_plans.duration_in_months', 1)
+            ->sum('subscriptions.amount_paid');
+            
+        // Calcul du revenu annuel récurrent (divisé par 12 pour le mensuel)
+        $yearlyRevenue = \App\Models\Subscription::where('status', 'active')
+            ->join('subscription_plans', 'subscriptions.subscription_plan_id', '=', 'subscription_plans.id')
+            ->where('subscription_plans.duration_in_months', 12)
+            ->sum('subscriptions.amount_paid') / 12;
+        
+        $stats = [
+            'active_subscriptions' => \App\Models\Subscription::where('status', 'active')->count(),
+            'expiring_this_month' => \App\Models\Subscription::where('status', 'active')
+                ->where('ends_at', '>=', $now)
+                ->where('ends_at', '<=', $endOfMonth)
+                ->count(),
+            'monthly_recurring_revenue' => $monthlyRevenue + $yearlyRevenue,
+            'active_plans' => \App\Models\SubscriptionPlan::where('is_active', true)->count(),
+        ];
+
         return Inertia::render('Subscriptions/Manage', [
             'subscriptions' => $subscriptions,
+            'stats' => $stats,
+            'filters' => request()->only(['search', 'status'])
         ]);
     }
 
@@ -40,32 +73,26 @@ class SubscriptionController extends Controller
      */
     public function index()
     {
+        $plans = \App\Models\SubscriptionPlan::where('is_active', true)
+            ->get()
+            ->map(function($plan) {
+                return [
+                    'id' => $plan->id,
+                    'name' => $plan->name,
+                    'slug' => $plan->slug,
+                    'price' => (float)$plan->price,
+                    'formatted_price' => number_format($plan->price, 0, ',', ' ') . ' FCFA',
+                    'period' => $plan->duration_in_months == 1 ? 'par mois' : 'par an',
+                    'duration_in_months' => $plan->duration_in_months,
+                    'description' => $plan->description,
+                    'features' => $plan->features,
+                    'is_popular' => $plan->slug === 'etudiant',
+                    'is_current' => false // À implémenter la logique pour vérifier l'abonnement actuel
+                ];
+            });
+
         return Inertia::render('Subscriptions/Index', [
-            'plans' => [
-                [
-                    'id' => 1,
-                    'name' => 'Basique',
-                    'price' => 300,
-                    'period' => 'par mois',
-                    'features' => ['Projets illimités', 'Jusqu\'à 5 membres par projet', 'Stockage de base'],
-                    'is_popular' => true,
-                ],
-                [
-                    'id' => 2,
-                    'name' => 'Étudiant',
-                    'price' => 2000,
-                    'period' => 'par an',
-                    'features' => ['Tout dans le plan Basique', 'Jusqu\'à 20 membres par projet', 'Stockage étendu', 'Support prioritaire'],
-                    'is_current' => true,
-                ],
-                [
-                    'id' => 3,
-                    'name' => 'Startup',
-                    'price' => 50000,
-                    'period' => 'par an',
-                    'features' => ['Tout dans l\'offre Étudiant', 'Membres illimités', 'Stockage illimité', 'Support 24/7', 'SSO', 'Formation gratuite'],
-                ],
-            ],
+            'plans' => $plans
         ]);
     }
 
@@ -103,7 +130,6 @@ class SubscriptionController extends Controller
             ],
         ];
         
-        // Les données d'authentification sont déjà partagées via le middleware HandleInertiaRequests
         return Inertia::render('Subscriptions/Checkout', [
             'plan' => $plan,
             'paymentMethods' => $paymentMethods,
@@ -170,108 +196,143 @@ class SubscriptionController extends Controller
      */
     private function getPlanById($id)
     {
-        $plans = [
-            [
-                'id' => 1,
-                'name' => 'Basique',
-                'slug' => 'basique',
-                'price' => 300,
-                'formatted_price' => '300 FCFA',
-                'duration_in_months' => 1,
-                'description' => 'Parfait pour les petits projets',
-                'features' => ['Jusqu\'à 5 projets par mois', 'Jusqu\'à 5 membres par projet', 'Stockage de base'],
-                'is_current' => true,
-            ],
-            [
-                'id' => 2,
-                'name' => 'Étudiant',
-                'slug' => 'etudiant',
-                'price' => 1000, // 1000 FCFA
-                'formatted_price' => '1000 FCFA',
-                'duration_in_months' => 12,
-                'description' => 'Idéal pour les étudiants',
-                'features' => ['Tout dans le plan basique', 'Jusqu\'à 20 membres par projet', 'Stockage étendu', 'Support prioritaire'],
-                'is_popular' => true,
-            ],
-            [
-                'id' => 3,
-                'name' => 'Entreprise',
-                'slug' => 'entreprise',
-                'price' => 20000, // 20000 FCFA
-                'formatted_price' => '20000 FCFA',
-                'duration_in_months' => 1,
-                'description' => 'Pour les entreprises avec des besoins avancés',
-                'features' => ['Tout dans le professionnel', 'Membres illimités', 'Stockage illimité', 'Support 24/7', 'SSO'],
-            ],
-        ];
+        $plan = \App\Models\SubscriptionPlan::find($id);
         
-        foreach ($plans as $plan) {
-            if ($plan['id'] == $id) {
-                return $plan;
-            }
+        if (!$plan || !$plan->is_active) {
+            return null;
         }
         
-        return null;
+        return [
+            'id' => $plan->id,
+            'name' => $plan->name,
+            'slug' => $plan->slug,
+            'price' => (float)$plan->price,
+            'formatted_price' => number_format($plan->price, 0, ',', ' ') . ' FCFA',
+            'duration_in_months' => $plan->duration_in_months,
+            'period' => $plan->duration_in_months == 1 ? 'par mois' : 'par an',
+            'description' => $plan->description,
+            'features' => $plan->features,
+            'is_popular' => $plan->slug === 'etudiant',
+            'is_current' => false // À implémenter la logique pour vérifier l'abonnement actuel
+        ];
     }
 
     /**
-     * Affiche la page de succès après souscription
+     * Affiche la page de succès après un paiement réussi
      */
     public function success(Request $request)
     {
         $transactionId = $request->query('transaction_id');
-        $subscription = null;
+        $status = $request->query('status');
+        $planId = $request->query('plan_id');
         
-        if ($transactionId) {
-            try {
-                // Récupérer la transaction depuis FedaPay
-                \FedaPay\FedaPay::setApiKey(config('services.fedapay.secret_key'));
-                \FedaPay\FedaPay::setEnvironment('live');
-                
-                $transaction = \FedaPay\Transaction::retrieve($transactionId);
-                
-                if ($transaction && $transaction->status === 'approved') {
-                    // Récupérer l'ID du plan depuis les métadonnées ou les paramètres
-                    $planId = $request->query('plan_id');
-                    
-                    // Créer ou mettre à jour l'abonnement
-                    $subscription = \App\Models\Subscription::updateOrCreate(
-                        ['transaction_id' => $transactionId],
-                        [
-                            'user_id' => auth()->id(),
-                            'plan_id' => $planId,
-                            'amount_paid' => $transaction->amount / 100,
+        if (!$transactionId) {
+            return redirect()->route('subscription.plans')
+                ->with('error', 'Aucun identifiant de transaction fourni.');
+        }
+        
+        try {
+            $subscription = null;
+            
+            // Vérifier si la transaction existe déjà
+            $subscription = \App\Models\Subscription::where('payment_id', $transactionId)->first();
+            
+            if ($subscription) {
+                // Mettre à jour le statut de l'utilisateur si le paiement est réussi
+                if ($status === 'approved') {
+                    $user = auth()->user();
+                    if ($user) {
+                        // Calculer la date de fin en fonction de la durée du plan
+                        $plan = \App\Models\SubscriptionPlan::find($subscription->subscription_plan_id);
+                        $endsAt = $plan ? now()->addMonths($plan->duration_in_months) : now()->addMonth();
+                        
+                        $user->update([
+                            'subscription_status' => 'active',
+                            'subscription_ends_at' => $endsAt,
+                        ]);
+                        
+                        // Mettre à jour l'abonnement
+                        $subscription->update([
                             'status' => 'active',
                             'starts_at' => now(),
-                            'ends_at' => now()->addMonth(),
-                            'metadata' => json_encode($transaction->toArray())
-                        ]
-                    );
+                            'ends_at' => $endsAt,
+                        ]);
+                    }
                 }
-            } catch (\Exception $e) {
-                \Log::error('Erreur lors de la récupération de la transaction FedaPay: ' . $e->getMessage());
+                
+                // Journaliser le statut de la transaction
+                \Log::info("Statut de la transaction $transactionId: $status", [
+                    'subscription_id' => $subscription->id,
+                    'user_id' => auth()->id(),
+                    'plan_id' => $planId,
+                    'status' => $status
+                ]);
+                
+                // Si le paiement a échoué, rediriger avec un message d'erreur
+                if ($status !== 'approved') {
+                    return redirect()->route('subscription.plans')
+                        ->with('error', "Le paiement a échoué. Statut: " . ucfirst($status));
+                }
+            } else {
+                // Si la transaction n'existe pas
+                \Log::error("Transaction non trouvée: $transactionId");
+                return redirect()->route('subscription.plans')
+                    ->with('error', 'Transaction introuvable. Veuillez contacter le support.');
             }
+        } catch (\Exception $e) {
+            $errorMessage = $e->getMessage();
+            \Log::error("Erreur lors du traitement de la transaction $transactionId: " . $errorMessage);
+            
+            // Enregistrer quand même l'échec dans la base de données
+            try {
+                \App\Models\Subscription::create([
+                    'user_id' => auth()->id(),
+                    'subscription_plan_id' => $planId,
+                    'status' => 'error',
+                    'payment_id' => $transactionId ?? 'unknown_' . uniqid(),
+                    'payment_method' => 'unknown',
+                    'currency' => 'XOF',
+                    'payment_details' => ['error' => $errorMessage],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } catch (\Exception $dbError) {
+                \Log::error('Échec de l\'enregistrement de l\'erreur dans la base de données: ' . $dbError->getMessage());
+            }
+            
+            return redirect()->route('subscription.plans')
+                ->with('error', 'Une erreur est survenue lors du traitement de votre paiement. Veuillez réessayer ou contacter le support.');
         }
         
         // Récupérer les informations du plan pour l'affichage
         $plan = null;
-        if ($subscription && $subscription->plan_id) {
-            $plan = $this->getPlanById($subscription->plan_id);
-        } elseif ($request->query('plan_id')) {
-            $plan = $this->getPlanById($request->query('plan_id'));
+        if ($subscription && $subscription->subscription_plan_id) {
+            $plan = \App\Models\SubscriptionPlan::find($subscription->subscription_plan_id);
+        }
+        
+        // Préparer les données pour la vue Inertia
+        $subscriptionData = [
+            'id' => $subscription->id,
+            'starts_at' => $subscription->starts_at,
+            'ends_at' => $subscription->ends_at,
+            'amount_paid' => $subscription->amount_paid,
+            'status' => $subscription->status,
+            'plan' => null
+        ];
+        
+        if ($plan) {
+            $subscriptionData['plan'] = [
+                'id' => $plan->id,
+                'name' => $plan->name,
+                'description' => $plan->description ?? '',
+                'price' => $plan->price,
+                'duration_in_months' => $plan->duration_in_months,
+                'features' => $plan->features ?? []
+            ];
         }
         
         return Inertia::render('Subscriptions/Success', [
-            'subscription' => $subscription ? [
-                'id' => $subscription->id,
-                'plan' => [
-                    'name' => $plan['name'] ?? 'Abonnement',
-                    'price' => $plan['price'] ?? 0,
-                ],
-                'starts_at' => $subscription->starts_at,
-                'ends_at' => $subscription->ends_at,
-                'amount_paid' => $subscription->amount_paid,
-            ] : null
+            'subscription' => $subscriptionData
         ]);
     }
 }

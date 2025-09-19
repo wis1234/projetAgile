@@ -355,7 +355,7 @@ export default function AdminLayout({ children }) {
                   </Link>
                   {isAdmin && (
                     <Link 
-                      href="/subscription/manage" 
+                      href="/admin/subscription-plans" 
                       className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200"
                     >
                       <div className="flex items-center">

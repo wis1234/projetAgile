@@ -36,14 +36,14 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard 
             title={isAdmin ? "Total versé" : "Total gagné"} 
-            value={`${stats.total_earned.toFixed(2)} €`} 
+            value={`${stats.total_earned.toLocaleString('fr-FR')} XOF`} 
             icon={<FaMoneyBillWave className="h-6 w-6 text-green-500" />}
             color="green"
           />
           
           <StatCard 
             title={isAdmin ? "Total en attente" : "En attente"} 
-            value={`${stats.pending_amount.toFixed(2)} €`} 
+            value={`${stats.pending_amount.toLocaleString('fr-FR')} XOF`} 
             icon={<FaClock className="h-6 w-6 text-yellow-500" />}
             color="yellow"
           />
@@ -124,7 +124,7 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
                         </div>
                         <div className="text-right">
                           <p className="font-medium text-green-600 dark:text-green-400">
-                            +{parseFloat(remuneration.amount).toFixed(2)} €
+                            +{parseFloat(remuneration.amount).toLocaleString('fr-FR')} XOF
                           </p>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             remuneration.status === 'paid' 
@@ -173,7 +173,7 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
                   <h4 className="font-medium text-gray-900 dark:text-white">Voir les paiements en attente</h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                     {stats.pending_amount > 0 
-                      ? `${stats.pending_amount.toFixed(2)} € en attente` 
+                      ? `${stats.pending_amount.toLocaleString('fr-FR')} XOF en attente` 
                       : 'Aucun paiement en attente'}
                   </p>
                 </Link>

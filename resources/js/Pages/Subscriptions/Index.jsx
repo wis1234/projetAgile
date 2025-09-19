@@ -7,14 +7,7 @@ import { faCheckCircle, faCrown, faUserTie, faGift, faClock, faCheck, faCog, faU
 export default function SubscriptionPlans({ plans, currentPlan = null }) {
     const { auth } = usePage().props;
 
-    const features = [
-        'Accès à tous les projets',
-        'Gestion des tâches illimitée',
-        'Stockage de fichiers 10GB',
-        'Support prioritaire',
-        'Rapports avancés',
-        'Export de données'
-    ];
+    // Les fonctionnalités sont maintenant récupérées depuis la base de données via la propriété features de chaque plan
 
     const getPlanIcon = (planName) => {
         switch (planName.toLowerCase()) {
@@ -120,15 +113,36 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                     </div>
 
                                     <ul className="mt-6 space-y-3">
-                                        {features.map((feature, index) => (
-                                            <li key={index} className="flex items-start">
-                                                <FontAwesomeIcon 
-                                                    icon={faCheck} 
-                                                    className="w-5 h-5 mt-0.5 mr-2 text-green-500 flex-shrink-0" 
-                                                />
-                                                <span className="text-sm font-medium text-gray-700">{feature}</span>
-                                            </li>
-                                        ))}
+                                        {(() => {
+                                            try {
+                                                // Essayer de parser features s'il s'agit d'une chaîne JSON
+                                                const features = typeof plan.features === 'string' 
+                                                    ? JSON.parse(plan.features)
+                                                    : Array.isArray(plan.features) 
+                                                        ? plan.features 
+                                                        : [];
+                                                
+                                                if (features && features.length > 0) {
+                                                    return features.map((feature, index) => (
+                                                        <li key={index} className="flex items-start">
+                                                            <FontAwesomeIcon 
+                                                                icon={faCheck} 
+                                                                className="w-5 h-5 mt-0.5 mr-2 text-green-500 flex-shrink-0" 
+                                                            />
+                                                            <span className="text-sm font-medium text-gray-700">{feature}</span>
+                                                        </li>
+                                                    ));
+                                                }
+                                            } catch (e) {
+                                                console.error('Erreur lors du traitement des fonctionnalités:', e);
+                                            }
+                                            
+                                            return (
+                                                <li className="text-sm text-gray-500">
+                                                    Aucune fonctionnalité spécifiée
+                                                </li>
+                                            );
+                                        })()}
                                     </ul>
 
                                     <div className="mt-8">

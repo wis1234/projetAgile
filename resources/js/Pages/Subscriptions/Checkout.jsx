@@ -122,15 +122,36 @@ export default function Checkout({ plan, paymentMethods }) {
                                         <div className="pt-4 border-t border-gray-100">
                                             <h4 className="font-medium text-gray-900 mb-3">Ce qui est inclus :</h4>
                                             <ul className="space-y-3">
-                                                {plan.features?.map((feature, index) => (
-                                                    <li key={index} className="flex items-start">
-                                                        <FontAwesomeIcon 
-                                                            icon={faCheckCircle} 
-                                                            className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" 
-                                                        />
-                                                        <span className="text-gray-700">{feature}</span>
-                                                    </li>
-                                                ))}
+                                                {(() => {
+                                                    try {
+                                                        // Essayer de parser features s'il s'agit d'une chaîne JSON
+                                                        const features = typeof plan.features === 'string' 
+                                                            ? JSON.parse(plan.features)
+                                                            : Array.isArray(plan.features) 
+                                                                ? plan.features 
+                                                                : [];
+                                                        
+                                                        if (features && features.length > 0) {
+                                                            return features.map((feature, index) => (
+                                                                <li key={index} className="flex items-start">
+                                                                    <FontAwesomeIcon 
+                                                                        icon={faCheckCircle} 
+                                                                        className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" 
+                                                                    />
+                                                                    <span className="text-gray-700">{feature}</span>
+                                                                </li>
+                                                            ));
+                                                        }
+                                                    } catch (e) {
+                                                        console.error('Erreur lors du traitement des fonctionnalités:', e);
+                                                    }
+                                                    
+                                                    return (
+                                                        <li className="text-sm text-gray-500">
+                                                            Aucune fonctionnalité spécifiée
+                                                        </li>
+                                                    );
+                                                })()}
                                             </ul>
                                         </div>
 
