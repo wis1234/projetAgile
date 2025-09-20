@@ -461,4 +461,85 @@ class SubscriptionController extends Controller
             ], 500);
         }
     }
+    
+    /**
+     * Affiche la page de facturation de l'utilisateur
+     *
+     * @return \Inertia\Response
+     */
+    public function billing()
+    {
+        $user = auth()->user();
+        
+        // Récupérer l'abonnement actif de l'utilisateur
+        $subscription = $user->subscriptions()
+            ->with(['plan'])
+            ->latest()
+            ->first();
+        
+        // Formater les données de l'abonnement pour la vue
+        $subscriptionData = null;
+        if ($subscription) {
+            $subscriptionData = [
+                'id' => $subscription->id,
+                'plan_name' => $subscription->plan ? $subscription->plan->name : 'Forfait personnalisé',
+                'amount' => $subscription->amount_paid ?? 0,
+                'status' => $subscription->status,
+                'interval' => $subscription->plan && $subscription->plan->duration_in_months >= 12 ? 'year' : 'month',
+                'starts_at' => $subscription->starts_at ? $subscription->starts_at->toDateTimeString() : null,
+                'ends_at' => $subscription->ends_at ? $subscription->ends_at->toDateTimeString() : null,
+                'created_at' => $subscription->created_at->toDateTimeString(),
+                'updated_at' => $subscription->updated_at->toDateTimeString(),
+            ];
+        }
+        
+        // Récupérer l'historique des factures (exemple avec des données factices)
+        // Dans une application réelle, vous récupéreriez cela depuis votre système de facturation
+        $invoices = [];
+        
+        // Récupérer les méthodes de paiement enregistrées (exemple avec des données factices)
+        // Dans une application réelle, vous utiliseriez l'API de votre processeur de paiement
+        $paymentMethods = [];
+        
+        // Exemple de données factices pour le développement
+        if (app()->environment('local')) {
+            $invoices = [
+                [
+                    'id' => 'in_123456789',
+                    'number' => 'INV-2023-001',
+                    'date' => now()->subDays(30)->toDateTimeString(),
+                    'amount' => 10000,
+                    'currency' => 'XOF',
+                    'paid' => true,
+                    'invoice_pdf' => '#'
+                ],
+                [
+                    'id' => 'in_987654321',
+                    'number' => 'INV-2023-002',
+                    'date' => now()->subDays(60)->toDateTimeString(),
+                    'amount' => 10000,
+                    'currency' => 'XOF',
+                    'paid' => true,
+                    'invoice_pdf' => '#'
+                ]
+            ];
+            
+            $paymentMethods = [
+                [
+                    'id' => 'pm_123456789',
+                    'brand' => 'visa',
+                    'last4' => '4242',
+                    'exp_month' => 12,
+                    'exp_year' => 2025,
+                    'is_default' => true
+                ]
+            ];
+        }
+        
+        return Inertia::render('Settings/Billing', [
+            'subscription' => $subscriptionData,
+            'invoices' => $invoices,
+            'paymentMethods' => $paymentMethods,
+        ]);
+    }
 }

@@ -25,6 +25,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/subscriptions/subscribe', [App\Http\Controllers\SubscriptionController::class, 'subscribe'])->name('subscriptions.subscribe');
     Route::get('/subscriptions/success', [App\Http\Controllers\SubscriptionController::class, 'success'])->name('subscriptions.success');
     Route::get('/subscriptions/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancel'])->name('subscriptions.cancel');
+    Route::get('/settings/billing', [App\Http\Controllers\SubscriptionController::class, 'billing'])->name('settings.billing');
     
     // Route de débogage pour les abonnements (à supprimer en production)
     Route::get('/debug/subscriptions', [App\Http\Controllers\SubscriptionController::class, 'debugSubscriptions'])

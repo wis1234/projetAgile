@@ -246,7 +246,7 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                     href="/settings/billing" 
                                     className="text-blue-600 hover:text-blue-800 hover:underline"
                                 >
-                                    Voir les détails de facturation →
+                                    {/* Voir les détails de facturation → */}
                                 </Link>
                             </div>
                         </div>
