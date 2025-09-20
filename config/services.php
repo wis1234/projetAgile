@@ -42,8 +42,9 @@ return [
     ],
 
     'fedapay' => [
-        'public_key' => env('FEDAPAY_PUBLIC_KEY', 'pk_live_NVw62EiQ_Yu6mvPq13vuUapq'),
-        'secret_key' => env('FEDAPAY_SECRET_KEY'),
+        'public_key' => env('FEDAPAY_LIVE_PUBLIC_KEY', 'pk_live_NVw62EiQ_Yu6mvPq13vuUapq'),
+        'secret_key' => env('FEDAPAY_LIVE_SECRET_KEY'),
+        'webhook_secret' => env('FEDAPAY_WEBHOOK_SECRET'),
         'environment' => env('FEDAPAY_ENV', 'live'), // 'live' ou 'sandbox'
     ],
 

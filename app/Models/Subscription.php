@@ -17,10 +17,29 @@ class Subscription extends Model
     public const STATUS_EXPIRED = 'expired';
 
     /**
-     * Les attributs qui sont assignables en masse.
+     * Les attributs qui ne sont pas assignables en masse.
      *
      * @var array<int, string>
      */
+    protected $guarded = [];
+    
+    /**
+     * Les attributs qui doivent être convertis.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'metadata' => 'array',
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'amount_paid' => 'decimal:2',
+        'payment_details' => 'array',
+        'is_renewal' => 'boolean',
+    ];
+    
+    // Ancienne propriété fillable commentée pour référence
+    /*
     protected $fillable = [
         'user_id',
         'subscription_plan_id',
@@ -35,21 +54,9 @@ class Subscription extends Model
         'payment_details',
         'receipt_url',
         'is_renewal',
+        'metadata',
     ];
-
-    /**
-     * Les attributs qui doivent être convertis.
-     *
-     * @var array<string, string>
-     */
-    protected $casts = [
-        'starts_at' => 'datetime',
-        'ends_at' => 'datetime',
-        'cancelled_at' => 'datetime',
-        'amount_paid' => 'decimal:2',
-        'payment_details' => 'array',
-        'is_renewal' => 'boolean',
-    ];
+    */
 
     /**
      * Les attributs qui doivent être mutés en dates.

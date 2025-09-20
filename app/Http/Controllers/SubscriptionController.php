@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Jobs\VerifyFedapayTransaction;
 
 class SubscriptionController extends Controller
 {
@@ -73,9 +74,27 @@ class SubscriptionController extends Controller
      */
     public function index()
     {
+        // Récupérer l'utilisateur connecté
+        $user = auth()->user();
+        $currentSubscription = null;
+
+        // Récupérer l'abonnement actif de l'utilisateur s'il en a un
+        if ($user) {
+            $currentSubscription = \App\Models\Subscription::with('plan')
+                ->where('user_id', $user->id)
+                ->where(function($query) {
+                    $query->where('status', 'active')
+                          ->orWhere('status', 'pending');
+                })
+                ->latest()
+                ->first();
+        }
+
         $plans = \App\Models\SubscriptionPlan::where('is_active', true)
             ->get()
-            ->map(function($plan) {
+            ->map(function($plan) use ($currentSubscription) {
+                $isCurrent = $currentSubscription && $currentSubscription->plan_id === $plan->id;
+                
                 return [
                     'id' => $plan->id,
                     'name' => $plan->name,
@@ -87,12 +106,34 @@ class SubscriptionController extends Controller
                     'description' => $plan->description,
                     'features' => $plan->features,
                     'is_popular' => $plan->slug === 'etudiant',
-                    'is_current' => false // À implémenter la logique pour vérifier l'abonnement actuel
+                    'is_current' => $isCurrent
                 ];
             });
 
+        // Préparer les données de l'abonnement actuel pour la vue
+        $currentSubscriptionData = null;
+        if ($currentSubscription) {
+            $currentSubscriptionData = [
+                'id' => $currentSubscription->id,
+                'plan_id' => $currentSubscription->plan_id,
+                'plan_name' => $currentSubscription->plan ? $currentSubscription->plan->name : 'Inconnu',
+                'status' => $currentSubscription->status,
+                'starts_at' => $currentSubscription->starts_at,
+                'ends_at' => $currentSubscription->ends_at,
+                'amount_paid' => $currentSubscription->amount_paid,
+                'payment_method' => $currentSubscription->payment_method,
+                'created_at' => $currentSubscription->created_at,
+                'updated_at' => $currentSubscription->updated_at,
+                'is_active' => $currentSubscription->status === 'active',
+                'is_pending' => $currentSubscription->status === 'pending',
+                'is_expired' => $currentSubscription->ends_at && $currentSubscription->ends_at->isPast(),
+                'days_remaining' => $currentSubscription->ends_at ? now()->diffInDays($currentSubscription->ends_at, false) : null
+            ];
+        }
+
         return Inertia::render('Subscriptions/Index', [
-            'plans' => $plans
+            'plans' => $plans,
+            'currentPlan' => $currentSubscriptionData
         ]);
     }
 
@@ -175,14 +216,44 @@ class SubscriptionController extends Controller
                 ]
             ]);
             
+            // Créer l'abonnement avec le statut 'pending' initialement
+            $subscription = new \App\Models\Subscription([
+                'user_id' => $user->id,
+                'subscription_plan_id' => $plan->id,
+                'starts_at' => now(),
+                'ends_at' => now()->addMonths($plan->duration_in_months),
+                'amount_paid' => $plan->price,
+                'status' => 'pending', // Statut initial
+                'payment_method' => $request->payment_method,
+                'transaction_id' => $transaction->id ?? null,
+                'metadata' => [
+                    'attempted_at' => now(),
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent()
+                ]
+            ]);
+            
+            // Sauvegarder l'abonnement avant le paiement
+            $subscription->save();
+            
             // Générer le token de paiement
             $token = $transaction->generateToken();
             
+            // Mettre à jour l'abonnement avec les informations de la transaction
+            $subscription->update([
+                'transaction_id' => $transaction->id,
+                'status' => 'pending', // Le statut reste en attente jusqu'à confirmation
+                'metadata' => array_merge($subscription->metadata ?? [], [
+                    'payment_initiated_at' => now(),
+                    'payment_token' => $token->token
+                ])
+            ]);
+
             // Retourner le token dans une réponse JSON
             return response()->json([
-                'success' => true,
                 'token' => $token->token,
-                'url' => $token->url
+                'url' => $token->url,
+                'subscription_id' => $subscription->id
             ]);
             
         } catch (\Exception $e) {
@@ -223,116 +294,171 @@ class SubscriptionController extends Controller
     public function success(Request $request)
     {
         $transactionId = $request->query('transaction_id');
-        $status = $request->query('status');
+        $status = $request->query('status', 'pending');
         $planId = $request->query('plan_id');
+        $subscriptionId = $request->query('subscription_id');
         
-        if (!$transactionId) {
-            return redirect()->route('subscription.plans')
-                ->with('error', 'Aucun identifiant de transaction fourni.');
+        // Si aucune transaction ID n'est fournie, vérifier si on a un ID d'abonnement
+        if (!$transactionId && !$subscriptionId) {
+            // Essayer de trouver l'abonnement le plus récent pour l'utilisateur connecté
+            $subscription = \App\Models\Subscription::where('user_id', auth()->id())
+                ->latest()
+                ->first();
+                
+            if ($subscription) {
+                $subscriptionId = $subscription->id;
+            } else {
+                return redirect()->route('subscription.plans')
+                    ->with('error', 'Aucun identifiant de transaction ou d\'abonnement fourni.');
+            }
         }
         
         try {
-            $subscription = null;
+            // Essayer de trouver l'abonnement par ID ou par ID de transaction
+            $subscription = $subscriptionId 
+                ? \App\Models\Subscription::find($subscriptionId)
+                : \App\Models\Subscription::where('payment_id', $transactionId)->first();
             
-            // Vérifier si la transaction existe déjà
-            $subscription = \App\Models\Subscription::where('payment_id', $transactionId)->first();
-            
-            if ($subscription) {
-                // Mettre à jour le statut de l'utilisateur si le paiement est réussi
-                if ($status === 'approved') {
-                    $user = auth()->user();
-                    if ($user) {
-                        // Calculer la date de fin en fonction de la durée du plan
-                        $plan = \App\Models\SubscriptionPlan::find($subscription->subscription_plan_id);
-                        $endsAt = $plan ? now()->addMonths($plan->duration_in_months) : now()->addMonth();
-                        
-                        $user->update([
-                            'subscription_status' => 'active',
-                            'subscription_ends_at' => $endsAt,
-                        ]);
-                        
-                        // Mettre à jour l'abonnement
-                        $subscription->update([
-                            'status' => 'active',
-                            'starts_at' => now(),
-                            'ends_at' => $endsAt,
-                        ]);
-                    }
-                }
-                
-                // Journaliser le statut de la transaction
-                \Log::info("Statut de la transaction $transactionId: $status", [
-                    'subscription_id' => $subscription->id,
+            // Si l'abonnement n'existe pas, en créer un nouveau en attente
+            if (!$subscription) {
+                $subscription = new \App\Models\Subscription([
                     'user_id' => auth()->id(),
-                    'plan_id' => $planId,
-                    'status' => $status
+                    'subscription_plan_id' => $planId,
+                    'payment_id' => $transactionId,
+                    'status' => 'pending',
+                    'starts_at' => now(),
+                    'ends_at' => now()->addMonth(), // Par défaut 1 mois, sera mis à jour par le webhook
+                    'amount_paid' => 0,
+                    'payment_method' => $request->query('payment_method', 'unknown'),
+                    'metadata' => [
+                        'created_via' => 'success_callback',
+                        'callback_data' => $request->all()
+                    ]
                 ]);
-                
-                // Si le paiement a échoué, rediriger avec un message d'erreur
-                if ($status !== 'approved') {
-                    return redirect()->route('subscription.plans')
-                        ->with('error', "Le paiement a échoué. Statut: " . ucfirst($status));
-                }
-            } else {
-                // Si la transaction n'existe pas
-                \Log::error("Transaction non trouvée: $transactionId");
-                return redirect()->route('subscription.plans')
-                    ->with('error', 'Transaction introuvable. Veuillez contacter le support.');
+                $subscription->save();
             }
+            
+            // Vérifier si nous devons vérifier le statut de la transaction
+            if ($subscription->status === 'pending' && $transactionId) {
+                // Planifier un job pour vérifier le statut de la transaction
+                VerifyFedapayTransaction::dispatch($subscription, $transactionId)
+                    ->delay(now()->addSeconds(30));
+            }
+            
+            // Récupérer les informations du plan pour l'affichage
+            $plan = null;
+            if ($subscription->subscription_plan_id) {
+                $plan = \App\Models\SubscriptionPlan::find($subscription->subscription_plan_id);
+            }
+            
+            // Préparer les données pour la vue Inertia
+            $subscriptionData = [
+                'id' => $subscription->id,
+                'status' => $subscription->status,
+                'isPending' => $subscription->status === 'pending',
+                'transaction_id' => $transactionId,
+                'starts_at' => $subscription->starts_at,
+                'ends_at' => $subscription->ends_at,
+                'amount_paid' => $subscription->amount_paid,
+                'plan' => null
+            ];
+            
+            if ($plan) {
+                $subscriptionData['plan'] = [
+                    'id' => $plan->id,
+                    'name' => $plan->name,
+                    'description' => $plan->description ?? '',
+                    'price' => $plan->price,
+                    'duration_in_months' => $plan->duration_in_months,
+                    'features' => $plan->features ?? []
+                ];
+            }
+
+            return Inertia::render('Subscriptions/Success', [
+                'subscription' => $subscriptionData
+            ]);
+            
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
             \Log::error("Erreur lors du traitement de la transaction $transactionId: " . $errorMessage);
             
-            // Enregistrer quand même l'échec dans la base de données
+            // Enregistrer l'échec dans la base de données
             try {
-                \App\Models\Subscription::create([
-                    'user_id' => auth()->id(),
-                    'subscription_plan_id' => $planId,
-                    'status' => 'error',
-                    'payment_id' => $transactionId ?? 'unknown_' . uniqid(),
-                    'payment_method' => 'unknown',
-                    'currency' => 'XOF',
-                    'payment_details' => ['error' => $errorMessage],
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                $subscription = \App\Models\Subscription::updateOrCreate(
+                    ['payment_id' => $transactionId ?? 'unknown_' . uniqid()],
+                    [
+                        'user_id' => auth()->id(),
+                        'subscription_plan_id' => $planId,
+                        'status' => 'error',
+                        'payment_method' => 'unknown',
+                        'currency' => 'XOF',
+                        'payment_details' => ['error' => $errorMessage],
+                        'starts_at' => now(),
+                        'ends_at' => now(),
+                        'metadata' => [
+                            'error' => $errorMessage,
+                            'trace' => $e->getTraceAsString()
+                        ]
+                    ]
+                );
+                
+                return redirect()->route('subscription.plans')
+                    ->with('error', 'Une erreur est survenue lors du traitement de votre paiement. Veuillez réessayer ou contacter le support.');
+                    
             } catch (\Exception $dbError) {
                 \Log::error('Échec de l\'enregistrement de l\'erreur dans la base de données: ' . $dbError->getMessage());
+                
+                return redirect()->route('subscription.plans')
+                    ->with('error', 'Une erreur critique est survenue. Veuillez contacter le support.');
             }
-            
-            return redirect()->route('subscription.plans')
-                ->with('error', 'Une erreur est survenue lors du traitement de votre paiement. Veuillez réessayer ou contacter le support.');
-        }
-        
-        // Récupérer les informations du plan pour l'affichage
-        $plan = null;
-        if ($subscription && $subscription->subscription_plan_id) {
-            $plan = \App\Models\SubscriptionPlan::find($subscription->subscription_plan_id);
-        }
-        
-        // Préparer les données pour la vue Inertia
-        $subscriptionData = [
-            'id' => $subscription->id,
-            'starts_at' => $subscription->starts_at,
-            'ends_at' => $subscription->ends_at,
-            'amount_paid' => $subscription->amount_paid,
-            'status' => $subscription->status,
-            'plan' => null
-        ];
-        
-        if ($plan) {
-            $subscriptionData['plan'] = [
-                'id' => $plan->id,
-                'name' => $plan->name,
-                'description' => $plan->description ?? '',
-                'price' => $plan->price,
-                'duration_in_months' => $plan->duration_in_months,
-                'features' => $plan->features ?? []
-            ];
         }
         
         return Inertia::render('Subscriptions/Success', [
             'subscription' => $subscriptionData
         ]);
+    }
+    
+    /**
+     * Affiche le contenu de la table subscriptions (pour débogage)
+     */
+    public function debugSubscriptions()
+    {
+        try {
+            // Vérifier si la table existe
+            if (!\Schema::hasTable('subscriptions')) {
+                return response()->json([
+                    'error' => 'La table subscriptions n\'existe pas',
+                    'tables' => \Schema::getAllTables()
+                ], 500);
+            }
+            
+            // Récupérer les abonnements
+            $subscriptions = \DB::table('subscriptions')->get();
+            
+            // Vérifier les colonnes de la table
+            $columns = \Schema::getColumnListing('subscriptions');
+            
+            // Vérifier les contraintes de validation du modèle
+            $subscription = new \App\Models\Subscription();
+            $rules = method_exists($subscription, 'rules') ? $subscription->rules() : [];
+            
+            return response()->json([
+                'count' => $subscriptions->count(),
+                'subscriptions' => $subscriptions,
+                'columns' => $columns,
+                'validation_rules' => $rules,
+                'db_connection' => \DB::connection()->getDatabaseName(),
+                'table_exists' => \Schema::hasTable('subscriptions'),
+                'migrations' => \DB::table('migrations')->where('migration', 'like', '%subscription%')->get()
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'connection' => config('database.default'),
+                'database' => config('database.connections.' . config('database.default') . '.database')
+            ], 500);
+        }
     }
 }

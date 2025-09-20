@@ -25,6 +25,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/subscriptions/subscribe', [App\Http\Controllers\SubscriptionController::class, 'subscribe'])->name('subscriptions.subscribe');
     Route::get('/subscriptions/success', [App\Http\Controllers\SubscriptionController::class, 'success'])->name('subscriptions.success');
     Route::get('/subscriptions/cancel', [App\Http\Controllers\SubscriptionController::class, 'cancel'])->name('subscriptions.cancel');
+    
+    // Route de débogage pour les abonnements (à supprimer en production)
+    Route::get('/debug/subscriptions', [App\Http\Controllers\SubscriptionController::class, 'debugSubscriptions'])
+        ->name('subscriptions.debug')
+        ->middleware('auth');
+        
     // Profile routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -174,6 +180,11 @@ Route::middleware('auth')->group(function () {
             ->name('api.files.save-to-dropbox');
     });
 });
+
+// Webhook FedaPay pour les paiements
+Route::post('/webhooks/fedapay', [App\Http\Controllers\WebhookController::class, 'handleFedapayWebhook'])
+    ->name('webhooks.fedapay')
+    ->withoutMiddleware(['web', 'csrf']);
 
 // Route pour gérer l'erreur 419 (Session expirée)
 Route::get('/419', function () {

@@ -10,7 +10,11 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
     // Les fonctionnalités sont maintenant récupérées depuis la base de données via la propriété features de chaque plan
 
     const getPlanIcon = (planName) => {
-        switch (planName.toLowerCase()) {
+        if (!planName) {
+            return <FontAwesomeIcon icon={faUserTie} className="mr-2" />;
+        }
+        const lowerName = String(planName).toLowerCase();
+        switch (lowerName) {
             case 'mensuel':
                 return <FontAwesomeIcon icon={faClock} className="mr-2" />;
             case 'annuel':
@@ -22,14 +26,27 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
         }
     };
 
+    // Fonction pour formater la date en français
+    const formatDate = (dateString) => {
+        if (!dateString) return 'Non défini';
+        const options = { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        };
+        return new Date(dateString).toLocaleDateString('fr-FR', options);
+    };
+
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-gray-50">
             <AdminLayout
                 header={
-                    <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
+                    <div className="flex flex-col px-6 py-4 space-y-4 bg-white border-b border-gray-200 md:space-y-0 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center space-x-4">
                             <h2 className="text-2xl font-bold leading-tight text-gray-800">
-                                Choisissez votre forfait
+                                Gestion des abonnements
                             </h2>
                             <div className="flex space-x-4">
                                 <Link 
@@ -60,8 +77,12 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
             >
             <Head title="Abonnements" />
 
-            <div className="py-12">
+            <div className="py-8">
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                    <h2 className="mb-6 text-2xl font-bold text-gray-800">
+                        Choisissez votre forfait
+                    </h2>
+                    
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                         {plans.map((plan) => {
                             const isCurrentPlan = currentPlan && currentPlan.id === plan.id;
@@ -84,28 +105,40 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
 
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-lg font-medium text-gray-900">
-                                            {getPlanIcon(plan.name)}
-                                            {plan.name}
+                                            {getPlanIcon(plan?.name)}
+                                            {plan?.name || 'Forfait sans nom'}
                                         </h3>
                                         {isCurrentPlan && (
-                                            <span className="px-2 py-1 text-xs font-medium text-green-800 bg-green-100 rounded-full">
-                                                Actif
+                                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                                currentPlan.status === 'active' 
+                                                    ? 'text-green-800 bg-green-100' 
+                                                    : currentPlan.status === 'pending' 
+                                                        ? 'text-yellow-800 bg-yellow-100' 
+                                                        : 'text-red-800 bg-red-100'
+                                            }`}>
+                                                {currentPlan.status === 'active' 
+                                                    ? 'Actif' 
+                                                    : currentPlan.status === 'pending' 
+                                                        ? 'En attente' 
+                                                        : 'Expiré'}
                                             </span>
                                         )}
                                     </div>
 
                                     <p className="mt-4 text-sm text-gray-500">
-                                        {plan.description}
+                                        {plan?.description || 'Aucune description disponible pour ce forfait.'}
                                     </p>
 
                                     <div className="mt-6">
                                         <p className="text-4xl font-extrabold text-gray-900">
-                                            {plan.price.toLocaleString()} FCFA
-                                            <span className="text-base font-medium text-gray-600">
-                                                /{plan.period}
-                                            </span>
+                                            {plan?.price ? plan.price.toLocaleString() : '0'} FCFA
+                                            {plan?.period && (
+                                                <span className="text-base font-medium text-gray-600">
+                                                    /{plan.period}
+                                                </span>
+                                            )}
                                         </p>
-                                        {plan.period === 'par an' && (
+                                        {plan?.period === 'par an' && plan?.price && (
                                             <p className="mt-1 text-sm text-gray-500">
                                                 Soit {Math.round(plan.price / 12).toLocaleString()} FCFA/mois
                                             </p>
@@ -166,9 +199,62 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                             );
                         })}
                     </div>
-
+                    
+                    {/* Section Abonnement Actuel */}
+                    {currentPlan && (
+                        <div className="p-6 mt-12 bg-white rounded-lg shadow">
+                            <h3 className="mb-4 text-xl font-semibold text-gray-900">Détails sur votre abonnement</h3>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                                <div className="p-4 border rounded-lg">
+                                    <p className="text-sm font-medium text-gray-500">Type d'abonnement</p>
+                                    <p className="mt-1 text-lg font-semibold text-gray-900">
+                                        {getPlanIcon(currentPlan.plan_name)}
+                                        {currentPlan.plan_name}
+                                    </p>
+                                </div>
+                                <div className="p-4 border rounded-lg">
+                                    <p className="text-sm font-medium text-gray-500">Date de début</p>
+                                    <p className="mt-1 text-lg font-semibold text-gray-900">
+                                        {formatDate(currentPlan.starts_at)}
+                                    </p>
+                                </div>
+                                <div className="p-4 border rounded-lg">
+                                    <p className="text-sm font-medium text-gray-500">Date de fin</p>
+                                    <p className="mt-1 text-lg font-semibold text-gray-900">
+                                        {formatDate(currentPlan.ends_at)}
+                                    </p>
+                                </div>
+                                <div className="p-4 border rounded-lg">
+                                    <p className="text-sm font-medium text-gray-500">Montant payé</p>
+                                    <p className="mt-1 text-lg font-semibold text-green-600">
+                                        {currentPlan.amount_paid?.toLocaleString() || '0'} FCFA
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between px-4 py-3 mt-4 text-sm bg-blue-50 rounded-b-lg">
+                                <span className="flex items-center">
+                                    <span className={`inline-block w-2 h-2 mr-2 rounded-full ${
+                                        currentPlan.status === 'active' ? 'bg-green-500' : 
+                                        currentPlan.status === 'pending' ? 'bg-yellow-500' : 'bg-red-500'
+                                    }`}></span>
+                                    Statut: <span className="ml-1 font-medium">
+                                        {currentPlan.status === 'active' ? 'Actif' : 
+                                         currentPlan.status === 'pending' ? 'En attente' : 'Inactif'}
+                                    </span>
+                                </span>
+                                <Link 
+                                    href="/settings/billing" 
+                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                    Voir les détails de facturation →
+                                </Link>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Section Questions Fréquentes */}
                     <div className="mt-12 bg-white rounded-lg shadow">
-                        <div className="px-6 py-5 border-b border-gray-200 sm:px-6">
+                        <div className="px-6 py-5 border-b border-gray-200">
                             <h3 className="text-lg font-medium leading-6 text-gray-900">Questions fréquentes</h3>
                         </div>
                         <div className="px-6 py-5 space-y-6">
