@@ -18,3 +18,6 @@ window.Echo = new Echo({
     disableStats: true,
     enabledTransports: ['ws', 'wss'],
 });
+
+// Variables reCAPTCHA
+window.recaptchaSiteKey = '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN';

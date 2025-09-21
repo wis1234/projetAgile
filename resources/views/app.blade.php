@@ -26,6 +26,54 @@
         <script>
             window.FedaPayEnvironment = '{{ env('MIX_FEDAPAY_ENV', 'sandbox') }}';
         </script>
+        <!-- reCAPTCHA Script -->
+        <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>
+        <style>
+            .grecaptcha-badge { 
+                visibility: visible !important;
+                z-index: 1000;
+            }
+            #recaptcha-element {
+                margin: 10px 0;
+            }
+        </style>
+        <script>
+            // Fonction appelée quand reCAPTCHA est chargé
+            function onRecaptchaLoad() {
+                // Événement personnalisé pour indiquer que reCAPTCHA est prêt
+                const event = new Event('recaptcha-loaded');
+                document.dispatchEvent(event);
+            }
+            
+            // Fonction de rappel pour le succès de reCAPTCHA
+            window.onRecaptchaSuccess = function(token) {
+                const event = new CustomEvent('recaptcha-verified', { detail: { token } });
+                document.dispatchEvent(event);
+            };
+            
+            // Fonction de rappel pour l'expiration de reCAPTCHA
+            window.onRecaptchaExpired = function() {
+                const event = new Event('recaptcha-expired');
+                document.dispatchEvent(event);
+            };
+            
+            // Fonction de rappel pour les erreurs reCAPTCHA
+            window.onRecaptchaError = function() {
+                const event = new Event('recaptcha-error');
+                document.dispatchEvent(event);
+            };
+        </script>
+        <script>
+            window.recaptchaCallback = function() {
+                window.recaptchaReady = true;
+            };
+        </script>
+        <style>
+            .grecaptcha-badge { 
+                visibility: visible !important;
+                z-index: 1000;
+            }
+        </style>
     </head>
     <body class="font-sans antialiased">
         @inertia
@@ -40,5 +88,17 @@
                 <div class="mt-8 text-gray-400 text-sm">&copy; {{ date('Y') }} ProJA</div>
             </div>
         @endif
+        <script>
+            function onRecaptchaSuccess(token) {
+                const event = new CustomEvent('recaptcha-verified', { detail: { token } });
+                document.querySelector('form').dispatchEvent(event);
+            }
+            function onRecaptchaExpired() {
+                document.querySelector('form').dispatchEvent(new Event('recaptcha-expired'));
+            }
+            function onRecaptchaError() {
+                document.querySelector('form').dispatchEvent(new Event('recaptcha-error'));
+            }
+        </script>
     </body>
 </html>

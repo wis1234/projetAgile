@@ -1,6 +1,6 @@
 import { Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
-import { FaUser, FaEnvelope, FaLock } from 'react-icons/fa';
+import { useState, useEffect, useRef } from 'react';
+import { FaUser, FaEnvelope, FaLock, FaShieldAlt } from 'react-icons/fa';
 import { InputError, PrimaryButton, TextInput } from '@/Components';
 
 export default function Register() {
@@ -12,10 +12,93 @@ export default function Register() {
         recaptcha_token: '',
     });
 
+    const recaptchaRef = useRef(null);
+    const [recaptchaError, setRecaptchaError] = useState('');
+    const [isRecaptchaLoaded, setIsRecaptchaLoaded] = useState(false);
+
+    useEffect(() => {
+        // Fonction pour initialiser reCAPTCHA
+        const initializeRecaptcha = () => {
+            if (window.grecaptcha) {
+                setIsRecaptchaLoaded(true);
+                
+                window.grecaptcha.ready(() => {
+                    const recaptchaElement = document.getElementById('recaptcha-element');
+                    if (recaptchaElement && !recaptchaElement.querySelector('iframe')) {
+                        window.grecaptcha.render('recaptcha-element', {
+                            sitekey: '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN',
+                            callback: 'onRecaptchaSuccess',
+                            'expired-callback': 'onRecaptchaExpired',
+                            'error-callback': 'onRecaptchaError',
+                            theme: 'light',
+                            size: 'normal',
+                            tabindex: 0
+                        });
+                    }
+                });
+            }
+        };
+
+        const handleRecaptchaVerified = (e) => {
+            setData('recaptcha_token', e.detail.token);
+            setRecaptchaError('');
+        };
+        
+        const handleRecaptchaExpired = () => {
+            setData('recaptcha_token', '');
+            setRecaptchaError('La vérification a expiré. Veuillez réessayer.');
+            // Réinitialiser le widget reCAPTCHA
+            if (window.grecaptcha) {
+                window.grecaptcha.reset();
+            }
+        };
+        
+        const handleRecaptchaError = () => {
+            setData('recaptcha_token', '');
+            setRecaptchaError('Une erreur est survenue. Veuillez réessayer.');
+        };
+
+        // Écouter les événements reCAPTCHA
+        document.addEventListener('recaptcha-verified', handleRecaptchaVerified);
+        document.addEventListener('recaptcha-expired', handleRecaptchaExpired);
+        document.addEventListener('recaptcha-error', handleRecaptchaError);
+        document.addEventListener('recaptcha-loaded', initializeRecaptcha);
+
+        // Vérifier périodiquement si reCAPTCHA est chargé
+        const checkRecaptcha = setInterval(() => {
+            if (window.grecaptcha) {
+                clearInterval(checkRecaptcha);
+                initializeRecaptcha();
+            }
+        }, 100);
+
+        // Nettoyer les écouteurs d'événements et l'intervalle
+        return () => {
+            clearInterval(checkRecaptcha);
+            document.removeEventListener('recaptcha-verified', handleRecaptchaVerified);
+            document.removeEventListener('recaptcha-expired', handleRecaptchaExpired);
+            document.removeEventListener('recaptcha-error', handleRecaptchaError);
+            document.removeEventListener('recaptcha-loaded', initializeRecaptcha);
+        };
+    }, [setData]);
+
     const submit = (e) => {
         e.preventDefault();
         
-        post(route('register'));
+        if (!data.recaptcha_token) {
+            setRecaptchaError('Veuillez confirmer que vous n\'êtes pas un robot.');
+            return;
+        }
+        
+        post(route('register'), {
+            onError: () => {
+                // Réinitialiser reCAPTCHA en cas d'erreur
+                if (window.grecaptcha) {
+                    window.grecaptcha.reset();
+                }
+                setData('recaptcha_token', '');
+            }
+        });
     };
 
     return (
@@ -137,8 +220,37 @@ export default function Register() {
                             <InputError message={errors.password_confirmation} className="mt-1" />
                         </div>
 
+                        {/* reCAPTCHA */}
+                        <div className="mt-6">
+                            <div className="flex items-center mb-2">
+                                <FaShieldAlt className="h-5 w-5 text-gray-400 mr-2" />
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Vérification de sécurité
+                                </span>
+                            </div>
+                            <div className="flex justify-center">
+                                <div 
+                                    id="recaptcha-element"
+                                    className={`g-recaptcha ${errors.recaptcha_token ? 'border border-red-500 rounded p-2' : ''}`}
+                                    data-sitekey="6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN"
+                                    data-theme="light"
+                                    data-size="normal"
+                                    data-callback="onRecaptchaSuccess"
+                                    data-expired-callback="onRecaptchaExpired"
+                                    data-error-callback="onRecaptchaError"
+                                    ref={recaptchaRef}
+                                    style={{ transform: 'scale(0.9)' }}
+                                ></div>
+                            </div>
+                            {recaptchaError && (
+                                <p className="mt-2 text-sm text-red-600">{recaptchaError}</p>
+                            )}
+                            {errors.recaptcha_token && (
+                                <p className="mt-2 text-sm text-red-600">{errors.recaptcha_token}</p>
+                            )}
+                        </div>
 
-                        <div>
+                        <div className="pt-2">
                             <div className="flex justify-center">
                                 <PrimaryButton 
                                     type="submit" 

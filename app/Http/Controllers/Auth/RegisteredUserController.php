@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Support\Facades\Validator;
 
 class RegisteredUserController extends Controller
 {
@@ -43,7 +44,7 @@ class RegisteredUserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         // Validation des données du formulaire
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
@@ -52,7 +53,31 @@ class RegisteredUserController extends Controller
             'job_title' => 'nullable|string|max:100',
             'company' => 'nullable|string|max:100',
             'bio' => 'nullable|string|max:1000',
+            'recaptcha_token' => 'required|string',
         ]);
+
+        // Validation du token reCAPTCHA
+        $recaptchaResponse = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
+            'secret' => config('services.recaptcha.secret_key'),
+            'response' => $request->recaptcha_token,
+            'remoteip' => $request->ip(),
+        ]);
+
+        // Vérifier la réponse de reCAPTCHA
+        if (!$recaptchaResponse->json('success') || $recaptchaResponse->json('score') < 0.5) {
+            $validator->errors()->add('recaptcha_token', 'La vérification de sécurité a échoué. Veuillez réessayer.');
+            return back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        if ($validator->fails()) {
+            return back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $validated = $validator->validated();
 
         try {
             // Création de l'utilisateur avec les données validées
