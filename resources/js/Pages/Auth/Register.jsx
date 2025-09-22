@@ -16,128 +16,147 @@ export default function Register() {
     const [recaptchaError, setRecaptchaError] = useState('');
     const [isRecaptchaLoaded, setIsRecaptchaLoaded] = useState(false);
 
-    useEffect(() => {
-        // Fonction pour initialiser reCAPTCHA
-        const initializeRecaptcha = () => {
-            if (window.grecaptcha) {
-                setIsRecaptchaLoaded(true);
-                
-                window.grecaptcha.ready(() => {
-                    const recaptchaElement = document.getElementById('recaptcha-element');
-                    if (recaptchaElement && !recaptchaElement.querySelector('iframe')) {
-                        window.grecaptcha.render('recaptcha-element', {
-                            sitekey: '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN',
-                            callback: 'onRecaptchaSuccess',
-                            'expired-callback': 'onRecaptchaExpired',
-                            'error-callback': 'onRecaptchaError',
-                            theme: 'light',
-                            size: 'normal',
-                            tabindex: 0
-                        });
-                    }
-                });
-            }
-        };
+    // Fonction pour initialiser reCAPTCHA
+    const initializeRecaptcha = () => {
+        if (!window.grecaptcha) {
+            console.error('grecaptcha non disponible');
+            return;
+        }
 
-        const handleRecaptchaVerified = (e) => {
-            setData('recaptcha_token', e.detail.token);
-            setRecaptchaError('');
-        };
-        
-        const handleRecaptchaExpired = () => {
-            setData('recaptcha_token', '');
-            setRecaptchaError('La vérification a expiré. Veuillez réessayer.');
-            // Réinitialiser le widget reCAPTCHA
-            if (window.grecaptcha) {
-                window.grecaptcha.reset();
-            }
-        };
-        
-        const handleRecaptchaError = () => {
-            setData('recaptcha_token', '');
-            setRecaptchaError('Une erreur est survenue. Veuillez réessayer.');
-        };
-
-        // Écouter les événements reCAPTCHA
-        document.addEventListener('recaptcha-verified', handleRecaptchaVerified);
-        document.addEventListener('recaptcha-expired', handleRecaptchaExpired);
-        document.addEventListener('recaptcha-error', handleRecaptchaError);
-        document.addEventListener('recaptcha-loaded', initializeRecaptcha);
-
-        // Vérifier périodiquement si reCAPTCHA est chargé
-        const checkRecaptcha = setInterval(() => {
-            if (window.grecaptcha) {
-                clearInterval(checkRecaptcha);
-                initializeRecaptcha();
-            }
-        }, 100);
-
-        // Nettoyer les écouteurs d'événements et l'intervalle
-        return () => {
-            clearInterval(checkRecaptcha);
-            document.removeEventListener('recaptcha-verified', handleRecaptchaVerified);
-            document.removeEventListener('recaptcha-expired', handleRecaptchaExpired);
-            document.removeEventListener('recaptcha-error', handleRecaptchaError);
-            document.removeEventListener('recaptcha-loaded', initializeRecaptcha);
-        };
-    }, [setData]);
-
-    const submit = async (e) => {
-        e.preventDefault();
+        console.log('Initialisation de reCAPTCHA...');
         
         try {
-            // Exécuter reCAPTCHA
-            const token = await new Promise((resolve) => {
-                if (!window.grecaptcha) {
-                    setRecaptchaError('reCAPTCHA non chargé. Veuillez rafraîchir la page.');
-                    return resolve(null);
-                }
-                
-                window.grecaptcha.ready(() => {
-                    window.grecaptcha.execute('6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN', { action: 'submit' })
-                        .then((token) => resolve(token))
-                        .catch((error) => {
-                            console.error('Erreur reCAPTCHA:', error);
-                            setRecaptchaError('Erreur lors de la vérification reCAPTCHA');
-                            resolve(null);
-                        });
-                });
-            });
-            
-            if (!token) {
-                setRecaptchaError('Veuillez compléter la vérification reCAPTCHA');
+            // Vérifier si le widget a déjà été rendu
+            if (document.getElementById('recaptcha-element').hasChildNodes()) {
+                console.log('reCAPTCHA déjà initialisé');
                 return;
             }
+
+            // Rendre le widget reCAPTCHA
+            const widgetId = window.grecaptcha.render('recaptcha-element', {
+                sitekey: window.recaptchaSiteKey || '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN',
+                callback: onRecaptchaSuccess,
+                'expired-callback': onRecaptchaExpired,
+                'error-callback': onRecaptchaError,
+                theme: 'light',
+                size: 'normal'
+            });
+
+            console.log('reCAPTCHA rendu avec succès, widget ID:', widgetId);
+            setIsRecaptchaLoaded(true);
+            setRecaptchaError('');
             
-            setData('recaptcha_token', token);
-            
-            post(route('register'), {
-                onSuccess: () => {
-                    // Réinitialiser reCAPTCHA après une soumission réussie
-                    if (window.grecaptcha) {
-                        window.grecaptcha.reset();
-                    }
-                },
-                onError: (errors) => {
-                    if (errors.recaptcha_token) {
-                        setRecaptchaError(errors.recaptcha_token);
-                    }
-                    // Réinitialiser reCAPTCHA en cas d'erreur
-                    if (window.grecaptcha) {
-                        window.grecaptcha.reset();
-                    }
-                    setData('recaptcha_token', '');
-                },
-                preserveScroll: true
+            // Forcer l'exécution de la vérification
+            window.grecaptcha.ready(() => {
+                try {
+                    window.grecaptcha.execute(widgetId);
+                } catch (e) {
+                    console.error('Erreur lors de l\'exécution de reCAPTCHA:', e);
+                }
             });
             
         } catch (error) {
-            console.error('Erreur lors de la soumission:', error);
-            setRecaptchaError('Une erreur est survenue. Veuillez réessayer.');
-            if (window.grecaptcha) {
-                window.grecaptcha.reset();
-            }
+            console.error('Erreur lors du rendu de reCAPTCHA:', error);
+            setRecaptchaError('Erreur lors du chargement de la vérification de sécurité.');
+            setIsRecaptchaLoaded(false);
         }
+    };
+
+    // Callback pour une vérification reCAPTCHA réussie
+    const onRecaptchaSuccess = (token) => {
+        console.log('Token reCAPTCHA reçu:', token);
+        setData('recaptcha_token', token);
+        setRecaptchaError('');
+        setIsRecaptchaLoaded(true);
+    };
+
+    // Callback pour une vérification reCAPTCHA expirée
+    const onRecaptchaExpired = () => {
+        console.log('reCAPTCHA expiré');
+        setData('recaptcha_token', '');
+        setRecaptchaError('La vérification a expiré. Veuillez réessayer.');
+        setIsRecaptchaLoaded(false);
+    };
+
+    // Callback pour une erreur reCAPTCHA
+    const onRecaptchaError = () => {
+        console.error('Erreur reCAPTCHA');
+        setData('recaptcha_token', '');
+        setRecaptchaError('Une erreur est survenue. Veuillez réessayer.');
+        setIsRecaptchaLoaded(false);
+    };
+
+    // Gestion du chargement de reCAPTCHA
+    useEffect(() => {
+        const handleRecaptchaLoaded = () => {
+            console.log('Événement reCAPTCHA chargé reçu');
+            initializeRecaptcha();
+        };
+
+        // Vérifier si reCAPTCHA est déjà chargé
+        if (window.grecaptcha) {
+            handleRecaptchaLoaded();
+        }
+
+        // Écouter l'événement de chargement de reCAPTCHA
+        document.addEventListener('recaptcha-loaded', handleRecaptchaLoaded);
+        
+        // Nettoyage
+        return () => {
+            document.removeEventListener('recaptcha-loaded', handleRecaptchaLoaded);
+        };
+    }, []);
+
+    const submit = (e) => {
+        e.preventDefault();
+        
+        if (!data.recaptcha_token) {
+            setRecaptchaError('Veuillez confirmer que vous n\'êtes pas un robot.');
+            
+            // Essayer d'exécuter reCAPTCHA si disponible
+            if (window.grecaptcha) {
+                try {
+                    window.grecaptcha.ready(() => {
+                        const widgetId = window.grecaptcha.render('recaptcha-element');
+                        if (widgetId) {
+                            window.grecaptcha.execute(widgetId);
+                        }
+                    });
+                } catch (e) {
+                    console.error('Erreur lors de l\'exécution de reCAPTCHA:', e);
+                }
+            }
+            
+            return;
+        }
+        
+        console.log('Soumission du formulaire avec le token:', data.recaptcha_token);
+        
+        post(route('register'), {
+            onSuccess: () => {
+                console.log('Inscription réussie');
+                // Réinitialiser reCAPTCHA après une soumission réussie
+                if (window.grecaptcha) {
+                    window.grecaptcha.reset();
+                }
+            },
+            onError: (errors) => {
+                console.error('Erreur lors de l\'inscription:', errors);
+                if (errors.recaptcha_token) {
+                    setRecaptchaError(errors.recaptcha_token);
+                }
+                // Réinitialiser reCAPTCHA en cas d'erreur
+                if (window.grecaptcha) {
+                    window.grecaptcha.reset();
+                }
+                setData('recaptcha_token', '');
+            },
+            preserveScroll: true,
+            onFinish: () => {
+                // S'assurer que le token est bien effacé après la soumission
+                setData('recaptcha_token', '');
+            }
+        });
     };
 
     return (
@@ -267,19 +286,17 @@ export default function Register() {
                                     Vérification de sécurité
                                 </span>
                             </div>
-                            <div className="flex justify-center">
+                            <div className="flex flex-col items-center">
                                 <div 
                                     id="recaptcha-element"
-                                    className={`g-recaptcha ${errors.recaptcha_token || recaptchaError ? 'border border-red-500 rounded p-2' : ''}`}
+                                    className={`${errors.recaptcha_token || recaptchaError ? 'border border-red-500 rounded p-2' : ''}`}
                                     data-sitekey="6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN"
-                                    data-theme="light"
-                                    data-size="normal"
-                                    data-callback="onRecaptchaSuccess"
-                                    data-expired-callback="onRecaptchaExpired"
-                                    data-error-callback="onRecaptchaError"
-                                    ref={recaptchaRef}
-                                    style={{ transform: 'scale(0.9)' }}
                                 ></div>
+                                {!isRecaptchaLoaded && (
+                                    <div className="mt-2 text-yellow-600 text-sm">
+                                        Chargement de la vérification de sécurité...
+                                    </div>
+                                )}
                             </div>
                             {recaptchaError && (
                                 <p className="mt-2 text-sm text-red-600">{recaptchaError}</p>

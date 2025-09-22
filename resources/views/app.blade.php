@@ -28,11 +28,25 @@
         </script>
         <!-- reCAPTCHA Script -->
         <script>
+            // Définir la clé de site reCAPTCHA
+            window.recaptchaSiteKey = '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN';
+
             // Fonctions de rappel globales pour reCAPTCHA
             function onRecaptchaLoad() {
                 console.log('reCAPTCHA chargé');
-                const event = new Event('recaptcha-loaded');
-                document.dispatchEvent(event);
+                try {
+                    // Vérifier si grecaptcha est disponible
+                    if (typeof grecaptcha === 'undefined') {
+                        console.error('grecaptcha non défini après le chargement');
+                        return;
+                    }
+                    
+                    // Déclencher l'événement de chargement
+                    const event = new Event('recaptcha-loaded');
+                    document.dispatchEvent(event);
+                } catch (error) {
+                    console.error('Erreur lors de l\'initialisation de reCAPTCHA:', error);
+                }
             }
             
             function onRecaptchaSuccess(token) {
@@ -53,19 +67,30 @@
                 document.dispatchEvent(event);
             }
             
-            // Définir les fonctions globales pour les callbacks
-            window.onRecaptchaLoad = onRecaptchaLoad;
-            window.onRecaptchaSuccess = onRecaptchaSuccess;
-            window.onRecaptchaExpired = onRecaptchaExpired;
-            window.onRecaptchaError = onRecaptchaError;
-            
             // Charger reCAPTCHA de manière asynchrone
             function loadRecaptcha() {
-                const script = document.createElement('script');
-                script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
-                script.async = true;
-                script.defer = true;
-                document.head.appendChild(script);
+                try {
+                    // Vérifier si reCAPTCHA est déjà chargé
+                    if (window.grecaptcha) {
+                        onRecaptchaLoad();
+                        return;
+                    }
+                    
+                    const script = document.createElement('script');
+                    script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
+                    script.async = true;
+                    script.defer = true;
+                    script.onerror = function() {
+                        console.error('Erreur lors du chargement du script reCAPTCHA');
+                        const event = new Event('recaptcha-error');
+                        document.dispatchEvent(event);
+                    };
+                    document.head.appendChild(script);
+                } catch (error) {
+                    console.error('Erreur lors du chargement de reCAPTCHA:', error);
+                    const event = new Event('recaptcha-error');
+                    document.dispatchEvent(event);
+                }
             }
             
             // Démarrer le chargement de reCAPTCHA
@@ -88,43 +113,6 @@
             }
             .g-recaptcha > div {
                 margin: 0 auto;
-            }
-        </style>
-        <script>
-            // Fonction appelée quand reCAPTCHA est chargé
-            function onRecaptchaLoad() {
-                // Événement personnalisé pour indiquer que reCAPTCHA est prêt
-                const event = new Event('recaptcha-loaded');
-                document.dispatchEvent(event);
-            }
-            
-            // Fonction de rappel pour le succès de reCAPTCHA
-            window.onRecaptchaSuccess = function(token) {
-                const event = new CustomEvent('recaptcha-verified', { detail: { token } });
-                document.dispatchEvent(event);
-            };
-            
-            // Fonction de rappel pour l'expiration de reCAPTCHA
-            window.onRecaptchaExpired = function() {
-                const event = new Event('recaptcha-expired');
-                document.dispatchEvent(event);
-            };
-            
-            // Fonction de rappel pour les erreurs reCAPTCHA
-            window.onRecaptchaError = function() {
-                const event = new Event('recaptcha-error');
-                document.dispatchEvent(event);
-            };
-        </script>
-        <script>
-            window.recaptchaCallback = function() {
-                window.recaptchaReady = true;
-            };
-        </script>
-        <style>
-            .grecaptcha-badge { 
-                visibility: visible !important;
-                z-index: 1000;
             }
         </style>
     </head>

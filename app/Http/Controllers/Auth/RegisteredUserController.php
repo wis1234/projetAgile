@@ -58,38 +58,125 @@ class RegisteredUserController extends Controller
 
         // Validation du token reCAPTCHA
         try {
+            $recaptchaToken = $request->recaptcha_token;
+            
+            if (empty($recaptchaToken)) {
+                $validator->errors()->add('recaptcha_token', 'Le jeton de vérification est manquant.');
+                return back()
+                    ->withErrors($validator)
+                    ->withInput();
+            }
+
             $recaptchaResponse = Http::timeout(10)->asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
                 'secret' => config('services.recaptcha.secret_key', '6Lcvg8krAAAAADCaicd7FIRDZNKxXPPgWKcq-K6e'),
-                'response' => $request->recaptcha_token,
+                'response' => $recaptchaToken,
                 'remoteip' => $request->ip(),
             ]);
 
+            // Vérifier si la requête a réussi
+            if (!$recaptchaResponse->successful()) {
+                Log::error('Erreur de réponse reCAPTCHA', [
+                    'status' => $recaptchaResponse->status(),
+                    'body' => $recaptchaResponse->body(),
+                ]);
+                
+                $validator->errors()->add('recaptcha_token', 'Impossible de vérifier la sécurité. Veuillez réessayer.');
+                return back()
+                    ->withErrors($validator)
+                    ->withInput();
+            }
+
             $responseData = $recaptchaResponse->json();
+            
+            // Journalisation pour le débogage
+            Log::debug('Réponse reCAPTCHA', [
+                'success' => $responseData['success'] ?? null,
+                'score' => $responseData['score'] ?? null,
+                'action' => $responseData['action'] ?? null,
+                'hostname' => $responseData['hostname'] ?? null,
+                'error_codes' => $responseData['error-codes'] ?? null,
+            ]);
 
             if (!$responseData['success']) {
-                $errorMessage = 'La vérification de sécurité a échoué.';
-                if (isset($responseData['error-codes'])) {
-                    $errorMessage .= ' Code d\'erreur: ' . implode(', ', $responseData['error-codes']);
+                $errorMessage = 'La vérification de sécurité a échoué. ';
+                $errorCodes = $responseData['error-codes'] ?? [];
+                
+                // Messages d'erreur plus détaillés
+                $errorMessages = [
+                    'missing-input-secret' => 'Le paramètre secret est manquant.',
+                    'invalid-input-secret' => 'Le paramètre secret est invalide ou malformé.',
+                    'missing-input-response' => 'Le paramètre de réponse est manquant.',
+                    'invalid-input-response' => 'Le paramètre de réponse est invalide ou malformé.',
+                    'bad-request' => 'La requête est invalide ou malformée.',
+                    'timeout-or-duplicate' => 'La réponse n\'est plus valide : elle est trop ancienne ou a déjà été utilisée.',
+                ];
+                
+                $detailedErrors = [];
+                foreach ($errorCodes as $code) {
+                    $detailedErrors[] = $errorMessages[$code] ?? $code;
                 }
+                
+                if (!empty($detailedErrors)) {
+                    $errorMessage .= 'Raisons : ' . implode(', ', $detailedErrors);
+                }
+                
+                Log::warning('Échec de la validation reCAPTCHA', [
+                    'errors' => $errorCodes,
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
+                
                 $validator->errors()->add('recaptcha_token', $errorMessage);
                 return back()
                     ->withErrors($validator)
-                    ->withInput();
+                    ->withInput()
+                    ->with('error', $errorMessage);
             }
 
-            // Vérifier le score si vous utilisez reCAPTCHA v3
-            if (isset($responseData['score']) && $responseData['score'] < 0.5) {
+            // Vérifier le score pour reCAPTCHA v3 (optionnel)
+            $minimumScore = 0.5; // Score minimum acceptable (0.0 à 1.0)
+            if (isset($responseData['score']) && $responseData['score'] < $minimumScore) {
+                Log::warning('Score reCAPTCHA trop bas', [
+                    'score' => $responseData['score'],
+                    'minimum_required' => $minimumScore,
+                    'ip' => $request->ip(),
+                ]);
+                
                 $validator->errors()->add('recaptcha_token', 'Activité suspecte détectée. Veuillez réessayer.');
                 return back()
                     ->withErrors($validator)
-                    ->withInput();
+                    ->withInput()
+                    ->with('error', 'Activité suspecte détectée. Veuillez réessayer.');
             }
+            
+            // Vérifier l'action (pour reCAPTCHA v3)
+            if (isset($responseData['action']) && $responseData['action'] !== 'submit') {
+                Log::warning('Action reCAPTCHA invalide', [
+                    'expected' => 'submit',
+                    'actual' => $responseData['action'],
+                    'ip' => $request->ip(),
+                ]);
+                
+                $validator->errors()->add('recaptcha_token', 'Action de vérification invalide.');
+                return back()
+                    ->withErrors($validator)
+                    ->withInput()
+                    ->with('error', 'Action de vérification invalide.');
+            }
+            
         } catch (\Exception $e) {
-            \Log::error('Erreur lors de la vérification reCAPTCHA: ' . $e->getMessage());
-            $validator->errors()->add('recaptcha_token', 'Erreur lors de la vérification de sécurité. Veuillez réessayer.');
+            Log::error('Erreur lors de la vérification reCAPTCHA', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'ip' => $request->ip(),
+            ]);
+            
+            $validator->errors()->add('recaptcha_token', 'Une erreur est survenue lors de la vérification de sécurité. Veuillez réessayer.');
             return back()
                 ->withErrors($validator)
-                ->withInput();
+                ->withInput()
+                ->with('error', 'Une erreur est survenue lors de la vérification de sécurité. Veuillez réessayer.');
         }
 
         if ($validator->fails()) {
