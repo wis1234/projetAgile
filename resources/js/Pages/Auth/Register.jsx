@@ -82,23 +82,62 @@ export default function Register() {
         };
     }, [setData]);
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
         
-        if (!data.recaptcha_token) {
-            setRecaptchaError('Veuillez confirmer que vous n\'êtes pas un robot.');
-            return;
-        }
-        
-        post(route('register'), {
-            onError: () => {
-                // Réinitialiser reCAPTCHA en cas d'erreur
-                if (window.grecaptcha) {
-                    window.grecaptcha.reset();
+        try {
+            // Exécuter reCAPTCHA
+            const token = await new Promise((resolve) => {
+                if (!window.grecaptcha) {
+                    setRecaptchaError('reCAPTCHA non chargé. Veuillez rafraîchir la page.');
+                    return resolve(null);
                 }
-                setData('recaptcha_token', '');
+                
+                window.grecaptcha.ready(() => {
+                    window.grecaptcha.execute('6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN', { action: 'submit' })
+                        .then((token) => resolve(token))
+                        .catch((error) => {
+                            console.error('Erreur reCAPTCHA:', error);
+                            setRecaptchaError('Erreur lors de la vérification reCAPTCHA');
+                            resolve(null);
+                        });
+                });
+            });
+            
+            if (!token) {
+                setRecaptchaError('Veuillez compléter la vérification reCAPTCHA');
+                return;
             }
-        });
+            
+            setData('recaptcha_token', token);
+            
+            post(route('register'), {
+                onSuccess: () => {
+                    // Réinitialiser reCAPTCHA après une soumission réussie
+                    if (window.grecaptcha) {
+                        window.grecaptcha.reset();
+                    }
+                },
+                onError: (errors) => {
+                    if (errors.recaptcha_token) {
+                        setRecaptchaError(errors.recaptcha_token);
+                    }
+                    // Réinitialiser reCAPTCHA en cas d'erreur
+                    if (window.grecaptcha) {
+                        window.grecaptcha.reset();
+                    }
+                    setData('recaptcha_token', '');
+                },
+                preserveScroll: true
+            });
+            
+        } catch (error) {
+            console.error('Erreur lors de la soumission:', error);
+            setRecaptchaError('Une erreur est survenue. Veuillez réessayer.');
+            if (window.grecaptcha) {
+                window.grecaptcha.reset();
+            }
+        }
     };
 
     return (
@@ -231,7 +270,7 @@ export default function Register() {
                             <div className="flex justify-center">
                                 <div 
                                     id="recaptcha-element"
-                                    className={`g-recaptcha ${errors.recaptcha_token ? 'border border-red-500 rounded p-2' : ''}`}
+                                    className={`g-recaptcha ${errors.recaptcha_token || recaptchaError ? 'border border-red-500 rounded p-2' : ''}`}
                                     data-sitekey="6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN"
                                     data-theme="light"
                                     data-size="normal"

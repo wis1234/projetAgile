@@ -27,7 +27,54 @@
             window.FedaPayEnvironment = '{{ env('MIX_FEDAPAY_ENV', 'sandbox') }}';
         </script>
         <!-- reCAPTCHA Script -->
-        <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>
+        <script>
+            // Fonctions de rappel globales pour reCAPTCHA
+            function onRecaptchaLoad() {
+                console.log('reCAPTCHA chargé');
+                const event = new Event('recaptcha-loaded');
+                document.dispatchEvent(event);
+            }
+            
+            function onRecaptchaSuccess(token) {
+                console.log('reCAPTCHA réussi:', token);
+                const event = new CustomEvent('recaptcha-verified', { detail: { token } });
+                document.dispatchEvent(event);
+            }
+            
+            function onRecaptchaExpired() {
+                console.log('reCAPTCHA expiré');
+                const event = new Event('recaptcha-expired');
+                document.dispatchEvent(event);
+            }
+            
+            function onRecaptchaError() {
+                console.error('Erreur reCAPTCHA');
+                const event = new Event('recaptcha-error');
+                document.dispatchEvent(event);
+            }
+            
+            // Définir les fonctions globales pour les callbacks
+            window.onRecaptchaLoad = onRecaptchaLoad;
+            window.onRecaptchaSuccess = onRecaptchaSuccess;
+            window.onRecaptchaExpired = onRecaptchaExpired;
+            window.onRecaptchaError = onRecaptchaError;
+            
+            // Charger reCAPTCHA de manière asynchrone
+            function loadRecaptcha() {
+                const script = document.createElement('script');
+                script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
+                script.async = true;
+                script.defer = true;
+                document.head.appendChild(script);
+            }
+            
+            // Démarrer le chargement de reCAPTCHA
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadRecaptcha);
+            } else {
+                loadRecaptcha();
+            }
+        </script>
         <style>
             .grecaptcha-badge { 
                 visibility: visible !important;
@@ -35,6 +82,12 @@
             }
             #recaptcha-element {
                 margin: 10px 0;
+                min-height: 78px;
+                display: flex;
+                justify-content: center;
+            }
+            .g-recaptcha > div {
+                margin: 0 auto;
             }
         </style>
         <script>
@@ -88,17 +141,5 @@
                 <div class="mt-8 text-gray-400 text-sm">&copy; {{ date('Y') }} ProJA</div>
             </div>
         @endif
-        <script>
-            function onRecaptchaSuccess(token) {
-                const event = new CustomEvent('recaptcha-verified', { detail: { token } });
-                document.querySelector('form').dispatchEvent(event);
-            }
-            function onRecaptchaExpired() {
-                document.querySelector('form').dispatchEvent(new Event('recaptcha-expired'));
-            }
-            function onRecaptchaError() {
-                document.querySelector('form').dispatchEvent(new Event('recaptcha-error'));
-            }
-        </script>
     </body>
 </html>
