@@ -223,16 +223,58 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
         $current = $request->user();
+        
+        // Vérifier les autorisations
         if (!$current || $current->email !== 'ronaldoagbohou@gmail.com') {
-            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+            return response()->json(['error' => 'Non autorisé'], 403);
         }
+
+        // Valider la requête
         $validated = $request->validate([
-            'role' => 'required|in:admin,manager,member,user',
+            'role' => 'required|in:admin,manager,member,user,developer',
+            'send_email' => 'sometimes|boolean'
         ]);
+
+        // Vérifier si le rôle a réellement changé
+        $oldRole = $user->roles->first() ? $user->roles->first()->name : 'user';
+        
+        if ($oldRole === $validated['role']) {
+            return response()->json(['message' => 'Le rôle est déjà défini à cette valeur'], 200);
+        }
+
+        // Mettre à jour le rôle
         $user->syncRoles([$validated['role']]);
         $user->role = $validated['role'];
         $user->save();
-        return back()->with('success', 'Rôle mis à jour !');
+
+        // Envoyer l'email de notification si demandé
+        $sendEmail = $request->input('send_email', true);
+        if ($sendEmail) {
+            try {
+                $user->notify(new \App\Notifications\RoleChangedNotification(
+                    $validated['role'],
+                    $oldRole,
+                    $current
+                ));
+            } catch (\Exception $e) {
+                // Logger l'erreur mais ne pas échouer la requête
+                \Log::error('Erreur lors de l\'envoi de l\'email de notification: ' . $e->getMessage());
+            }
+        }
+
+        // Journaliser l'action
+        activity_log('update', 'Changement de rôle', $user, [
+            'old_role' => $oldRole,
+            'new_role' => $validated['role'],
+            'changed_by' => $current->id
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Rôle mis à jour avec succès',
+            'role' => $validated['role'],
+            'role_display' => ucfirst($validated['role'])
+        ]);
     }
 
     public function createRole(Request $request)

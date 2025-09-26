@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage, router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { 
   FaUser, 
@@ -12,6 +12,7 @@ import {
   FaUserShield,
   FaArrowLeft
 } from 'react-icons/fa';
+import RoleManagement from '../../Components/RoleManagement';
 import { motion } from 'framer-motion';
 
 function Show({ user, auth }) {
@@ -35,31 +36,40 @@ function Show({ user, auth }) {
   const [success, setSuccess] = React.useState('');
   const [error, setError] = React.useState('');
 
-  const handleRoleChange = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setSuccess('');
-    setError('');
+  const handleRoleChange = async (newRole, sendEmail = true) => {
     try {
-      const res = await fetch(`/users/${sanitizedUser.id}/assign-role`, {
+      const response = await fetch(`/users/${sanitizedUser.id}/assign-role`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
         },
-        body: JSON.stringify({ role })
+        body: JSON.stringify({ 
+          role: newRole,
+          send_email: sendEmail 
+        })
       });
-      if (res.ok) {
-        setSuccess('Rôle mis à jour avec succès !');
-      } else {
-        const data = await res.json();
-        setError(data.message || 'Erreur lors de la mise à jour du rôle');
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Erreur lors de la mise à jour du rôle');
       }
-    } catch (e) {
-      setError('Une erreur est survenue lors de la mise à jour');
+
+      // Mettre à jour l'utilisateur localement
+      router.reload({
+        only: ['user'],
+        onSuccess: () => {
+          setSuccess('Rôle mis à jour avec succès !');
+        }
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Error updating role:', error);
+      throw error;
     }
-    setLoading(false);
   };
 
   const getRoleBadge = (role) => {
@@ -190,58 +200,12 @@ function Show({ user, auth }) {
 
           {/* Right Column - Actions */}
           <div className="space-y-6">
-            {/* Role Assignment */}
-            {canAssignRole && (
-              <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Gestion des rôles</h3>
-                </div>
-                <div className="px-6 py-5">
-                  <form onSubmit={handleRoleChange}>
-                    <div className="space-y-4">
-                      <div>
-                            <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Rôle global
-                            </label>
-                            <select
-                              id="role"
-                              value={role}
-                              onChange={(e) => setRole(e.target.value)}
-                              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                            >
-                              <option value="admin">Administrateur</option>
-                              <option value="manager">Manager</option>
-                              <option value="member">Membre</option>
-                              <option value="user">Utilisateur</option>
-                            </select>
-                          </div>
-                      
-                      <div>
-                        <button
-                          type="submit"
-                          disabled={loading}
-                          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                        >
-                          {loading ? 'Mise à jour...' : 'Mettre à jour le rôle'}
-                        </button>
-                      </div>
-                      
-                      {success && (
-                        <div className="mt-2 text-sm text-green-600 dark:text-green-400">
-                          {success}
-                        </div>
-                      )}
-                      
-                      {error && (
-                        <div className="mt-2 text-sm text-red-600 dark:text-red-400">
-                          {error}
-                        </div>
-                      )}
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
+            {/* Role Management */}
+            <RoleManagement 
+              user={sanitizedUser} 
+              currentUser={userAuth}
+              onRoleChange={handleRoleChange}
+            />
 
             {/* Quick Actions */}
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
