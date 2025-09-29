@@ -287,90 +287,78 @@ export default function SubscriptionPlansIndex({
                     {/* Cartes de statistiques */}
                     <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-2 lg:grid-cols-4">
                         {/* Plans d'abonnement */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
-                            <div className="flex items-center">
-                                <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-blue-100 rounded-xl">
-                                    <FontAwesomeIcon icon={faMoneyBillWave} className="w-6 h-6 text-blue-600" />
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-start">
+                                <div className="flex-shrink-0 p-2 bg-blue-100 rounded-lg">
+                                    <FontAwesomeIcon icon={faMoneyBillWave} className="w-5 h-5 text-blue-600" />
                                 </div>
-                                <div className="ml-5 flex-1">
-                                    <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">Total des plans</dt>
-                                        <dd className="text-2xl font-bold text-gray-900">
-                                            {total_plans > 0 ? total_plans : 'Aucun'}
-                                        </dd>
-                                        <dd className="text-xs text-gray-500 mt-1">
-                                            <span className={`inline-flex items-center ${active_plans > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                                                <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3 mr-1" />
-                                                {active_plans} actifs
-                                            </span>
-                                            <span className="mx-2">•</span>
-                                            <span className="text-gray-400">{inactive_plans} inactifs</span>
-                                        </dd>
-                                    </dl>
+                                <div className="ml-3 min-w-0">
+                                    <p className="text-sm font-medium text-gray-500 truncate">Total des plans</p>
+                                    <p className="text-xl font-bold text-gray-900 mt-1">
+                                        {total_plans > 0 ? total_plans : 'Aucun'}
+                                    </p>
+                                    <div className="flex items-center text-xs text-gray-500 mt-1 space-x-1">
+                                        <span className={`inline-flex items-center ${active_plans > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                            <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3 mr-1" />
+                                            {active_plans} actifs
+                                        </span>
+                                        <span>•</span>
+                                        <span className="text-gray-400">{inactive_plans} inactifs</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
                         {/* Abonnements actifs */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
-                            <div className="flex items-center">
-                                <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-green-100 rounded-xl">
-                                    <FontAwesomeIcon icon={faUsers} className="w-6 h-6 text-green-600" />
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-start">
+                                <div className="flex-shrink-0 p-2 bg-green-100 rounded-lg">
+                                    <FontAwesomeIcon icon={faUsers} className="w-5 h-5 text-green-600" />
                                 </div>
-                                <div className="ml-5 flex-1">
-                                    <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">Abonnements actifs</dt>
-                                        <dd className="text-2xl font-bold text-gray-900">
-                                            {active_subscriptions > 0 ? active_subscriptions : 'Aucun'}
-                                        </dd>
-                                        <dd className="text-xs text-gray-500 mt-1">
-                                            <span className="text-green-600">
-                                                +{subscription_growth_rate > 0 ? formatPercentage(subscription_growth_rate) : '0%'} ce mois
-                                            </span>
-                                        </dd>
-                                    </dl>
+                                <div className="ml-3 min-w-0">
+                                    <p className="text-sm font-medium text-gray-500 truncate">Abonnements actifs</p>
+                                    <p className="text-xl font-bold text-gray-900 mt-1">
+                                        {active_subscriptions > 0 ? active_subscriptions : 'Aucun'}
+                                    </p>
+                                    <p className="text-xs text-green-600 mt-1">
+                                        +{subscription_growth_rate > 0 ? formatPercentage(subscription_growth_rate) : '0%'} ce mois
+                                    </p>
                                 </div>
                             </div>
                         </div>
                         
                         {/* Revenu mensuel */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
-                            <div className="flex items-center">
-                                <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-purple-100 rounded-xl">
-                                    <FontAwesomeIcon icon={faChartLine} className="w-6 h-6 text-purple-600" />
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-start">
+                                <div className="flex-shrink-0 p-2 bg-purple-100 rounded-lg">
+                                    <FontAwesomeIcon icon={faChartLine} className="w-5 h-5 text-purple-600" />
                                 </div>
-                                <div className="ml-5 flex-1">
-                                    <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">Revenu mensuel</dt>
-                                        <dd className="text-2xl font-bold text-gray-900">
-                                            {monthly_recurring_revenue > 0 ? formatCurrency(monthly_recurring_revenue) : 'Aucun'}
-                                        </dd>
-                                        <dd className="text-xs text-gray-500 mt-1">
-                                            Total: {formatCurrency(total_revenue)}
-                                        </dd>
-                                    </dl>
+                                <div className="ml-3 min-w-0">
+                                    <p className="text-sm font-medium text-gray-500 truncate">Revenu mensuel</p>
+                                    <p className="text-xl font-bold text-gray-900 mt-1">
+                                        {monthly_recurring_revenue > 0 ? formatCurrency(monthly_recurring_revenue) : 'Aucun'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1 truncate">
+                                        Total: {formatCurrency(total_revenue)}
+                                    </p>
                                 </div>
                             </div>
                         </div>
                         
                         {/* Expirations */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
-                            <div className="flex items-center">
-                                <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-orange-100 rounded-xl">
-                                    <FontAwesomeIcon icon={faExclamationTriangle} className="w-6 h-6 text-orange-600" />
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-start">
+                                <div className="flex-shrink-0 p-2 bg-orange-100 rounded-lg">
+                                    <FontAwesomeIcon icon={faExclamationTriangle} className="w-5 h-5 text-orange-600" />
                                 </div>
-                                <div className="ml-5 flex-1">
-                                    <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">Expire ce mois</dt>
-                                        <dd className="text-2xl font-bold text-gray-900">
-                                            {expiring_this_month > 0 ? expiring_this_month : 'Aucun'}
-                                        </dd>
-                                        <dd className="text-xs text-gray-500 mt-1">
-                                            <span className="text-orange-600">
-                                                À renouveler
-                                            </span>
-                                        </dd>
-                                    </dl>
+                                <div className="ml-3 min-w-0">
+                                    <p className="text-sm font-medium text-gray-500 truncate">Expire ce mois</p>
+                                    <p className="text-xl font-bold text-gray-900 mt-1">
+                                        {expiring_this_month > 0 ? expiring_this_month : 'Aucun'}
+                                    </p>
+                                    <p className="text-xs text-orange-600 mt-1">
+                                        À renouveler
+                                    </p>
                                 </div>
                             </div>
                         </div>
