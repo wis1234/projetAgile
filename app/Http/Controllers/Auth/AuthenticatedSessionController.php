@@ -31,11 +31,27 @@ class AuthenticatedSessionController extends Controller
     /**
      * Display the login view.
      */
-    public function create(): Response
+    /**
+     * Display the login view.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Inertia\Response
+     */
+    public function create(Request $request): Response
     {
+        $status = session('status');
+        
+        // Si la session a expiré, on affiche un message spécifique
+        if ($request->has('expired') || session('expired')) {
+            $status = 'Votre session a expiré en raison d\'une inactivité prolongée. Veuillez vous reconnecter.';
+            // On supprime la clé de session pour éviter de réafficher le message au rafraîchissement
+            $request->session()->forget('expired');
+        }
+        
         return Inertia::render('Auth/Login', [
             'canResetPassword' => Route::has('password.request'),
-            'status' => session('status'),
+            'status' => $status,
+            'errors' => $request->session()->get('errors') ? $request->session()->get('errors')->getBag('default')->getMessages() : (object) [],
         ]);
     }
 

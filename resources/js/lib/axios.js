@@ -32,16 +32,36 @@ axiosInstance.interceptors.request.use(
 // Intercepteur de réponse pour gérer les erreurs
 axiosInstance.interceptors.response.use(
     response => response,
-    error => {
+    async error => {
         if (!error.response) {
             // Erreur réseau ou serveur indisponible
             console.error('Erreur réseau - Vérifiez votre connexion');
             return Promise.reject(error);
         }
 
-        const { status } = error.response;
+        const { status, data } = error.response;
         
         switch (status) {
+            case 419: // Session expirée / Token CSRF invalide
+                // Si c'est une requête AJAX, on rejette avec un code spécifique
+                if (error.config.headers['X-Requested-With'] === 'XMLHttpRequest') {
+                    return Promise.reject({ ...error, isSessionExpired: true });
+                }
+                
+                // Pour les requêtes normales, on redirige vers la page de session expirée
+                if (typeof window !== 'undefined') {
+                    // On force une déconnexion propre
+                    try {
+                        await axiosInstance.post('/logout');
+                    } catch (e) {
+                        console.error('Erreur lors de la déconnexion:', e);
+                    }
+                    
+                    // On redirige vers la page de connexion avec un message
+                    window.location.href = '/login?expired=1';
+                }
+                break;
+                
             case 401: // Non authentifié
                 // Rediriger vers la page de connexion avec un message
                 if (typeof window !== 'undefined') {

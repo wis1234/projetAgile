@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import CsrfErrorModal from '@/Components/CsrfErrorModal';
 import { TutorialProvider } from '@/contexts/TutorialContext';
 import './lib/axios';
+import './lib/globalErrorHandler';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Proja';
 

@@ -22,10 +22,18 @@ class Handler extends Exception
 
         // Gestion des erreurs 419 (Session expirée / Token CSRF invalide)
         if ($exception instanceof TokenMismatchException) {
-            if ($request->hasHeader('X-Inertia')) {
-                return Inertia::location(route('session.expired'));
+            if ($request->hasHeader('X-Inertia') || $request->header('X-Inertia')) {
+                // Pour les requêtes Inertia, on retourne une réponse JSON spéciale
+                return response()->json([
+                    'component' => 'Error419',
+                    'props' => [
+                        'status' => 419,
+                        'message' => 'Votre session a expiré. Veuillez vous reconnecter.'
+                    ]
+                ], 419);
             }
             
+            // Pour les requêtes normales, on redirige vers la page de session expirée
             return redirect()->route('session.expired');
         }
 

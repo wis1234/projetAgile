@@ -197,10 +197,18 @@ Route::post('/webhooks/fedapay', [App\Http\Controllers\WebhookController::class,
 
 // Route pour gérer l'erreur 419 (Session expirée)
 Route::get('/419', function () {
-    if (request()->hasHeader('X-Inertia')) {
-        return Inertia::render('Error419');
+    if (request()->hasHeader('X-Inertia') || request()->header('X-Inertia')) {
+        // Pour les requêtes Inertia, on retourne une réponse JSON spéciale
+        return response()->json([
+            'component' => 'Error419',
+            'props' => [
+                'status' => 419,
+                'message' => 'Votre session a expiré. Veuillez vous reconnecter.'
+            ]
+        ], 419);
     }
     
+    // Pour les requêtes normales, on redirige vers la page de connexion avec un message
     return redirect()->route('login')
         ->with('error', 'Votre session a expiré. Veuillez vous reconnecter.');
 })->name('session.expired');

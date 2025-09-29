@@ -1,11 +1,41 @@
-import React from 'react';
-import { Link, router } from '@inertiajs/react';
+import React, { useEffect } from 'react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { FaClock, FaSignInAlt, FaSync } from 'react-icons/fa';
 import AdminLayout from '@/Layouts/AdminLayout';
 
 export default function Error419() {
+    const { props } = usePage();
+    const { status, message } = props;
+
+    useEffect(() => {
+        // Si le token CSRF a expiré, on force une déconnexion propre
+        if (window.location.pathname !== '/login') {
+            router.post('/logout').then(() => {
+                router.visit('/login', {
+                    only: [],
+                    onError: (errors) => {
+                        console.error('Erreur lors de la déconnexion:', errors);
+                    },
+                    onFinish: () => {
+                        // S'assurer que le cache est vidé
+                        if ('caches' in window) {
+                            caches.keys().then(names => {
+                                names.forEach(name => caches.delete(name));
+                            });
+                        }
+                    }
+                });
+            });
+        }
+    }, []);
+
     const handleRefresh = () => {
-        window.location.reload();
+        // On recharge complètement la page pour s'assurer que tout est réinitialisé
+        window.location.href = '/';
+    };
+
+    const handleLogin = () => {
+        router.visit('/login', { only: [] });
     };
 
     return (
@@ -29,13 +59,13 @@ export default function Error419() {
                 <div className="mt-8 space-y-4">
                     <div>
                         <Link
-                            href="/login"
-                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors duration-200"
+                            onClick={handleLogin}
+                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors duration-200 cursor-pointer"
                         >
                             <span className="absolute left-0 inset-y-0 flex items-center pl-3">
                                 <FaSignInAlt className="h-5 w-5 text-orange-300 group-hover:text-orange-200" />
                             </span>
-                            Se reconnecter
+                            {message || 'Votre session a expiré. Veuillez vous reconnecter.'}
                         </Link>
                     </div>
                     <div>
