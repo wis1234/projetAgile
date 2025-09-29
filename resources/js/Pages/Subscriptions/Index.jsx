@@ -9,6 +9,9 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
     
     // Vérifier si l'utilisateur a un abonnement actif
     const hasActiveSubscription = currentPlan && currentPlan.status === 'active';
+    
+    // Vérifier si l'utilisateur est administrateur
+    const isAdmin = auth?.user?.role === 'admin';
 
     // Les fonctionnalités sont maintenant récupérées depuis la base de données via la propriété features de chaque plan
 
@@ -95,9 +98,11 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                 <div 
                                     key={plan.id}
                                     className={`relative flex flex-col p-8 transition-all duration-300 border-2 rounded-lg shadow-sm ${
-                                        isPopular 
-                                            ? 'bg-gradient-to-br from-blue-50 to-white border-blue-500 transform scale-105 z-10' 
-                                            : 'bg-white border-gray-200 hover:border-blue-300'
+                                        isCurrentPlan
+                                            ? 'bg-gradient-to-br from-green-50 to-white border-green-500 transform scale-[1.02] z-10'
+                                            : isPopular 
+                                                ? 'bg-gradient-to-br from-blue-50 to-white border-blue-500 transform scale-100 z-5' 
+                                                : 'bg-white border-gray-200 hover:border-blue-300'
                                     }`}
                                 >
                                     {isPopular && (
@@ -198,18 +203,28 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                     <div className="mt-8">
                                         {isCurrentPlan ? (
                                             <div className="space-y-2">
-                                                <button
-                                                    disabled
-                                                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md cursor-not-allowed"
-                                                >
-                                                    {hasActiveSubscription ? 'Abonnement actif' : 'Forfait actuel'}
-                                                </button>
-                                                {hasActiveSubscription && (
+                                                {isCurrentPlan ? (
+                                                    <button
+                                                        disabled
+                                                        className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md cursor-not-allowed"
+                                                    >
+                                                        {hasActiveSubscription ? 'Abonnement actif' : 'Forfait actuel'}
+                                                    </button>
+                                                ) : (
+                                                    <Link
+                                                        href={route('subscription.checkout', plan.id)}
+                                                        className="block w-full px-4 py-2 text-sm font-medium text-center text-white transition duration-150 ease-in-out bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                    >
+                                                        Choisir ce forfait
+                                                    </Link>
+                                                )}
+                                                
+                                                {isAdmin && (
                                                     <Link
                                                         href={route('subscription.manage')}
-                                                        className="block w-full px-4 py-2 text-sm font-medium text-center text-blue-600 transition duration-150 ease-in-out bg-white border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                        className="block w-full px-4 py-2 mt-2 text-sm font-medium text-center text-blue-600 transition duration-150 ease-in-out bg-white border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                                     >
-                                                        Gérer l'abonnement
+                                                        Gérer l'abonnement (Admin)
                                                     </Link>
                                                 )}
                                             </div>
