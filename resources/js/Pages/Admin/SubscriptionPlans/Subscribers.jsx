@@ -30,40 +30,40 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message }) {
         <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-                    <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+                    <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
                 </div>
 
                 <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                    <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div className="sm:flex sm:items-start">
-                            <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                                <FontAwesomeIcon icon={faExclamationTriangle} className="h-6 w-6 text-red-600" />
+                            <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                                <FontAwesomeIcon icon={faExclamationTriangle} className="h-6 w-6 text-red-600 dark:text-red-400" />
                             </div>
                             <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                                <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
                                     {title}
                                 </h3>
                                 <div className="mt-2">
-                                    <p className="text-sm text-gray-500">
+                                    <p className="text-sm text-gray-500 dark:text-gray-300">
                                         {message}
                                     </p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                         <button
                             type="button"
-                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-500"
                             onClick={onConfirm}
                         >
                             Confirmer
                         </button>
                         <button
                             type="button"
-                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500 dark:hover:bg-gray-500"
                             onClick={onClose}
                         >
                             Annuler
@@ -152,7 +152,7 @@ function CustomPopover({ isOpen, onClose, triggerRef, children }) {
     return createPortal(
         <div
             ref={popoverRef}
-            className="fixed z-50 w-52 bg-white rounded-md shadow-lg border border-gray-200 py-1"
+            className="fixed z-50 w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-600 py-1"
             style={{
                 top: `${position.top}px`,
                 left: `${position.left}px`,
@@ -267,10 +267,10 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
 
     const getStatusBadge = (status) => {
         const statusClasses = {
-            active: 'bg-green-100 text-green-800',
-            pending: 'bg-yellow-100 text-yellow-800',
-            cancelled: 'bg-red-100 text-red-800',
-            expired: 'bg-gray-100 text-gray-800'
+            active: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+            cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+            expired: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
         };
         
         const statusLabels = {
@@ -281,7 +281,7 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
         };
         
         return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClasses[status] || 'bg-gray-100 text-gray-800'}`}>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClasses[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'}`}>
                 {status === 'active' && <FontAwesomeIcon icon={faCheckCircle} className="mr-1.5 h-3 w-3" />}
                 {status === 'pending' && <FontAwesomeIcon icon={faClock} className="mr-1.5 h-3 w-3" />}
                 {status === 'cancelled' && <FontAwesomeIcon icon={faTimesCircle} className="mr-1.5 h-3 w-3" />}
@@ -295,7 +295,7 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
             <button
                 ref={el => buttonRefs.current[id] = el}
                 onClick={() => togglePopover(id)}
-                className="flex items-center text-gray-400 hover:text-gray-600 focus:outline-none p-1"
+                className="flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none p-1 transition-colors duration-200"
                 aria-haspopup="true"
                 aria-expanded={openPopoverId === id}
             >
@@ -311,37 +311,37 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                 {subscription.status !== 'active' && (
                     <button
                         onClick={() => handleStatusChange(subscription.id, 'active')}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
                     >
-                        <FontAwesomeIcon icon={faUserCheck} className="mr-3 h-4 w-4 text-green-600" />
+                        <FontAwesomeIcon icon={faUserCheck} className="mr-3 h-4 w-4 text-green-600 dark:text-green-400" />
                         Activer l'abonnement
                     </button>
                 )}
                 {subscription.status !== 'pending' && (
                     <button
                         onClick={() => handleStatusChange(subscription.id, 'pending')}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
                     >
-                        <FontAwesomeIcon icon={faUserClock} className="mr-3 h-4 w-4 text-yellow-600" />
+                        <FontAwesomeIcon icon={faUserClock} className="mr-3 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                         Mettre en attente
                     </button>
                 )}
                 {subscription.status !== 'cancelled' && (
                     <button
                         onClick={() => handleStatusChange(subscription.id, 'cancelled')}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
                     >
-                        <FontAwesomeIcon icon={faUserXmark} className="mr-3 h-4 w-4 text-red-600" />
+                        <FontAwesomeIcon icon={faUserXmark} className="mr-3 h-4 w-4 text-red-600 dark:text-red-400" />
                         Annuler l'abonnement
                     </button>
                 )}
-                <div className="border-t border-gray-100"></div>
+                <div className="border-t border-gray-100 dark:border-gray-600"></div>
                 <a
                     href={`mailto:${subscription.user?.email}`}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
                     onClick={closePopover}
                 >
-                    <FontAwesomeIcon icon={faEnvelope} className="mr-3 h-4 w-4 text-blue-600" />
+                    <FontAwesomeIcon icon={faEnvelope} className="mr-3 h-4 w-4 text-blue-600 dark:text-blue-400" />
                     Envoyer un email
                 </a>
             </CustomPopover>
@@ -350,11 +350,11 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
 
     return (
         <AdminLayout>
-            <div className="min-h-screen bg-gray-100">
+            <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
                 <Head title="Abonnés aux plans" />
 
                 {/* En-tête */}
-                <div className="bg-white shadow">
+                <div className="bg-white dark:bg-gray-800 shadow">
                     <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center">
@@ -364,12 +364,12 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                 >
                                     <FontAwesomeIcon icon={faArrowLeft} className="h-5 w-5" />
                                 </Link>
-                                <h1 className="text-2xl font-bold text-gray-900">Gestion des abonnés</h1>
+                                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Gestion des abonnés</h1>
                             </div>
                             <div className="mt-4 sm:mt-0">
                                 <Link
                                     href={route('admin.subscription-plans.index')}
-                                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 transition-colors duration-200"
                                 >
                                     <FontAwesomeIcon icon={faArrowLeft} className="mr-2" />
                                     Retour aux plans
@@ -382,7 +382,7 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                 {/* Contenu principal */}
                 <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
                     {/* Filtres et recherche */}
-                    <div className="mb-6 bg-white rounded-lg shadow">
+                    <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow">
                         <div className="px-4 py-5 sm:p-6">
                             <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
                                 <div className="flex-1 max-w-md">
@@ -393,7 +393,7 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                             </div>
                                             <input
                                                 type="text"
-                                                className="block w-full py-2 pl-10 pr-3 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                                                className="block w-full py-2 pl-10 pr-3 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                                                 placeholder="Rechercher des abonnés..."
                                                 value={searchQuery}
                                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -401,7 +401,7 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                         </div>
                                         <button
                                             type="submit"
-                                            className="inline-flex items-center px-4 py-2 ml-3 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                            className="inline-flex items-center px-4 py-2 ml-3 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors duration-200"
                                         >
                                             <FontAwesomeIcon icon={faSearch} className="w-4 h-4 mr-2" />
                                             Rechercher
@@ -411,12 +411,12 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                 
                                 <div className="flex items-center space-x-3">
                                     <div className="flex items-center">
-                                        <label htmlFor="status-filter" className="mr-2 text-sm font-medium text-gray-700">
+                                        <label htmlFor="status-filter" className="mr-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                                             Statut
                                         </label>
                                         <select
                                             id="status-filter"
-                                            className="block w-full py-2 pl-3 pr-10 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                                            className="block w-full py-2 pl-3 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
                                             value={statusFilter}
                                             onChange={handleFilterChange}
                                         >
@@ -431,7 +431,7 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                     <button
                                         type="button"
                                         onClick={handleReset}
-                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
                                     >
                                         Réinitialiser
                                     </button>
@@ -440,13 +440,13 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                         </div>
                     </div>
                     
-                    <div className="bg-white shadow-sm sm:rounded-lg">
-                        <div className="p-6 bg-white border-b border-gray-200">
+                    <div className="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg">
+                        <div className="p-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                             {(!subscriptions.data || subscriptions.data.length === 0) ? (
                                 <div className="text-center py-8">
-                                    <FontAwesomeIcon icon={faUserXmark} className="mx-auto h-12 w-12 text-gray-400" />
-                                    <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun abonné trouvé</h3>
-                                    <p className="mt-1 text-sm text-gray-500">
+                                    <FontAwesomeIcon icon={faUserXmark} className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+                                    <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Aucun abonné trouvé</h3>
+                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                         Aucun utilisateur n'est abonné pour le moment.
                                     </p>
                                 </div>
@@ -455,22 +455,22 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                     {/* Vue bureau - tableau */}
                                     <div className="hidden lg:block">
                                         <div className="overflow-x-auto">
-                                            <table className="min-w-full divide-y divide-gray-200">
-                                                <thead className="bg-gray-50">
+                                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                                <thead className="bg-gray-50 dark:bg-gray-700">
                                                     <tr>
-                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                             Utilisateur
                                                         </th>
-                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                             Plan
                                                         </th>
-                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                             Période
                                                         </th>
-                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                             Statut
                                                         </th>
-                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                             Date d'expiration
                                                         </th>
                                                         <th scope="col" className="relative px-6 py-3">
@@ -478,9 +478,9 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                                         </th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="bg-white divide-y divide-gray-200">
+                                                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                                     {subscriptions.data && subscriptions.data.map((subscription) => (
-                                                        <tr key={subscription.id} className="hover:bg-gray-50">
+                                                        <tr key={subscription.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                                             <td className="px-6 py-4 whitespace-nowrap">
                                                                 <div className="flex items-center">
                                                                     <div className="flex-shrink-0 h-10 w-10">
@@ -491,33 +491,33 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                                                                 alt={subscription.user.name}
                                                                             />
                                                                         ) : (
-                                                                            <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                                                                                <span className="text-indigo-600 font-medium">
+                                                                            <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                                                                                <span className="text-indigo-600 dark:text-indigo-300 font-medium">
                                                                                     {subscription.user?.name?.charAt(0) || 'U'}
                                                                                 </span>
                                                                             </div>
                                                                         )}
                                                                     </div>
                                                                     <div className="ml-4">
-                                                                        <div className="text-sm font-medium text-gray-900">
+                                                                        <div className="text-sm font-medium text-gray-900 dark:text-white">
                                                                             {subscription.user?.name || 'Utilisateur inconnu'}
                                                                         </div>
-                                                                        <div className="text-sm text-gray-500 truncate max-w-[200px]" title={subscription.user?.email || ''}>
+                                                                        <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]" title={subscription.user?.email || ''}>
                                                                             {subscription.user?.email || ''}
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                             </td>
                                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                                <div className="text-sm font-medium text-gray-900">
+                                                                <div className="text-sm font-medium text-gray-900 dark:text-white">
                                                                     {subscription.plan?.name || 'Plan inconnu'}
                                                                 </div>
-                                                                <div className="text-sm text-gray-500">
+                                                                <div className="text-sm text-gray-500 dark:text-gray-400">
                                                                     {subscription.plan?.price?.toLocaleString() || '0'} FCFA
                                                                 </div>
                                                             </td>
                                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                                <div className="text-sm text-gray-900">
+                                                                <div className="text-sm text-gray-900 dark:text-white">
                                                                     {subscription.plan?.duration_in_months === 1 
                                                                         ? 'Mensuel' 
                                                                         : `${subscription.plan?.duration_in_months} mois`}
@@ -526,7 +526,7 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                                             <td className="px-6 py-4 whitespace-nowrap">
                                                                 {getStatusBadge(subscription.status)}
                                                             </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                                                 {subscription.ends_at 
                                                                     ? new Date(subscription.ends_at).toLocaleDateString('fr-FR')
                                                                     : 'Non défini'}
@@ -544,7 +544,7 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                     {/* Vue mobile/tablette - cartes empilées */}
                                     <div className="lg:hidden space-y-4">
                                         {subscriptions.data && subscriptions.data.map((subscription) => (
-                                            <div key={subscription.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                                            <div key={subscription.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
                                                 <div className="flex items-start space-x-3">
                                                     <div className="flex-shrink-0">
                                                         {subscription.user?.profile_photo_url ? (
@@ -554,48 +554,48 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                                                 alt={subscription.user.name}
                                                             />
                                                         ) : (
-                                                            <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center">
-                                                                <span className="text-indigo-600 font-medium text-lg">
+                                                            <div className="h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                                                                <span className="text-indigo-600 dark:text-indigo-300 font-medium text-lg">
                                                                     {subscription.user?.name?.charAt(0) || 'U'}
                                                                 </span>
                                                             </div>
                                                         )}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <h3 className="text-sm font-medium text-gray-900 truncate">
+                                                        <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                                             {subscription.user?.name || 'Utilisateur inconnu'}
                                                         </h3>
-                                                        <div className="text-sm text-gray-500 truncate max-w-[200px]" title={subscription.user?.email || ''}>
+                                                        <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]" title={subscription.user?.email || ''}>
                                                             {subscription.user?.email || ''}
                                                         </div>
                                                         
                                                         <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                                                             <div>
-                                                                <span className="text-gray-500">Plan:</span>
-                                                                <p className="font-medium text-gray-900">
+                                                                <span className="text-gray-500 dark:text-gray-400">Plan:</span>
+                                                                <p className="font-medium text-gray-900 dark:text-white">
                                                                     {subscription.plan?.name || 'Plan inconnu'}
                                                                 </p>
-                                                                <p className="text-gray-500">
+                                                                <p className="text-gray-500 dark:text-gray-400">
                                                                     {subscription.plan?.price?.toLocaleString() || '0'} FCFA • {subscription.plan?.duration_in_months === 1 ? 'Mensuel' : `${subscription.plan?.duration_in_months} mois`}
                                                                 </p>
                                                             </div>
                                                             <div>
-                                                                <span className="text-gray-500">Statut:</span>
+                                                                <span className="text-gray-500 dark:text-gray-400">Statut:</span>
                                                                 <div className="mt-1">
                                                                     {getStatusBadge(subscription.status)}
                                                                 </div>
                                                             </div>
                                                             <div>
-                                                                <span className="text-gray-500">Début:</span>
-                                                                <p className="text-gray-900">
+                                                                <span className="text-gray-500 dark:text-gray-400">Début:</span>
+                                                                <p className="text-gray-900 dark:text-white">
                                                                     {subscription.starts_at 
                                                                         ? new Date(subscription.starts_at).toLocaleDateString('fr-FR')
                                                                         : 'Non défini'}
                                                                 </p>
                                                             </div>
                                                             <div>
-                                                                <span className="text-gray-500">Expire le:</span>
-                                                                <p className="text-gray-900">
+                                                                <span className="text-gray-500 dark:text-gray-400">Expire le:</span>
+                                                                <p className="text-gray-900 dark:text-white">
                                                                     {subscription.ends_at 
                                                                         ? new Date(subscription.ends_at).toLocaleDateString('fr-FR')
                                                                         : 'Non défini'}
@@ -605,11 +605,11 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="mt-4 pt-4 border-t border-gray-100">
+                                                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                                                     <div className="flex justify-between items-center">
                                                         <a
                                                             href={`mailto:${subscription.user?.email}`}
-                                                            className="inline-flex items-center px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+                                                            className="inline-flex items-center px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/30 rounded transition-colors duration-200"
                                                         >
                                                             <FontAwesomeIcon icon={faEnvelope} className="mr-1.5 h-4 w-4" />
                                                             Email
@@ -627,7 +627,7 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                             {/* Pagination */}
                             {subscriptions.data && subscriptions.data.length > 0 && subscriptions.meta && (
                                 <div className="mt-6 flex flex-col sm:flex-row items-center justify-between">
-                                    <div className="text-sm text-gray-700 mb-2 sm:mb-0">
+                                    <div className="text-sm text-gray-700 dark:text-gray-300 mb-2 sm:mb-0">
                                         Affichage de <span className="font-medium">{subscriptions.meta.from || 0}</span> à <span className="font-medium">{subscriptions.meta.to || 0}</span> sur{' '}
                                         <span className="font-medium">{subscriptions.meta.total || 0}</span> résultats
                                     </div>
@@ -635,13 +635,13 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                         {subscriptions.links?.prev ? (
                                             <Link
                                                 href={subscriptions.links.prev}
-                                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200"
                                                 preserveScroll
                                             >
                                                 Précédent
                                             </Link>
                                         ) : (
-                                            <span className="inline-flex items-center px-3 py-1.5 border border-gray-200 text-sm font-medium rounded-md text-gray-300 bg-gray-50 cursor-not-allowed">
+                                            <span className="inline-flex items-center px-3 py-1.5 border border-gray-200 dark:border-gray-700 text-sm font-medium rounded-md text-gray-300 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 cursor-not-allowed">
                                                 Précédent
                                             </span>
                                         )}
@@ -649,13 +649,13 @@ function SubscriptionSubscribers({ subscriptions = { data: [] }, filters = {} })
                                         {subscriptions.links?.next ? (
                                             <Link
                                                 href={subscriptions.links.next}
-                                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200"
                                                 preserveScroll
                                             >
                                                 Suivant
                                             </Link>
                                         ) : (
-                                            <span className="inline-flex items-center px-3 py-1.5 border border-gray-200 text-sm font-medium rounded-md text-gray-300 bg-gray-50 cursor-not-allowed">
+                                            <span className="inline-flex items-center px-3 py-1.5 border border-gray-200 dark:border-gray-700 text-sm font-medium rounded-md text-gray-300 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 cursor-not-allowed">
                                                 Suivant
                                             </span>
                                         )}

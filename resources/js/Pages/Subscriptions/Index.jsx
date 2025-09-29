@@ -46,18 +46,18 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             <AdminLayout
                 header={
-                    <div className="flex flex-col px-6 py-4 space-y-4 bg-white border-b border-gray-200 md:space-y-0 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col px-6 py-4 space-y-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 md:space-y-0 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center space-x-4">
-                            <h2 className="text-2xl font-bold leading-tight text-gray-800">
+                            <h2 className="text-2xl font-bold leading-tight text-gray-800 dark:text-white">
                                 Gestion des abonnements
                             </h2>
                             <div className="flex space-x-4">
                                 <Link 
                                     href="/settings/subscription" 
-                                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                 >
                                     <FontAwesomeIcon icon={faCog} className="w-4 h-4 mr-2" />
                                     Mon abonnement
@@ -65,7 +65,7 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                 {(auth?.user?.role === 'admin' || auth?.user?.is_admin || auth?.user?.isAdmin) && (
                                     <Link 
                                         href="/admin/subscriptions" 
-                                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md shadow-sm hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                                     >
                                         <FontAwesomeIcon icon={faUsersCog} className="w-4 h-4 mr-2" />
                                         Gérer les abonnements
@@ -74,7 +74,7 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                             </div>
                         </div>
                         {currentPlan && (
-                            <span className="px-4 py-2 text-sm font-semibold text-green-800 bg-green-100 border border-green-200 rounded-full shadow-sm">
+                            <span className="px-4 py-2 text-sm font-semibold text-green-800 dark:text-green-200 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-full shadow-sm">
                                 Votre forfait actuel: {currentPlan.name}
                             </span>
                         )}
@@ -83,9 +83,9 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
             >
             <Head title="Abonnements" />
 
-            <div className="py-8">
-                <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <h2 className="mb-6 text-2xl font-bold text-gray-800">
+            <div className="py-8 bg-gray-50 dark:bg-gray-900 min-h-screen">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <h2 className="mb-6 text-2xl font-bold text-gray-800 dark:text-white">
                         Choisissez votre forfait
                     </h2>
                     
@@ -97,12 +97,12 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                             return (
                                 <div 
                                     key={plan.id}
-                                    className={`relative flex flex-col p-8 transition-all duration-300 border-2 rounded-lg shadow-sm ${
+                                    className={`relative flex flex-col p-8 transition-all duration-300 border-2 rounded-lg shadow-sm bg-white dark:bg-gray-800 ${
                                         isCurrentPlan
-                                            ? 'bg-gradient-to-br from-green-50 to-white border-green-500 transform scale-[1.02] z-10'
+                                            ? 'bg-gradient-to-br from-green-50 to-white dark:from-green-900/30 dark:to-gray-800 border-green-500 transform scale-[1.02] z-10'
                                             : isPopular 
-                                                ? 'bg-gradient-to-br from-blue-50 to-white border-blue-500 transform scale-100 z-5' 
-                                                : 'bg-white border-gray-200 hover:border-blue-300'
+                                                ? 'bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/30 dark:to-gray-800 border-blue-500 transform scale-100 z-5' 
+                                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
                                     }`}
                                 >
                                     {isPopular && (
@@ -112,20 +112,19 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                     )}
 
                                     <div className="flex items-center justify-between">
-                                        <h3 className="text-lg font-medium text-gray-900">
-                                            {getPlanIcon(plan?.name)}
+                                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                                             {plan?.name || 'Forfait sans nom'}
                                         </h3>
                                         {isCurrentPlan && (
                                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                                                 currentPlan.status === 'active' 
-                                                    ? 'text-green-800 bg-green-100' 
-                                                    : currentPlan.status === 'pending' 
-                                                        ? 'text-yellow-800 bg-yellow-100' 
-                                                        : 'text-red-800 bg-red-100'
+                                                    ? 'text-green-800 dark:text-green-200 bg-green-100 dark:bg-green-900/30' 
+                                                : currentPlan.status === 'pending' 
+                                                    ? 'text-yellow-800 dark:text-yellow-200 bg-yellow-100 dark:bg-yellow-900/30' 
+                                                    : 'text-red-800 dark:text-red-200 bg-red-100 dark:bg-red-900/30'
                                             }`}>
                                                 {currentPlan.status === 'active' 
-                                                    ? 'Votre forfait' 
+                                                    ? 'Abonnement actif' 
                                                     : currentPlan.status === 'pending' 
                                                         ? 'En attente' 
                                                         : 'Expiré'}
@@ -133,35 +132,35 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                         )}
                                     </div>
 
-                                    <p className="mt-4 text-sm text-gray-500">
+                                    <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
                                         {plan?.description || 'Aucune description disponible pour ce forfait.'}
                                     </p>
 
                                     <div className="mt-6">
                                         {isCurrentPlan && currentPlan.amount_paid ? (
                                             <>
-                                                <p className="text-2xl font-bold text-gray-500 line-through">
+                                                <p className="text-2xl font-bold text-gray-500 dark:text-gray-400 line-through">
                                                     {plan?.price ? plan.price.toLocaleString() : '0'} FCFA
                                                 </p>
-                                                <p className="text-4xl font-extrabold text-blue-600">
+                                                <p className="text-4xl font-extrabold text-blue-600 dark:text-blue-400">
                                                     {currentPlan.amount_paid.toLocaleString()} FCFA
-                                                    <span className="text-base font-medium text-gray-600">
+                                                    <span className="text-base font-medium text-gray-600 dark:text-gray-400">
                                                         /{plan?.period || 'période'}
                                                     </span>
                                                 </p>
                                             </>
                                         ) : (
-                                            <p className="text-4xl font-extrabold text-gray-900">
+                                            <p className="text-4xl font-extrabold text-gray-900 dark:text-white">
                                                 {plan?.price ? plan.price.toLocaleString() : '0'} FCFA
                                                 {plan?.period && (
-                                                    <span className="text-base font-medium text-gray-600">
+                                                    <span className="text-base font-medium text-gray-600 dark:text-gray-300">
                                                         /{plan.period}
                                                     </span>
                                                 )}
                                             </p>
                                         )}
                                         {plan?.period === 'par an' && plan?.price && (
-                                            <p className="mt-1 text-sm text-gray-500">
+                                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                                 Soit {Math.round(plan.price / 12).toLocaleString()} FCFA/mois
                                             </p>
                                         )}
@@ -184,7 +183,7 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                                                 icon={faCheck} 
                                                                 className="w-5 h-5 mt-0.5 mr-2 text-green-500 flex-shrink-0" 
                                                             />
-                                                            <span className="text-sm font-medium text-gray-700">{feature}</span>
+                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{feature}</span>
                                                         </li>
                                                     ));
                                                 }
@@ -249,36 +248,35 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                     
                     {/* Section Abonnement Actuel */}
                     {currentPlan && (
-                        <div className="p-6 mt-12 bg-white rounded-lg shadow">
-                            <h3 className="mb-4 text-xl font-semibold text-gray-900">Détails sur votre abonnement</h3>
+                        <div className="p-6 mt-12 bg-white dark:bg-gray-800 rounded-lg shadow">
+                            <h3 className="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Détails sur votre abonnement</h3>
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                                <div className="p-4 border rounded-lg">
-                                    <p className="text-sm font-medium text-gray-500">Type d'abonnement</p>
-                                    <p className="mt-1 text-lg font-semibold text-gray-900">
+                                <div className="p-4 border rounded-lg dark:border-gray-700">
+                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Type d'abonnement</p>
+                                    <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
                                         {getPlanIcon(currentPlan.plan_name)}
                                         {currentPlan.plan_name}
                                     </p>
                                 </div>
-                                <div className="p-4 border rounded-lg">
-                                    <p className="text-sm font-medium text-gray-500">Date de début</p>
-                                    <p className="mt-1 text-lg font-semibold text-gray-900">
+                                <div className="p-4 border rounded-lg dark:border-gray-700">
+                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Date de début</p>
+                                    <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
                                         {formatDate(currentPlan.starts_at)}
                                     </p>
                                 </div>
-                                <div className="p-4 border rounded-lg">
-                                    <p className="text-sm font-medium text-gray-500">Date de fin</p>
-                                    <p className="mt-1 text-lg font-semibold text-gray-900">
+                                <div className="p-4 border rounded-lg dark:border-gray-700">
+                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Date de fin</p>
+                                    <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
                                         {formatDate(currentPlan.ends_at)}
                                     </p>
                                 </div>
                                 {/* <div className="p-4 border rounded-lg">
                                     <p className="text-sm font-medium text-gray-500">Montant payé</p>
-                                    <p className="mt-1 text-lg font-semibold text-green-600">
                                         {currentPlan.amount_paid?.toLocaleString() || '0'} FCFA
                                     </p>
                                 </div> */}
                             </div>
-                            <div className="flex items-center justify-between px-4 py-3 mt-4 text-sm bg-blue-50 rounded-b-lg">
+                            <div className="flex items-center justify-between px-4 py-3 mt-4 text-sm bg-blue-50 dark:bg-blue-900/30 rounded-b-lg">
                                 <span className="flex items-center">
                                     <span className={`inline-block w-2 h-2 mr-2 rounded-full ${
                                         currentPlan.status === 'active' ? 'bg-green-500' : 
@@ -286,12 +284,12 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                     }`}></span>
                                     Statut: <span className="ml-1 font-medium">
                                         {currentPlan.status === 'active' ? 'Actif' : 
-                                         currentPlan.status === 'pending' ? 'En attente' : 'Inactif'}
+                                            currentPlan.status === 'pending' ? 'En attente' : 'Inactif'}
                                     </span>
                                 </span>
                                 <Link 
                                     href="/settings/billing" 
-                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
                                 >
                                     {/* Voir les détails de facturation → */}
                                 </Link>
@@ -300,26 +298,26 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                     )}
                     
                     {/* Section Questions Fréquentes */}
-                    <div className="mt-12 bg-white rounded-lg shadow">
-                        <div className="px-6 py-5 border-b border-gray-200">
-                            <h3 className="text-lg font-medium leading-6 text-gray-900">Questions fréquentes</h3>
+                    <div className="mt-12 bg-white dark:bg-gray-800 rounded-lg shadow">
+                        <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+                            <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">Questions fréquentes</h3>
                         </div>
                         <div className="px-6 py-5 space-y-6">
                             <div>
-                                <h4 className="font-medium text-gray-900">Puis-je changer de forfait à tout moment ?</h4>
-                                <p className="mt-2 text-sm text-gray-500">
+                                <h4 className="font-medium text-gray-900 dark:text-white">Puis-je changer de forfait à tout moment ?</h4>
+                                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                                     Oui, vous pouvez passer à un autre forfait à tout moment. Le changement prendra effet à la fin de votre période de facturation actuelle.
                                 </p>
                             </div>
                             <div>
-                                <h4 className="font-medium text-gray-900">Quels modes de paiement acceptez-vous ?</h4>
-                                <p className="mt-2 text-sm text-gray-500">
+                                <h4 className="font-medium text-gray-900 dark:text-white">Quels modes de paiement acceptez-vous ?</h4>
+                                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                                     Nous acceptons les paiements par carte bancaire, Orange Money et MTN Mobile Money via notre partenaire FedaPay.
                                 </p>
                             </div>
                             <div>
-                                <h4 className="font-medium text-gray-900">Puis-je annuler mon abonnement ?</h4>
-                                <p className="mt-2 text-sm text-gray-500">
+                                <h4 className="font-medium text-gray-900 dark:text-white">Puis-je annuler mon abonnement ?</h4>
+                                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                                     Oui, vous pouvez annuler votre abonnement à tout moment. Vous continuerez à avoir accès aux fonctionnalités payantes jusqu'à la fin de votre période de facturation actuelle.
                                 </p>
                             </div>
@@ -330,7 +328,7 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                     <div className="mt-12 text-center">
                         <Link 
                             href="/dashboard"
-                            className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg shadow-md hover:from-blue-700 hover:to-blue-800 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                            className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 text-white font-medium rounded-lg shadow-md hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                         >
                             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>

@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { FaSave, FaArrowLeft, FaPlus, FaTrash, FaCalendarAlt } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
@@ -53,12 +53,12 @@ export default function RecruitmentEdit({ recruitment }) {
         <AdminLayout>
             <Head title={`Modifier l'offre : ${recruitment.title}`} />
             
-            <div className="py-6 bg-white min-h-screen">
+            <div className="py-6 bg-white dark:bg-gray-900 min-h-screen">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                        <div className="p-6 bg-white border-b border-gray-200">
+                    <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                        <div className="p-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-semibold text-gray-800">
+                                <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
                                     Modifier l'offre : {recruitment.title}
                                 </h2>
                                 <Link 
@@ -81,7 +81,7 @@ export default function RecruitmentEdit({ recruitment }) {
                                             id="title"
                                             value={data.title}
                                             onChange={e => setData('title', e.target.value)}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                                             required
                                         />
                                         {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
@@ -92,7 +92,7 @@ export default function RecruitmentEdit({ recruitment }) {
                                         <label htmlFor="type" className="block text-sm font-medium text-gray-700">Type de contrat *</label>
                                         <select
                                             id="type"
-                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                            className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white"
                                             value={data.type}
                                             onChange={(e) => setData('type', e.target.value)}
                                             required
@@ -114,7 +114,7 @@ export default function RecruitmentEdit({ recruitment }) {
                                         <input
                                             type="text"
                                             id="location"
-                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                            className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white"
                                             value={data.location}
                                             onChange={(e) => setData('location', e.target.value)}
                                             required
@@ -226,7 +226,7 @@ export default function RecruitmentEdit({ recruitment }) {
                                             id="experience_level"
                                             value={data.experience_level}
                                             onChange={e => setData('experience_level', e.target.value)}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                                             placeholder="Ex: Débutant, 3-5 ans d'expérience, etc."
                                         />
                                         {errors.experience_level && <p className="mt-1 text-sm text-red-600">{errors.experience_level}</p>}
@@ -242,7 +242,7 @@ export default function RecruitmentEdit({ recruitment }) {
                                             id="education_level"
                                             value={data.education_level}
                                             onChange={e => setData('education_level', e.target.value)}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                                             placeholder="Ex: Bac+3, Master, etc."
                                         />
                                         {errors.education_level && <p className="mt-1 text-sm text-red-600">{errors.education_level}</p>}
@@ -323,11 +323,11 @@ export default function RecruitmentEdit({ recruitment }) {
                                                 rows={8}
                                                 value={data.description}
                                                 onChange={e => setData('description', e.target.value)}
-                                                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border border-gray-300 rounded-md"
+                                                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                                                 required
                                             />
                                         </div>
-                                        <p className="mt-2 text-sm text-gray-500">
+                                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                                             Décrivez en détail les missions, responsabilités et attentes du poste.
                                         </p>
                                         {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
@@ -335,8 +335,8 @@ export default function RecruitmentEdit({ recruitment }) {
 
                                     {/* Champs personnalisés */}
                                     <div className="md:col-span-2 pt-4 border-t border-gray-200">
-                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Champs personnalisés</h3>
-                                        <p className="text-sm text-gray-500 mb-4">Ajoutez des champs personnalisés au formulaire de candidature.</p>
+                                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Champs personnalisés</h3>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Ajoutez des champs personnalisés au formulaire de candidature.</p>
                                         <CustomFieldsEditor 
                                             fields={data.custom_fields || []}
                                             onChange={(fields) => setData('custom_fields', fields)}
@@ -348,7 +348,7 @@ export default function RecruitmentEdit({ recruitment }) {
 
                                     {/* Statut */}
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                             Statut
                                         </label>
                                         <div className="mt-2 space-y-2">
@@ -361,11 +361,11 @@ export default function RecruitmentEdit({ recruitment }) {
                                                     onChange={() => setData('status', 'draft')}
                                                     className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300"
                                                 />
-                                                <label htmlFor="status-draft" className="ml-3 block text-sm font-medium text-gray-700">
+                                                <label htmlFor="status-draft" className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">
                                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                                         Brouillon
                                                     </span>
-                                                    <p className="text-gray-500 text-sm font-normal">L'offre sera enregistrée mais non publiée.</p>
+                                                    <p className="text-gray-500 dark:text-gray-400 text-sm font-normal">L'offre sera enregistrée mais non publiée.</p>
                                                 </label>
                                             </div>
                                             <div className="flex items-center">
@@ -377,11 +377,11 @@ export default function RecruitmentEdit({ recruitment }) {
                                                     onChange={() => setData('status', 'published')}
                                                     className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300"
                                                 />
-                                                <label htmlFor="status-published" className="ml-3 block text-sm font-medium text-gray-700">
+                                                <label htmlFor="status-published" className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">
                                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                                         Publiée
                                                     </span>
-                                                    <p className="text-gray-500 text-sm font-normal">L'offre sera visible par les candidats.</p>
+                                                    <p className="text-gray-500 dark:text-gray-400 text-sm font-normal">L'offre sera visible par les candidats.</p>
                                                 </label>
                                             </div>
                                             <div className="flex items-center">
@@ -393,11 +393,11 @@ export default function RecruitmentEdit({ recruitment }) {
                                                     onChange={() => setData('status', 'closed')}
                                                     className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300"
                                                 />
-                                                <label htmlFor="status-closed" className="ml-3 block text-sm font-medium text-gray-700">
+                                                <label htmlFor="status-closed" className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">
                                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                                         Clôturée
                                                     </span>
-                                                    <p className="text-gray-500 text-sm font-normal">L'offre ne sera plus visible et n'acceptera plus de candidatures.</p>
+                                                    <p className="text-gray-500 dark:text-gray-400 text-sm font-normal">L'offre ne sera plus visible et n'acceptera plus de candidatures.</p>
                                                 </label>
                                             </div>
                                         </div>
@@ -409,7 +409,7 @@ export default function RecruitmentEdit({ recruitment }) {
                                         type="button"
                                         onClick={() => {
                                             if (confirm('Êtes-vous sûr de vouloir supprimer cette offre ? Cette action est irréversible.')) {
-                                                this.$inertia.delete(route('recruitment.destroy', recruitment.id));
+                                                router.delete(route('recruitment.destroy', recruitment.id));
                                             }
                                         }}
                                         className="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
@@ -419,7 +419,7 @@ export default function RecruitmentEdit({ recruitment }) {
                                     <div className="space-x-3">
                                         <Link
                                             href={route('recruitment.show', recruitment.id)}
-                                            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                         >
                                             Annuler
                                         </Link>

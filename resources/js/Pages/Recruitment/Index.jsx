@@ -96,11 +96,11 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
     // Fonction pour obtenir la couleur du statut
     const getStatusColor = (status) => {
         const colors = {
-            'draft': 'bg-gray-100 text-gray-800',
-            'published': 'bg-green-100 text-green-800',
-            'closed': 'bg-red-100 text-red-800',
+            'draft': 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200',
+            'published': 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200',
+            'closed': 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200',
         };
-        return colors[status] || 'bg-gray-100 text-gray-800';
+        return colors[status] || 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200';
     };
 
     // Fonction pour obtenir le libellé du statut
@@ -153,26 +153,26 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
         <AdminLayout>
             <Head title="Offres d'emploi" />
             
-            <div className="min-h-screen bg-white py-6 px-4 sm:px-6 lg:px-8">
+            <div className="min-h-screen bg-white dark:bg-gray-900 py-6 px-4 sm:px-6 lg:px-8">
                 <div className="max-w-7xl mx-auto">
                     {/* En-tête avec titre et bouton d'ajout */}
                     <div className="md:flex md:items-center md:justify-between mb-6">
                         <div className="flex-1 min-w-0">
-                            <h2 className="text-3xl font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent sm:text-4xl">
+                            <h2 className="text-3xl font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent sm:text-4xl dark:from-blue-400 dark:to-purple-400">
                                 Offres d'emploi
-                                <span className="block h-1 w-20 bg-gradient-to-r from-blue-500 to-purple-500 mt-2 rounded-full"></span>
+                                <span className="block h-1 w-20 bg-gradient-to-r from-blue-500 to-purple-500 dark:from-blue-400 dark:to-purple-400 mt-2 rounded-full"></span>
                             </h2>
                         </div>
                         <div className="mt-4 flex md:mt-0 md:ml-4 items-center space-x-4">
                             {/* Boutons de changement de vue */}
-                            <div className="flex items-center space-x-2 bg-white p-1 rounded-md border border-gray-200">
+                            <div className="flex items-center space-x-2 bg-white dark:bg-gray-800 p-1 rounded-md border border-gray-200 dark:border-gray-700">
                                 <button
                                     type="button"
                                     onClick={() => setViewMode('table')}
-                                    className={`relative inline-flex items-center px-4 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                                    className={`relative inline-flex items-center px-4 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
                                         viewMode === 'table' 
-                                            ? 'bg-blue-50 text-blue-700 border-blue-500 z-10' 
-                                            : 'text-gray-700 hover:bg-gray-50'
+                                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 border-blue-500 dark:border-blue-400 z-10' 
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                                     }`}
                                 >
                                     <FaTable className="mr-2 h-4 w-4" />
@@ -181,10 +181,10 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                 <button
                                     type="button"
                                     onClick={() => setViewMode('cards')}
-                                    className={`relative inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-r ${
+                                    className={`relative inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-r border border-l-0 border-gray-300 dark:border-gray-600 ${
                                         viewMode === 'cards' 
-                                            ? 'bg-blue-50 text-blue-700 border-blue-500' 
-                                            : 'text-gray-700 hover:bg-gray-50'
+                                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 border-blue-500 dark:border-blue-400' 
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                                     }`}
                                 >
                                     <FaTh className="h-4 w-4" />
@@ -195,7 +195,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                             {canCreate && (
                                 <Link
                                     href={route('recruitment.create')}
-                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 whitespace-nowrap"
+                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 whitespace-nowrap dark:bg-blue-700 dark:hover:bg-blue-600 dark:focus:ring-blue-500 dark:focus:ring-offset-gray-900"
                                 >
                                     <FaPlus className="mr-2 h-4 w-4" />
                                     Nouvelle offre
@@ -206,25 +206,25 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
 
                     {/* Notification de succès */}
                     {notification && (
-                        <div className="rounded-md bg-green-50 p-4 mb-6">
+                        <div className="rounded-md bg-green-50 dark:bg-green-900/30 p-4 mb-6 border border-green-200 dark:border-green-800">
                             <div className="flex">
                                 <div className="flex-shrink-0">
                                     <FaCheckCircle className="h-5 w-5 text-green-400" aria-hidden="true" />
                                 </div>
                                 <div className="ml-3">
-                                    <p className="text-sm font-medium text-green-800">{notification}</p>
+                                    <p className="text-sm font-medium text-green-800 dark:text-green-200">{notification}</p>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     {/* Filtres et recherche */}
-                    <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+                    <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg mb-6 border border-gray-200 dark:border-gray-700">
                         <div className="px-4 py-5 sm:p-6">
                             <div className="flex flex-col md:flex-row md:items-end gap-4">
                                 {/* Champ de recherche */}
                                 <div className="flex-1">
-                                    <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label htmlFor="search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Rechercher
                                     </label>
                                     <div className="relative">
@@ -240,13 +240,13 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                     value={search || ''}
                                                     onChange={(e) => setSearch(e.target.value)}
                                                     onKeyPress={(e) => e.key === 'Enter' && handleSearchSubmit(e)}
-                                                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-l-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                                     placeholder="Rechercher par titre, description..."
                                                 />
                                             </div>
                                             <button
                                                 type="submit"
-                                                className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 dark:border-gray-600 text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600 dark:focus:ring-blue-500 dark:focus:ring-offset-gray-800"
                                             >
                                                 <FaSearch className="h-4 w-4 mr-2" />
                                                 Rechercher
@@ -257,7 +257,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
 
                                 {/* Filtre par statut */}
                                 <div className="w-full md:w-48">
-                                    <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Statut
                                     </label>
                                     <select
@@ -275,9 +275,9 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                 only: ['recruitments', 'filters']
                                             });
                                         }}
-                                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                     >
-                                        <option value="">Tous les statuts</option>
+                                        <option value="" className="bg-white dark:bg-gray-700">Tous les statuts</option>
                                         <option value="draft">Brouillon</option>
                                         <option value="published">Publiée</option>
                                         <option value="closed">Clôturée</option>
@@ -289,7 +289,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                     <button
                                         type="button"
                                         onClick={handleResetFilters}
-                                        className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
                                     >
                                         Réinitialiser
                                     </button>
@@ -307,50 +307,50 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
 
                     {/* Message quand il n'y a pas d'offres */}
                     {!isLoading && !hasRecruitments && (
-                        <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
-                            <p className="text-gray-500">Aucune offre d'emploi trouvée.</p>
+                        <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg p-6 text-center border border-gray-200 dark:border-gray-700">
+                            <p className="text-gray-500 dark:text-gray-400">Aucune offre d'emploi trouvée.</p>
                         </div>
                     )}
 
                     {/* Vue tableau */}
                     {viewMode === 'table' && !isLoading && hasRecruitments && (
-                        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                        <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg border border-gray-200 dark:border-gray-700">
                             <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                    <thead className="bg-gray-50 dark:bg-gray-700">
                                         <tr>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                 Titre
                                             </th>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                 Type
                                             </th>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                 Localisation
                                             </th>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                 Statut
                                             </th>
                                             {auth?.user?.roles?.includes('admin') && (
-                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                                     Candidatures
                                                 </th>
                                             )}
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
+                                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                         {recruitments.data.length > 0 ? (
                                             recruitments.data.map((recruitment) => (
                                                 <tr 
                                                     key={recruitment.id} 
-                                                    className="hover:bg-gray-100 cursor-pointer transition-colors duration-150"
+                                                    className="hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150"
                                                     onClick={() => handleRowClick(recruitment.id)}
                                                 >
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="flex items-center">
                                                             <div>
-                                                                <div className="text-sm font-medium text-gray-900">{recruitment.title}</div>
-                                                                <div className="text-sm text-gray-500 flex items-center">
+                                                                <div className="text-sm font-medium text-gray-900 dark:text-white">{recruitment.title}</div>
+                                                                <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
                                                                     <FaCalendarAlt className="mr-1.5 h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
                                                                     {formatDate(recruitment.created_at)}
                                                                 </div>
@@ -358,12 +358,12 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm text-gray-900">{recruitment.type || 'Non spécifié'}</div>
+                                                        <div className="text-sm text-gray-900 dark:text-gray-200">{recruitment.type || 'Non spécifié'}</div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="flex items-center">
                                                             <FaMapMarkerAlt className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
-                                                            <span className="text-sm text-gray-900">
+                                                            <span className="text-sm text-gray-900 dark:text-gray-200">
                                                                 {recruitment.location || 'Non spécifiée'}
                                                             </span>
                                                         </div>
@@ -374,7 +374,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                         </span>
                                                     </td>
                                                     {auth?.user?.roles?.includes('admin') && (
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                                             <div className="flex items-center">
                                                                 <FaUserFriends className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
                                                                 {recruitment.applications_count || 0} candidature(s)
@@ -385,7 +385,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={auth?.user?.roles?.includes('admin') ? 5 : 4} className="px-6 py-4 text-center text-sm text-gray-500">
+                                                <td colSpan={auth?.user?.roles?.includes('admin') ? 5 : 4} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                                                     Aucune offre d'emploi trouvée
                                                 </td>
                                             </tr>
@@ -408,7 +408,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                     return (
                                                         <span 
                                                             key={index}
-                                                            className="px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
+                                                            className="px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-transparent"
                                                             dangerouslySetInnerHTML={{ __html: link.label }}
                                                         />
                                                     );
@@ -422,7 +422,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                             href={link.url}
                                                             className={`px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 ${
                                                                 link.active
-                                                                    ? 'bg-blue-600 text-white'
+                                                                    ? 'bg-blue-600 text-white border-blue-700 dark:border-blue-600'
                                                                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
                                                             }`}
                                                         >
@@ -438,7 +438,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                             href={link.url}
                                                             className={`px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 ${
                                                                 link.active
-                                                                    ? 'bg-blue-600 text-white'
+                                                                    ? 'bg-blue-600 text-white border-blue-700 dark:border-blue-600'
                                                                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
                                                             }`}
                                                         >
@@ -466,7 +466,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
 
                     {/* Vue cartes - Par défaut */}
                     {viewMode === 'cards' && (
-                        <div className="bg-white">
+                        <div className="bg-transparent">
                             {isLoading ? (
                                 <div className="flex justify-center items-center py-12">
                                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -476,17 +476,17 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                     {recruitments.data.map((recruitment) => (
                                         <div 
                                             key={recruitment.id}
-                                            className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer hover:border-blue-200"
+                                            className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md dark:hover:shadow-lg transition-all duration-200 cursor-pointer hover:border-blue-200 dark:hover:border-blue-600"
                                             onClick={() => handleRowClick(recruitment.id)}
                                         >
                                             <div className="p-5">
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1 min-w-0">
-                                                        <h3 className="text-lg font-semibold text-gray-900 leading-6 mb-1 truncate">
+                                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white leading-6 mb-1 truncate">
                                                             {recruitment.title}
                                                         </h3>
-                                                        <div className="flex items-center text-sm text-gray-500 mb-2">
-                                                            <FaBriefcase className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
+                                                        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mb-2">
+                                                            <FaBriefcase className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                             {recruitment.type || 'Non spécifié'}
                                                         </div>
                                                     </div>
@@ -572,10 +572,10 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                             
                             {/* Pagination pour la vue cartes */}
                             {recruitments?.data?.length > 0 && recruitments?.links?.length > 0 && viewMode === 'cards' && (
-                                <div className="mt-6 sm:mt-8">
+                                <div className="mt-6 sm:mt-8 bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
                                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                                         <div className="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
-                                            Affichage de {recruitments.from || 0} à {recruitments.to || 0} sur {recruitments.total || 0} résultat{recruitments.total !== 1 ? 's' : ''}
+                                            Affichage de <span className="font-medium">{recruitments.from || 0}</span> à <span className="font-medium">{recruitments.to || 0}</span> sur <span className="font-medium">{recruitments.total || 0}</span> résultat{recruitments.total !== 1 ? 's' : ''}
                                         </div>
                                         <div className="flex flex-wrap justify-center gap-1 sm:gap-2 order-1 sm:order-2">
                                             {recruitments.links.map((link, index) => {
@@ -583,7 +583,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                     return (
                                                         <span 
                                                             key={index}
-                                                            className="px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
+                                                            className="px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-transparent"
                                                             dangerouslySetInnerHTML={{ __html: link.label }}
                                                         />
                                                     );
@@ -596,7 +596,7 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                             href={link.url}
                                                             className={`px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 ${
                                                                 link.active
-                                                                    ? 'bg-blue-600 text-white'
+                                                                    ? 'bg-blue-600 text-white border-blue-700 dark:border-blue-600 dark:bg-blue-700 dark:hover:bg-blue-600'
                                                                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
                                                             }`}
                                                             preserveState
@@ -612,9 +612,9 @@ const RecruitmentIndex = ({ recruitments, filters: initialFilters = {}, canCreat
                                                         <Link
                                                             key={index}
                                                             href={link.url}
-                                                            className={`px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 ${
+                                                            className={`px-3 py-1 sm:py-2 min-w-[2.5rem] text-center text-xs sm:text-sm rounded-md transition-colors duration-200 ${
                                                                 link.active
-                                                                    ? 'bg-blue-600 text-white'
+                                                                    ? 'bg-blue-600 text-white border-blue-700 dark:border-blue-600 dark:bg-blue-700 dark:hover:bg-blue-600'
                                                                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
                                                             }`}
                                                             preserveState

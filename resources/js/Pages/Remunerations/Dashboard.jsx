@@ -22,7 +22,7 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
         <div className="mb-6">
           <Link 
             href={route('dashboard')} 
-            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
           >
             <FaArrowLeft className="mr-2 h-4 w-4" />
             Retour au tableau de bord
@@ -84,15 +84,15 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Dernières rémunérations */}
           <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                     {isAdmin ? 'Dernières rémunérations' : 'Mes dernières rémunérations'}
                   </h3>
                   <Link 
                     href={isAdmin ? route('remunerations.index') : '#'}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
                   >
                     Voir tout
                   </Link>
@@ -101,20 +101,20 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {recentRemunerations.length > 0 ? (
                   recentRemunerations.map((remuneration) => (
-                    <div key={remuneration.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                    <div key={remuneration.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200 border-b border-gray-100 dark:border-gray-700 last:border-0">
                       <div className="flex items-center justify-between">
                         <div>
                           <div>
-                            <h4 className="font-medium text-gray-900 dark:text-white">
+                            <h4 className="font-medium text-gray-900 dark:text-gray-100">
                               {remuneration.task?.title || 'Tâche supprimée'}
                             </h4>
                             {isAdmin && remuneration.user && (
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 {remuneration.user.name}
                               </p>
                             )}
                           </div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                             {new Date(remuneration.created_at).toLocaleDateString('fr-FR', {
                               day: '2-digit',
                               month: 'long',
@@ -146,12 +146,12 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
                   </div>
                 )}
               </div>
-              <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700 text-right">
+              <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/50 text-right border-t border-gray-200 dark:border-gray-700">
                 <Link 
                   href={route('remunerations.index')} 
-                  className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                  className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
                 >
-                  Voir tout <FaArrowRight className="inline ml-1" />
+                  Voir tout <FaArrowRight className="ml-1 w-3 h-3" />
                 </Link>
               </div>
             </div>
@@ -159,8 +159,8 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
           
           {/* Actions rapides */}
           <div>
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                   Actions rapides
                 </h3>
@@ -168,7 +168,7 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
               <div className="p-6 space-y-4">
                 <Link 
                   href={route('remunerations.index', { status: 'pending' })}
-                  className="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  className="block p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200"
                 >
                   <h4 className="font-medium text-gray-900 dark:text-white">Voir les paiements en attente</h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -180,7 +180,7 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
                 
                 <Link 
                   href={route('tasks.index', { filter: 'my_tasks', status: 'completed' })}
-                  className="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  className="block p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200"
                 >
                   <h4 className="font-medium text-gray-900 dark:text-white">Tâches terminées</h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -190,7 +190,7 @@ const RemunerationDashboard = ({ stats, recentRemunerations, isAdmin = false }) 
                 
                 <Link 
                   href={route('profile.bank-details')}
-                  className="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  className="block p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200"
                 >
                   <h4 className="font-medium text-gray-900 dark:text-white">Mettre à jour vos informations bancaires</h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">

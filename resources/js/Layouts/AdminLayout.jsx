@@ -95,7 +95,17 @@ const Loader = () => {
 export default function AdminLayout({ children }) {
   const { auth, flash = {}, appName } = usePage().props;
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [darkMode, setDarkMode] = useState(() => {
+    // Vérifie si l'utilisateur a une préférence enregistrée, sinon utilise la préférence système
+    if (typeof window !== 'undefined') {
+      const savedMode = localStorage.getItem('darkMode');
+      if (savedMode !== null) {
+        return savedMode === 'true';
+      }
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
   const [notifDropdown, setNotifDropdown] = useState(false);
   const [profileDropdown, setProfileDropdown] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -117,9 +127,32 @@ export default function AdminLayout({ children }) {
   }, [auth.user]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
     localStorage.setItem('darkMode', darkMode);
   }, [darkMode]);
+
+  // Écouter les changements de préférence système
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const handleChange = (e) => {
+      // Ne mettre à jour que si l'utilisateur n'a pas de préférence enregistrée
+      if (localStorage.getItem('darkMode') === null) {
+        setDarkMode(e.matches);
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   useEffect(() => {
     if (auth?.user || auth?.id) {
@@ -196,19 +229,19 @@ export default function AdminLayout({ children }) {
   console.log('User data:', user);
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-white dark:bg-gray-900">
       {globalLoading && <Loader />}
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}>
+      <aside className={`fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}>
         {/* Logo */}
         <div className="flex items-center justify-between h-20 px-6">
           <div className="flex items-center space-x-3">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-8 h-8 text-white dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <span className="text-xl font-bold text-white">PROJA</span>
+            <span className="text-xl font-bold text-white dark:text-blue-400">ProJA</span>
           </div>
-          <button className="md:hidden text-white/70 hover:text-white transition-colors" onClick={() => setSidebarOpen(false)}>
+          <button className="md:hidden text-white/70 hover:text-white dark:hover:text-blue-300 transition-colors" onClick={() => setSidebarOpen(false)}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -223,8 +256,8 @@ export default function AdminLayout({ children }) {
               href={link.href}
               className={`flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 ${
                 route().current(link.href.replace(/^\//, ''))
-                  ? 'bg-white/10 text-white shadow-lg'
-                  : 'text-white/80 hover:bg-white/5 hover:text-white'
+                  ? 'bg-white/10 dark:bg-blue-900/50 text-white dark:text-blue-100 shadow-lg'
+                  : 'text-white/80 hover:bg-white/5 dark:hover:bg-blue-900/30 hover:text-white dark:hover:text-blue-100'
               }`}
             >
               <span className="text-lg">
@@ -236,25 +269,25 @@ export default function AdminLayout({ children }) {
               </span>
               <span className="font-medium">{link.label}</span>
               {route().current(link.href.replace(/^\//, '')) && (
-                <span className="ml-auto w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
+                <span className="ml-auto w-1.5 h-1.5 bg-blue-400 dark:bg-blue-300 rounded-full"></span>
               )}
             </Link>
           ))}
         </nav>
 
         {/* Version */}
-        <div className="p-4 border-t border-white/10 text-center">
-          <div className="text-sm font-medium text-white/60">
-            PROJA v1.0
+        <div className="p-4 border-t border-white/10 dark:border-gray-700 text-center">
+          <div className="text-sm font-medium text-white/60 dark:text-gray-400">
+            ProJA v1.0
           </div>
         </div>
       </aside>
       {/* Overlay for mobile */}
-      {sidebarOpen && <div className="fixed inset-0 bg-black bg-opacity-30 z-40 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
+      {sidebarOpen && <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
         {/* Header */}
-        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white bg-opacity-100 border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 z-40 transition-all duration-300">
+        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white dark:bg-gray-800 bg-opacity-100 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 sm:px-6 z-40 transition-all duration-300">
           <button 
             className="md:hidden text-2xl mr-2 text-gray-600 dark:text-gray-200" 
             onClick={() => setSidebarOpen(true)}
@@ -265,14 +298,14 @@ export default function AdminLayout({ children }) {
             </svg>
           </button>
           <div className="flex items-center">
-            <span className="text-xl md:text-2xl font-light tracking-wider text-gray-700 dark:text-gray-200">
-              PROJA DASHBOARD
+            <span className="text-xl md:text-2xl font-light tracking-wider text-gray-700 dark:text-white">
+              ProJA DASHBOARD
             </span>
             <span className="ml-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-medium rounded-full border border-blue-100 dark:border-blue-800">
               v1.0
             </span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 dark:text-gray-200">
             {/* Notifications internes */}
             <div className="relative">
               <button className="relative" title="Notifications internes" onClick={() => setNotifDropdown(d => !d)}>
@@ -284,22 +317,52 @@ export default function AdminLayout({ children }) {
                   <div className="p-4 border-b font-bold text-blue-700 dark:text-blue-200">Notifications</div>
                   <ul>
                     {notifications.length === 0 && <li className="p-4 text-gray-500 dark:text-gray-300">Aucune notification</li>}
-                    {notifications.slice(0, 5).map(n => (
-                      <li
-                        key={n.id}
-                        className={`p-4 border-b last:border-b-0 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 ${!n.read_at ? 'bg-blue-50 dark:bg-blue-900' : ''}`}
-                        onClick={() => {
-                          setSelectedNotif(n);
-                          setNotifDropdown(false);
-                          if (n.url) {
-                            window.location.href = n.url;
-                          }
-                        }}
-                      >
-                        <div className={`font-semibold text-gray-700 dark:text-gray-200`}>{n.message}</div>
-                        <div className="px-4 py-6 mx-auto bg-white max-w-7xl sm:px-6 md:px-8">{new Date(n.created_at).toLocaleString()}</div>
-                      </li>
-                    ))}
+                    {notifications.slice(0, 5).map(n => {
+                      // Extraire l'ID utilisateur du message si présent
+                      const userIdMatch = n.message.match(/User #(\d+)/);
+                      let message = n.message;
+                      
+                      // Remplacer l'ID utilisateur par le nom si disponible
+                      if (userIdMatch && userIdMatch[1] && n.data?.user) {
+                        message = message.replace(`User #${userIdMatch[1]}`, n.data.user.name || `Utilisateur #${userIdMatch[1]}`);
+                      }
+                      
+                      return (
+                        <li
+                          key={n.id}
+                          className={`p-4 border-b last:border-b-0 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 ${!n.read_at ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
+                          onClick={() => {
+                            setSelectedNotif(n);
+                            setNotifDropdown(false);
+                            if (n.url) {
+                              window.location.href = n.url;
+                            }
+                          }}
+                        >
+                          <div className="flex items-start">
+                            <div className="flex-shrink-0 pt-0.5">
+                              <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </div>
+                            <div className="ml-3 flex-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                {message}
+                              </p>
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(n.created_at).toLocaleString('fr-FR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                   <div className="p-2 text-center border-t">
                     <Link href="/activities" className="text-blue-700 hover:underline font-semibold">Voir tout le journal d'activité</Link>
@@ -312,19 +375,93 @@ export default function AdminLayout({ children }) {
                   <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg w-full max-w-md p-6 relative animate-fade-in">
                     <button onClick={() => setSelectedNotif(null)} className="absolute top-2 right-3 text-2xl text-gray-400 hover:text-gray-700">&times;</button>
                     <h2 className="text-xl font-bold mb-2 text-blue-700 dark:text-blue-200">Détail de la notification</h2>
-                    <div className="mb-2 font-semibold">{selectedNotif.message}</div>
-                    <div className="text-sm text-gray-500 mb-2">{new Date(selectedNotif.created_at).toLocaleString()}</div>
-                    <pre className="bg-gray-100 dark:bg-gray-800 rounded p-3 text-xs overflow-x-auto mt-2">{JSON.stringify(selectedNotif.data, null, 2)}</pre>
+                    <div className="mb-4">
+                      <div className="flex items-center mb-2">
+                        <div className="flex-shrink-0">
+                          <svg className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </div>
+                        <h3 className="ml-2 text-lg font-semibold text-gray-900 dark:text-white">
+                          {(() => {
+                            let message = selectedNotif.message;
+                            if (selectedNotif.data?.user) {
+                              message = message.replace(/User #(\d+)/, selectedNotif.data.user.name || 'Utilisateur');
+                            }
+                            return message;
+                          })()}
+                        </h3>
+                      </div>
+                      <div className="ml-8">
+                        <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                          {new Date(selectedNotif.created_at).toLocaleString('fr-FR', {
+                            weekday: 'long',
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                        
+                        {selectedNotif.data && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Détails :</h4>
+                            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-sm">
+                              {selectedNotif.data.user && (
+                                <p className="mb-1">
+                                  <span className="font-medium text-gray-700 dark:text-gray-300">Utilisateur :</span>{' '}
+                                  <span className="text-gray-900 dark:text-white">
+                                    {selectedNotif.data.user.name || 'Inconnu'}
+                                    {selectedNotif.data.user.email ? ` (${selectedNotif.data.user.email})` : ''}
+                                  </span>
+                                </p>
+                              )}
+                              {selectedNotif.data.subject && (
+                                <p className="mb-1">
+                                  <span className="font-medium text-gray-700 dark:text-gray-300">Sujet :</span>{' '}
+                                  <span className="text-gray-900 dark:text-white">{selectedNotif.data.subject}</span>
+                                </p>
+                              )}
+                              {selectedNotif.data.changes && (
+                                <div className="mt-2">
+                                  <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Modifications :</p>
+                                  <ul className="space-y-1">
+                                    {Object.entries(selectedNotif.data.changes).map(([key, value]) => (
+                                      <li key={key} className="flex">
+                                        <span className="font-medium text-gray-700 dark:text-gray-300 w-1/3">{key} :</span>
+                                        <span className="text-gray-900 dark:text-white flex-1">
+                                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
             {/* Dark mode toggle */}
-            <button className="ml-2" onClick={() => setDarkMode(dm => !dm)} title="Mode sombre/clair">
+            <button 
+              className="ml-2 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
+              onClick={() => setDarkMode(dm => !dm)} 
+              aria-label={darkMode ? "Désactiver le mode sombre" : "Activer le mode sombre"}
+              title={darkMode ? "Désactiver le mode sombre" : "Activer le mode sombre"}
+            >
               {darkMode ? (
-                <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m8.66-13.66l-.71.71M4.05 19.95l-.71.71M21 12h-1M4 12H3m16.66 5.66l-.71-.71M4.05 4.05l-.71-.71M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" /></svg>
+                <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m8.66-13.66l-.71.71M4.05 19.95l-.71.71M21 12h-1M4 12H3m16.66 5.66l-.71-.71M4.05 4.05l-.71-.71M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
               ) : (
-                <svg className="w-6 h-6 text-gray-600 dark:text-gray-200" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" /></svg>
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
               )}
             </button>
             {/* Profil & menu */}
@@ -406,7 +543,7 @@ export default function AdminLayout({ children }) {
         <Notification message={flash.error} type="error" />
         <Notification message={flash.info} type="info" />
         {/* Page content */}
-        <main className="flex-1 w-full h-full transition-colors pt-16">
+        <main className="flex-1 w-full h-full transition-colors pt-16 bg-white dark:bg-gray-900">
           {children}
         </main>
       </div>
