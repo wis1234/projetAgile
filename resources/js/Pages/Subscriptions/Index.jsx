@@ -6,6 +6,9 @@ import { faCheckCircle, faCrown, faUserTie, faGift, faClock, faCheck, faCog, faU
 
 export default function SubscriptionPlans({ plans, currentPlan = null }) {
     const { auth } = usePage().props;
+    
+    // Vérifier si l'utilisateur a un abonnement actif
+    const hasActiveSubscription = currentPlan && currentPlan.status === 'active';
 
     // Les fonctionnalités sont maintenant récupérées depuis la base de données via la propriété features de chaque plan
 
@@ -117,7 +120,7 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                                         : 'text-red-800 bg-red-100'
                                             }`}>
                                                 {currentPlan.status === 'active' 
-                                                    ? 'Actif' 
+                                                    ? 'Votre forfait' 
                                                     : currentPlan.status === 'pending' 
                                                         ? 'En attente' 
                                                         : 'Expiré'}
@@ -130,14 +133,28 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                     </p>
 
                                     <div className="mt-6">
-                                        <p className="text-4xl font-extrabold text-gray-900">
-                                            {plan?.price ? plan.price.toLocaleString() : '0'} FCFA
-                                            {plan?.period && (
-                                                <span className="text-base font-medium text-gray-600">
-                                                    /{plan.period}
-                                                </span>
-                                            )}
-                                        </p>
+                                        {isCurrentPlan && currentPlan.amount_paid ? (
+                                            <>
+                                                <p className="text-2xl font-bold text-gray-500 line-through">
+                                                    {plan?.price ? plan.price.toLocaleString() : '0'} FCFA
+                                                </p>
+                                                <p className="text-4xl font-extrabold text-blue-600">
+                                                    {currentPlan.amount_paid.toLocaleString()} FCFA
+                                                    <span className="text-base font-medium text-gray-600">
+                                                        /{plan?.period || 'période'}
+                                                    </span>
+                                                </p>
+                                            </>
+                                        ) : (
+                                            <p className="text-4xl font-extrabold text-gray-900">
+                                                {plan?.price ? plan.price.toLocaleString() : '0'} FCFA
+                                                {plan?.period && (
+                                                    <span className="text-base font-medium text-gray-600">
+                                                        /{plan.period}
+                                                    </span>
+                                                )}
+                                            </p>
+                                        )}
                                         {plan?.period === 'par an' && plan?.price && (
                                             <p className="mt-1 text-sm text-gray-500">
                                                 Soit {Math.round(plan.price / 12).toLocaleString()} FCFA/mois
@@ -180,18 +197,33 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
 
                                     <div className="mt-8">
                                         {isCurrentPlan ? (
-                                            <button
-                                                disabled
-                                                className="w-full px-4 py-2 text-sm font-medium text-white bg-gray-400 rounded-md cursor-not-allowed"
-                                            >
-                                                Forfait actuel
-                                            </button>
+                                            <div className="space-y-2">
+                                                <button
+                                                    disabled
+                                                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md cursor-not-allowed"
+                                                >
+                                                    {hasActiveSubscription ? 'Abonnement actif' : 'Forfait actuel'}
+                                                </button>
+                                                {hasActiveSubscription && (
+                                                    <Link
+                                                        href={route('subscription.manage')}
+                                                        className="block w-full px-4 py-2 text-sm font-medium text-center text-blue-600 transition duration-150 ease-in-out bg-white border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                    >
+                                                        Gérer l'abonnement
+                                                    </Link>
+                                                )}
+                                            </div>
                                         ) : (
                                             <Link
                                                 href={route('subscription.checkout', plan.id)}
-                                                className="block w-full px-4 py-3 text-sm font-medium text-center text-white transition duration-150 ease-in-out bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-md hover:shadow-lg"
+                                                className={`block w-full px-4 py-3 text-sm font-medium text-center text-white transition duration-150 ease-in-out border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-md hover:shadow-lg ${
+                                                    hasActiveSubscription 
+                                                        ? 'bg-gray-400 hover:bg-gray-500 focus:ring-gray-500' 
+                                                        : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                                                }`}
+                                                disabled={hasActiveSubscription}
                                             >
-                                                Choisir ce forfait
+                                                {hasActiveSubscription ? 'Changement de forfait' : 'Choisir ce forfait'}
                                             </Link>
                                         )}
                                     </div>
@@ -224,12 +256,12 @@ export default function SubscriptionPlans({ plans, currentPlan = null }) {
                                         {formatDate(currentPlan.ends_at)}
                                     </p>
                                 </div>
-                                <div className="p-4 border rounded-lg">
+                                {/* <div className="p-4 border rounded-lg">
                                     <p className="text-sm font-medium text-gray-500">Montant payé</p>
                                     <p className="mt-1 text-lg font-semibold text-green-600">
                                         {currentPlan.amount_paid?.toLocaleString() || '0'} FCFA
                                     </p>
-                                </div>
+                                </div> */}
                             </div>
                             <div className="flex items-center justify-between px-4 py-3 mt-4 text-sm bg-blue-50 rounded-b-lg">
                                 <span className="flex items-center">

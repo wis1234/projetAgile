@@ -10,8 +10,15 @@ import {
     faClock,
     faCalendarAlt,
     faEdit,
-    faTrash
+    faTrash,
+    faUserGroup,
+    faEllipsisVertical
 } from '@fortawesome/free-solid-svg-icons';
+import { Menu, Transition } from '@headlessui/react';
+
+function classNames(...classes) {
+    return classes.filter(Boolean).join(' ');
+}
 
 export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters = {} }) {
     // Valeurs par défaut pour les statistiques
@@ -58,7 +65,14 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
                     <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between items-center">
                             <h1 className="text-2xl font-bold text-gray-900">Gestion des plans d'abonnement</h1>
-                            <div className="flex space-x-4">
+                            <div className="flex flex-wrap gap-3">
+                                <Link
+                                    href={route('admin.subscription-plans.subscribers')}
+                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                                >
+                                    <FontAwesomeIcon icon={faUserGroup} className="mr-2" />
+                                    Abonnés
+                                </Link>
                                 <Link
                                     href={route('subscription.plans')}
                                     className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -287,27 +301,75 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-4 text-right whitespace-nowrap">
-                                                            <div className="flex justify-end space-x-1">
-                                                                <Link
-                                                                    href={route('admin.subscription-plans.edit', plan.id)}
-                                                                    className="text-indigo-600 hover:text-indigo-900 p-1"
-                                                                    title="Modifier"
+                                                            <Menu as="div" className="relative inline-block text-left">
+                                                                <div>
+                                                                    <Menu.Button className="flex items-center text-gray-400 hover:text-gray-600 focus:outline-none">
+                                                                        <span className="sr-only">Ouvrir les options</span>
+                                                                        <FontAwesomeIcon icon={faEllipsisVertical} className="h-5 w-5" />
+                                                                    </Menu.Button>
+                                                                </div>
+
+                                                                <Transition
+                                                                    as={React.Fragment}
+                                                                    enter="transition ease-out duration-100"
+                                                                    enterFrom="transform opacity-0 scale-95"
+                                                                    enterTo="transform opacity-100 scale-100"
+                                                                    leave="transition ease-in duration-75"
+                                                                    leaveFrom="transform opacity-100 scale-100"
+                                                                    leaveTo="transform opacity-0 scale-95"
                                                                 >
-                                                                    <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
-                                                                </Link>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        if (confirm('Êtes-vous sûr de vouloir supprimer ce plan ?')) {
-                                                                            router.delete(route('admin.subscription-plans.destroy', plan.id));
-                                                                        }
-                                                                    }}
-                                                                    className="text-red-600 hover:text-red-900 p-1"
-                                                                    title="Supprimer"
-                                                                >
-                                                                    <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
-                                                                </button>
-                                                            </div>
+                                                                    <Menu.Items className="origin-top-right absolute right-0 z-10 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                                                        <div className="py-1">
+                                                                            <Menu.Item>
+                                                                                {({ active }) => (
+                                                                                    <Link
+                                                                                        href={route('admin.subscription-plans.subscribers', { plan: plan.id })}
+                                                                                        className={classNames(
+                                                                                            active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                                                                                            'block px-4 py-2 text-sm'
+                                                                                        )}
+                                                                                    >
+                                                                                        <FontAwesomeIcon icon={faUserGroup} className="mr-2 text-blue-600" />
+                                                                                        Voir les abonnés
+                                                                                    </Link>
+                                                                                )}
+                                                                            </Menu.Item>
+                                                                            <Menu.Item>
+                                                                                {({ active }) => (
+                                                                                    <Link
+                                                                                        href={route('admin.subscription-plans.edit', plan.id)}
+                                                                                        className={classNames(
+                                                                                            active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                                                                                            'block px-4 py-2 text-sm'
+                                                                                        )}
+                                                                                    >
+                                                                                        <FontAwesomeIcon icon={faEdit} className="mr-2 text-indigo-600" />
+                                                                                        Modifier
+                                                                                    </Link>
+                                                                                )}
+                                                                            </Menu.Item>
+                                                                            <Menu.Item>
+                                                                                {({ active }) => (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            if (confirm('Êtes-vous sûr de vouloir supprimer ce plan ?')) {
+                                                                                                router.delete(route('admin.subscription-plans.destroy', plan.id));
+                                                                                            }
+                                                                                        }}
+                                                                                        className={classNames(
+                                                                                            active ? 'bg-gray-100 text-gray-900' : 'text-red-600',
+                                                                                            'w-full text-left block px-4 py-2 text-sm'
+                                                                                        )}
+                                                                                    >
+                                                                                        <FontAwesomeIcon icon={faTrash} className="mr-2" />
+                                                                                        Supprimer
+                                                                                    </button>
+                                                                                )}
+                                                                            </Menu.Item>
+                                                                        </div>
+                                                                    </Menu.Items>
+                                                                </Transition>
+                                                            </Menu>
                                                         </td>
                                                     </tr>
                                                     );
@@ -357,28 +419,37 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex justify-end space-x-2 mt-4 pt-4 border-t border-gray-100">
+                                                <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
                                                     <Link
-                                                        href={route('admin.subscription-plans.edit', plan.id)}
-                                                        className="inline-flex items-center px-3 py-1.5 text-sm text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded"
-                                                        title="Modifier"
+                                                        href={route('admin.subscription-plans.subscribers', { plan: plan.id })}
+                                                        className="inline-flex items-center px-3 py-1.5 text-sm text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded"
                                                     >
-                                                        <FontAwesomeIcon icon={faEdit} className="w-4 h-4 mr-1" />
-                                                        Modifier
+                                                        <FontAwesomeIcon icon={faUserGroup} className="w-4 h-4 mr-1" />
+                                                        Voir les abonnés
                                                     </Link>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            if (confirm('Êtes-vous sûr de vouloir supprimer ce plan ?')) {
-                                                                router.delete(route('admin.subscription-plans.destroy', plan.id));
-                                                            }
-                                                        }}
-                                                        className="inline-flex items-center px-3 py-1.5 text-sm text-red-600 hover:text-red-900 hover:bg-red-50 rounded"
-                                                        title="Supprimer"
-                                                    >
-                                                        <FontAwesomeIcon icon={faTrash} className="w-4 h-4 mr-1" />
-                                                        Supprimer
-                                                    </button>
+                                                    <div className="flex space-x-2">
+                                                        <Link
+                                                            href={route('admin.subscription-plans.edit', plan.id)}
+                                                            className="inline-flex items-center px-3 py-1.5 text-sm text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded"
+                                                            title="Modifier"
+                                                        >
+                                                            <FontAwesomeIcon icon={faEdit} className="w-4 h-4 mr-1" />
+                                                            Modifier
+                                                        </Link>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (confirm('Êtes-vous sûr de vouloir supprimer ce plan ?')) {
+                                                                    router.delete(route('admin.subscription-plans.destroy', plan.id));
+                                                                }
+                                                            }}
+                                                            className="inline-flex items-center px-3 py-1.5 text-sm text-red-600 hover:text-red-900 hover:bg-red-50 rounded"
+                                                            title="Supprimer"
+                                                        >
+                                                            <FontAwesomeIcon icon={faTrash} className="w-4 h-4 mr-1" />
+                                                            Supprimer
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                             );

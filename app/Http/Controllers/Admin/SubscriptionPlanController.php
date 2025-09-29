@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\SubscriptionPlan;
 use App\Models\Subscription;
+use App\Notifications\SubscriptionStatusUpdated;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 class SubscriptionPlanController extends Controller
@@ -189,5 +191,130 @@ class SubscriptionPlanController extends Controller
 
         return redirect()->route('admin.subscription-plans.index')
             ->with('success', 'Plan d\'abonnement supprimé avec succès.');
+    }
+
+    /**
+     * Affiche la liste des abonnés à un plan d'abonnement
+     */
+    /**
+     * Met à jour le statut d'un abonnement
+     */
+    public function updateStatus(Request $request, $subscription_id)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:active,pending,cancelled,expired',
+        ]);
+
+        try {
+            // Trouver l'abonnement par son ID avec les relations nécessaires
+            $subscription = Subscription::with(['user', 'plan'])->findOrFail($subscription_id);
+            
+            // Sauvegarder l'ancien statut pour la notification
+            $oldStatus = $subscription->status;
+            
+            // Mettre à jour le statut de l'abonnement
+            $subscription->update([
+                'status' => $validated['status'],
+                'cancelled_at' => $validated['status'] === 'cancelled' ? now() : null,
+                'ends_at' => $validated['status'] === 'cancelled' || $validated['status'] === 'expired' ? now() : $subscription->ends_at
+            ]);
+            
+            // Recharger le modèle avec les relations mises à jour
+            $subscription->refresh();
+            
+            // Envoyer une notification par email uniquement si le statut a changé
+            if ($oldStatus !== $subscription->status && $subscription->user) {
+                try {
+                    // Envoyer la notification
+                    $subscription->user->notify(new SubscriptionStatusUpdated($subscription, $oldStatus));
+                } catch (\Exception $e) {
+                    // Enregistrer l'erreur mais ne pas interrompre le flux
+                    \Log::error('Erreur lors de l\'envoi de la notification de changement de statut: ' . $e->getMessage(), [
+                        'subscription_id' => $subscription->id,
+                        'user_id' => $subscription->user->id,
+                        'error' => $e->getTraceAsString()
+                    ]);
+                }
+            }
+
+            // Rediriger vers la page précédente avec un message de succès
+            return back()->with('success', 'Le statut de l\'abonnement a été mis à jour avec succès.');
+            
+        } catch (\Exception $e) {
+            \Log::error('Erreur lors de la mise à jour du statut de l\'abonnement: ' . $e->getMessage(), [
+                'subscription_id' => $subscription_id,
+                'status' => $validated['status'] ?? null,
+                'error' => $e->getTraceAsString()
+            ]);
+
+            return back()->with('error', 'Une erreur est survenue lors de la mise à jour du statut: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Affiche la liste des abonnés à un plan d'abonnement
+     */
+    public function subscribers(Request $request, $subscription_plan = null)
+    {
+        $query = \App\Models\Subscription::with(['user', 'plan']);
+        $selectedPlan = null;
+        $search = $request->input('search');
+        $status = $request->input('status', 'all');
+        
+        // Filtrer par plan spécifique si fourni
+        if ($subscription_plan) {
+            $selectedPlan = SubscriptionPlan::findOrFail($subscription_plan);
+            $query->where('subscription_plan_id', $subscription_plan);
+        }
+        
+        // Recherche par nom d'utilisateur ou email
+        if (!empty($search)) {
+            $query->whereHas('user', function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+        
+        // Filtrer par statut
+        if ($status !== 'all') {
+            $query->where('status', $status);
+        }
+        
+        $subscriptions = $query->latest()->paginate(15);
+        $plans = SubscriptionPlan::all();
+        
+        // Format subscriptions data for Inertia
+        $subscriptionsData = [
+            'data' => $subscriptions->items(),
+            'links' => [
+                'first' => $subscriptions->url(1),
+                'last' => $subscriptions->url($subscriptions->lastPage()),
+                'prev' => $subscriptions->previousPageUrl(),
+                'next' => $subscriptions->nextPageUrl(),
+            ],
+            'meta' => [
+                'current_page' => $subscriptions->currentPage(),
+                'from' => $subscriptions->firstItem(),
+                'last_page' => $subscriptions->lastPage(),
+                'path' => $subscriptions->path(),
+                'per_page' => $subscriptions->perPage(),
+                'to' => $subscriptions->lastItem(),
+                'total' => $subscriptions->total(),
+            ]
+        ];
+
+        return Inertia::render('Admin/SubscriptionPlans/Subscribers', [
+            'subscriptions' => $subscriptionsData,
+            'plans' => $plans,
+            'selectedPlan' => $selectedPlan ? [
+                'id' => $selectedPlan->id,
+                'name' => $selectedPlan->name,
+                'price' => $selectedPlan->price,
+            ] : null,
+            'filters' => [
+                'search' => $search ?? '',
+                'status' => $status,
+            ]
+        ]);
     }
 }

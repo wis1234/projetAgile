@@ -101,6 +101,14 @@ Route::middleware('auth')->group(function () {
         Route::get('subscription-plans/{subscription_plan}/edit', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'edit'])->name('subscription-plans.edit');
         Route::put('subscription-plans/{subscription_plan}', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'update'])->name('subscription-plans.update');
         Route::delete('subscription-plans/{subscription_plan}', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'destroy'])->name('subscription-plans.destroy');
+        
+        // Subscribers routes
+        Route::get('subscription-plans/subscribers', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'subscribers'])->name('subscription-plans.subscribers');
+        Route::get('subscription-plans/{subscription_plan}/subscribers', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'subscribers'])->name('subscription-plans.plan-subscribers');
+        
+        // Update subscription status
+        Route::put('subscriptions/{subscription}/update-status', [App\Http\Controllers\Admin\SubscriptionPlanController::class, 'updateStatus'])
+            ->name('subscriptions.update-status');
     });
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
