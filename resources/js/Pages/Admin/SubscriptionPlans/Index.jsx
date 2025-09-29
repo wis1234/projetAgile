@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -12,30 +12,126 @@ import {
     faEdit,
     faTrash,
     faUserGroup,
-    faEllipsisVertical
+    faEllipsisVertical,
+    faChevronLeft,
+    faChevronRight,
+    faChartLine,
+    faExclamationTriangle,
+    faCheckCircle
 } from '@fortawesome/free-solid-svg-icons';
-import { Menu, Transition } from '@headlessui/react';
 
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ');
 }
 
-export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters = {} }) {
-    // Valeurs par défaut pour les statistiques
+// Composant Menu Déroulant simple comme WhatsApp
+function DropdownMenu({ isOpen, onClose, triggerRef, children }) {
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target) && 
+                triggerRef.current && !triggerRef.current.contains(event.target)) {
+                onClose();
+            }
+        };
+
+        const handleEscape = (event) => {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [isOpen, onClose, triggerRef]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div
+            ref={menuRef}
+            className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50"
+        >
+            {children}
+        </div>
+    );
+}
+
+export default function SubscriptionPlansIndex({ 
+    plans = { 
+        data: [], 
+        current_page: 1, 
+        last_page: 1, 
+        from: 0, 
+        to: 0, 
+        total: 0, 
+        path: '', 
+        links: {} 
+    }, 
+    stats = {
+        // Statistiques principales
+        total_plans: 0,
+        active_plans: 0,
+        inactive_plans: 0,
+        
+        // Statistiques des abonnements
+        total_subscriptions: 0,
+        active_subscriptions: 0,
+        expiring_this_month: 0,
+        expired_subscriptions: 0,
+        
+        // Statistiques financières
+        monthly_recurring_revenue: 0,
+        total_revenue: 0,
+        average_revenue_per_user: 0,
+        
+        // Statistiques d'engagement
+        most_popular_plan: null,
+        subscription_growth_rate: 0,
+        renewal_rate: 0
+    }, 
+    filters = {} 
+}) {
     const {
+        // Statistiques principales
+        total_plans = 0,
+        active_plans = 0,
+        inactive_plans = 0,
+        
+        // Statistiques des abonnements
+        total_subscriptions = 0,
         active_subscriptions = 0,
         expiring_this_month = 0,
+        expired_subscriptions = 0,
+        
+        // Statistiques financières
         monthly_recurring_revenue = 0,
-        active_plans = 0
+        total_revenue = 0,
+        average_revenue_per_user = 0,
+        
+        // Statistiques d'engagement
+        most_popular_plan = null,
+        subscription_growth_rate = 0,
+        renewal_rate = 0
     } = stats;
 
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
+    const [openMenuId, setOpenMenuId] = useState(null);
+    const buttonRefs = useRef({});
     
     const handleSearch = (e) => {
         e.preventDefault();
         router.get(route('admin.subscription-plans.index'), 
-            { search: searchQuery, status: statusFilter },
+            { search: searchQuery, status: statusFilter, page: 1 },
             { preserveState: true, preserveScroll: true }
         );
     };
@@ -44,7 +140,7 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
         const newStatus = e.target.value;
         setStatusFilter(newStatus);
         router.get(route('admin.subscription-plans.index'), 
-            { search: searchQuery, status: newStatus },
+            { search: searchQuery, status: newStatus, page: 1 },
             { preserveState: true, preserveScroll: true }
         );
     };
@@ -55,36 +151,130 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
         router.get(route('admin.subscription-plans.index'));
     };
 
+    const toggleMenu = (planId) => {
+        setOpenMenuId(openMenuId === planId ? null : planId);
+    };
+
+    const closeMenu = () => {
+        setOpenMenuId(null);
+    };
+
+    const handleDelete = (planId) => {
+        if (confirm('Êtes-vous sûr de vouloir supprimer ce plan ?')) {
+            closeMenu();
+            router.delete(route('admin.subscription-plans.destroy', planId));
+        }
+    };
+
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('fr-FR', {
+            style: 'currency',
+            currency: 'XOF',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(amount || 0);
+    };
+
+    const formatPercentage = (value) => {
+        return `${(value || 0).toFixed(1)}%`;
+    };
+
+    const renderActionMenu = (plan, id) => (
+        <div className="relative">
+            <button
+                ref={el => buttonRefs.current[id] = el}
+                onClick={() => toggleMenu(id)}
+                className="flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                aria-haspopup="true"
+                aria-expanded={openMenuId === id}
+            >
+                <FontAwesomeIcon icon={faEllipsisVertical} className="h-4 w-4" />
+            </button>
+
+            <DropdownMenu
+                isOpen={openMenuId === id}
+                onClose={closeMenu}
+                triggerRef={{ current: buttonRefs.current[id] }}
+            >
+                <Link
+                    href={route('admin.subscription-plans.subscribers', { plan: plan.id })}
+                    className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100"
+                    onClick={closeMenu}
+                >
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                        <FontAwesomeIcon icon={faUserGroup} className="h-3 w-3 text-blue-600" />
+                    </div>
+                    <div>
+                        <div className="font-medium">Voir les abonnés</div>
+                        <div className="text-xs text-gray-500">Consulter la liste</div>
+                    </div>
+                </Link>
+                
+                <Link
+                    href={route('admin.subscription-plans.edit', plan.id)}
+                    className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100"
+                    onClick={closeMenu}
+                >
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                        <FontAwesomeIcon icon={faEdit} className="h-3 w-3 text-indigo-600" />
+                    </div>
+                    <div>
+                        <div className="font-medium">Modifier</div>
+                        <div className="text-xs text-gray-500">Éditer le plan</div>
+                    </div>
+                </Link>
+                
+                <button
+                    onClick={() => handleDelete(plan.id)}
+                    className="flex items-center w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
+                >
+                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center mr-3">
+                        <FontAwesomeIcon icon={faTrash} className="h-3 w-3 text-red-600" />
+                    </div>
+                    <div>
+                        <div className="font-medium">Supprimer</div>
+                        <div className="text-xs text-red-500">Action irréversible</div>
+                    </div>
+                </button>
+            </DropdownMenu>
+        </div>
+    );
+
     return (
         <AdminLayout>
-            <div className="min-h-screen bg-gray-100">
+            <div className="min-h-screen bg-gray-50">
                 <Head title="Plans d'abonnement" />
 
                 {/* En-tête */}
-                <div className="bg-white shadow">
-                    <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-                        <div className="flex justify-between items-center">
-                            <h1 className="text-2xl font-bold text-gray-900">Gestion des plans d'abonnement</h1>
+                <div className="bg-white shadow-sm border-b border-gray-200">
+                    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900">Gestion des plans d'abonnement</h1>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    Gérez vos offres d'abonnement et suivez les performances
+                                </p>
+                            </div>
                             <div className="flex flex-wrap gap-3">
                                 <Link
                                     href={route('admin.subscription-plans.subscribers')}
-                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-200 shadow-sm"
                                 >
-                                    <FontAwesomeIcon icon={faUserGroup} className="mr-2" />
+                                    <FontAwesomeIcon icon={faUserGroup} className="mr-2 h-4 w-4" />
                                     Abonnés
                                 </Link>
                                 <Link
                                     href={route('subscription.plans')}
-                                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-sm"
                                 >
-                                    <FontAwesomeIcon icon={faMoneyBillWave} className="mr-2" />
+                                    <FontAwesomeIcon icon={faMoneyBillWave} className="mr-2 h-4 w-4" />
                                     Voir les offres
                                 </Link>
                                 <Link
                                     href={route('admin.subscription-plans.create')}
-                                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors duration-200 shadow-sm"
                                 >
-                                    <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                                    <FontAwesomeIcon icon={faPlus} className="mr-2 h-4 w-4" />
                                     Nouveau plan
                                 </Link>
                             </div>
@@ -93,97 +283,180 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
                 </div>
 
                 {/* Contenu principal */}
-                <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+                <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
                     {/* Cartes de statistiques */}
-                    <div className="grid grid-cols-1 gap-5 mb-6 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="overflow-hidden bg-white rounded-lg shadow">
-                            <div className="p-5">
-                                <div className="flex items-center">
-                                    <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 text-green-500 bg-green-100 rounded-md">
-                                        <FontAwesomeIcon icon={faUsers} className="w-6 h-6" />
-                                    </div>
-                                    <div className="ml-5 w-0 flex-1">
-                                        <dl>
-                                            <dt className="text-sm font-medium text-gray-500 truncate">Abonnements actifs</dt>
-                                            <dd className="flex items-baseline">
-                                                <div className="text-2xl font-semibold text-gray-900">{active_subscriptions}</div>
-                                            </dd>
-                                        </dl>
-                                    </div>
+                    <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-2 lg:grid-cols-4">
+                        {/* Plans d'abonnement */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-center">
+                                <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-blue-100 rounded-xl">
+                                    <FontAwesomeIcon icon={faMoneyBillWave} className="w-6 h-6 text-blue-600" />
+                                </div>
+                                <div className="ml-5 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-gray-500 truncate">Total des plans</dt>
+                                        <dd className="text-2xl font-bold text-gray-900">
+                                            {total_plans > 0 ? total_plans : 'Aucun'}
+                                        </dd>
+                                        <dd className="text-xs text-gray-500 mt-1">
+                                            <span className={`inline-flex items-center ${active_plans > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                                <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3 mr-1" />
+                                                {active_plans} actifs
+                                            </span>
+                                            <span className="mx-2">•</span>
+                                            <span className="text-gray-400">{inactive_plans} inactifs</span>
+                                        </dd>
+                                    </dl>
                                 </div>
                             </div>
                         </div>
                         
-                        <div className="overflow-hidden bg-white rounded-lg shadow">
-                            <div className="p-5">
-                                <div className="flex items-center">
-                                    <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 text-yellow-500 bg-yellow-100 rounded-md">
-                                        <FontAwesomeIcon icon={faClock} className="w-6 h-6" />
-                                    </div>
-                                    <div className="ml-5 w-0 flex-1">
-                                        <dl>
-                                            <dt className="text-sm font-medium text-gray-500 truncate">Expirant ce mois</dt>
-                                            <dd className="flex items-baseline">
-                                                <div className="text-2xl font-semibold text-gray-900">{expiring_this_month}</div>
-                                            </dd>
-                                        </dl>
-                                    </div>
+                        {/* Abonnements actifs */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-center">
+                                <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-green-100 rounded-xl">
+                                    <FontAwesomeIcon icon={faUsers} className="w-6 h-6 text-green-600" />
+                                </div>
+                                <div className="ml-5 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-gray-500 truncate">Abonnements actifs</dt>
+                                        <dd className="text-2xl font-bold text-gray-900">
+                                            {active_subscriptions > 0 ? active_subscriptions : 'Aucun'}
+                                        </dd>
+                                        <dd className="text-xs text-gray-500 mt-1">
+                                            <span className="text-green-600">
+                                                +{subscription_growth_rate > 0 ? formatPercentage(subscription_growth_rate) : '0%'} ce mois
+                                            </span>
+                                        </dd>
+                                    </dl>
                                 </div>
                             </div>
                         </div>
                         
-                        <div className="overflow-hidden bg-white rounded-lg shadow">
-                            <div className="p-5">
-                                <div className="flex items-center">
-                                    <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 text-blue-500 bg-blue-100 rounded-md">
-                                        <FontAwesomeIcon icon={faMoneyBillWave} className="w-6 h-6" />
-                                    </div>
-                                    <div className="ml-5 w-0 flex-1">
-                                        <dl>
-                                            <dt className="text-sm font-medium text-gray-500 truncate">Revenu mensuel récurrent</dt>
-                                            <dd className="flex items-baseline">
-                                                <div className="text-2xl font-semibold text-gray-900">
-                                                    {monthly_recurring_revenue ? `${parseFloat(monthly_recurring_revenue).toLocaleString()} FCFA` : '0 FCFA'}
-                                                </div>
-                                            </dd>
-                                        </dl>
-                                    </div>
+                        {/* Revenu mensuel */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-center">
+                                <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-purple-100 rounded-xl">
+                                    <FontAwesomeIcon icon={faChartLine} className="w-6 h-6 text-purple-600" />
+                                </div>
+                                <div className="ml-5 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-gray-500 truncate">Revenu mensuel</dt>
+                                        <dd className="text-2xl font-bold text-gray-900">
+                                            {monthly_recurring_revenue > 0 ? formatCurrency(monthly_recurring_revenue) : 'Aucun'}
+                                        </dd>
+                                        <dd className="text-xs text-gray-500 mt-1">
+                                            Total: {formatCurrency(total_revenue)}
+                                        </dd>
+                                    </dl>
                                 </div>
                             </div>
                         </div>
                         
-                        <div className="overflow-hidden bg-white rounded-lg shadow">
-                            <div className="p-5">
-                                <div className="flex items-center">
-                                    <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 text-purple-500 bg-purple-100 rounded-md">
-                                        <FontAwesomeIcon icon={faCalendarAlt} className="w-6 h-6" />
-                                    </div>
-                                    <div className="ml-5 w-0 flex-1">
-                                        <dl>
-                                            <dt className="text-sm font-medium text-gray-500 truncate">Plans actifs</dt>
-                                            <dd className="flex items-baseline">
-                                                <div className="text-2xl font-semibold text-gray-900">{active_plans}</div>
-                                            </dd>
-                                        </dl>
-                                    </div>
+                        {/* Expirations */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-center">
+                                <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-orange-100 rounded-xl">
+                                    <FontAwesomeIcon icon={faExclamationTriangle} className="w-6 h-6 text-orange-600" />
+                                </div>
+                                <div className="ml-5 flex-1">
+                                    <dl>
+                                        <dt className="text-sm font-medium text-gray-500 truncate">Expire ce mois</dt>
+                                        <dd className="text-2xl font-bold text-gray-900">
+                                            {expiring_this_month > 0 ? expiring_this_month : 'Aucun'}
+                                        </dd>
+                                        <dd className="text-xs text-gray-500 mt-1">
+                                            <span className="text-orange-600">
+                                                À renouveler
+                                            </span>
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Statistiques détaillées */}
+                    <div className="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-3">
+                        {/* Plan le plus populaire */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Plan le plus populaire</h3>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-2xl font-bold text-gray-900">
+                                        {most_popular_plan?.name || 'Aucun plan'}
+                                    </p>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        {most_popular_plan?.subscriptions_count ? `${most_popular_plan.subscriptions_count} abonnés` : 'Aucun abonné'}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-lg font-semibold text-indigo-600">
+                                        {formatCurrency(most_popular_plan?.price || 0)}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                        {most_popular_plan?.duration_in_months 
+                                            ? `par ${most_popular_plan.duration_in_months === 1 ? 'mois' : `${most_popular_plan.duration_in_months} mois`}`
+                                            : 'Aucune durée définie'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Taux de renouvellement */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance</h3>
+                            <div className="space-y-3">
+                                <div>
+                                    <p className="text-sm text-gray-500">Taux de renouvellement</p>
+                                    <p className="text-xl font-bold text-green-600">
+                                        {formatPercentage(renewal_rate)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">Revenu moyen par utilisateur</p>
+                                    <p className="text-xl font-bold text-purple-600">
+                                        {formatCurrency(average_revenue_per_user)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Vue d'ensemble */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Vue d'ensemble</h3>
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">Total abonnements:</span>
+                                    <span className="font-semibold">{total_subscriptions}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">Abonnements expirés:</span>
+                                    <span className="font-semibold text-red-600">{expired_subscriptions}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">Croissance mensuelle:</span>
+                                    <span className={`font-semibold ${subscription_growth_rate > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {subscription_growth_rate > 0 ? '+' : ''}{formatPercentage(subscription_growth_rate)}
+                                    </span>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
                     {/* Filtres et recherche */}
-                    <div className="mb-6 bg-white rounded-lg shadow">
-                        <div className="px-4 py-5 sm:p-6">
-                            <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-                                <div className="flex-1 max-w-md">
-                                    <form onSubmit={handleSearch} className="flex">
+                    <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200">
+                        <div className="p-6">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                                <div className="flex-1">
+                                    <form onSubmit={handleSearch} className="flex gap-3">
                                         <div className="relative flex-1">
                                             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                                                 <FontAwesomeIcon icon={faSearch} className="w-5 h-5 text-gray-400" />
                                             </div>
                                             <input
                                                 type="text"
-                                                className="block w-full py-2 pl-10 pr-3 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                                                className="block w-full py-3 pl-10 pr-4 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                                 placeholder="Rechercher des plans..."
                                                 value={searchQuery}
                                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -191,7 +464,7 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
                                         </div>
                                         <button
                                             type="submit"
-                                            className="inline-flex items-center px-4 py-2 ml-3 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                            className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
                                         >
                                             <FontAwesomeIcon icon={faSearch} className="w-4 h-4 mr-2" />
                                             Rechercher
@@ -199,29 +472,27 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
                                     </form>
                                 </div>
                                 
-                                <div className="flex items-center space-x-3">
-                                    <div className="flex items-center">
-                                        <label htmlFor="status-filter" className="mr-2 text-sm font-medium text-gray-700">
-                                            Statut
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <label htmlFor="status-filter" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                                            Statut:
                                         </label>
                                         <select
                                             id="status-filter"
-                                            className="block w-full py-2 pl-3 pr-10 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                                            className="block w-full py-3 pl-3 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                             value={statusFilter}
                                             onChange={handleFilterChange}
                                         >
                                             <option value="all">Tous</option>
                                             <option value="active">Actif</option>
-                                            <option value="pending">En attente</option>
-                                            <option value="cancelled">Annulé</option>
-                                            <option value="expired">Expiré</option>
+                                            <option value="inactive">Inactif</option>
                                         </select>
                                     </div>
                                     
                                     <button
                                         type="button"
                                         onClick={handleReset}
-                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                        className="inline-flex items-center px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
                                     >
                                         Réinitialiser
                                     </button>
@@ -230,166 +501,120 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
                         </div>
                     </div>
                     
-                    <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="p-6 bg-white border-b border-gray-200">
-                            {plans.length === 0 ? (
-                                <div className="text-center">
-                                    <p className="text-gray-500">Aucun plan d'abonnement n'a été créé pour le moment.</p>
-                                    <div className="mt-4">
-                                        <Link
-                                            href={route('admin.subscription-plans.create')}
-                                            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700"
-                                        >
-                                            <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-2" />
-                                            Créer un plan
-                                        </Link>
+                    {/* Tableau des plans */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="p-6">
+                            {(!plans.data || plans.data.length === 0) ? (
+                                <div className="text-center py-12">
+                                    <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                        <FontAwesomeIcon icon={faMoneyBillWave} className="w-8 h-8 text-gray-400" />
                                     </div>
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun plan d'abonnement</h3>
+                                    <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                                        Commencez par créer votre premier plan d'abonnement pour proposer vos services.
+                                    </p>
+                                    <Link
+                                        href={route('admin.subscription-plans.create')}
+                                        className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                                    >
+                                        <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-2" />
+                                        Créer un plan
+                                    </Link>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
-                                    {/* Vue bureau - tableau responsive */}
+                                <div className="space-y-6">
+                                    {/* Vue bureau */}
                                     <div className="hidden lg:block">
-                                        <table className="w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50">
-                                                <tr>
-                                                    <th scope="col" className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase w-1/5">
-                                                        Plan
-                                                    </th>
-                                                    <th scope="col" className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase w-2/5">
-                                                        Description
-                                                    </th>
-                                                    <th scope="col" className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase w-1/6">
-                                                        Prix
-                                                    </th>
-                                                    <th scope="col" className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase w-1/6">
-                                                        Statut
-                                                    </th>
-                                                    <th scope="col" className="relative px-4 py-3 w-16">
-                                                        <span className="sr-only">Actions</span>
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
-                                                {plans.map((plan) => {
-                                                    const startDate = plan.start_date ? new Date(plan.start_date).toLocaleDateString('fr-FR') : 'Non défini';
-                                                    const endDate = plan.end_date ? new Date(plan.end_date).toLocaleDateString('fr-FR') : 'Non défini';
-                                                    
-                                                    return (
-                                                    <tr key={plan.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-4">
-                                                            <div className="text-sm font-medium text-gray-900">{plan.name}</div>
-                                                            <div className="text-xs text-gray-500">
-                                                                {plan.duration_in_months === 1 ? 'Mensuel' : `${plan.duration_in_months} mois`}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-4">
-                                                            <div className="text-sm text-gray-600 line-clamp-2">{plan.description || 'Aucune description'}</div>
-                                                            <div className="text-xs text-gray-500 mt-1">
-                                                                {/* {startDate} - {endDate} */}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-4 whitespace-nowrap">
-                                                            <div className="text-sm font-medium text-gray-900">{plan.price?.toLocaleString()} FCFA</div>
-                                                        </td>
-                                                        <td className="px-4 py-4 whitespace-nowrap">
-                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                                plan.is_active 
-                                                                    ? 'bg-green-100 text-green-800' 
-                                                                    : 'bg-red-100 text-red-800'
-                                                            }`}>
-                                                                {plan.is_active ? 'Actif' : 'Inactif'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-4 text-right whitespace-nowrap">
-                                                            <Menu as="div" className="relative inline-block text-left">
-                                                                <div>
-                                                                    <Menu.Button className="flex items-center text-gray-400 hover:text-gray-600 focus:outline-none">
-                                                                        <span className="sr-only">Ouvrir les options</span>
-                                                                        <FontAwesomeIcon icon={faEllipsisVertical} className="h-5 w-5" />
-                                                                    </Menu.Button>
-                                                                </div>
-
-                                                                <Transition
-                                                                    as={React.Fragment}
-                                                                    enter="transition ease-out duration-100"
-                                                                    enterFrom="transform opacity-0 scale-95"
-                                                                    enterTo="transform opacity-100 scale-100"
-                                                                    leave="transition ease-in duration-75"
-                                                                    leaveFrom="transform opacity-100 scale-100"
-                                                                    leaveTo="transform opacity-0 scale-95"
-                                                                >
-                                                                    <Menu.Items className="origin-top-right absolute right-0 z-10 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
-                                                                        <div className="py-1">
-                                                                            <Menu.Item>
-                                                                                {({ active }) => (
-                                                                                    <Link
-                                                                                        href={route('admin.subscription-plans.subscribers', { plan: plan.id })}
-                                                                                        className={classNames(
-                                                                                            active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
-                                                                                            'block px-4 py-2 text-sm'
-                                                                                        )}
-                                                                                    >
-                                                                                        <FontAwesomeIcon icon={faUserGroup} className="mr-2 text-blue-600" />
-                                                                                        Voir les abonnés
-                                                                                    </Link>
-                                                                                )}
-                                                                            </Menu.Item>
-                                                                            <Menu.Item>
-                                                                                {({ active }) => (
-                                                                                    <Link
-                                                                                        href={route('admin.subscription-plans.edit', plan.id)}
-                                                                                        className={classNames(
-                                                                                            active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
-                                                                                            'block px-4 py-2 text-sm'
-                                                                                        )}
-                                                                                    >
-                                                                                        <FontAwesomeIcon icon={faEdit} className="mr-2 text-indigo-600" />
-                                                                                        Modifier
-                                                                                    </Link>
-                                                                                )}
-                                                                            </Menu.Item>
-                                                                            <Menu.Item>
-                                                                                {({ active }) => (
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            if (confirm('Êtes-vous sûr de vouloir supprimer ce plan ?')) {
-                                                                                                router.delete(route('admin.subscription-plans.destroy', plan.id));
-                                                                                            }
-                                                                                        }}
-                                                                                        className={classNames(
-                                                                                            active ? 'bg-gray-100 text-gray-900' : 'text-red-600',
-                                                                                            'w-full text-left block px-4 py-2 text-sm'
-                                                                                        )}
-                                                                                    >
-                                                                                        <FontAwesomeIcon icon={faTrash} className="mr-2" />
-                                                                                        Supprimer
-                                                                                    </button>
-                                                                                )}
-                                                                            </Menu.Item>
-                                                                        </div>
-                                                                    </Menu.Items>
-                                                                </Transition>
-                                                            </Menu>
-                                                        </td>
+                                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                            <table className="w-full divide-y divide-gray-200">
+                                                <thead className="bg-gray-50">
+                                                    <tr>
+                                                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                            Plan
+                                                        </th>
+                                                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                            Description
+                                                        </th>
+                                                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                            Prix
+                                                        </th>
+                                                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                            Statut
+                                                        </th>
+                                                        <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                            Actions
+                                                        </th>
                                                     </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody className="bg-white divide-y divide-gray-200">
+                                                    {plans.data.map((plan) => (
+                                                        <tr key={plan.id} className="hover:bg-gray-50 transition-colors duration-150">
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="text-sm font-semibold text-gray-900">{plan.name}</div>
+                                                                <div className="text-xs text-gray-500">
+                                                                    {plan.duration_in_months === 1 ? 'Mensuel' : `${plan.duration_in_months} mois`}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <div className="text-sm text-gray-600 max-w-md line-clamp-2">{plan.description || 'Aucune description'}</div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="text-sm font-semibold text-gray-900">{formatCurrency(plan.price)}</div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="flex items-center">
+                                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                                                        plan.is_active 
+                                                                            ? 'bg-green-100 text-green-800' 
+                                                                            : 'bg-red-100 text-red-800'
+                                                                    }`}>
+                                                                        {plan.is_active ? 'Actif' : 'Inactif'}
+                                                                    </span>
+                                                                    {plan.pending_activation && (
+                                                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                                            En attente
+                                                                        </span>
+                                                                    )}
+                                                                    {plan.is_active && plan.will_expire_soon && (
+                                                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                                            Expire bientôt
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {plan.status_changed_at && (
+                                                                    <div className="text-xs text-gray-500 mt-1">
+                                                                        {plan.is_active ? 'Activé le ' : 'Désactivé le '}
+                                                                        {new Date(plan.status_changed_at).toLocaleDateString('fr-FR', {
+                                                                            day: '2-digit',
+                                                                            month: 'short',
+                                                                            year: 'numeric'
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                                {renderActionMenu(plan, `desktop-${plan.id}`)}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
 
-                                    {/* Vue mobile/tablette - cartes empilées */}
+                                    {/* Vue mobile */}
                                     <div className="lg:hidden space-y-4">
-                                        {plans.map((plan) => {
-                                            const startDate = plan.start_date ? new Date(plan.start_date).toLocaleDateString('fr-FR') : 'Non défini';
-                                            const endDate = plan.end_date ? new Date(plan.end_date).toLocaleDateString('fr-FR') : 'Non défini';
-                                            
-                                            return (
-                                            <div key={plan.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <h3 className="text-sm font-medium text-gray-900 truncate">{plan.name}</h3>
+                                        {plans.data.map((plan) => (
+                                            <div key={plan.id} className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow duration-200">
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <div className="flex-1">
+                                                        <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
+                                                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                                            {plan.description || 'Aucune description'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex flex-col items-end">
+                                                        <div className="flex items-center">
                                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                                                 plan.is_active 
                                                                     ? 'bg-green-100 text-green-800' 
@@ -397,54 +622,57 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
                                                             }`}>
                                                                 {plan.is_active ? 'Actif' : 'Inactif'}
                                                             </span>
+                                                            {plan.pending_activation && (
+                                                                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800">
+                                                                    En attente
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">{plan.description || 'Aucune description'}</p>
-                                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                                            <div>
-                                                                <span className="text-gray-500">Prix:</span>
-                                                                <div className="font-medium text-gray-900">{plan.price?.toLocaleString()} FCFA</div>
+                                                        {plan.status_changed_at && (
+                                                            <div className="text-[10px] text-gray-500 mt-0.5">
+                                                                {plan.is_active ? 'Depuis ' : 'Depuis '}
+                                                                {new Date(plan.status_changed_at).toLocaleDateString('fr-FR', {
+                                                                    day: '2-digit',
+                                                                    month: 'short'
+                                                                })}
                                                             </div>
-                                                            <div>
-                                                                <span className="text-gray-500">Période:</span>
-                                                                <div className="text-gray-900">{plan.duration_in_months === 1 ? 'Mensuel' : `${plan.duration_in_months} mois`}</div>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-gray-500">Début:</span>
-                                                                <div className="text-gray-900">{startDate}</div>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-gray-500">Fin:</span>
-                                                                <div className="text-gray-900">{endDate}</div>
-                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                                                    <div>
+                                                        <span className="text-gray-500">Prix:</span>
+                                                        <div className="font-semibold text-gray-900">{formatCurrency(plan.price)}</div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-500">Durée:</span>
+                                                        <div className="text-gray-900">
+                                                            {plan.duration_in_months === 1 ? 'Mensuel' : `${plan.duration_in_months} mois`}
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
+                                                
+                                                <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                                                     <Link
                                                         href={route('admin.subscription-plans.subscribers', { plan: plan.id })}
-                                                        className="inline-flex items-center px-3 py-1.5 text-sm text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded"
+                                                        className="inline-flex items-center px-3 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-200"
                                                     >
                                                         <FontAwesomeIcon icon={faUserGroup} className="w-4 h-4 mr-1" />
-                                                        Voir les abonnés
+                                                        Abonnés
                                                     </Link>
-                                                    <div className="flex space-x-2">
+                                                    <div className="flex gap-2">
                                                         <Link
                                                             href={route('admin.subscription-plans.edit', plan.id)}
-                                                            className="inline-flex items-center px-3 py-1.5 text-sm text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded"
-                                                            title="Modifier"
+                                                            className="inline-flex items-center px-3 py-2 text-sm text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors duration-200"
                                                         >
                                                             <FontAwesomeIcon icon={faEdit} className="w-4 h-4 mr-1" />
                                                             Modifier
                                                         </Link>
                                                         <button
                                                             type="button"
-                                                            onClick={() => {
-                                                                if (confirm('Êtes-vous sûr de vouloir supprimer ce plan ?')) {
-                                                                    router.delete(route('admin.subscription-plans.destroy', plan.id));
-                                                                }
-                                                            }}
-                                                            className="inline-flex items-center px-3 py-1.5 text-sm text-red-600 hover:text-red-900 hover:bg-red-50 rounded"
-                                                            title="Supprimer"
+                                                            onClick={() => handleDelete(plan.id)}
+                                                            className="inline-flex items-center px-3 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200"
                                                         >
                                                             <FontAwesomeIcon icon={faTrash} className="w-4 h-4 mr-1" />
                                                             Supprimer
@@ -452,8 +680,54 @@ export default function SubscriptionPlansIndex({ plans = [], stats = {}, filters
                                                     </div>
                                                 </div>
                                             </div>
-                                            );
-                                        })}
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Pagination */}
+                            {plans.data && plans.data.length > 0 && plans.total > 0 && (
+                                <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div className="text-sm text-gray-700">
+                                        Affichage de <span className="font-semibold">{plans.from || 0}</span> à <span className="font-semibold">{plans.to || 0}</span> sur{' '}
+                                        <span className="font-semibold">{plans.total || 0}</span> résultats
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {plans.links?.prev ? (
+                                            <Link
+                                                href={plans.links.prev}
+                                                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 shadow-sm"
+                                                preserveScroll
+                                            >
+                                                <FontAwesomeIcon icon={faChevronLeft} className="h-4 w-4 mr-2" />
+                                                Précédent
+                                            </Link>
+                                        ) : (
+                                            <span className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-300 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed">
+                                                <FontAwesomeIcon icon={faChevronLeft} className="h-4 w-4 mr-2" />
+                                                Précédent
+                                            </span>
+                                        )}
+                                        
+                                        <span className="px-3 py-2 text-sm font-medium text-gray-700">
+                                            Page {plans.current_page} sur {plans.last_page}
+                                        </span>
+                                        
+                                        {plans.links?.next ? (
+                                            <Link
+                                                href={plans.links.next}
+                                                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 shadow-sm"
+                                                preserveScroll
+                                            >
+                                                Suivant
+                                                <FontAwesomeIcon icon={faChevronRight} className="h-4 w-4 ml-2" />
+                                            </Link>
+                                        ) : (
+                                            <span className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-300 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed">
+                                                Suivant
+                                                <FontAwesomeIcon icon={faChevronRight} className="h-4 w-4 ml-2" />
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             )}

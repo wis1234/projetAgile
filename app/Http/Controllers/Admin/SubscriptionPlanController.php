@@ -35,23 +35,87 @@ class SubscriptionPlanController extends Controller
             $query->where('is_active', $filters['status'] === 'active');
         }
         
-        $plans = $query->latest()->get();
+        $plans = $query->latest()->paginate(15);
         
-        // Calculer les statistiques
+        // Calculer les statistiques complètes
+        $totalPlans = SubscriptionPlan::count();
+        $activePlans = SubscriptionPlan::where('is_active', true)->count();
+        $inactivePlans = $totalPlans - $activePlans;
+        
+        $totalSubscriptions = Subscription::count();
+        $activeSubscriptions = Subscription::where('status', 'active')->count();
+        $expiringThisMonth = Subscription::where('status', 'active')
+            ->where('ends_at', '>=', now())
+            ->where('ends_at', '<=', now()->endOfMonth())
+            ->count();
+        $expiredSubscriptions = Subscription::where('status', 'expired')->count();
+        
+        $monthlyRecurringRevenue = Subscription::where('status', 'active')
+            ->join('subscription_plans', 'subscriptions.subscription_plan_id', '=', 'subscription_plans.id')
+            ->sum('subscription_plans.price');
+            
+        $totalRevenue = Subscription::join('subscription_plans', 'subscriptions.subscription_plan_id', '=', 'subscription_plans.id')
+            ->sum('subscription_plans.price');
+            
+        // Trouver le plan le plus populaire
+        $mostPopularPlan = Subscription::selectRaw('subscription_plan_id, count(*) as subscription_count')
+            ->groupBy('subscription_plan_id')
+            ->with('plan')
+            ->orderByDesc('subscription_count')
+            ->first();
+            
+        // Calculer le taux de croissance (exemple simplifié)
+        $lastMonthSubscriptions = Subscription::where('created_at', '>=', now()->subMonth())->count();
+        $previousMonthSubscriptions = Subscription::whereBetween('created_at', [now()->subMonths(2), now()->subMonth()])->count();
+        $subscriptionGrowthRate = $previousMonthSubscriptions > 0 
+            ? (($lastMonthSubscriptions - $previousMonthSubscriptions) / $previousMonthSubscriptions) * 100 
+            : ($lastMonthSubscriptions > 0 ? 100 : 0);
+            
+        // Taux de renouvellement (utilise created_at comme approximation)
+        $renewedSubscriptions = Subscription::where('status', 'active')
+            ->where('created_at', '>=', now()->subMonth())
+            ->count();
+        $renewalRate = $activeSubscriptions > 0 
+            ? ($renewedSubscriptions / $activeSubscriptions) * 100 
+            : 0;
+            
+        // Revenu moyen par utilisateur
+        $averageRevenuePerUser = $activeSubscriptions > 0 
+            ? $monthlyRecurringRevenue / $activeSubscriptions 
+            : 0;
+        
         $stats = [
-            'active_subscriptions' => Subscription::where('status', 'active')->count(),
-            'expiring_this_month' => Subscription::where('status', 'active')
-                ->where('ends_at', '>=', now())
-                ->where('ends_at', '<=', now()->endOfMonth())
-                ->count(),
-            'monthly_recurring_revenue' => Subscription::where('status', 'active')
-                ->join('subscription_plans', 'subscriptions.subscription_plan_id', '=', 'subscription_plans.id')
-                ->sum('subscription_plans.price'),
-            'active_plans' => SubscriptionPlan::where('is_active', true)->count(),
+            // Statistiques principales
+            'total_plans' => $totalPlans,
+            'active_plans' => $activePlans,
+            'inactive_plans' => $inactivePlans,
+            
+            // Statistiques des abonnements
+            'total_subscriptions' => $totalSubscriptions,
+            'active_subscriptions' => $activeSubscriptions,
+            'expiring_this_month' => $expiringThisMonth,
+            'expired_subscriptions' => $expiredSubscriptions,
+            
+            // Statistiques financières
+            'monthly_recurring_revenue' => $monthlyRecurringRevenue,
+            'total_revenue' => $totalRevenue,
+            'average_revenue_per_user' => $averageRevenuePerUser,
+            
+            // Statistiques d'engagement
+            'most_popular_plan' => $mostPopularPlan ? [
+                'id' => $mostPopularPlan->plan->id,
+                'name' => $mostPopularPlan->plan->name,
+                'price' => $mostPopularPlan->plan->price,
+                'duration_in_months' => $mostPopularPlan->plan->duration_in_months,
+                'subscriptions_count' => $mostPopularPlan->subscription_count
+            ] : null,
+            'subscription_growth_rate' => $subscriptionGrowthRate,
+            'renewal_rate' => $renewalRate,
         ];
         
+        // Retourner directement la pagination
         return Inertia::render('Admin/SubscriptionPlans/Index', [
-            'plans' => $plans,
+            'plans' => $plans->toArray(),
             'stats' => $stats,
             'filters' => $filters
         ]);
@@ -109,14 +173,14 @@ class SubscriptionPlanController extends Controller
         \DB::beginTransaction();
         
         try {
-            // Valider les données
+            // Valider les données de base
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'price' => 'required|numeric|min:0',
                 'duration_in_months' => 'required|integer|min:1',
                 'features' => 'required|array',
-                'features.*' => 'string',
+                'features.*' => 'nullable|string', // Permettre les valeurs nulles
                 'is_active' => 'boolean',
             ]);
 
@@ -126,22 +190,26 @@ class SubscriptionPlanController extends Controller
             }
             
             // Nettoyer les fonctionnalités
-            $validated['features'] = array_values(array_filter(array_map('trim', $validated['features'])));
+            $features = array_values(
+                array_filter(
+                    array_map('trim', $validated['features']),
+                    function($value) {
+                        return $value !== '' && $value !== null;
+                    }
+                )
+            );
             
             // S'assurer qu'il y a au moins une fonctionnalité
-            if (empty($validated['features'])) {
-                $validated['features'] = [''];
+            if (empty($features)) {
+                $features = [''];
             }
             
-            // Convertir en JSON pour le stockage
-            $validated['features'] = json_encode($validated['features']);
-            
-            // Mettre à jour le modèle manuellement
+            // Mettre à jour le modèle avec les données validées
             $subscriptionPlan->name = $validated['name'];
             $subscriptionPlan->description = $validated['description'] ?? null;
             $subscriptionPlan->price = $validated['price'];
             $subscriptionPlan->duration_in_months = $validated['duration_in_months'];
-            $subscriptionPlan->features = $validated['features'];
+            $subscriptionPlan->features = $features;
             $subscriptionPlan->is_active = $validated['is_active'] ?? false;
             
             if (isset($validated['slug'])) {
