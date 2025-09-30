@@ -16,7 +16,7 @@ import { Link } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
-import TextArea from '@/Components/TextArea';
+import TextArea from '@/Components/Textarea';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 
