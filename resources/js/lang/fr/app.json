@@ -340,6 +340,13 @@
   "time_remaining": "Temps restant",
   "deadline_met": "Délai respecté",
   "deadline_exceeded": "Délai dépassé",
+  "deadline_expired": "Échéance dépassée",
+  "deadline_countdown": "Temps restant",
+  "resources_not_available_title": "Ressources non disponibles",
+  "days_abbr": "j",
+  "hours_abbr": "h",
+  "minutes_abbr": "m",
+  "seconds_abbr": "s",
   "edit": "Modifier",
   "delete": "Supprimer",
   "navigation_tabs": "Onglets de navigation",
@@ -442,7 +449,8 @@
 
 "actions": {
   "edit_task": "Modifier la tâche",
-  "delete_task": "Supprimer la tâche"
+  "delete_task": "Supprimer la tâche",
+  "upload_file": "Téléverser un fichier"
 },
 
 "payment": {

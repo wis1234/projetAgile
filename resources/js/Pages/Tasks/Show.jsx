@@ -19,6 +19,105 @@ const formatTimeUnit = (value, label) => (
   </div>
 );
 
+// Composant pour le compte à rebours de l'échéance
+const DeadlineCountdown = ({ dueDate, onExpire }) => {
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    isExpired: false
+  });
+
+  useEffect(() => {
+    if (!dueDate) return;
+
+    const calculateTimeLeft = () => {
+      const targetDate = new Date(dueDate);
+      // Si l'heure n'est pas spécifiée, on considère la fin de la journée
+      if (targetDate.getHours() === 0 && targetDate.getMinutes() === 0 && targetDate.getSeconds() === 0) {
+        targetDate.setHours(23, 59, 59, 999);
+      }
+
+      const now = new Date();
+      const difference = targetDate - now;
+      const isExpired = difference <= 0;
+
+      if (isExpired) {
+        setTimeLeft({
+          days: 0,
+          hours: 0,
+          minutes: 0,
+          seconds: 0,
+          isExpired: true
+        });
+        if (onExpire) onExpire();
+        return;
+      }
+
+      setTimeLeft({
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+        isExpired: false
+      });
+    };
+
+    // Calcul initial
+    calculateTimeLeft();
+
+    // Mise à jour toutes les secondes
+    const timer = setInterval(calculateTimeLeft, 1000);
+
+    // Nettoyage
+    return () => clearInterval(timer);
+  }, [dueDate, onExpire]);
+
+  if (timeLeft.isExpired) {
+    return (
+      <div className="text-red-500 text-sm mt-1">
+        <FaClock className="inline mr-1" />
+        {i18n.t('deadline_expired')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+        <div className="flex items-center gap-1">
+          <FaClock className="mr-1" />
+          <span className="text-gray-700 dark:text-gray-300">
+            {i18n.t('deadline_countdown')}:
+          </span>
+          <div className="flex items-center gap-1 ml-1 font-mono">
+            <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+              {String(timeLeft.days).padStart(2, '0')}
+            </span>
+            <span className="text-xs">{i18n.t('days_abbr')}</span>
+            <span className="mx-0.5">:</span>
+            <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+              {String(timeLeft.hours).padStart(2, '0')}
+            </span>
+            <span className="text-xs">{i18n.t('hours_abbr')}</span>
+            <span className="mx-0.5">:</span>
+            <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+              {String(timeLeft.minutes).padStart(2, '0')}
+            </span>
+            <span className="text-xs">{i18n.t('minutes_abbr')}</span>
+            <span className="mx-0.5">:</span>
+            <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+              {String(timeLeft.seconds).padStart(2, '0')}
+            </span>
+            <span className="text-xs">{i18n.t('seconds_abbr')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, t }) => {
   const calculateTimeLeft = useCallback(() => {
@@ -112,6 +211,7 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, t }
 export default function Show({ task, payments, projectMembers, currentUserRole }) {
   const { t } = useTranslation();
   const { auth } = usePage().props;
+  const [deadlineExpired, setDeadlineExpired] = useState(false);
   
   // Récupérer l'utilisateur connecté et ses rôles
   const currentUser = auth.user;
@@ -747,7 +847,25 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const hasAccess = isAdmin || isProjectManager;
   
   // Vérifier si la date d'échéance est dépassée et si l'utilisateur n'a pas accès
-  const isDeadlinePassed = !hasAccess && task?.due_date && new Date() > new Date(task.due_date);
+  const handleDeadlineExpired = useCallback(() => {
+    setDeadlineExpired(true);
+  }, []);
+
+  // Vérifier si la date d'échéance est dépassée en tenant compte de l'heure de fin de journée
+  // et si la tâche n'est pas déjà marquée comme terminée
+  const isDeadlinePassed = !hasAccess && task?.due_date && task.status !== 'done' && task.status !== 'termine' && (() => {
+    const dueDate = new Date(task.due_date);
+    const now = new Date();
+    
+    // Si l'heure n'est pas spécifiée (minuit), on considère la fin de la journée
+    if (dueDate.getHours() === 0 && dueDate.getMinutes() === 0 && dueDate.getSeconds() === 0) {
+      const endOfDay = new Date(dueDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      return now > endOfDay;
+    }
+    
+    return now > dueDate;
+  })();
 
   // Function to mark all comments as read
   const markCommentsAsRead = useCallback(() => {
@@ -865,7 +983,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         )}
       </button>
 
-      {task.is_paid && (hasAccess ? (
+      {task.is_paid && ((hasAccess || !isDeadlinePassed) ? (
         <button
           onClick={() => setActiveTab('payment')}
           className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
@@ -883,24 +1001,26 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
           )}
         </button>
       ) : (
-        <div className="relative group" title="The due date of this task has passed">
+        <div className="relative group" title={isDeadlinePassed ? t('deadline_expired') : t('task_details.tab_remuneration_not_available')}>
           <div className="px-5 py-3 rounded-xl font-medium text-sm text-gray-400 dark:text-gray-600 cursor-not-allowed">
             <div className="flex items-center gap-2">
               <FaDollarSign className="text-lg" />
               <span>{t('task_details.tab_remuneration')}</span>
-              <span className="text-xs text-yellow-500">({t('task_details.tab_remuneration_not_available')})</span>
+              <span className="text-xs text-yellow-500">
+                ({isDeadlinePassed ? t('deadline_expired') : t('task_details.tab_remuneration_not_available')})
+              </span>
             </div>
           </div>
         </div>
       ))}
 
-      {!hasAccess ? (
-        <div className="relative group" title="The due date of this task has passed">
+      {!hasAccess && isDeadlinePassed ? (
+        <div className="relative group" title={t('deadline_expired')}>
           <div className="px-5 py-3 rounded-xl font-medium text-sm text-gray-400 dark:text-gray-600 cursor-not-allowed">
             <div className="flex items-center gap-2">
               <FaFileUpload className="text-lg" />
               <span>{t('task_details.tab_resources')}</span>
-              <span className="text-xs text-yellow-500">({t('task_details.tab_resources_not_available')})</span>
+              <span className="text-xs text-yellow-500">({t('deadline_expired')})</span>
             </div>
           </div>
         </div>
@@ -1174,9 +1294,20 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                 {(isAssigned || isAdmin) && (
-                  <Link href={`/files/create?task_id=${task.id}&project_id=${task.project_id}`} className="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md">
-                    <FaFileUpload /> {t('actions.upload_file')}
-                  </Link>
+                  <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <Link 
+                      href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
+                      className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md`}
+                      title={isDeadlinePassed ? t('deadline_expired') : ''}
+                    >
+                      <FaFileUpload /> {t('actions.upload_file')}
+                    </Link>
+                    {isDeadlinePassed && (
+                      <div className="absolute -bottom-6 left-0 right-0 text-xs text-red-500 text-center">
+                        {t('deadline_expired')}
+                      </div>
+                    )}
+                  </div>
                 )}
                 {(isAdmin || isProjectManager) && (
                   <Link href={`/tasks/${task.id}/edit`} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md">
@@ -1492,7 +1623,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
             </div>
           )}
 
-          {activeTab === 'files' && !hasAccess && (
+          {activeTab === 'files' && !hasAccess && isDeadlinePassed && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700">
               <div className="text-center py-12">
                 <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/50 mb-4">
@@ -1500,32 +1631,40 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Accès refusé</h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">{t('task_details.access_denied')}</h3>
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
-                  L'accès aux ressources est réservé à l'administrateur ou au manager du projet.
+                  {t('task_details.access_denied_message')}
                 </p>
                 {isDeadlinePassed && (
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    Note : La date d'échéance de cette tâche est dépassée.
+                    {t('task_details.deadline_expired')}
                   </p>
                 )}
               </div>
             </div>
           )}
           
-          {activeTab === 'files' && hasAccess && (
+          {activeTab === 'files' && (hasAccess || !isDeadlinePassed) && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold flex items-center gap-3 text-blue-700 dark:text-blue-200">
                   <FaFileUpload /> {t('task_details.resources')}
                 </h2>
                 {/* Upload button visible to all members */}
-                <Link 
-                  href={`/files/create?task_id=${task.id}&project_id=${task.project_id}`} 
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md"
-                >
-                  <FaFileUpload /> {t('task_details.add_file')}
-                </Link>
+                <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <Link 
+                    href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
+                    className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md`}
+                    title={isDeadlinePassed ? t('deadline_expired') : ''}
+                  >
+                    <FaFileUpload /> {t('task_details.add_file')}
+                  </Link>
+                  {isDeadlinePassed && (
+                    <div className="absolute -bottom-6 left-0 right-0 text-xs text-red-500 text-center">
+                      {t('deadline_expired')}
+                    </div>
+                  )}
+                </div>
               </div>
               
               {task.files && task.files.length > 0 ? (

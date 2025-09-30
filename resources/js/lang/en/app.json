@@ -413,7 +413,8 @@
 
   "actions":{
     "edit_task":"Edit Task",
-    "delete_task":"Delete Task"
+    "delete_task":"Delete Task",
+    "upload_file":"Upload File"
     
   },
 
