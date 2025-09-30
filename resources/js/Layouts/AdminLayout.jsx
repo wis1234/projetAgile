@@ -2,46 +2,47 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import Notification from '../Components/Notification';
 import { router } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 
 const navLinks = [
-  { href: '/dashboard', label: 'Dashboard', icon: (
+  { href: '/dashboard', label: 'dashboard', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6m-6 0v6m0-6H7m6 0h6" /></svg>
   ) },
-  { href: '/projects', label: 'Projets', icon: (
+  { href: '/projects', label: 'projects', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44z" /></svg>
   ) },
-  { href: '/project-users', label: 'Membres', icon: (
+  { href: '/project-users', label: 'members', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
   ) },
-  { href: '/sprints', label: 'Sprints', icon: (
+  { href: '/sprints', label: 'sprints', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" /></svg>
   ) },
-  { href: '/tasks', label: 'Tâches', icon: (
+  { href: '/tasks', label: 'tasks', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6m9 2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7l5 5v10z" /></svg>
   ) },
-  { href: '/kanban', label: 'Suivi des tâches', icon: (
+  { href: '/kanban', label: 'task_tracking', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 5.25A2.25 2.25 0 0 1 6 3h12a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 18 21H6a2.25 2.25 0 0 1-2.25-2.25V5.25ZM9 7.5v9M15 7.5v9" /></svg>
   ) },
-  { href: '/files', label: 'Fichiers', icon: (
+  { href: '/files', label: 'files', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h9a2.25 2.25 0 0 0 2.25-2.25V9h-3.75z" /></svg>
   ) },
-  { href: '/users', label: 'Utilisateurs', icon: (
+  { href: '/users', label: 'users', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m9-5.13a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" /></svg>
   ) },
-  { href: '/activities', label: "Journal d'activité", icon: (
+  { href: '/activities', label: 'activity_log', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a4 4 0 0 1 4-4h4M7 7h.01M7 11h.01M7 15h.01" /></svg>
   ) },
-  { href: '/recruitment', label: 'Recrutement', icon: (
+  { href: '/recruitment', label: 'recruitment', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V9m18 0V9a2.25 2.25 0 0 0-2.25-2.25H15M3 9l9-6 9 6m-18 0a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 9m-18 0V9a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 9v1.5m-9-3h.008v.008H12V7.5zm0 3h.008v.008H12v-.008zm0 3h.008v.008H12v-.008z" />
     </svg>
   ) },
-  { href: '/subscription/plans', label: 'Mon abonnement', icon: (
+  { href: '/subscription/plans', label: 'my_subscription', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
     </svg>
   ) },
-  { href: '/remunerations/dashboard', label: 'Rémunérations', icon: (
+  { href: '/remunerations/dashboard', label: 'remunerations', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
@@ -107,6 +108,7 @@ export default function AdminLayout({ children }) {
     return false;
   });
   const [notifDropdown, setNotifDropdown] = useState(false);
+  const [languageOpen, setLanguageOpen] = useState(false);
   const [profileDropdown, setProfileDropdown] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notifCount, setNotifCount] = useState(0);
@@ -114,6 +116,15 @@ export default function AdminLayout({ children }) {
   const profileRef = useRef();
   const [globalLoading, setGlobalLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState('fr');
+  const [isChangingLanguage, setIsChangingLanguage] = useState(false);
+  const { t, i18n } = useTranslation();
+  
+  // Available languages with their display names and flag codes
+  const languages = [
+    { code: 'fr', name: 'Français', flag: 'fr' },
+    { code: 'en', name: 'English', flag: 'gb' }
+  ];
 
   useEffect(() => {
     // Vérifier si l'utilisateur est admin via différentes méthodes
@@ -219,6 +230,58 @@ export default function AdminLayout({ children }) {
     };
   }, []);
 
+  // Load language preference from localStorage on component mount
+  useEffect(() => {
+    const savedLanguage = localStorage.getItem('i18nextLng') || 'fr';
+    setCurrentLanguage(savedLanguage);
+    i18n.changeLanguage(savedLanguage);
+  }, [i18n]);
+
+  // Update current language when i18n language changes
+  useEffect(() => {
+    const handleLanguageChanged = (lng) => {
+      setCurrentLanguage(lng);
+    };
+    
+    i18n.on('languageChanged', handleLanguageChanged);
+    return () => {
+      i18n.off('languageChanged', handleLanguageChanged);
+    };
+  }, [i18n]);
+
+  // Function to change language
+  const changeLanguage = async (lng) => {
+    if (currentLanguage === lng || isChangingLanguage) return;
+    
+    try {
+      setIsChangingLanguage(true);
+      await i18n.changeLanguage(lng);
+      setCurrentLanguage(lng);
+      localStorage.setItem('i18nextLng', lng);
+      document.documentElement.lang = lng;
+      
+      // Show success notification
+      const selectedLang = languages.find(lang => lang.code === lng);
+      if (flash?.success) {
+        flash.success(t('language_changed', { language: selectedLang?.name || lng }));
+      }
+      
+      // Close the language dropdown after a short delay
+      setTimeout(() => {
+        setLanguageOpen(false);
+        setIsChangingLanguage(false);
+      }, 300);
+      
+    } catch (error) {
+      console.error('Error changing language:', error);
+      // Show error notification to user
+      if (flash?.error) {
+        flash.error(t('error_changing_language'));
+      }
+      setIsChangingLanguage(false);
+    }
+  };
+
   // Get user data from auth object (handles both auth.user and direct auth properties)
   const user = auth?.user || auth;
   const userName = user?.name || 'Utilisateur';
@@ -267,7 +330,7 @@ export default function AdminLayout({ children }) {
                   </svg>
                 )}
               </span>
-              <span className="font-medium">{link.label}</span>
+              <span className="font-medium">{t(link.label)}</span>
               {route().current(link.href.replace(/^\//, '')) && (
                 <span className="ml-auto w-1.5 h-1.5 bg-blue-400 dark:bg-blue-300 rounded-full"></span>
               )}
@@ -306,6 +369,128 @@ export default function AdminLayout({ children }) {
             </span>
           </div>
           <div className="flex items-center gap-4 dark:text-gray-200">
+            {/* Language Switcher */}
+            <div className="relative group" ref={useRef(null)}>
+              <button 
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isChangingLanguage ? 'opacity-70 cursor-not-allowed' : ''}`}
+                onClick={() => !isChangingLanguage && setLanguageOpen(prev => !prev)}
+                onBlur={() => setTimeout(() => setLanguageOpen(false), 200)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setLanguageOpen(false);
+                  if (e.key === 'ArrowDown' && !languageOpen) setLanguageOpen(true);
+                }}
+                aria-haspopup="true"
+                aria-expanded={languageOpen}
+                aria-label={t('change_language')}
+                disabled={isChangingLanguage}
+                title={t('change_language')}
+              >
+                {isChangingLanguage ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="sr-only">{t('changing_language')}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="fi" style={{ 
+                      backgroundImage: `url(https://flagcdn.com/24x18/${languages.find(lang => lang.code === currentLanguage)?.flag || 'gb'}.png)`,
+                      width: '20px',
+                      height: '15px',
+                      backgroundSize: 'cover',
+                      display: 'inline-block',
+                      borderRadius: '2px',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                    }} aria-hidden="true"></span>
+                    <span className="hidden sm:inline">
+                      {languages.find(lang => lang.code === currentLanguage)?.name || 'English'}
+                    </span>
+                    <span className="sr-only">{t('current_language')}: {languages.find(lang => lang.code === currentLanguage)?.name || 'English'}</span>
+                  </>
+                )}
+                {!isChangingLanguage && (
+                  <svg 
+                    className={`w-4 h-4 transition-transform ${languageOpen ? 'transform rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
+              </button>
+              {languageOpen && (
+                <div 
+                  className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700"
+                  role="menu"
+                  aria-orientation="vertical"
+                  aria-labelledby="language-menu"
+                  onMouseEnter={() => setLanguageOpen(true)}
+                  onMouseLeave={() => setLanguageOpen(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setLanguageOpen(false);
+                  }}
+                >
+                  {languages.map((language) => (
+                    <button 
+                      key={language.code}
+                      onClick={() => changeLanguage(language.code)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          changeLanguage(language.code);
+                        }
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 ${
+                        currentLanguage === language.code 
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
+                          : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      role="menuitemradio"
+                      aria-checked={currentLanguage === language.code}
+                      disabled={isChangingLanguage}
+                      tabIndex={0}
+                    >
+                      <span 
+                        className="fi" 
+                        style={{ 
+                          backgroundImage: `url(https://flagcdn.com/24x18/${language.flag}.png)`,
+                          width: '20px',
+                          height: '15px',
+                          backgroundSize: 'cover',
+                          display: 'inline-block',
+                          borderRadius: '2px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                        }}
+                        aria-hidden="true"
+                      ></span>
+                      <span>{language.name}</span>
+                      {currentLanguage === language.code && (
+                        <span className="ml-auto">
+                          <svg 
+                            className="w-4 h-4 text-blue-500" 
+                            fill="currentColor" 
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                          >
+                            <path 
+                              fillRule="evenodd" 
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" 
+                              clipRule="evenodd" 
+                            />
+                          </svg>
+                          <span className="sr-only">{t('selected')}</span>
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Notifications internes */}
             <div className="relative">
               <button className="relative" title="Notifications internes" onClick={() => setNotifDropdown(d => !d)}>

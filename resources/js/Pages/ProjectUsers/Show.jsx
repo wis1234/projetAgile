@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
+import i18n from 'i18next';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { 
     FaUsers, 
@@ -49,6 +51,7 @@ const sanitizeProjectData = (project) => {
 };
 
 export default function Show({ project: initialProject, auth }) {
+    const { t } = useTranslation();
     // Sanitize project data
     const [project, setProject] = useState(() => sanitizeProjectData(initialProject));
     const { flash = {} } = usePage().props;
@@ -130,12 +133,12 @@ export default function Show({ project: initialProject, auth }) {
             <AdminLayout>
                 <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
                     <div className="text-center">
-                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Projet non trouvé</h1>
+                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('project_not_found')}</h1>
                         <Link 
                             href={route('project-users.index')}
                             className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                         >
-                            <FaArrowLeft className="mr-2" /> Retour à la liste
+                            <FaArrowLeft className="mr-2" /> {t('back_to_list')}
                         </Link>
                     </div>
                 </div>
@@ -160,10 +163,10 @@ export default function Show({ project: initialProject, auth }) {
 
     const getRoleLabel = (role) => {
         switch (role) {
-            case 'manager': return 'Chef de projet';
-            case 'member': return 'Membre';
-            case 'observer': return 'Observateur';
-            default: return 'Autre';
+            case 'manager': return t('role_manager');
+            case 'member': return t('role_member');
+            case 'observer': return t('role_observer');
+            default: return t('role_other');
         }
     };
 
@@ -204,10 +207,10 @@ export default function Show({ project: initialProject, auth }) {
                             </div>
                             <div>
                                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
-                                    Gestion des membres du projet
+                                    {t('project_members_management')}
                                 </h1>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                    Consultez les informations des membres du projet "{project.name}"
+                                    {t('view_project_members_info', { projectName: project.name })}
                                 </p>
                             </div>
                         </div>
@@ -236,15 +239,15 @@ export default function Show({ project: initialProject, auth }) {
                                 <div className="flex items-center gap-6 mt-2 text-sm text-gray-600 dark:text-gray-400">
                                     <div className="flex items-center gap-1">
                                         <FaUsers />
-                                        <span>{project?.users?.length || 0} membre(s)</span>
+                                        <span>{t('members_count', { count: project?.users?.length || 0 })}</span>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <FaTasks />
-                                        <span>{project.tasks_count || 0} tâche(s)</span>
+                                        <span>{t('tasks_count', { count: project.tasks_count || 0 })}</span>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <FaCalendarAlt />
-                                        <span>Créé le {new Date(project.created_at).toLocaleDateString('fr-FR', {
+                                        <span>{t('created_on')} {new Date(project.created_at).toLocaleDateString(i18n.language, {
                                             day: '2-digit',
                                             month: 'long',
                                             year: 'numeric',
@@ -262,14 +265,14 @@ export default function Show({ project: initialProject, auth }) {
                                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                                     {project.users?.length || 0}
                                 </div>
-                                <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">Membres</div>
+                                <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">{t('members')}</div>
                             </div>
                             <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center border border-green-200 dark:border-green-800">
                                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                                     {project.tasks_count ?? project.tasks?.length ?? 0}
                                 </div>
                                 <div className="text-sm text-green-600 dark:text-green-400 font-medium">
-                                    Tâches
+                                    {t('tasks')}
                                     {project.tasks_by_status && (
                                         <div className="text-xs mt-1">
                                             {Object.entries(project.tasks_by_status).map(([status, count]) => (
@@ -287,7 +290,7 @@ export default function Show({ project: initialProject, auth }) {
                                 <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                                     {project.users?.filter(u => u.pivot?.role === 'manager').length || 0}
                                 </div>
-                                <div className="text-sm text-purple-600 dark:text-purple-400 font-medium">Managers</div>
+                                <div className="text-sm text-purple-600 dark:text-purple-400 font-medium">{t('managers')}</div>
                             </div>
                         </div>
                     </div>
@@ -297,10 +300,10 @@ export default function Show({ project: initialProject, auth }) {
                         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                             <h3 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                 <FaUsers className="text-blue-500" />
-                                Membres du projet ({project.users?.length || 0})
+                                {t('project_members')} ({project.users?.length || 0})
                             </h3>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                Liste des utilisateurs assignés à ce projet avec leurs rôles
+                                {t('project_members_list_description')}
                             </p>
                         </div>
 
@@ -346,7 +349,7 @@ export default function Show({ project: initialProject, auth }) {
                                                     </div>
                                                     <div className="mt-1 relative group">
                                                         <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-[180px]" title={user.email || ''}>
-                                                            {user.email || 'Email non disponible'}
+                                                            {user.email || t('email_not_available')}
                                                         </p>
                                                         {user.email && user.email.length > 25 && (
                                                             <div className="absolute z-10 invisible group-hover:visible bg-gray-800 text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-1 whitespace-nowrap">
@@ -357,11 +360,11 @@ export default function Show({ project: initialProject, auth }) {
                                                     </div>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                                                         <FaCalendarAlt className="inline mr-1" />
-                                                        Membre depuis {user.pivot?.created_at ? new Date(user.pivot.created_at).toLocaleDateString('fr-FR', {
+                                                        {t('member_since')} {user.pivot?.created_at ? new Date(user.pivot.created_at).toLocaleDateString(i18n.language, {
                                                             day: '2-digit',
                                                             month: 'short',
                                                             year: 'numeric'
-                                                        }) : 'Date inconnue'}
+                                                        }) : t('date_unknown')}
                                                     </p>
                                                 </div>
                                             </div>
@@ -373,17 +376,17 @@ export default function Show({ project: initialProject, auth }) {
                                                         className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${user.pivot?.is_muted 
                                                             ? 'text-green-700 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50' 
                                                             : 'text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}`}
-                                                        title={user.pivot?.is_muted ? 'Activer les notifications' : 'Mettre en sourdine'}
+                                                        title={user.pivot?.is_muted ? t('enable_notifications') : t('mute_notifications')}
                                                     >
                                                         {user.pivot?.is_muted ? (
                                                             <>
                                                                 <FaVolumeUp className="text-xs" />
-                                                                <span>Activer</span>
+                                                                <span>{t('enable')}</span>
                                                             </>
                                                         ) : (
                                                             <>
                                                                 <FaVolumeMute className="text-xs" />
-                                                                <span>Muet</span>
+                                                                <span>{t('muted')}</span>
                                                             </>
                                                         )}
                                                     </button>
@@ -395,7 +398,7 @@ export default function Show({ project: initialProject, auth }) {
                             ) : (
                                 <div className="text-center p-4">
                                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                                        Aucun membre n'a été ajouté à ce projet.
+                                        {t('no_members_added')}
                                     </p>
                                 </div>
                             )}
@@ -406,28 +409,28 @@ export default function Show({ project: initialProject, auth }) {
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
                         <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                             <FaInfoCircle className="text-blue-500" />
-                            Rôles et permissions
+                            {t('roles_and_permissions')}
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                                 <FaCrown className="text-yellow-500 mt-1" />
                                 <div>
-                                    <h5 className="font-medium text-yellow-800 dark:text-yellow-200">Chef de projet</h5>
-                                    <p className="text-sm text-yellow-700 dark:text-yellow-300">Peut gérer le projet et ses membres</p>
+                                    <h5 className="font-medium text-yellow-800 dark:text-yellow-200">{t('project_manager')}</h5>
+                                    <p className="text-sm text-yellow-700 dark:text-yellow-300">{t('project_manager_description')}</p>
                                 </div>
                             </div>
                             <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                                 <FaUser className="text-blue-500 mt-1" />
                                 <div>
-                                    <h5 className="font-medium text-blue-800 dark:text-blue-200">Membre</h5>
-                                    <p className="text-sm text-blue-700 dark:text-blue-300">Peut participer au projet et voir les tâches</p>
+                                    <h5 className="font-medium text-blue-800 dark:text-blue-200">{t('member')}</h5>
+                                    <p className="text-sm text-blue-700 dark:text-blue-300">{t('member_description')}</p>
                                 </div>
                             </div>
                             <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                                 <FaShieldAlt className="text-gray-500 mt-1" />
                                 <div>
-                                    <h5 className="font-medium text-gray-800 dark:text-gray-200">Observateur</h5>
-                                    <p className="text-sm text-gray-700 dark:text-gray-300">Peut seulement consulter le projet</p>
+                                    <h5 className="font-medium text-gray-800 dark:text-gray-200">{t('observer')}</h5>
+                                    <p className="text-sm text-gray-700 dark:text-gray-300">{t('observer_description')}</p>
                                 </div>
                             </div>
                         </div>
@@ -441,21 +444,21 @@ export default function Show({ project: initialProject, auth }) {
                                 className="flex-1 sm:flex-none bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200 transform hover:scale-105"
                             >
                                 <FaUserEdit />
-                                Modifier les membres
+                                {t('edit_members')}
                             </Link>
                             <Link 
                                 href={route('project-users.create')}
                                 className="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200 transform hover:scale-105"
                             >
                                 <FaUsers />
-                                Ajouter un membre
+                                {t('add_member')}
                             </Link>
                             <Link 
                                 href={route('project-users.index')}
                                 className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200"
                             >
                                 <FaArrowLeft />
-                                Retour à la liste
+                                {t('back_to_list')}
                             </Link>
                         </div>
                     </div>

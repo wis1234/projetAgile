@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { router, usePage } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
 import { FaPlus, FaProjectDiagram, FaArrowLeft, FaChartLine, FaInfoCircle } from 'react-icons/fa';
@@ -8,6 +9,7 @@ import { projectCreationTutorial } from '@/tutorials/projectTutorials';
 import TutorialSettings from '@/Components/TutorialSettings';
 
 function Create() {
+  const { t } = useTranslation();
   const { errors = {}, flash = {}, availableStatuses = {} } = usePage().props;
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -24,7 +26,7 @@ function Create() {
     router.post('/projects', { name, description, meeting_link: meetingLink, status }, {
       onSuccess: (page) => {
         const projectId = page.props.flash.project?.id;
-        setNotification('Projet créé avec succès');
+        setNotification(t('project_created_success'));
         setNotificationType('success');
         setLoading(false);
         if (projectId) {
@@ -35,7 +37,7 @@ function Create() {
         }
       },
       onError: () => {
-        setNotification('Erreur lors de la création');
+        setNotification(t('project_creation_error'));
         setNotificationType('error');
         setLoading(false);
       }
@@ -75,7 +77,7 @@ function Create() {
               </Link>
               <div className="flex items-center gap-3">
                 <FaProjectDiagram className="text-2xl sm:text-3xl text-blue-600 flex-shrink-0" />
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Créer un projet</h1>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">{t('create_project')}</h1>
               </div>
             </div>
 
@@ -91,14 +93,14 @@ function Create() {
                 {/* Nom du projet */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                    Nom du projet *
+                    {t('project_name_required')}
                   </label>
                   <input 
                     type="text" 
                     value={name} 
                     onChange={e => setName(e.target.value)} 
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" 
-                    placeholder="Entrez le nom du projet"
+                    placeholder={t('project_name')}
                     required 
                   />
                   {errors.name && (
@@ -109,14 +111,14 @@ function Create() {
                 {/* Description */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                    Description
+                    {t('project_description_label')}
                   </label>
                   <textarea 
                     value={description} 
                     onChange={e => setDescription(e.target.value)} 
                     rows="4"
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition resize-none" 
-                    placeholder="Décrivez brièvement le projet (optionnel)"
+                    placeholder={t('project_description_placeholder')}
                   />
                   {errors.description && (
                     <div className="text-red-600 text-sm mt-2 font-medium">{errors.description}</div>
@@ -126,17 +128,17 @@ function Create() {
                 {/* Lien de réunion */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                    Lien de réunion (optionnel)
+                    {t('meeting_link_label')}
                   </label>
                   <input 
                     type="url" 
                     value={meetingLink} 
                     onChange={e => setMeetingLink(e.target.value)} 
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" 
-                    placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                    placeholder={t('meeting_link_placeholder')}
                   />
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Lien vers une salle de réunion virtuelle (Google Meet, Zoom, etc.)
+                    {t('meeting_link_help')}
                   </p>
                   {errors.meeting_link && (
                     <div className="text-red-600 text-sm mt-2 font-medium">{errors.meeting_link}</div>
@@ -148,7 +150,7 @@ function Create() {
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                     <div className="flex items-center gap-2">
                       <FaChartLine className="text-blue-500" />
-                      Statut initial du projet
+                      {t('initial_project_status')}
                     </div>
                   </label>
                   <div className="space-y-3">
@@ -158,16 +160,18 @@ function Create() {
                       className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition"
                     >
                       {Object.entries(availableStatuses).map(([key, label]) => (
-                        <option key={key} value={key}>{label}</option>
+                        <option key={key} value={key}>
+                          {t(`status_${key}`, { defaultValue: label })}
+                        </option>
                       ))}
                     </select>
                     
                     {/* Aperçu du statut sélectionné */}
                     <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Aperçu :</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">{t('preview')}</span>
                       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(status)}`}>
                         <FaChartLine className="text-xs" />
-                        {availableStatuses[status] || 'Nouveau'}
+                        {t(`status_${status}`, { defaultValue: availableStatuses[status] || 'Nouveau' })}
                       </span>
                     </div>
                   </div>
@@ -181,12 +185,12 @@ function Create() {
                   <div className="flex items-start gap-3">
                     <FaInfoCircle className="text-blue-500 text-lg flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-blue-700 dark:text-blue-300">
-                      <p className="font-semibold mb-2">Conseils pour la création de projet :</p>
+                      <p className="font-semibold mb-2">{t('project_creation_tips_title')}</p>
                       <ul className="space-y-1 list-disc list-inside">
-                        <li>Choisissez un nom descriptif et unique pour votre projet</li>
-                        <li>La description aide les membres à comprendre l'objectif</li>
-                        <li>Le statut "Nouveau" est recommandé pour un projet en préparation</li>
-                        <li>Vous pourrez modifier ces informations après la création</li>
+                        <li>{t('project_creation_tip1')}</li>
+                        <li>{t('project_creation_tip2')}</li>
+                        <li>{t('project_creation_tip3')}</li>
+                        <li>{t('project_creation_tip4')}</li>
                       </ul>
                     </div>
                   </div>
@@ -206,7 +210,7 @@ function Create() {
                       </>
                     ) : (
                       <>
-                        <FaPlus /> Créer le projet
+                        <FaPlus /> {t('create_project')}
                       </>
                     )}
                   </button>
@@ -214,7 +218,7 @@ function Create() {
                     href="/projects" 
                     className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 text-sm sm:text-base"
                   >
-                    <FaArrowLeft /> Annuler
+                    <FaArrowLeft /> {t('cancel')}
                   </Link>
                 </div>
               </form>

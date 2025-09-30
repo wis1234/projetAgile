@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { router, usePage } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { FaFlagCheckered, FaProjectDiagram, FaArrowLeft, FaTrash, FaSave, FaCalendarAlt, FaInfoCircle, FaSpinner } from 'react-icons/fa';
 import { Link } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function Edit({ sprint, projects }) {
+  const { t } = useTranslation();
   const { errors = {}, flash = {}, auth } = usePage().props;
   const [formData, setFormData] = useState({
     name: sprint.name || '',
@@ -34,11 +36,11 @@ function Edit({ sprint, projects }) {
     setLoading(true);
     router.put(route('sprints.update', sprint.id), formData, {
       onSuccess: () => {
-        setNotification({ type: 'success', message: 'Sprint mis à jour avec succès!' });
+        setNotification({ type: 'success', message: t('sprint_updated_success') });
         setTimeout(() => router.visit(route('sprints.show', sprint.id)), 1500);
       },
       onError: (err) => {
-        setNotification({ type: 'error', message: 'Erreur lors de la mise à jour. Veuillez vérifier les champs.' });
+        setNotification({ type: 'error', message: t('sprint_update_error') });
         setLoading(false);
       },
       onFinish: () => setLoading(false)
@@ -52,7 +54,7 @@ function Edit({ sprint, projects }) {
         router.visit(route('sprints.index'));
       },
       onError: () => {
-        setNotification({ type: 'error', message: 'Erreur lors de la suppression.' });
+        setNotification({ type: 'error', message: t('sprint_update_error') });
         setLoading(false);
         setShowDeleteModal(false);
       }
@@ -85,7 +87,7 @@ function Edit({ sprint, projects }) {
                 <Link 
                   href={route('sprints.show', sprint.id)}
                   className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                  title="Retour au détail du sprint"
+                  title={t('sprint_go_back')}
                 >
                   <FaArrowLeft className="h-5 w-5" />
                 </Link>
@@ -93,7 +95,7 @@ function Edit({ sprint, projects }) {
                   <FaFlagCheckered className="h-5 w-5" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Modifier le Sprint</h1>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('edit_sprint')}</h1>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{sprint.name}</p>
                 </div>
               </div>
@@ -123,11 +125,11 @@ function Edit({ sprint, projects }) {
               {/* Main Column */}
               <div className="lg:col-span-2 space-y-6">
                 <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Détails du Sprint</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">{t('sprint_details')}</h3>
                   
                   {/* Sprint Name */}
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nom du Sprint</label>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('sprint_name')}</label>
                     <input
                       type="text"
                       name="name"
@@ -142,7 +144,7 @@ function Edit({ sprint, projects }) {
 
                   {/* Description */}
                   <div className="mt-4">
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('description')}</label>
                     <textarea
                       name="description"
                       id="description"
@@ -151,7 +153,7 @@ function Edit({ sprint, projects }) {
                       onChange={handleChange}
                       className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                     ></textarea>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Décrivez brièvement les objectifs de ce sprint.</p>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('sprint_description_helper')}</p>
                   </div>
                 </div>
               </div>
@@ -159,11 +161,11 @@ function Edit({ sprint, projects }) {
               {/* Side Column */}
               <div className="space-y-6">
                 <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Configuration</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">{t('configuration')}</h3>
                   
                   {/* Project */}
                   <div>
-                    <label htmlFor="project_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Projet</label>
+                    <label htmlFor="project_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('project')}</label>
                     <div className="mt-1 relative">
                       <FaProjectDiagram className="pointer-events-none absolute top-1/2 -translate-y-1/2 left-3 h-5 w-5 text-gray-400" />
                       <select
@@ -182,7 +184,7 @@ function Edit({ sprint, projects }) {
 
                   {/* Start Date */}
                   <div className="mt-4">
-                    <label htmlFor="start_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Date de début</label>
+                    <label htmlFor="start_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('start_date')}</label>
                     <div className="mt-1 relative">
                        <FaCalendarAlt className="pointer-events-none absolute top-1/2 -translate-y-1/2 left-3 h-5 w-5 text-gray-400" />
                        <input
@@ -200,7 +202,7 @@ function Edit({ sprint, projects }) {
 
                   {/* End Date */}
                   <div className="mt-4">
-                    <label htmlFor="end_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Date de fin</label>
+                    <label htmlFor="end_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('end_date')}</label>
                     <div className="mt-1 relative">
                       <FaCalendarAlt className="pointer-events-none absolute top-1/2 -translate-y-1/2 left-3 h-5 w-5 text-gray-400" />
                       <input
@@ -230,7 +232,7 @@ function Edit({ sprint, projects }) {
                   className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <FaArrowLeft className="mr-2 h-4 w-4" />
-                  Annuler
+                  {t('cancel')}
                 </Link>
                 {canDelete && (
                   <button
@@ -240,7 +242,7 @@ function Edit({ sprint, projects }) {
                     className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
                   >
                     <FaTrash className="mr-2 h-4 w-4" />
-                    Supprimer
+                    {t('sprint_delete_confirm_delete')}
                   </button>
                 )}
                 <button 
@@ -252,12 +254,12 @@ function Edit({ sprint, projects }) {
                   {loading ? (
                     <>
                       <FaSpinner className="animate-spin mr-2" />
-                      Enregistrement...
+                      {t('sprint_saving')}
                     </>
                   ) : (
                     <>
                       <FaSave className="mr-2" />
-                      Enregistrer les modifications
+                      {t('sprint_save_changes')}
                     </>
                   )}
                 </button>
@@ -281,18 +283,18 @@ function Edit({ sprint, projects }) {
                     <FaTrash className="h-6 w-6 text-red-600 dark:text-red-400" />
                   </div>
                   <div className="ml-4 text-left">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Supprimer le Sprint</h3>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{t('sprint_delete_confirm_title')}</h3>
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      Êtes-vous sûr de vouloir supprimer ce sprint ? Toutes les tâches associées seront également supprimées. Cette action est irréversible.
+                      {t('sprint_delete_confirm_message')}
                     </p>
                   </div>
                 </div>
                 <div className="mt-6 flex justify-end gap-3">
                   <button onClick={() => setShowDeleteModal(false)} disabled={loading} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none">
-                    Annuler
+                    {t('sprint_delete_confirm_cancel')}
                   </button>
                   <button onClick={handleDelete} disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none disabled:opacity-50">
-                    {loading ? <FaSpinner className="animate-spin" /> : 'Supprimer'}
+                    {loading ? <FaSpinner className="animate-spin" /> : t('sprint_delete_confirm_delete')}
                   </button>
                 </div>
               </motion.div>
@@ -304,6 +306,11 @@ function Edit({ sprint, projects }) {
   );
 }
 
-Edit.layout = page => <AdminLayout children={page} title="Modifier le Sprint" />;
+const Layout = (page) => {
+  const { t } = useTranslation();
+  return <AdminLayout children={page} title={t('edit_sprint')} />;
+};
+
+Edit.layout = Layout;
 
 export default Edit;

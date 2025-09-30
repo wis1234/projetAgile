@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SortableContext, useSortable } from '@dnd-kit/sortable';
 import { TaskCard } from './TaskCard';
 import { PlusIcon } from '@heroicons/react/24/outline';
@@ -35,6 +36,8 @@ export function Column({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const { t } = useTranslation();
+
   return (
     <div 
       ref={setNodeRef}
@@ -43,12 +46,12 @@ export function Column({
     >
       {/* En-tête de la colonne avec dégradé */}
       <div 
-        className={`p-4 bg-gradient-to-r ${headerBg} text-white`}
+        className={`p-4 bg-white border-b ${borderColor}`}
         {...attributes}
         {...listeners}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{title}</h2>
+          <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
           <span className="bg-white bg-opacity-20 px-2 py-1 rounded-full text-xs font-medium">
             {tasks.length}
           </span>
@@ -72,7 +75,7 @@ export function Column({
             className="mt-3 w-full flex items-center justify-center p-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:bg-white hover:border-gray-400 transition-colors"
           >
             <PlusIcon className="h-4 w-4 mr-2" />
-            <span>Ajouter une tâche</span>
+            <span>{t('kanban.add_task')}</span>
           </button>
         )}
       </div>

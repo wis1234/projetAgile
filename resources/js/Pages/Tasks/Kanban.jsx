@@ -1,48 +1,51 @@
 import React from 'react';
 import { Link, router } from '@inertiajs/react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { useTranslation } from 'react-i18next';
 import AdminLayout from '@/Layouts/AdminLayout';
 
-const STATUS_COLUMNS = [
-  { 
-    key: 'todo', 
-    label: 'À faire', 
-    color: 'bg-gray-50 dark:bg-gray-800/60',
-    borderColor: 'border-gray-200 dark:border-gray-700/50',
-    textColor: 'text-gray-700 dark:text-gray-200',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    )
-  },
-  { 
-    key: 'in_progress', 
-    label: 'En cours', 
-    color: 'bg-blue-50/80 dark:bg-blue-900/30',
-    borderColor: 'border-blue-200 dark:border-blue-800/50',
-    textColor: 'text-blue-700 dark:text-blue-300',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-      </svg>
-    )
-  },
-  { 
-    key: 'done', 
-    label: 'Terminé', 
-    color: 'bg-green-50/80 dark:bg-green-900/20',
-    borderColor: 'border-green-200 dark:border-green-800/50',
-    textColor: 'text-green-700 dark:text-green-300',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
-    )
-  },
-];
+const Kanban = ({ tasks }) => {
+  const { t } = useTranslation();
 
-function Kanban({ tasks }) {
+  const STATUS_COLUMNS = [
+    { 
+      key: 'todo', 
+      label: t('status.todo'), 
+      color: 'bg-gray-50 dark:bg-gray-800/60',
+      borderColor: 'border-gray-200 dark:border-gray-700/50',
+      textColor: 'text-gray-700 dark:text-gray-200',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    },
+    { 
+      key: 'in_progress', 
+      label: t('status.in_progress'), 
+      color: 'bg-blue-50/80 dark:bg-blue-900/30',
+      borderColor: 'border-blue-200 dark:border-blue-800/50',
+      textColor: 'text-blue-700 dark:text-blue-300',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      )
+    },
+    { 
+      key: 'done', 
+      label: t('status.done'), 
+      color: 'bg-green-50/80 dark:bg-green-900/20',
+      borderColor: 'border-green-200 dark:border-green-800/50',
+      textColor: 'text-green-700 dark:text-green-300',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      )
+    },
+  ];
+
   // Convert tasks object to array for DnD
   const [columns, setColumns] = React.useState(() => {
     const cols = {};
@@ -83,8 +86,8 @@ function Kanban({ tasks }) {
                   </svg>
                 </span>
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Tableau Kanban</h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Glissez et déposez les tâches pour les organiser</p>
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">{t('kanban.page_title')}</h1>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('kanban.page_subtitle')}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -95,7 +98,7 @@ function Kanban({ tasks }) {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
-                  Vue liste
+                  {t('kanban.list_view')}
                 </Link>
                 <Link 
                   href="/tasks/create" 
@@ -104,7 +107,7 @@ function Kanban({ tasks }) {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
-                  Nouvelle tâche
+                  {t('kanban.new_task')}
                 </Link>
               </div>
             </div>
@@ -160,8 +163,8 @@ function Kanban({ tasks }) {
                                   </div>
                                   <div className="flex items-center gap-1.5">
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                      task.priority === 'Haute' ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200' :
-                                      task.priority === 'Moyenne' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200' :
+                                      task.priority === t('kanban.priority_high') ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200' :
+                                      task.priority === t('kanban.priority_medium') ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200' :
                                       'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200'
                                     }`}>
                                       {task.priority || '—'}
@@ -198,7 +201,7 @@ function Kanban({ tasks }) {
                                       <div 
                                         key={idx} 
                                         className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs font-medium text-white shadow-sm"
-                                        title={assignee.name || 'Non assigné'}
+                                        title={assignee.name || t('kanban.not_assigned')}
                                       >
                                         {assignee.name?.charAt(0).toUpperCase() || '?'}
                                       </div>
@@ -206,7 +209,7 @@ function Kanban({ tasks }) {
                                     {task.assignees?.length > 3 && (
                                       <div 
                                         className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 shadow-sm"
-                                        title={`${task.assignees.length - 3} autres`}
+                                        title={t('kanban.more_assignees', { count: task.assignees.length - 3 })}
                                       >
                                         +{task.assignees.length - 3}
                                       </div>
@@ -236,6 +239,7 @@ function Kanban({ tasks }) {
         <Link 
           href="/tasks/create" 
           className="flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 transition-transform hover:scale-105"
+          title={t('kanban.new_task')}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />

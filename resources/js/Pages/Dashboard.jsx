@@ -3,72 +3,80 @@ import AdminLayout from '../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
 import { Line, Bar, Pie } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
-import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload } from 'react-icons/fa';
+import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload, FaUserPlus } from 'react-icons/fa';
 import RecruitmentCard from '@/Components/RecruitmentCard';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler);
 
-const Widget = ({ title, count, color, link, icon }) => (
-  <motion.div 
-    whileHover={{ y: -5, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
-    className={`${color} rounded-xl p-6 shadow-md transition-all duration-300`}
-  >
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{title}</p>
-        <p className="text-2xl font-bold text-gray-800 dark:text-white">{count ?? '0'}</p>
+const Widget = ({ title, count, color, link, icon }) => {
+  const { t } = useTranslation();
+  return (
+    <motion.div 
+      whileHover={{ y: -5, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
+      className={`${color} rounded-xl p-6 shadow-md transition-all duration-300`}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{title}</p>
+          <p className="text-2xl font-bold text-gray-800 dark:text-white">{count ?? '0'}</p>
+        </div>
+        <div className="p-3 rounded-lg bg-white bg-opacity-20 dark:bg-opacity-10">
+          {React.cloneElement(icon, { className: 'text-2xl' })}
+        </div>
       </div>
-      <div className="p-3 rounded-lg bg-white bg-opacity-20 dark:bg-opacity-10">
-        {React.cloneElement(icon, { className: 'text-2xl' })}
-      </div>
-    </div>
-    {link && (
-      <Link 
-        href={link} 
-        className="mt-3 inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-      >
-        Voir plus <FaChevronRight className="ml-1 h-3 w-3" />
-      </Link>
-    )}
-  </motion.div>
-);
+      {link && (
+        <Link 
+          href={link} 
+          className="mt-3 inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+        >
+          {t('view_more')} <FaChevronRight className="ml-1 h-3 w-3" />
+        </Link>
+      )}
+    </motion.div>
+  );
+};
 
-const QuickAccess = () => (
-  <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl overflow-hidden">
-    <div className="p-6 text-white">
-      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <FaChartLine /> Accès rapide
-      </h2>
-      <div className="space-y-3">
-        {[
-          { icon: <FaTasks />, label: 'Nouvelle tâche', link: '/tasks/create' },
-          { icon: <FaProjectDiagram />, label: 'Nouveau projet', link: '/projects/create' },
-          { icon: <FaUsers />, label: 'Ajouter un membre', link: '/users/create' },
-          { icon: <FaFileAlt />, label: 'Importer un fichier', link: '/files/upload' },
-          { icon: <FaUserPlus />, label: 'Offres de recrutement', link: '/recruitment' },
-        ].map((item, index) => (
-          <Link
-            key={index}
-            href={item.link}
-            className="flex items-center p-3 rounded-lg bg-white bg-opacity-10 hover:bg-opacity-20 transition-all"
-          >
-            <span className="mr-3">{item.icon}</span>
-            <span className="font-medium">{item.label}</span>
-            <FaChevronRight className="ml-auto h-3 w-3 opacity-70" />
-          </Link>
-        ))}
+const QuickAccess = () => {
+  const { t } = useTranslation();
+  return (
+    <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl overflow-hidden">
+      <div className="p-6 text-white">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <FaChartLine /> {t('quick_access')}
+        </h2>
+        <div className="space-y-3">
+          {[
+            { icon: <FaTasks />, label: t('new_task'), link: '/tasks/create' },
+            { icon: <FaProjectDiagram />, label: t('new_project'), link: '/projects/create' },
+            { icon: <FaUsers />, label: t('add_member'), link: '/users/create' },
+            { icon: <FaFileAlt />, label: t('import_file'), link: '/files/upload' },
+            { icon: <FaUserPlus />, label: t('recruitment_offers'), link: '/recruitment' },
+          ].map((item, index) => (
+            <Link
+              key={index}
+              href={item.link}
+              className="flex items-center p-3 rounded-lg bg-white bg-opacity-10 hover:bg-opacity-20 transition-all"
+            >
+              <span className="mr-3">{item.icon}</span>
+              <span className="font-medium">{item.label}</span>
+              <FaChevronRight className="ml-auto h-3 w-3 opacity-70" />
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const StatusBadge = ({ status, count }) => {
+  const { t } = useTranslation();
   const statusConfig = {
-    todo: { label: 'À faire', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-    in_progress: { label: 'En cours', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-    done: { label: 'Terminé', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-    en_attente: { label: 'En attente', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' },
+    todo: { label: t('status_todo'), color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
+    in_progress: { label: t('status_in_progress'), color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
+    done: { label: t('status_done'), color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+    en_attente: { label: t('status_pending'), color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' },
   };
 
   const config = statusConfig[status] || { label: status, color: 'bg-gray-100 text-gray-800' };
@@ -81,9 +89,10 @@ const StatusBadge = ({ status, count }) => {
       <span className="font-medium">{count}</span>
     </div>
   );
-};
+}
 
 const RecentActivityItem = ({ activity }) => {
+  const { t } = useTranslation();
   const getActivityIcon = (type) => {
     const icons = {
       task: <FaTasks className="text-blue-500" />,
@@ -118,6 +127,7 @@ const RecentActivityItem = ({ activity }) => {
 };
 
 const ProjectCard = ({ project }) => {
+  const { t } = useTranslation();
   const progress = project.progress || 0;
   
   return (
@@ -145,14 +155,15 @@ const ProjectCard = ({ project }) => {
       </div>
       
       <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>Échéance: {new Date(project.deadline).toLocaleDateString('fr-FR')}</span>
-        <span>{project.task_count} tâches</span>
+        <span>{t('deadline')}: {new Date(project.deadline).toLocaleDateString('fr-FR')}</span>
+        <span>{project.task_count} {t('tasks')}</span>
       </div>
     </div>
   );
-};
+}
 
 export default function Dashboard({ auth, stats = {}, activityByDay = [], recentActivities = [], topUsers = [], recentProjects = [], recentFiles = [] }) {
+  const { t } = useTranslation();
   const isAdmin = auth?.user?.roles?.includes('admin');
   // Initialisation des valeurs par défaut pour les tâches par statut
   const tasksByStatus = stats.tasksByStatus || {
@@ -165,7 +176,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
   // Données pour les widgets statistiques
   const statsData = [
     {
-      title: 'Tâches',
+      title: t('tasks'),
       count: stats.tasks || 0,
       color: 'bg-gradient-to-r from-blue-500 to-blue-600 text-white',
       link: '/tasks',
@@ -173,7 +184,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
       show: true
     },
     {
-      title: 'Projets',
+      title: t('projects'),
       count: stats.projects || 0,
       color: 'bg-gradient-to-r from-green-500 to-green-600 text-white',
       link: '/projects',
@@ -181,7 +192,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
       show: true
     },
     {
-      title: 'Coéquipiers',
+      title: t('team_members'),
       count: stats.members || 0,
       color: 'bg-gradient-to-r from-purple-500 to-purple-600 text-white',
       link: '/users',
@@ -189,7 +200,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
       show: isAdmin // Only show users widget to admins
     },
     {
-      title: 'Fichiers',
+      title: t('files'),
       count: stats.files || 0,
       color: 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white',
       link: '/files',
@@ -254,9 +265,9 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
         >
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">TABLEAU DE BORD</h1>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('dashboard').toUpperCase()}</h1>
               <p className="text-gray-500 dark:text-gray-400">
-                Statistiques et activités de mon espace
+                {t('dashboard_subtitle')}
               </p>
             </div>
             <div className="w-64">
@@ -282,7 +293,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
         {/* Graphique d'activité et utilisateurs actifs */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">Activité récente</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">{t('recent_activity')}</h2>
             <div className="h-64">
               <Line
                 data={activityChartData}
@@ -316,7 +327,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">Coéquipiers actifs</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">{t('active_team_members')}</h2>
             <div className="space-y-4">
               {topUsers && topUsers.length > 0 ? (
                 topUsers.map((user, index) => (
@@ -350,7 +361,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                 ))
               ) : (
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                  Aucune activité utilisateur récente
+                  {t('no_recent_user_activity')}
                 </p>
               )}
             </div>
@@ -403,12 +414,12 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden p-6 mb-8"
         >
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Projets récents</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{t('recent_projects')}</h2>
             <Link 
               href="/projects" 
               className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
             >
-              Voir tous les projets <FaChevronRight className="ml-1 h-3 w-3" />
+              {t('view_all_projects')} <FaChevronRight className="ml-1 h-3 w-3" />
             </Link>
           </div>
           
@@ -447,7 +458,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                         <span className="text-gray-600 dark:text-gray-300">{project.manager.name}</span>
                       </div>
                       <span className="text-gray-500 dark:text-gray-400">
-                        {project.task_count} tâches
+                        {project.task_count} {t('tasks')}
                       </span>
                     </div>
                   </div>
@@ -456,14 +467,14 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                       href={`/projects/${project.id}`}
                       className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                     >
-                      Voir le projet
+                      {t('view_project')}
                     </Link>
                   </div>
                 </div>
               ))
             ) : (
               <div className="col-span-full text-center py-8 text-gray-400">
-                <p>Aucun projet récent</p>
+                <p>{t('no_recent_projects')}</p>
               </div>
             )}
           </div>
@@ -477,12 +488,12 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden p-6 mb-8"
         >
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Fichiers récents</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{t('recent_files')}</h2>
             <Link 
               href="/files" 
               className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
             >
-              Voir tous les fichiers <FaChevronRight className="ml-1 h-3 w-3" />
+              {t('view_all_files')} <FaChevronRight className="ml-1 h-3 w-3" />
             </Link>
           </div>
           
@@ -515,7 +526,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
               ))
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                Aucun fichier récent
+                {t('no_recent_files')}
               </p>
             )}
           </div>
@@ -529,12 +540,12 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden p-6 mb-8"
         >
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Activités récentes</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{t('recent_activities')}</h2>
             <Link 
               href="/activities" 
               className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
             >
-              Voir toutes les activités <FaChevronRight className="ml-1 h-3 w-3" />
+              {t('view_all_activities')} <FaChevronRight className="ml-1 h-3 w-3" />
             </Link>
           </div>
           
@@ -559,7 +570,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-800 dark:text-gray-200">
-                      <span className="font-medium">{activity.user?.name || 'Utilisateur inconnu'}</span>
+                      <span className="font-medium">{activity.user?.name || t('unknown_user')}</span>
                       {' '}{activity.description}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -570,7 +581,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
               ))
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                Aucune activité récente
+                {t('no_recent_activity')}
               </p>
             )}
           </div>
@@ -583,7 +594,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           transition={{ delay: 1 }}
           className="text-center text-sm text-gray-500 dark:text-gray-400 pt-8 border-t border-gray-200 dark:border-gray-700 mt-8"
         >
-          <p> {new Date().getFullYear()} ProjA - Tous droits réservés</p>
+          <p>{new Date().getFullYear()} {t('app_name')} - {t('all_rights_reserved')}</p>
         </motion.div>
       </div>
     </div>

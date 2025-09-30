@@ -3,8 +3,10 @@ import { router, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
 import { FaEdit, FaProjectDiagram, FaArrowLeft, FaSave, FaChartLine, FaInfoCircle, FaHistory } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatus, userRole }) {
+  const { t, i18n } = useTranslation();
   const { errors = {}, flash = {} } = usePage().props;
   const [name, setName] = useState(project.name || '');
   const [description, setDescription] = useState(project.description || '');
@@ -19,13 +21,13 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
     setLoading(true);
     router.put(`/projects/${project.id}`, { name, description, meeting_link: meetingLink, status }, {
       onSuccess: () => {
-        setNotification('Projet mis à jour avec succès');
+        setNotification(t('project_updated_successfully'));
         setNotificationType('success');
         setLoading(false);
         setTimeout(() => router.visit(`/projects/${project.id}`), 1200);
       },
       onError: () => {
-        setNotification('Erreur lors de la mise à jour');
+        setNotification(t('update_error'));
         setNotificationType('error');
         setLoading(false);
       }
@@ -37,7 +39,7 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
     // Current status first
     { 
       value: currentStatus, 
-      label: `${availableStatuses[currentStatus] || currentStatus} (actuel)`,
+      label: `${availableStatuses[currentStatus] || currentStatus} (${t('current')})`,
       disabled: true,
       className: 'font-semibold bg-gray-100 dark:bg-gray-700'
     },
@@ -60,7 +62,7 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
         label: value,
         disabled: true,
         className: 'opacity-50 cursor-not-allowed',
-        title: 'Transition non autorisée depuis le statut actuel'
+        title: t('transition_not_allowed')
       }))
   ];
   
@@ -88,14 +90,11 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
           <div className="flex flex-col h-full w-full max-w-5xl mx-auto mt-14 pt-4 bg-white dark:bg-gray-900 px-4 sm:px-6 lg:px-8">
             {/* Header section - Responsive */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
-              <Link href="/projects" className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-100 transition flex-shrink-0">
-                <FaArrowLeft className="text-lg sm:text-xl" />
-              </Link>
               <div className="flex items-center gap-3">
                 <FaProjectDiagram className="text-2xl sm:text-3xl text-blue-600 flex-shrink-0" />
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">Modifier le projet</h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{project.name}</p>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-blue-700 dark:text-blue-200 tracking-tight">{t('edit_project')}</h1>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{project.name} - {t('editing')}</p>
                 </div>
               </div>
             </div>
@@ -106,14 +105,14 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                 <div className="flex items-center gap-3">
                   <FaHistory className="text-blue-500 text-lg flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Statut actuel du projet :</p>
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">{t('current_project_status')}:</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(currentStatus)}`}>
                         <FaChartLine className="text-xs" />
                         {availableStatuses[currentStatus] || currentStatus}
                       </span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Créé le {new Date(project.created_at).toLocaleDateString('fr-FR')}
+                        {t('created_on')} {new Date(project.created_at).toLocaleDateString(i18n.language)}
                       </span>
                     </div>
                   </div>
@@ -133,14 +132,14 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                 {/* Nom du projet */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                    Nom du projet *
+                    {t('project_name')} *
                   </label>
                   <input 
                     type="text" 
                     value={name} 
                     onChange={e => setName(e.target.value)} 
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition" 
-                    placeholder="Entrez le nom du projet"
+                    placeholder={t('enter_project_name')}
                     required 
                   />
                   {errors.name && (
@@ -151,14 +150,14 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                 {/* Description */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                    Description
+                    {t('description')}
                   </label>
                   <textarea 
                     value={description} 
                     onChange={e => setDescription(e.target.value)} 
                     rows="4"
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition resize-none" 
-                    placeholder="Décrivez brièvement le projet (optionnel)"
+                    placeholder={t('project_description_placeholder')}
                   />
                   {errors.description && (
                     <div className="text-red-600 text-sm mt-2 font-medium">{errors.description}</div>
@@ -168,7 +167,7 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                 {/* Lien de réunion */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                    Lien de réunion (optionnel)
+                    {t('meeting_link')} ({t('optional')})
                   </label>
                   <input 
                     type="url" 
@@ -178,7 +177,7 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                     placeholder="https://meet.google.com/xxx-xxxx-xxx"
                   />
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Lien vers une salle de réunion virtuelle (Google Meet, Zoom, etc.)
+                    {t('meeting_link_help')}
                   </p>
                   {errors.meeting_link && (
                     <div className="text-red-600 text-sm mt-2 font-medium">{errors.meeting_link}</div>
@@ -190,7 +189,7 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <div className="flex items-center gap-2">
                       <FaChartLine className="text-blue-500" />
-                      Statut du projet
+                      {t('project_status')}
                     </div>
                   </label>
                   <div className="flex items-center gap-3 mb-2">
@@ -225,20 +224,23 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                           title={option.title || ''}
                         >
                           {option.icon && <span className="mr-2">{option.icon}</span>}
-                          {option.label}
+                          {option.disabled && option.label.includes('(Current)') 
+                            ? t('current') 
+                            : t(`status_${option.value}`, { defaultValue: option.label })
+                          }
                         </option>
                       );
                     })}
                   </select>
                   <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 flex items-center">
                     <FaInfoCircle className="mr-1 flex-shrink-0" />
-                    <span>Choisissez le nouveau statut du projet selon le flux de travail</span>
+                    <span>{t('choose_new_status')}</span>
                   </div>
                   
                   {status !== (project.status || 'nouveau') && (
                     <div className="mt-2">
                       <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                        ⚠️ Changement de statut
+                        ⚠️ {t('status_change')}
                       </span>
                     </div>
                   )}
@@ -253,16 +255,16 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                     <div className="flex items-start gap-3">
                       <FaInfoCircle className="text-yellow-500 text-lg flex-shrink-0 mt-0.5" />
                       <div className="text-sm text-yellow-700 dark:text-yellow-300">
-                        <p className="font-semibold mb-2">Transitions de statut autorisées :</p>
+                        <p className="font-semibold mb-2">{t('allowed_status_transitions')}:</p>
                         <ul className="space-y-1 list-disc list-inside">
                           {statusOptions.slice(1).map(option => (
                             <li key={option.value}>
-                              Passer à : <strong>{option.label}</strong>
+                              {t('switch_to')}: <strong>{t(`status_${option.value}`)}</strong>
                             </li>
                           ))}
                         </ul>
                         <p className="mt-2 text-xs">
-                          Les transitions de statut suivent la logique métier du projet pour assurer une progression cohérente.
+                          {t('status_transition_help')}
                         </p>
                       </div>
                     </div>
@@ -279,11 +281,11 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                     {loading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Mise à jour...
+                        {t('updating')}...
                       </>
                     ) : (
                       <>
-                        <FaSave /> Sauvegarder les modifications
+                        <FaSave /> {t('save_changes')}
                       </>
                     )}
                   </button>
@@ -291,7 +293,7 @@ function Edit({ project, availableStatuses = {}, nextStatuses = [], currentStatu
                     href="/projects" 
                     className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 text-sm sm:text-base"
                   >
-                    <FaArrowLeft /> Annuler
+                    <FaArrowLeft /> {t('cancel')}
                   </Link>
                 </div>
               </form>

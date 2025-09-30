@@ -1,93 +1,125 @@
 import React, { useState, useEffect } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 import AdminLayout from '@/Layouts/AdminLayout';
 import Tutorial from '@/Components/Tutorial';
 import TutorialSettings from '@/Components/TutorialSettings';
 import { projectShowTutorial } from '@/tutorials/projectTutorials';
-import { sprintManagementTutorial } from '@/tutorials/sprintTutorials';
-import {
-    FaProjectDiagram,
-    FaUsers,
-    FaTasks,
-    FaEdit,
-    FaEye,
-    FaArrowLeft,
-    FaCalendarAlt,
-    FaUserFriends,
-    FaClipboardList,
-    FaBolt,
-    FaRocket,
-    FaUserPlus,
-    FaFileExport,
-    FaChevronDown,
-    FaFileAlt,
-    FaFilePdf,
-    FaFileWord,
-    FaTrash,
-    FaChartLine,
-    FaCommentDots,
-    FaCheckCircle,
-    FaClock,
-    FaExclamationTriangle,
-    FaPlay,
-    FaPause,
-    FaStop,
-    FaChartBar,
-    FaChartPie,
-    FaCalendarCheck,
-    FaCrown,
-    FaUser,
-    FaShieldAlt,
-    FaPlus,
-    FaEnvelope,
-    FaPhone,
-    FaGlobe,
-    FaCode,
-    FaBug,
-    FaLightbulb,
-    FaExternalLinkAlt
+import { 
+  FaProjectDiagram, FaUsers, FaTasks, FaEdit, FaEye, FaArrowLeft, FaCalendarAlt,
+  FaUserFriends, FaClipboardList, FaBolt, FaRocket, FaUserPlus, FaFileExport,
+  FaChevronDown, FaFileAlt, FaFilePdf, FaFileWord, FaTrash, FaChartLine, FaCommentDots,
+  FaCheckCircle, FaClock, FaExclamationTriangle, FaPlay, FaPause, FaStop, FaChartBar,
+  FaChartPie, FaCalendarCheck, FaCrown, FaUser, FaShieldAlt, FaPlus, FaEnvelope,
+  FaPhone, FaGlobe, FaCode, FaLightbulb, FaExternalLinkAlt, FaQuestionCircle,
+  FaArrowUp, FaArrowDown, FaEquals
 } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
-import { 
-    Chart, 
-    BarElement, 
-    CategoryScale, 
-    LinearScale, 
-    Tooltip, 
-    Legend, 
-    ArcElement,
-    PointElement,
-    LineElement,
-    Title,
-    Filler
-} from 'chart.js';
-Chart.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Title, Filler);
+import 'chart.js/auto';
 import Modal from '../../Components/Modal';
 
-// Helper function to get status color class
-const getStatusColor = (status) => {
-  switch (status) {
-    case 'todo':
-    case 'nouveau':
-      return 'bg-gray-400';
-    case 'in_progress':
-    case 'en_cours':
-      return 'bg-blue-500';
-    case 'done':
-    case 'termine':
-      return 'bg-green-500';
-    case 'pending':
-    case 'en_attente':
-      return 'bg-yellow-500';
-    default:
-      return 'bg-gray-300';
-  }
+// Fonctions utilitaires pour les statuts et priorités
+const getStatusInfo = (status, t) => {
+  const statusMap = {
+    // English statuses
+    'todo': { 
+      color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+      icon: <FaClock className="mr-1.5" />,
+      text: t('status_todo')
+    },
+    'in_progress': { 
+      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      icon: <FaPlay className="mr-1.5" />,
+      text: t('status_in_progress')
+    },
+    'done': { 
+      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      icon: <FaCheckCircle className="mr-1.5" />,
+      text: t('status_done')
+    },
+    'pending': { 
+      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      icon: <FaPause className="mr-1.5" />,
+      text: t('status_pending')
+    },
+    // French statuses
+    'nouveau': { 
+      color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+      icon: <FaClock className="mr-1.5" />,
+      text: t('status_new')
+    },
+    'en_cours': { 
+      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      icon: <FaPlay className="mr-1.5" />,
+      text: t('status_in_progress')
+    },
+    'termine': { 
+      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      icon: <FaCheckCircle className="mr-1.5" />,
+      text: t('status_done')
+    },
+    'en_attente': { 
+      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      icon: <FaPause className="mr-1.5" />,
+      text: t('status_pending')
+    }
+  };
+
+  return statusMap[status] || { 
+    color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+    icon: <FaQuestionCircle className="mr-1.5" />,
+    text: status
+  };
+};
+
+const getPriorityInfo = (priority, t) => {
+  const priorityMap = {
+    'high': {
+      color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      icon: <FaArrowUp className="mr-1.5" />,
+      text: t('priority_high')
+    },
+    'medium': {
+      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      icon: <FaEquals className="mr-1.5" />,
+      text: t('priority_medium')
+    },
+    'low': {
+      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      icon: <FaArrowDown className="mr-1.5" />,
+      text: t('priority_low')
+    },
+    'haute': {
+      color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      icon: <FaArrowUp className="mr-1.5" />,
+      text: t('priority_high')
+    },
+    'moyenne': {
+      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      icon: <FaEquals className="mr-1.5" />,
+      text: t('priority_medium')
+    },
+    'basse': {
+      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      icon: <FaArrowDown className="mr-1.5" />,
+      text: t('priority_low')
+    }
+  };
+
+  return priorityMap[priority] || {
+    color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+    icon: <FaQuestionCircle className="mr-1.5" />,
+    text: priority
+  };
 };
 
 function Show({ project, tasks = [], auth, stats = {} }) {
+  const { t, i18n } = useTranslation();
   // État pour gérer l'affichage des tutoriels
   const [showProjectTutorial, setShowProjectTutorial] = useState(true);
   const [showSprintTutorial, setShowSprintTutorial] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const { flash = {} } = usePage().props;
   
   // Sanitize and validate user roles
@@ -95,8 +127,19 @@ function Show({ project, tasks = [], auth, stats = {} }) {
   const isAdmin = userRoles.includes('admin');
   const isManager = userRoles.includes('manager');
 
-  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
-  const [deleteLoading, setDeleteLoading] = React.useState(false);
+  // Force re-render on language change
+  const [language, setLanguage] = useState(i18n.language);
+  
+  useEffect(() => {
+    const handleLanguageChange = (lng) => {
+      setLanguage(lng);
+    };
+    
+    i18n.on('languageChanged', handleLanguageChange);
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange);
+    };
+  }, [i18n]);
 
   // Gérer l'affichage du tutoriel de sprint après la création d'un projet
   useEffect(() => {
@@ -151,7 +194,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
     labels: last30Days.map(date => new Date(date).toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'})),
     datasets: [
       {
-        label: 'Tâches totales',
+        label: t('total_tasks'),
         data: chartData.map(d => d.cumulativeTotal),
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -160,7 +203,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
         fill: true
       },
       {
-        label: 'Tâches terminées',
+        label: t('completed_tasks'),
         data: chartData.map(d => d.cumulativeDone),
         borderColor: 'rgb(16, 185, 129)',
         backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -261,52 +304,146 @@ function Show({ project, tasks = [], auth, stats = {} }) {
 
   // Helpers pour badges
   const getStatusBadge = (status) => {
-    let color = 'bg-gray-200 text-gray-800';
-    let text = 'Inconnu';
+    const statusMap = {
+      // English statuses
+      'todo': { 
+        color: 'bg-blue-200 text-blue-800',
+        text: t('status_todo')
+      },
+      'in_progress': { 
+        color: 'bg-yellow-200 text-yellow-800',
+        text: t('status_in_progress')
+      },
+      'done': { 
+        color: 'bg-green-200 text-green-800',
+        text: t('status_done')
+      },
+      'pending': { 
+        color: 'bg-purple-200 text-purple-800',
+        text: t('status_pending')
+      },
+      // French statuses
+      'nouveau': { 
+        color: 'bg-blue-200 text-blue-800',
+        text: t('status_todo')
+      },
+      'en_cours': { 
+        color: 'bg-yellow-200 text-yellow-800',
+        text: t('status_in_progress')
+      },
+      'termine': { 
+        color: 'bg-green-200 text-green-800',
+        text: t('status_done')
+      },
+      'en_attente': { 
+        color: 'bg-purple-200 text-purple-800',
+        text: t('status_pending')
+      },
+      // Status with prefix
+      'status_todo': { 
+        color: 'bg-blue-200 text-blue-800',
+        text: t('status_todo')
+      },
+      'status_in_progress': { 
+        color: 'bg-yellow-200 text-yellow-800',
+        text: t('status_in_progress')
+      },
+      'status_done': { 
+        color: 'bg-green-200 text-green-800',
+        text: t('status_done')
+      },
+      'status_pending': { 
+        color: 'bg-purple-200 text-purple-800',
+        text: t('status_pending')
+      },
+      // Default
+      'default': {
+        color: 'bg-gray-200 text-gray-800',
+        text: status || t('not_assigned')
+      }
+    };
     
-    if (status === 'in_progress') {
-      color = 'bg-yellow-200 text-yellow-800';
-      text = 'En cours';
-    } else if (status === 'done') {
-      color = 'bg-green-200 text-green-800';
-      text = 'Terminée';
-    } else if (status === 'todo') {
-      color = 'bg-blue-200 text-blue-800';
-      text = 'À faire';
-    }
-    
-    return <span className={`px-3 py-1 rounded-full text-xs font-semibold ${color}`}>{text}</span>;
+    const statusInfo = statusMap[status] || statusMap['default'];
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.color}`}>
+        {statusInfo.text}
+      </span>
+    );
   };
 
   const getPriorityBadge = (priority) => {
-    let color = 'bg-gray-200 text-gray-700';
-    let text = 'Non définie';
+    const priorityMap = {
+      // English priorities
+      'high': {
+        color: 'bg-red-200 text-red-800',
+        text: t('high')
+      },
+      'medium': {
+        color: 'bg-orange-200 text-orange-800',
+        text: t('medium')
+      },
+      'low': {
+        color: 'bg-blue-200 text-blue-800',
+        text: t('low')
+      },
+      // French priorities
+      'haute': {
+        color: 'bg-red-200 text-red-800',
+        text: t('high')
+      },
+      'moyenne': {
+        color: 'bg-orange-200 text-orange-800',
+        text: t('medium')
+      },
+      'basse': {
+        color: 'bg-blue-200 text-blue-800',
+        text: t('low')
+      },
+      // Priority with prefix
+      'priority_high': {
+        color: 'bg-red-200 text-red-800',
+        text: t('high')
+      },
+      'priority_medium': {
+        color: 'bg-orange-200 text-orange-800',
+        text: t('medium')
+      },
+      'priority_low': {
+        color: 'bg-blue-200 text-blue-800',
+        text: t('low')
+      },
+      // Default
+      'default': {
+        color: 'bg-gray-200 text-gray-700',
+        text: t('not_assigned')
+      }
+    };
     
-    if (priority === 'high') {
-      color = 'bg-red-200 text-red-800';
-      text = 'Haute';
-    } else if (priority === 'medium') {
-      color = 'bg-orange-200 text-orange-800';
-      text = 'Moyenne';
-    } else if (priority === 'low') {
-      color = 'bg-blue-200 text-blue-800';
-      text = 'Basse';
-    }
-    
-    return <span className={`px-3 py-1 rounded-full text-xs font-semibold ${color}`}>{text}</span>;
+    const priorityInfo = priorityMap[priority] || priorityMap['default'];
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${priorityInfo.color}`}>
+        {priorityInfo.text}
+      </span>
+    );
   };
 
   const handleDelete = async () => {
     setDeleteLoading(true);
     try {
-      await fetch(`/projects/${project.id}`, {
-        method: 'DELETE',
+      await router.delete(route('projects.destroy', project.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+          setShowDeleteModal(false);
+          // Une notification de succès sera affichée via Inertia
+        },
+        onError: () => {
+          setDeleteLoading(false);
+        },
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
         },
       });
-      window.location.href = '/projects';
     } catch (e) {
       setDeleteLoading(false);
     }
@@ -320,13 +457,13 @@ function Show({ project, tasks = [], auth, stats = {} }) {
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-4 px-4">
             <div className="flex items-center gap-3">
                 <FaProjectDiagram className="text-2xl text-blue-600" />
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Détails du Projet</h1>
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">{t('project_details_title')}</h1>
             </div>
             <Link
                 href="/projects"
                 className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
             >
-                <FaArrowLeft /> Retour
+                <FaArrowLeft /> {t('back_to_projects')}
             </Link>
           </div>
         </header>
@@ -353,7 +490,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     </h2>
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
                       <FaCalendarAlt className="text-blue-500" />
-                      <span>Créé le {new Date(project.created_at).toLocaleDateString('fr-FR', {day: '2-digit', month: 'long', year: 'numeric'})}</span>
+                      <span>{t('project_created_on')} {new Date(project.created_at).toLocaleDateString(i18n.language, {day: '2-digit', month: 'long', year: 'numeric'})}</span>
                     </div>
                   </div>
                 </div>
@@ -361,17 +498,17 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 <div className="space-y-6">
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                      <FaClipboardList className="text-blue-500" /> Description
+                      <FaClipboardList className="text-blue-500" /> {t('project_description_label')}
                     </h3>
                     <p className="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-100 dark:border-gray-600 mb-4">
-                      {project.description || 'Aucune description fournie'}
+                      {project.description || t('no_description')}
                     </p>
                   </div>
                   
                   {project.meeting_link && (
                     <div className="mb-6">
                       <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                        <FaGlobe className="text-blue-500" /> Lien de réunion
+                        <FaGlobe className="text-blue-500" /> {t('meeting_link_title')}
                       </h3>
                       <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
                         <a 
@@ -384,7 +521,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                           {project.meeting_link}
                         </a>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                          Cliquez pour rejoindre la réunion
+                          {t('click_to_join_meeting')}
                         </p>
                       </div>
                     </div>
@@ -395,13 +532,13 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               {/* Carte des membres */}
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Membres ({project.users?.length || 0})</h3>
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">{t('project_members')} ({project.users?.length || 0})</h3>
                   <Link 
                     href={route('project-users.show', project.id)}
                     className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1"
                   >
                     <FaEye className="text-sm" />
-                    <span>Voir tout</span>
+                    <span>{t('view_all')}</span>
                   </Link>
                 </div>
                 <div className="space-y-3">
@@ -439,12 +576,12 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                                 <FaUser className="text-blue-500" />
                               )}
                               {user.role === 'admin' 
-                                ? 'Administrateur' 
+                                ? t('admin') 
                                 : user.role === 'manager' 
-                                  ? 'Chef de projet'
+                                  ? t('manager')
                                   : user.role === 'observer'
-                                    ? 'Observateur'
-                                    : 'Membre'}
+                                    ? t('observer')
+                                    : t('member')}
                             </div>
                             {user.pivot_created_at && (
                               <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -458,7 +595,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                   ) : (
                     <div className="text-center py-6 text-gray-400 dark:text-gray-500">
                       <FaUserFriends className="mx-auto text-3xl mb-2" />
-                      <p>Aucun membre dans ce projet</p>
+                      <p>{t('no_members_in_project')}</p>
                     </div>
                   )}
                 </div>
@@ -469,7 +606,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
               <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
                 <FaBolt className="text-yellow-500" />
-                <span>Actions Rapides</span>
+                <span>{t('quick_actions')}</span>
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Bouton Ajouter un Sprint */}
@@ -482,8 +619,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3 mx-auto">
                       <FaRocket className="text-2xl text-white" />
                     </div>
-                    <h4 className="font-semibold text-lg mb-1">Ajouter un Sprint</h4>
-                    <p className="text-sm opacity-80">Planifiez un nouvel objectif</p>
+                    <h4 className="font-semibold text-lg mb-1">{t('add_sprint')}</h4>
+                    <p className="text-sm opacity-80">{t('plan_new_goal')}</p>
                   </div>
                 </Link>
 
@@ -498,8 +635,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                       <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3 mx-auto">
                         <FaUserPlus className="text-2xl text-white" />
                       </div>
-                      <h4 className="font-semibold text-lg mb-1">Ajouter un Membre</h4>
-                      <p className="text-sm opacity-80">Collaborez en équipe</p>
+                      <h4 className="font-semibold text-lg mb-1">{t('add_member')}</h4>
+                      <p className="text-sm opacity-80">{t('collaborate_in_team')}</p>
                     </div>
                   </Link>
                 )}
@@ -514,8 +651,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3 mx-auto">
                       <FaTasks className="text-2xl text-white" />
                     </div>
-                    <h4 className="font-semibold text-lg mb-1">Ajouter une Tâche</h4>
-                    <p className="text-sm opacity-80">Créez une nouvelle activité</p>
+                    <h4 className="font-semibold text-lg mb-1">{t('add_task')}</h4>
+                    <p className="text-sm opacity-80">{t('create_new_activity')}</p>
                   </div>
                 </Link>
 
@@ -527,8 +664,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3 mx-auto">
                       <FaFileExport className="text-2xl text-white" />
                     </div>
-                    <h4 className="font-semibold text-lg mb-1">Exporter</h4>
-                    <p className="text-sm opacity-80">Téléchargez les rapports</p>
+                    <h4 className="font-semibold text-lg mb-1">{t('export')}</h4>
+                    <p className="text-sm opacity-80">{t('download_reports')}</p>
                     <FaChevronDown className="absolute bottom-2 right-2 text-white/50 group-hover:text-white transition-colors" />
                   </button>
                   
@@ -543,8 +680,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                         <FaFileAlt className="text-blue-600 dark:text-blue-400" />
                       </div>
                       <div className="text-left">
-                        <div className="font-medium">Format TXT</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Simple et léger</div>
+                        <div className="font-medium">{t('txt_format')}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('simple_and_light')}</div>
                       </div>
                     </a>
                     <a 
@@ -557,8 +694,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                         <FaFilePdf className="text-red-600 dark:text-red-400" />
                       </div>
                       <div className="text-left">
-                        <div className="font-medium">Format PDF</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Idéal pour le partage</div>
+                        <div className="font-medium">{t('pdf_format')}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('ideal_for_sharing')}</div>
                       </div>
                     </a>
                     <a 
@@ -571,8 +708,8 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                         <FaFileWord className="text-blue-700 dark:text-blue-400" />
                       </div>
                       <div className="text-left">
-                        <div className="font-medium">Format Word</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Modifiable facilement</div>
+                        <div className="font-medium">{t('word_format')}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('easily_editable')}</div>
                       </div>
                     </a>
                   </div>
@@ -584,7 +721,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                       className="flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-3 rounded-lg font-medium"
                     >
                       <FaTasks className="text-lg" />
-                      <span>Créer une tâche</span>
+                      <span>{t('create_task')}</span>
                     </Link>
 
                     <Link
@@ -592,7 +729,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                       className="flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-3 rounded-lg font-medium"
                     >
                       <FaUserFriends className="text-lg" />
-                      <span>Voir les membres</span>
+                      <span>{t('view_members')}</span>
                     </Link>
 
                     <Link
@@ -600,19 +737,19 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                       className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-3 rounded-lg font-medium"
                     >
                       <FaEdit className="text-lg" />
-                      <span>Modifier le projet</span>
+                      <span>{t('edit_project')}</span>
                     </Link>
                     <button
                       onClick={() => setShowDeleteModal(true)}
                       className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-3 rounded-lg font-medium w-full"
                     >
                       <FaTrash className="text-lg" />
-                      <span>Supprimer le projet</span>
+                      <span>{t('delete_project')}</span>
                     </button>
                   </>
                 ) : (
                   <div className="col-span-full text-center text-gray-500 dark:text-gray-400 text-sm italic p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    Seuls les administrateurs et les gestionnaires peuvent effectuer des actions sur ce projet.
+                    {t('only_admin_manager_actions')}
                   </div>
                 )}
               </div>
@@ -622,16 +759,16 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                  <FaChartLine className="text-blue-500" /> Évolution des tâches (30 derniers jours)
+                  <FaChartLine className="text-blue-500" /> {t('tasks_evolution_title')}
                 </h3>
                 <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                   <div className="flex items-center gap-1 text-sm">
                     <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                    <span className="text-gray-600 dark:text-gray-300">Total</span>
+                    <span className="text-gray-600 dark:text-gray-300">{t('tasks_total')}</span>
                   </div>
                   <div className="flex items-center gap-1 text-sm">
                     <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                    <span className="text-gray-600 dark:text-gray-300">Terminées</span>
+                    <span className="text-gray-600 dark:text-gray-300">{t('tasks_completed')}</span>
                   </div>
                 </div>
               </div>
@@ -641,22 +778,22 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               </div>
               
               <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                <p>Évolution du nombre total de tâches et des tâches terminées au fil du temps</p>
-                <p className="text-xs mt-1">Les données sont cumulatives et montrent la progression globale</p>
+                <p>{t('tasks_evolution_description')}</p>
+                <p className="text-xs mt-1">{t('tasks_evolution_note')}</p>
               </div>
               
               <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
                 <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{stats.todoTasksCount || 0}</span> tâches à faire
+                  <span className="font-semibold">{stats.todoTasksCount || 0}</span> {t('tasks_todo')}
                 </div>
                 <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{stats.inProgressTasksCount || 0}</span> en cours
+                  <span className="font-semibold">{stats.inProgressTasksCount || 0}</span> {t('tasks_in_progress')}
                 </div>
                 <div className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{stats.doneTasksCount || 0}</span> tâches terminées
+                  <span className="font-semibold">{stats.doneTasksCount || 0}</span> {t('tasks_done')}
                 </div>
                 <div className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{stats.totalTasks || 0}</span> tâches au total
+                  <span className="font-semibold">{stats.totalTasks || 0}</span> {t('tasks_total_count')}
                 </div>
               </div>
             </div>
@@ -665,7 +802,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                  <FaTasks className="text-blue-500" /> Tâches ({tasks?.total || 0})
+                  <FaTasks className="text-blue-500" /> {t('tasks_section_title')} ({tasks?.total || 0})
                 </h3>
                 
                 <div className="flex flex-wrap items-center gap-3">
@@ -674,13 +811,13 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors duration-200 whitespace-nowrap"
                   >
                     <FaPlus size={12} />
-                    <span>Nouvelle tâche</span>
+                    <span>{t('new_task')}</span>
                   </Link>
                   
                   {tasks?.meta && (
                     <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      <span className="font-medium">{tasks.meta.from || 0}-{tasks.meta.to || 0}</span> sur{' '}
-                      <span className="font-medium">{tasks.meta.total || 0}</span> tâches
+                      <span className="font-medium">{tasks.meta.from || 0}-{tasks.meta.to || 0}</span> {t('showing_results', { from: tasks.meta.from || 0, to: tasks.meta.to || 0, total: tasks.meta.total || 0 })}
+                      <span className="font-medium">{tasks.meta.total || 0}</span> {t('tasks', { count: tasks.meta.total || 0 })}
                     </div>
                   )}
                 </div>
@@ -689,14 +826,14 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               {(!tasks?.data || tasks.data.length === 0) ? (
                 <div className="text-center py-12 px-4">
                   <FaTasks className="text-5xl mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">Aucune tâche pour ce projet</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Créez votre première tâche pour commencer à organiser le travail</p>
+                  <p className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">{t('no_tasks_for_project')}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{t('create_first_task')}</p>
                   <Link 
                     href={route('tasks.create', { project_id: project.id })}
                     className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200"
                   >
                     <FaPlus />
-                    <span>Créer une tâche</span>
+                    <span>{t('create_task')}</span>
                   </Link>
                 </div>
               ) : (
@@ -705,19 +842,19 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                     <thead className="bg-gray-50 dark:bg-gray-700/50">
                       <tr>
                         <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Tâche
+                          {t('task')}
                         </th>
                         <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
-                          Responsable
+                          {t('assigned_to')}
                         </th>
                         <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Statut
+                          {t('status')}
                         </th>
                         <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Priorité
+                          {t('priority')}
                         </th>
                         <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
-                          Échéance
+                          {t('deadline')}
                         </th>
                       </tr>
                     </thead>
@@ -730,7 +867,9 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                         >
                           <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className={`flex-shrink-0 h-3 w-3 rounded-full ${getStatusColor(task.status)} mr-3`}></div>
+                              <div className="flex-shrink-0 mr-3">
+                                {getStatusInfo(task.status, t).icon}
+                              </div>
                               <div className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
                                 {task.title}
                               </div>
@@ -738,7 +877,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs">
                               {task.description ? 
                                 (task.description.split(' ').slice(0, 2).join(' ') + (task.description.split(' ').length > 2 ? '...' : '')) : 
-                                'Aucune description'}
+                                t('no_description_short')}
                             </div>
                           </td>
                           <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
@@ -754,32 +893,21 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-sm text-gray-500 dark:text-gray-400">Non assignée</span>
+                              <span className="text-sm text-gray-500 dark:text-gray-400">{t('unassigned')}</span>
                             )}
                           </td>
                           <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
-                            <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(task.status)}`}>
-                              {task.status === 'todo' ? 'À faire' :
-                               task.status === 'in_progress' ? 'En cours' :
-                               task.status === 'done' ? 'Terminé' :
-                               task.status === 'pending' ? 'En attente' :
-                               task.status === 'nouveau' ? 'Nouveau' :
-                               task.status === 'en_cours' ? 'En cours' :
-                               task.status === 'termine' ? 'Terminé' :
-                               task.status === 'en_attente' ? 'En attente' : task.status}
-                            </span>
+                            <div className="flex items-center">
+                              {getStatusBadge(task.status)}
+                            </div>
                           </td>
                           <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
-                            <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              task.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                              'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            }`}>
-                              {task.priority === 'high' ? 'Haute' : task.priority === 'medium' ? 'Moyenne' : 'Basse'}
-                            </span>
+                            <div className="flex items-center">
+                              {getPriorityBadge(task.priority)}
+                            </div>
                           </td>
                           <td className="px-2 sm:px-3 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {task.due_date ? new Date(task.due_date).toLocaleDateString('fr-FR', {
+                            {task.due_date ? new Date(task.due_date).toLocaleDateString(i18n.language, {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric'
@@ -800,7 +928,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                             className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700"
                             preserveScroll
                           >
-                            Précédent
+                            {t('previous')}
                           </Link>
                         )}
                         {tasks.links[tasks.links.length - 1].url && (
@@ -809,15 +937,14 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                             className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700"
                             preserveScroll
                           >
-                            Suivant
+                            {t('next')}
                           </Link>
                         )}
                       </div>
                       <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm text-gray-700 dark:text-gray-300">
-                            Affichage de <span className="font-medium">{tasks.meta.from}</span> à <span className="font-medium">{tasks.meta.to}</span> sur{' '}
-                            <span className="font-medium">{tasks.meta.total}</span> résultats
+                            {t('showing_results_range', { from: tasks.meta.from, to: tasks.meta.to, total: tasks.meta.total })}
                           </p>
                         </div>
                         <div>
@@ -848,15 +975,15 @@ function Show({ project, tasks = [], auth, stats = {} }) {
           {/* Statistiques et graphique */}
           <div className="w-full max-w-full px-2 sm:px-4 mb-8">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                <StatCard icon={<FaCheckCircle className="text-green-500 text-3xl" />} label="Tâches terminées" value={stats.doneTasksCount ?? 0} />
-                <StatCard icon={<FaFileAlt className="text-blue-500 text-3xl" />} label="Fichiers" value={stats.filesCount ?? 0} />
-                <StatCard icon={<FaCommentDots className="text-purple-500 text-3xl" />} label="Commentaires" value={stats.commentsCount ?? 0} />
-                <StatCard icon={<FaUsers className="text-yellow-500 text-3xl" />} label="Membres" value={project.users?.length ?? 0} />
+                <StatCard icon={<FaCheckCircle className="text-green-500 text-3xl" />} label={t('completed_tasks')} value={stats.doneTasksCount ?? 0} />
+                <StatCard icon={<FaFileAlt className="text-blue-500 text-3xl" />} label={t('files')} value={stats.filesCount ?? 0} />
+                <StatCard icon={<FaCommentDots className="text-purple-500 text-3xl" />} label={t('comments')} value={stats.commentsCount ?? 0} />
+                <StatCard icon={<FaUsers className="text-yellow-500 text-3xl" />} label={t('members')} value={project.users?.length ?? 0} />
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                <FaUsers /> Tâches terminées par membre
+                <FaUsers /> {t('tasks_completed_by_member')}
               </h3>
               <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                 {project.users?.map(user => {
@@ -873,7 +1000,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                           <span key={t.id} className="inline-flex items-center px-2.5 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded-full border border-green-200 dark:border-green-700">
                             <FaCheckCircle className="mr-1.5 text-green-500" /> {t.title}
                           </span>
-                        )) : <span className="text-gray-400 text-xs italic">Aucune tâche terminée</span>}
+                        )) : <span className="text-gray-400 text-xs italic">{t('no_completed_tasks')}</span>}
                       </span>
                       <span className="text-blue-600 font-bold text-lg min-w-[32px] text-right">{stats.doneTasksByUser?.[user.id] ?? 0}</span>
                     </li>
@@ -892,19 +1019,19 @@ function Show({ project, tasks = [], auth, stats = {} }) {
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
               <FaTrash className="text-red-600 text-xl" />
             </div>
-            <h2 className="text-xl font-bold text-gray-800">Confirmer la suppression</h2>
+            <h2 className="text-xl font-bold text-gray-800">{t('confirm_deletion')}</h2>
           </div>
           
           <div className="mb-6">
             <p className="text-gray-700 dark:text-gray-300 mb-3">
-              Êtes-vous sûr de vouloir supprimer le projet <span className="font-semibold text-blue-700">{project.name}</span> ?
+              {t('confirm_delete_project', { name: project.name })}
             </p>
             <div className="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg border border-red-200 dark:border-red-700">
               <p className="text-red-700 dark:text-red-300 text-sm font-semibold mb-2 flex items-center gap-2">
-                <FaExclamationTriangle /> Attention : Cette action est irréversible !
+                <FaExclamationTriangle /> {t('irreversible_action')}
               </p>
               <p className="text-red-600 dark:text-red-400 text-sm">
-                La suppression de ce projet entraînera également la suppression de toutes les données associées.
+                {t('delete_warning')}
               </p>
             </div>
           </div>
@@ -915,7 +1042,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               onClick={() => setShowDeleteModal(false)}
               disabled={deleteLoading}
             >
-              Annuler
+              {t('cancel')}
             </button>
             <button
               className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition flex items-center gap-2 disabled:opacity-50"
@@ -925,11 +1052,11 @@ function Show({ project, tasks = [], auth, stats = {} }) {
               {deleteLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Suppression...
+                  {t('deleting_project')}...
                 </>
               ) : (
                 <>
-                  <FaTrash /> Supprimer définitivement
+                  <FaTrash /> {t('delete_project_permanently')}
                 </>
               )}
             </button>

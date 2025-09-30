@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { router, Link, usePage } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { 
     FaUserEdit, 
@@ -14,10 +15,13 @@ import {
     FaCalendarAlt
 } from 'react-icons/fa';
 
-export default function Edit({ project, users = [], roles = [] }) {
+function Edit({ project, users = [], roles = [] }) {
+    const { t } = useTranslation();
     const { errors = {}, flash = {} } = usePage().props;
-    const [selectedUser, setSelectedUser] = useState(project.users[0]?.id || '');
-    const [role, setRole] = useState(project.users[0]?.pivot?.role || '');
+    const currentMember = project.users[0];
+    const [selectedUser, setSelectedUser] = useState(currentMember?.id || '');
+    const [role, setRole] = useState(currentMember?.pivot?.role || '');
+    const selectedUserObj = users.find(user => user.id == selectedUser) || currentMember;
     const [submitting, setSubmitting] = useState(false);
     const [notification, setNotification] = useState(null);
 
@@ -50,14 +54,14 @@ export default function Edit({ project, users = [], roles = [] }) {
             role,
         }, {
             onSuccess: () => {
-                setNotification({ type: 'success', message: 'Membre modifié avec succès!' });
+                setNotification({ type: 'success', message: t('member_updated_success') });
                 setTimeout(() => {
                     router.visit(route('project-users.index'));
                 }, 1500);
             },
             onError: () => {
                 setSubmitting(false);
-                setNotification({ type: 'error', message: 'Une erreur est survenue lors de la modification.' });
+                setNotification({ type: 'error', message: t('error_updating_member') });
             },
             onFinish: () => {
                 if (!notification || notification.type !== 'success') {
@@ -69,23 +73,20 @@ export default function Edit({ project, users = [], roles = [] }) {
 
     const getRoleIcon = (role) => {
         switch (role) {
-            case 'manager': return <FaCrown className="text-yellow-500" />;
-            case 'member': return <FaUser className="text-blue-500" />;
-            default: return <FaShieldAlt className="text-gray-500" />;
+            case 'manager': return <FaCrown className="text-yellow-500" title={t('project_manager_short')} />;
+            case 'member': return <FaUser className="text-blue-500" title={t('member_role_short')} />;
+            default: return <FaShieldAlt className="text-gray-500" title={t('observer_short')} />;
         }
     };
 
     const getRoleLabel = (role) => {
         const labels = {
-            member: 'Membre',
-            manager: 'Chef de projet',
-            observer: 'Observateur',
+            member: t('member_role_short'),
+            manager: t('project_manager_short'),
+            observer: t('observer_short'),
         };
         return labels[role] || role;
     };
-
-    const selectedUserObj = users.find(u => u.id == selectedUser);
-    const currentMember = project.users.find(u => u.id == selectedUser);
 
     return (
         <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
@@ -108,7 +109,7 @@ export default function Edit({ project, users = [], roles = [] }) {
                 </div>
             )}
 
-            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+            <div className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
                 <div className="flex flex-col w-full max-w-4xl mx-auto mt-14 pt-4 px-4 sm:px-6 lg:px-8">
                     
                     {/* Header */}
@@ -125,10 +126,10 @@ export default function Edit({ project, users = [], roles = [] }) {
                             </div>
                             <div>
                                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
-                                    Modifier le membre
+                                    {t('edit_member')}
                                 </h1>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                    Modifiez l'assignation d'un utilisateur dans le projet "{project.name}"
+                                    {t('project_member_edit_description')}
                                 </p>
                             </div>
                         </div>
@@ -136,23 +137,23 @@ export default function Edit({ project, users = [], roles = [] }) {
 
                     {/* Project Info */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-sm">
-                                <FaProjectDiagram className="text-white text-lg" />
-                            </div>
-                            <div className="flex-1">
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-sm">
+                                    <FaProjectDiagram className="text-white text-lg" />
+                                </div>
                                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                                     {project.name}
                                 </h2>
-                                <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                    <div className="flex items-center gap-1">
-                                        <FaUsers />
-                                        <span>{project.users?.length || 0} membre(s)</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <FaCalendarAlt />
-                                        <span>Créé le {new Date(project.created_at).toLocaleDateString('fr-FR')}</span>
-                                    </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                                <div className="flex items-center gap-1">
+                                    <FaUsers />
+                                    <span>{t('members_count_plural', { count: project.users?.length || 0 })}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <FaCalendarAlt />
+                                    <span>Créé le {new Intl.DateTimeFormat('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(project.created_at))}</span>
                                 </div>
                             </div>
                         </div>
@@ -239,7 +240,7 @@ export default function Edit({ project, users = [], roles = [] }) {
                                         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
                                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                                                 <FaInfoCircle className="text-blue-500" />
-                                                Assignation actuelle
+                                                {t('current_assignment')}
                                             </h3>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg">
@@ -272,23 +273,25 @@ export default function Edit({ project, users = [], roles = [] }) {
                                         </div>
                                     </div>
                                 )}
-
                                 {/* Preview Section */}
                                 {selectedUserObj && role && (
                                     <div className="lg:col-span-2 mt-4">
                                         <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-xl p-6 border border-green-200 dark:border-green-800">
                                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                                                 <FaInfoCircle className="text-green-500" />
-                                                Nouvelle assignation
+                                                {t('new_assignment')}
                                             </h3>
                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                                 <div className="text-center">
                                                     <div className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
                                                         <FaProjectDiagram className="text-blue-500 text-xl mx-auto mb-2" />
+                                                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                                            {t('project_label')}
+                                                        </p>
                                                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                                                             {project.name}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Projet</p>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">{t('project')}</div>
                                                     </div>
                                                 </div>
                                                 <div className="text-center">
@@ -298,10 +301,13 @@ export default function Edit({ project, users = [], roles = [] }) {
                                                             alt={selectedUserObj.name}
                                                             className="w-8 h-8 rounded-full mx-auto mb-2 border border-gray-200 dark:border-gray-600"
                                                         />
-                                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                                            {selectedUserObj.name}
+                                                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                                            {t('user_label')}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Utilisateur</p>
+                                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                                            {selectedUserObj?.name}
+                                                        </p>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">{t('current_user')}</div>
                                                     </div>
                                                 </div>
                                                 <div className="text-center">
@@ -310,7 +316,7 @@ export default function Edit({ project, users = [], roles = [] }) {
                                                         <p className="text-sm font-medium text-gray-900 dark:text-white mt-2">
                                                             {getRoleLabel(role)}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">Rôle</p>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">{t('current_role')}</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -321,14 +327,14 @@ export default function Edit({ project, users = [], roles = [] }) {
 
                             {/* Help Section */}
                             <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                                <div className="flex items-center gap-2 mb-2">
                                     <FaInfoCircle className="text-blue-500" />
-                                    Aide
-                                </h4>
-                                <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                                    <li>• <strong>Chef de projet</strong> : Peut gérer le projet et ses membres</li>
-                                    <li>• <strong>Membre</strong> : Peut participer au projet et voir les tâches</li>
-                                    <li>• <strong>Observateur</strong> : Peut seulement consulter le projet</li>
+                                    <h4 className="font-medium text-gray-900 dark:text-white">{t('role_help_title')}</h4>
+                                </div>
+                                <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                                    <li>• {t('role_help_manager')}</li>
+                                    <li>• {t('role_help_member')}</li>
+                                    <li>• {t('role_help_observer')}</li>
                                 </ul>
                             </div>
 
@@ -347,7 +353,7 @@ export default function Edit({ project, users = [], roles = [] }) {
                                     ) : (
                                         <>
                                             <FaUserEdit />
-                                            Mettre à jour
+                                            {t('update_member')}
                                         </>
                                     )}
                                 </button>
@@ -356,15 +362,17 @@ export default function Edit({ project, users = [], roles = [] }) {
                                     className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200"
                                 >
                                     <FaArrowLeft />
-                                    Annuler
+                                    {t('cancel')}
                                 </Link>
                             </div>
                         </form>
                     </div>
                 </div>
-            </main>
+            </div>
         </div>
     );
 }
 
 Edit.layout = page => <AdminLayout children={page} />;
+
+export default Edit;

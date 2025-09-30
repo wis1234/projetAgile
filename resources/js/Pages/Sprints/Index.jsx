@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { router, Link, usePage } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { FaFlagCheckered, FaPlus, FaSearch, FaTable, FaTh, FaProjectDiagram, FaCalendarAlt, FaList } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
 const Index = ({ sprints, filters: initialFilters = {} }) => {
+  const { t } = useTranslation();
   const { flash = {} } = usePage().props;
   
   // Debug: Afficher la structure des données reçues
   useEffect(() => {
- 
+    console.log('Sprints data:', sprints);
   }, [sprints]);
   const [search, setSearch] = useState(initialFilters.search || '');
   const [viewMode, setViewMode] = useState('table'); // 'table' par défaut
@@ -42,9 +44,9 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
     const isPast = endDate < now;
 
     if (isPast) {
-      return { label: 'Terminé', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' };
+      return { label: t('completed'), color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' };
     }
-    return { label: 'En cours', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' };
+    return { label: t('in_progress'), color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' };
   };
 
   return (
@@ -56,7 +58,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
             <div className="flex items-center gap-3 sm:gap-4">
               <FaFlagCheckered className="text-3xl sm:text-4xl text-blue-600 dark:text-blue-400 flex-shrink-0" />
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
-                Gestion des Sprints
+                {t('sprints_management')}
               </h1>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
@@ -70,7 +72,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                   }`}
                 >
                   <FaList className="text-xs" />
-                  <span className="hidden sm:inline">Tableau</span>
+                  <span className="hidden sm:inline">{t('table')}</span>
                 </button>
                 <button
                   onClick={() => setViewMode('cards')}
@@ -81,7 +83,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                   }`}
                 >
                   <FaTh className="text-xs" />
-                  <span className="hidden sm:inline">Cartes</span>
+                  <span className="hidden sm:inline">{t('cards')}</span>
                 </button>
               </div>
               <Link 
@@ -89,8 +91,8 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base"
               >
                 <FaPlus className="text-sm sm:text-lg" /> 
-                <span className="hidden sm:inline">Nouveau Sprint</span>
-                <span className="sm:hidden">Nouveau</span>
+                <span className="hidden sm:inline">{t('new_sprint')}</span>
+                <span className="sm:hidden">{t('new')}</span>
               </Link>
             </div>
           </div>
@@ -101,7 +103,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
           <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
             <div className="lg:col-span-3">
               <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Recherche par nom de sprint
+                {t('search_by_sprint_name')}
               </label>
               <div className="relative">
                 <input
@@ -110,7 +112,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200"
-                  placeholder="Rechercher un sprint..."
+                  placeholder={t('search_sprint_placeholder')}
                 />
                 <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               </div>
@@ -120,7 +122,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
               className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md"
             >
               <FaSearch />
-              <span className="hidden sm:inline">Rechercher</span>
+              <span className="hidden sm:inline">{t('search')}</span>
             </button>
           </form>
         </div>
@@ -132,17 +134,17 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
               <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
                 <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
                   <tr>
-                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Sprint</th>
-                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Projet</th>
-                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Période</th>
-                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Statut</th>
+                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('sprint')}</th>
+                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('project')}</th>
+                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('period')}</th>
+                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('status')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sprints.data?.length === 0 ? (
                     <tr>
                       <td colSpan="4" className="text-center py-10 text-gray-500 dark:text-gray-400 text-lg">
-                        Aucun sprint trouvé.
+                        {t('no_sprints_found')}
                       </td>
                     </tr>
                   ) : sprints.data?.map(sprint => (
@@ -167,7 +169,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                       <td className="p-4 align-middle">
                         <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                           <FaProjectDiagram />
-                          <span>{sprint.project?.name || 'N/A'}</span>
+                          <span>{sprint.project?.name || t('not_available')}</span>
                         </div>
                       </td>
                       <td className="p-4 align-middle text-xs text-gray-500 dark:text-gray-400">
@@ -197,7 +199,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
             {sprints.data?.length === 0 ? (
               <div className="col-span-full text-center py-16">
                 <FaFlagCheckered className="mx-auto text-6xl text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-xl text-gray-500 dark:text-gray-400">Aucun sprint trouvé</p>
+                <p className="text-xl text-gray-500 dark:text-gray-400">{t('no_sprints_found')}</p>
               </div>
             ) : sprints.data?.map((sprint) => (
               <motion.div
@@ -217,11 +219,11 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                       </h3>
                       <div className="flex items-center">
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {sprint.project?.name || 'N/A'}
+                          {sprint.project?.name || t('not_available')}
                         </p>
                         {sprint.project?.is_muted && (
                             <span className="ml-2 px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full flex-shrink-0">
-                                Sourdine
+                                {t('muted')}
                             </span>
                         )}
                       </div>
@@ -248,15 +250,18 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
             {/* Indicateur de résultats */}
             {sprints.total > 0 && (
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Affichage de <span className="font-medium">{sprints.from || 0}</span> à <span className="font-medium">{sprints.to || 0}</span> sur <span className="font-medium">{sprints.total || 0}</span> résultats
+                {t('pagination_info')
+                  .replace('{from}', sprints.from || 0)
+                  .replace('{to}', sprints.to || 0)
+                  .replace('{total}', sprints.total || 0)}
               </div>
             )}
             
             <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg p-2 shadow">
               {sprints.links.map((link, index) => {
                 let label = link.label;
-                if (label.includes('Previous')) label = '«';
-                if (label.includes('Next')) label = '»';
+                if (label.includes('Previous')) label = t('pagination_previous');
+                if (label.includes('Next')) label = t('pagination_next');
                 
                 return (
                   <Link

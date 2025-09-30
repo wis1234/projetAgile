@@ -4,8 +4,10 @@ import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
 import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaReply, FaStar, FaPaperPlane } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
+import { useTranslation, Trans } from 'react-i18next';
+import i18n from 'i18next';
 // Ajout de FaSave à la liste des icônes importées
-import {FaSave, FaTimes } from 'react-icons/fa';
+import { FaSave, FaTimes } from 'react-icons/fa';
 
 // Composant de compte à rebours réutilisable
 const formatTimeUnit = (value, label) => (
@@ -18,7 +20,7 @@ const formatTimeUnit = (value, label) => (
 );
 
 
-const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt }) => {
+const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, t }) => {
   const calculateTimeLeft = useCallback(() => {
     const difference = new Date(targetDate) - new Date();
     
@@ -67,7 +69,7 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt }) =
             {formatTimeUnit(timeLeft.minutes, 'M')}
             {formatTimeUnit(timeLeft.seconds, 'S')}
           </div>
-          <span className="text-xs text-gray-500 dark:text-gray-400">Temps restant</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{t('time_remaining')}</span>
         </div>
       );
     }
@@ -78,7 +80,7 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt }) =
       <div className="flex items-center justify-end gap-2">
         <FaClock className={completedOnTime ? 'text-green-500' : 'text-red-500 animate-pulse'} />
         <span className={completedOnTime ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-          {completedOnTime ? 'Délai respecté' : 'Délai dépassé'}
+          {completedOnTime ? t('deadline_met') : t('deadline_exceeded')}
         </span>
       </div>
     );
@@ -89,7 +91,7 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt }) =
     return (
       <div className="flex items-center justify-end gap-2 text-red-600 dark:text-red-400">
         <FaClock className="animate-pulse" />
-        <span>Délai dépassé</span>
+        <span>{t('deadline_exceeded')}</span>
       </div>
     );
   }
@@ -102,17 +104,27 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt }) =
         {formatTimeUnit(timeLeft.minutes, 'M')}
         {formatTimeUnit(timeLeft.seconds, 'S')}
       </div>
-      <span className="text-xs text-gray-500 dark:text-gray-400">Temps restant</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400">{t('time_remaining')}</span>
     </div>
   );
 };
 
 export default function Show({ task, payments, projectMembers, currentUserRole }) {
+  const { t } = useTranslation();
   const { auth } = usePage().props;
   
+  // Récupérer l'utilisateur connecté et ses rôles
+  const currentUser = auth.user;
+  const userRoles = currentUser?.roles || [];
+  
   // Vérification des droits basée sur les rôles
-  const isAdmin = auth?.user?.role === 'admin' || auth?.user?.is_admin;
-  const isProjectManager = currentUserRole === 'manager';
+  const isAdmin = (auth?.user?.role === 'admin' || auth?.user?.is_admin) || 
+                 (Array.isArray(userRoles) && userRoles.some(role => role?.name === 'admin'));
+  
+  // Vérifier si l'utilisateur est le manager du projet lié à la tâche
+  const isProjectManager = currentUserRole === 'manager' || 
+                         (task?.project?.managers?.some(manager => manager?.id === currentUser?.id) || false);
+  
   const canEditTask = isAdmin || isProjectManager;
 
   // Sanitize task data to prevent sensitive information exposure
@@ -336,30 +348,29 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   useEffect(() => {
     setPaymentMethod(displayedPayment?.payment_method || '');
     setPhoneNumber(displayedPayment?.phone_number || '');
-    setPaymentStatus(displayedPayment?.status || 'pending');
   }, [displayedPayment]);
 
   // Helpers
   const getStatusBadge = (status) => {
     switch (status) {
       case 'in_progress':
-        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-yellow-100 text-yellow-800">En cours</span>;
+        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-yellow-100 text-yellow-800">{t('status.in_progress')}</span>;
       case 'todo':
-        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-800">À faire</span>;
+        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-800">{t('status.todo')}</span>;
       case 'done':
-        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-800">Terminé</span>;
+        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-800">{t('status.done')}</span>;
       default:
-        return <span className="italic text-gray-400">N/A</span>;
+        return <span className="italic text-gray-400">{t('status.unknown')}</span>;
     }
   };
   const getPriorityBadge = (priority) => {
     switch (priority) {
       case 'low':
-        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-800">Faible</span>;
+        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-800">{t('priority.low')}</span>;
       case 'medium':
-        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-800">Moyenne</span>;
+        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-800">{t('priority.medium')}</span>;
       case 'high':
-        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-800">Élevée</span>;
+        return <span className="capitalize px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-800">{t('priority.high')}</span>;
       default:
         return <span className="italic text-gray-400">Non définie</span>;
     }
@@ -731,6 +742,12 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   };
 
   const [activeTab, setActiveTab] = useState('details');
+  
+  // L'accès est autorisé pour l'admin ou le manager du projet
+  const hasAccess = isAdmin || isProjectManager;
+  
+  // Vérifier si la date d'échéance est dépassée et si l'utilisateur n'a pas accès
+  const isDeadlinePassed = !hasAccess && task?.due_date && new Date() > new Date(task.due_date);
 
   // Function to mark all comments as read
   const markCommentsAsRead = useCallback(() => {
@@ -786,7 +803,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                 <FaArrowLeft className="text-lg sm:text-xl" />
               </Link>
             <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
-              Détail de la tâche
+              {t('task_details.page_title')}
               {process.env.NODE_ENV !== 'production' && (
                 <div className="text-xs text-gray-500 mt-1">
                   Droits: {isAdmin ? 'Admin' : isProjectManager ? 'Manager' : 'Membre'}
@@ -804,14 +821,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                     className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
                   >
                     <FaEdit /> 
-                    <span>Modifier</span>
+                    <span>{t('edit')}</span>
                   </Link>
                   <button
                     onClick={handleDeleteTask}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
                   >
                     <FaTrash /> 
-                    <span>Supprimer</span>
+                    <span>{t('delete')}</span>
                   </button>
                 </>
               )}
@@ -828,7 +845,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-300 dark:border-gray-800 p-2">
      {/* Identification de la barre */}
   <h2 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wide">
-    Onglets de navigation
+    {t('task_details.navigation_tabs')}
   </h2>
     <nav className="flex flex-wrap gap-2 sm:gap-3" aria-label="Tabs">
       <button
@@ -841,14 +858,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       >
         <div className="flex items-center gap-2">
           <FaInfoCircle className="text-lg" />
-          <span>Détails</span>
+          <span>{t('task_details.tab_details')}</span>
         </div>
         {activeTab === 'details' && (
           <span className="absolute bottom-0 left-0 w-full h-1 bg-blue-400 rounded-full"></span>
         )}
       </button>
 
-      {task.is_paid && (
+      {task.is_paid && (hasAccess ? (
         <button
           onClick={() => setActiveTab('payment')}
           className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
@@ -859,30 +876,52 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         >
           <div className="flex items-center gap-2">
             <FaDollarSign className="text-lg" />
-            <span>Rémunération</span>
+            <span>{t('task_details.tab_remuneration')}</span>
           </div>
           {activeTab === 'payment' && (
             <span className="absolute bottom-0 left-0 w-full h-1 bg-green-400 rounded-full"></span>
           )}
         </button>
-      )}
-
-      <button
-        onClick={() => setActiveTab('files')}
-        className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
-          activeTab === 'files'
-            ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md shadow-purple-500/20'
-            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          <FaFileUpload className="text-lg" />
-          <span>Ressources</span>
+      ) : (
+        <div className="relative group" title="The due date of this task has passed">
+          <div className="px-5 py-3 rounded-xl font-medium text-sm text-gray-400 dark:text-gray-600 cursor-not-allowed">
+            <div className="flex items-center gap-2">
+              <FaDollarSign className="text-lg" />
+              <span>{t('task_details.tab_remuneration')}</span>
+              <span className="text-xs text-yellow-500">({t('task_details.tab_remuneration_not_available')})</span>
+            </div>
+          </div>
         </div>
-        {activeTab === 'files' && (
-          <span className="absolute bottom-0 left-0 w-full h-1 bg-purple-400 rounded-full"></span>
-        )}
-      </button>
+      ))}
+
+      {!hasAccess ? (
+        <div className="relative group" title="The due date of this task has passed">
+          <div className="px-5 py-3 rounded-xl font-medium text-sm text-gray-400 dark:text-gray-600 cursor-not-allowed">
+            <div className="flex items-center gap-2">
+              <FaFileUpload className="text-lg" />
+              <span>{t('task_details.tab_resources')}</span>
+              <span className="text-xs text-yellow-500">({t('task_details.tab_resources_not_available')})</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setActiveTab('files')}
+          className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
+            activeTab === 'files'
+              ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md shadow-purple-500/20'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FaFileUpload className="text-lg" />
+            <span>{t('task_details.tab_resources')}</span>
+          </div>
+          {activeTab === 'files' && (
+            <span className="absolute bottom-0 left-0 w-full h-1 bg-purple-400 rounded-full"></span>
+          )}
+        </button>
+      )}
 
       <button
         onClick={() => handleTabClick('comments')}
@@ -894,7 +933,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       >
         <div className="flex items-center gap-2">
           <FaCommentDots className="text-lg" />
-          <span>Discussions</span>
+          <span>{t('task_details.tab_discussions')}</span>
           {unreadCommentsCount > 0 && (
             <span className="flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-red-500 text-white">
               {unreadCommentsCount}
@@ -917,7 +956,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 mb-6">
                 {/* Assigned User */}
                 <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">Assigné à :</span>
+                  <span className="font-semibold text-gray-700 dark:text-gray-300">{t('task_details.assigned_to')} :</span>
                   {Array.isArray(task.assigned_users) && task.assigned_users.length > 0 ? (
                     <div className="flex flex-col gap-1">
                       <ul>
@@ -936,20 +975,20 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                       ) : (
                         <FaUserCircle className="w-10 h-10 text-gray-400 dark:text-gray-500" />
                       )}
-                      <div className="font-bold text-lg text-black dark:text-blue-100">{task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">Non assigné</span>}</div>
+                      <div className="font-bold text-lg text-black dark:text-blue-100">{task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">{t('task_details.not_assigned')}</span>}</div>
                     </div>
                   )}
                 </div>
 
                 {/* Task Title */}
                 <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">Titre :</span> 
+                  <span className="font-semibold text-gray-700 dark:text-gray-300">{t('task_details.title')} :</span> 
                   <span className="text-gray-900 dark:text-gray-100 text-lg font-medium">{task.title}</span>
                 </div>
 
                 {/* Project */}
                 <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">Projet :</span> 
+                  <span className="font-semibold text-gray-700 dark:text-gray-300">{t('task_details.project')} :</span> 
                   <Link href={`/projects/${task.project.id}`} className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 text-lg">
                     <FaProjectDiagram /> {task.project ? task.project.name : <span className="italic text-gray-400">Aucun</span>}
                   </Link>
@@ -957,7 +996,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
                 {/* Sprint avec plus de détails */}
                 <div className="flex items-start gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Sprint :</span> 
+                  <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.sprint')} :</span> 
                   <div className="flex-1">
                     {task.sprint_id ? (
                       <div className="space-y-2">
@@ -996,8 +1035,8 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
                 {/* Due Date */}
                 <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">Date d'échéance :</span> 
-                  <span className="text-gray-900 dark:text-gray-100">{task.due_date ? new Date(task.due_date).toLocaleDateString() : <span className="italic text-gray-400">Non définie</span>}</span>
+                  <span className="font-semibold text-gray-700 dark:text-gray-300">{t('task_details.due_date')} :</span> 
+                  <span className="text-gray-900 dark:text-gray-100">{task.due_date ? new Date(task.due_date).toLocaleDateString() : <span className="italic text-gray-400">{t('task_details.not_assigned')}</span>}</span>
                 </div>
                 
                 {/* Ces informations sont déjà affichées plus bas dans la section détaillée */}
@@ -1009,25 +1048,19 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                 <div className="space-y-4">
                   {/* Statut */}
                   <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Statut :</span> 
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.status')} :</span> 
                     {getStatusBadge(task.status)}
                   </div>
 
                   {/* Priorité */}
                   <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Priorité :</span>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      task.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
-                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                    }`}>
-                      {task.priority === 'high' ? 'Haute' : task.priority === 'medium' ? 'Moyenne' : 'Basse'}
-                    </span>
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.priority')} :</span>
+                    {getPriorityBadge(task.priority)}
                   </div>
 
                   {/* Date de création */}
                   <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Créée le :</span>
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.created_at')} :</span>
                     <span className="text-gray-600 dark:text-gray-400">
                       {new Date(task.created_at).toLocaleString('fr-FR', {
                         day: '2-digit',
@@ -1046,7 +1079,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                 <div className="space-y-4">
                   {/* Assigné à */}
                   <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Assigné à :</span>
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.assigned_to')} :</span>
                     {task.assigned_user ? (
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
@@ -1057,14 +1090,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                         <span>{task.assigned_user.name}</span>
                       </div>
                     ) : (
-                      <span className="text-gray-400 italic">Non assigné</span>
+                      <span className="text-gray-400 italic">{t('task_details.not_assigned')}</span>
                     )}
                   </div>
 
                   {/* Compte à rebours et date d'échéance */}
                   {task.due_date && (
                     <div className="flex items-start gap-4">
-                      <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px] mt-1">Échéance :</span>
+                      <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px] mt-1">{t('task_details.due_date')} :</span>
                       <div className="flex-1">
                         <div className={`mb-2 ${
                           new Date(task.due_date) < new Date() && task.status !== 'done' 
@@ -1081,7 +1114,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                           })}
                           {new Date(task.due_date) < new Date() && task.status !== 'done' && (
                             <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-300">
-                              En retard
+                              {t('task_details.overdue')}
                             </span>
                           )}
                         </div>
@@ -1091,6 +1124,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                               targetDate={task.due_date}
                               taskStatus={task.status}
                               taskUpdatedAt={task.updated_at}
+                              t={t}
                               onComplete={() => console.log('Temps écoulé!')}
                             />
                           </div>
@@ -1101,7 +1135,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
                   {/* Dernière mise à jour */}
                   <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">Mise à jour :</span>
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.updated_at')} :</span>
                     <span className="text-gray-600 dark:text-gray-400">
                       {new Date(task.updated_at).toLocaleString('fr-FR', {
                         day: '2-digit',
@@ -1118,7 +1152,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
               {/* Description */}
               <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Description</h3>
+                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{t('task_details.description')}</h3>
                 </div>
                 
                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
@@ -1132,7 +1166,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-400 italic">
-                      Aucune description n'a été ajoutée à cette tâche.
+                      {t('task_details.no_description')}
                     </div>
                   )}
                 </div>
@@ -1141,12 +1175,12 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
               <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                 {(isAssigned || isAdmin) && (
                   <Link href={`/files/create?task_id=${task.id}&project_id=${task.project_id}`} className="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md">
-                    <FaFileUpload /> Uploader un fichier
+                    <FaFileUpload /> {t('actions.upload_file')}
                   </Link>
                 )}
                 {(isAdmin || isProjectManager) && (
                   <Link href={`/tasks/${task.id}/edit`} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md">
-                    <FaEdit /> Modifier la tâche
+                    <FaEdit /> {t('actions.edit_task')}
                   </Link>
                 )}
                 {(isAdmin || isProjectManager) && (
@@ -1154,7 +1188,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                     onClick={handleDeleteTask}
                     className="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md"
                   >
-                    <FaTrash /> Supprimer la tâche
+                    <FaTrash /> {t('actions.delete_task')}
                   </button>
                 )}
               </div>
@@ -1165,7 +1199,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
             <div>
               {/* Payment Section - Current User's Payment */}
               <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-                <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">💳Rémunération</h2>
+                <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">💳{t('payment.title')}</h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Formulaire ou informations en lecture seule pour l'utilisateur courant */}
@@ -1173,12 +1207,12 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                     {((isAssigned || isAdmin || isProjectMember) && displayedPayment?.status !== 'validated') ? (
                       <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600 transition duration-200 hover:shadow-sm">
                         <h3 className="text-xl font-semibold mb-5 text-gray-800 dark:text-gray-200">
-                          {displayedPayment ? 'Modifier les informations de paiement' : 'Enregistrer les informations de paiement'}
+                          {displayedPayment ? t('payment.edit_payment_info') : t('payment.register_payment_info')}
                         </h3>
                         <form onSubmit={handlePaymentSubmit} className="flex flex-col gap-5">
                           {(isAdmin || isProjectManager) && (
                             <div>
-                              <label htmlFor="member_select" className="block font-semibold mb-2 text-gray-700 dark:text-gray-300">Membre</label>
+                              <label htmlFor="member_select" className="block font-semibold mb-2 text-gray-700 dark:text-gray-300">{t('payment.member')}</label>
                               <select
                                 id="member_select"
                                 value={selectedMemberId}
@@ -1192,7 +1226,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                             </div>
                           )}
                           <div>
-                            <label htmlFor="payment_method" className="block font-semibold mb-2 text-gray-700 dark:text-gray-300">Choisir le moyen de paiement</label>
+                            <label htmlFor="payment_method" className="block font-semibold mb-2 text-gray-700 dark:text-gray-300">{t('payment.choose_payment_method')}</label>
                             <select
                               id="payment_method"
                               value={paymentMethod}
@@ -1200,14 +1234,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                               className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
                               required
                             >
-                              <option value="">-- Sélectionner --</option>
-                              <option value="mtn">MTN Mobile Money</option>
-                              <option value="moov">Moov Money</option>
-                              <option value="celtis">Celtis Cash</option>
+                              <option value="">-- {t('common.select')} --</option>
+                              <option value="mtn">{t('payment.methods.mtn')}</option>
+                              <option value="moov">{t('payment.methods.moov')}</option>
+                              <option value="celtis">{t('payment.methods.celtis')}</option>
                             </select>
                           </div>
                           <div>
-                            <label htmlFor="phone_number" className="block font-semibold mb-2 text-gray-700 dark:text-gray-300">Numéro de téléphone</label>
+                            <label htmlFor="phone_number" className="block font-semibold mb-2 text-gray-700 dark:text-gray-300">{t('payment.phone_number')}</label>
                             <input
                               type="text"
                               id="phone_number"
@@ -1231,11 +1265,11 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                             {paymentLoading ? (
                               <>
                                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                Enregistrement...
+                                {t('common.saving')}...
                               </>
                             ) : (
                               <>
-                                💾 {displayedPayment ? 'Mettre à jour' : 'Enregistrer'}
+                                💾 {displayedPayment ? t('common.update') : t('common.save')}
                               </>
                             )}
                           </button>
@@ -1243,38 +1277,38 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                       </div>
                     ) : (
                       <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600 transition duration-200 hover:shadow-sm">
-                        <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Informations de paiement</h3>
+                        <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">{t('payment.payment_information')}</h3>
                         {displayedPayment ? (
                           <div className="space-y-4">
                             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-sm">
                               <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center justify-between">
-                                <span className="font-medium">Type:</span>
-                                <span className="text-gray-800 dark:text-white font-medium">Tâche rémunérée</span>
+                                <span className="font-medium">{t('common.type')}:</span>
+                                <span className="text-gray-800 dark:text-white font-medium">{t('payment.paid_task')}</span>
                               </p>
                             </div>
                             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-sm">
                               <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center justify-between">
-                                <span className="font-medium">Montant:</span>
+                                <span className="font-medium">{t('payment.amount')}:</span>
                                 <span className="text-gray-800 dark:text-white font-medium">{task.amount?.toLocaleString('fr-FR')} FCFA</span>
                               </p>
                             </div>
                             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-sm">
                               <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center justify-between">
-                                <span className="font-medium">Statut:</span>
+                                <span className="font-medium">{t('common.status')}:</span>
                                 {displayedPayment.status === 'validated' ? (
                                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                    Payé
+                                    {t('payment.status.paid')}
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                    En attente
+                                    {t('payment.status.pending')}
                                   </span>
                                 )}
                               </p>
                             </div>
                             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-sm">
                               <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center justify-between">
-                                <span className="font-medium">Date de paiement</span>
+                                <span className="font-medium">{t('payment.payment_date')}</span>
                                 <span className="text-gray-800 dark:text-white font-medium">
                                   {new Date(displayedPayment.updated_at).toLocaleDateString('fr-FR', {
                                     day: 'numeric',
@@ -1295,21 +1329,21 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200 hover:shadow-md mt-4"
                               >
                                 <FaDownload className="text-lg" />
-                                <span>Télécharger le reçu</span>
+                                <span>{t('payment.download_receipt')}</span>
                               </a>
                             )}
                           </div>
                         ) : (
                           <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3">
                             <FaInfoCircle className="text-blue-600 dark:text-blue-300 text-xl" />
-                            <p className="text-blue-800 dark:text-blue-200 italic">Aucune information de paiement enregistrée pour cette tâche.</p>
+                            <p className="text-blue-800 dark:text-blue-200 italic">{t('payment.no_payment_info')}</p>
                           </div>
                         )}
                       </div>
                     )}
                   </div>
 
-                  {/* Carte d'information à côté (Always shows current user's info if available) */}
+                  {/* Side information card (displays current user's payment information when available) */}
                   <div className="lg:col-span-2">
                     {displayedPayment && (
                       <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 rounded-xl p-6 border border-blue-200 dark:border-blue-700 transition duration-200 hover:shadow-md h-full flex flex-col justify-between">
@@ -1319,14 +1353,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                               <span className="text-white text-2xl">💳</span>
                             </div>
                             <div>
-                              <h3 className="text-xl font-bold text-blue-800 dark:text-blue-200">Détails de paiement</h3>
-                              <p className="text-blue-600 dark:text-blue-300 text-sm">Détails enregistrés</p>
+                              <h3 className="text-xl font-bold text-blue-800 dark:text-blue-200">{t('payment.payment_details')}</h3>
+                              <p className="text-blue-600 dark:text-blue-300 text-sm">{t('payment.details_saved')}</p>
                             </div>
                           </div>
                           
                           <div className="space-y-4">
                             <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 transition duration-200 hover:shadow-sm">
-                              <span className="text-gray-600 dark:text-gray-300 font-medium">Opérateur</span>
+                              <span className="text-gray-600 dark:text-gray-300 font-medium">{t('payment.operator')}</span>
                               <span className="font-bold text-blue-700 dark:text-blue-300 text-base">
                                 {displayedPayment.payment_method === 'mtn' && '📱 MTN Mobile Money'}
                                 {displayedPayment.payment_method === 'moov' && '📱 Moov Money'}
@@ -1335,20 +1369,20 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                             </div>
                             
                             <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 transition duration-200 hover:shadow-sm">
-                              <span className="text-gray-600 dark:text-gray-300 font-medium">Numéro</span>
+                              <span className="text-gray-600 dark:text-gray-300 font-medium">{t('payment.phone_number')}</span>
                               <span className="font-mono text-gray-800 dark:text-gray-200 font-semibold text-base">{displayedPayment.phone_number}</span>
                             </div>
                             
                             <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 transition duration-200 hover:shadow-sm">
-                              <span className="text-gray-600 dark:text-gray-300 font-medium">Statut</span>
+                              <span className="text-gray-600 dark:text-gray-300 font-medium">{t('common.status')}</span>
                               <div>
                                 {displayedPayment.status === 'validated' ? (
                                   <span className="inline-flex items-center px-4 py-1 rounded-full text-base font-bold bg-green-500 text-white">
-                                    ✅ Validé
+                                    ✅ {t('payment.status.validated')}
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center px-4 py-1 rounded-full text-base font-bold bg-yellow-500 text-white">
-                                    ⏳ En attente
+                                    ⏳ {t('payment.status.pending')}
                                   </span>
                                 )}
                               </div>
@@ -1359,7 +1393,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                             <div className="mt-5 space-y-4">
                               <div className="p-4 bg-green-100 dark:bg-green-900 rounded-lg border border-green-300 dark:border-green-700">
                                 <p className="text-green-800 dark:text-green-200 text-sm font-medium text-center flex items-center justify-center gap-2">
-                                  <span className="text-lg">✓</span> Ce moyen de paiement a été validé.
+                                  <span className="text-lg">✓</span> {t('payment.payment_method_validated')}
                                 </p>
                               </div>
                               
@@ -1381,7 +1415,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
               {/* Section de tous les paiements (visible pour Admin/Manager) */}
               {(isAdmin || isProjectManager) && payments.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-                  <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">💰 Toutes les Informations de Paiement</h2>
+                  <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">💰 {t('task_details.tab_payment')}</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {payments.map(p => (
                       <div key={p.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600 flex flex-col justify-between transition duration-200 hover:shadow-sm">
@@ -1392,24 +1426,24 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                             {p.user?.id === auth.user.id && <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Moi</span>}
                           </div>
                           <p className="text-gray-600 dark:text-gray-300 mb-2">
-                            <strong className="mr-2">Moyen :</strong> 
+                            <strong className="mr-2">{t('task_details.payment_method')} :</strong> 
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                               {p.payment_method.toUpperCase()}
                             </span>
                           </p>
                           <p className="text-gray-600 dark:text-gray-300 mb-2">
-                            <strong className="mr-2">Numéro :</strong> 
+                            <strong className="mr-2">{t('task_details.phone_number')} :</strong> 
                             <span className="font-mono text-gray-800 dark:text-gray-200 text-base">{p.phone_number}</span>
                           </p>
                           <p className="text-gray-600 dark:text-gray-300 mb-4">
-                            <strong className="mr-2">Statut :</strong> 
+                            <strong className="mr-2">{t('task_details.status')} :</strong> 
                             {p.status === 'validated' ? (
                               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                ✅ Validé
+                                ✅ {t('task_details.validated')}
                               </span>
                             ) : (
                               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                ⏳ En attente
+                                ⏳ {t('task_details.pending')}
                               </span>
                             )}
                           </p>
@@ -1424,11 +1458,11 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                             {validationLoading ? (
                               <>
                                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                Validation...
+                                {t('task_details.validating')}
                               </>
                             ) : (
                               <>
-                                ✅ Valider ce paiement
+                                ✅ {t('task_details.validate_payment')}
                               </>
                             )}
                           </button>
@@ -1441,7 +1475,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                             className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition duration-200 hover:shadow-lg"
                           >
                             <FaDownload className="text-sm" />
-                            <span>Télécharger le reçu</span>
+                            <span>{t('task_details.download_receipt')}</span>
                           </a>
                         )}
                       </div>
@@ -1450,7 +1484,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                   {payments.length === 0 && (
                     <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3">
                       <FaInfoCircle className="text-blue-600 dark:text-blue-300 text-xl" />
-                      <p className="text-blue-800 dark:text-blue-200 italic">Aucune information de paiement enregistrée pour cette tâche par les membres.</p>
+                      <p className="text-blue-800 dark:text-blue-200 italic">{t('task_details.no_payment_info')}</p>
                     </div>
                   )}
                 </div>
@@ -1458,18 +1492,39 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
             </div>
           )}
 
-          {activeTab === 'files' && (
+          {activeTab === 'files' && !hasAccess && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700">
+              <div className="text-center py-12">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/50 mb-4">
+                  <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Accès refusé</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-4">
+                  L'accès aux ressources est réservé à l'administrateur ou au manager du projet.
+                </p>
+                {isDeadlinePassed && (
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    Note : La date d'échéance de cette tâche est dépassée.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {activeTab === 'files' && hasAccess && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold flex items-center gap-3 text-blue-700 dark:text-blue-200">
-                  <FaFileUpload /> Ressources
+                  <FaFileUpload /> {t('task_details.resources')}
                 </h2>
                 {/* Upload button visible to all members */}
                 <Link 
                   href={`/files/create?task_id=${task.id}&project_id=${task.project_id}`} 
                   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md"
                 >
-                  <FaFileUpload /> Ajouter un fichier
+                  <FaFileUpload /> {t('task_details.add_file')}
                 </Link>
               </div>
               
@@ -1566,14 +1621,37 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
          {activeTab === 'comments' && (
   <div className="bg-white dark:bg-gray-800 rounded-xl p-6 md:p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-    <h2 className="text-2xl font-bold flex items-center gap-3 mb-6 text-blue-700 dark:text-blue-200">
-      <FaCommentDots /> Discussions
-      {loadingComments && (
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
-          Chargement...
-        </span>
-      )}
-    </h2>
+   <h2 className="text-2xl font-bold flex items-center justify-between mb-6 text-blue-700 dark:text-blue-200">
+  {/* Partie gauche : Icône + titre */}
+  <div className="flex items-center gap-3">
+    <FaCommentDots className="text-blue-600 dark:text-blue-300" />
+    <span>Discussions</span>
+
+    {loadingComments && (
+      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
+        {t('task_details.loading_comments')}
+      </span>
+    )}
+  </div>
+
+  {/* Partie droite : Avertissement */}
+  <div className="flex items-center p-2 text-yellow-800 border border-yellow-300 rounded-lg bg-yellow-50 text-sm font-medium">
+    <svg
+      className="flex-shrink-0 w-5 h-5 text-yellow-700 mr-2"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="currentColor"
+      viewBox="0 0 20 20"
+    >
+      <path
+        fillRule="evenodd"
+        d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.598c.75 1.336-.213 3.003-1.742 3.003H3.48c-1.53 0-2.492-1.667-1.742-3.003L8.257 3.1zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-2a.75.75 0 01-.75-.75v-3.5a.75.75 0 011.5 0v3.5c0 .414-.336.75-.75.75z"
+        clipRule="evenodd"
+      />
+    </svg>
+    <span> {t('task_details.messages_sent_to_mailbox')}</span>
+  </div>
+</h2>
+
     
     {/* Formulaire de commentaire en haut */}
     <div className={`mb-8 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 ${replyingTo ? 'ring-2 ring-blue-500/30' : ''}`}>
@@ -1581,17 +1659,17 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         {replyingTo ? (
           <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
             <FaReply className="w-4 h-4" />
-            <span>Répondre à un commentaire</span>
+            <span> {t('task_details.reply_to_comment')}</span>
             <button
               type="button"
               onClick={cancelReply}
               className="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              title="Annuler la réponse"
+              title={t('task_details.cancel_reply')}
             >
               <FaTimes className="w-3.5 h-3.5" />
             </button>
           </div>
-        ) : 'Écrire un commentaire'}
+        ) : t('task_details.write_your_comment')}
       </h3>
       
       <form onSubmit={handleCommentSubmit} className="space-y-4">
@@ -1600,7 +1678,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
             value={commentContent}
             onChange={e => setCommentContent(e.target.value)}
             onKeyDown={handleCommentKeyDown}
-            placeholder="Écrivez votre message ici..."
+            placeholder={t('task_details.write_your_message_here')}
             className="w-full min-h-[100px] p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700/50 dark:text-white transition-colors duration-200"
             disabled={posting || isRecording}
             required={!audioBlob}
@@ -1621,7 +1699,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                   </span>
                   <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                    Enregistrement en cours...
+                    {t('task_details.recording_in_progress')}         
                   </span>
                 </div>
                 <div className="text-sm font-mono bg-white dark:bg-gray-700 px-2 py-1 rounded">
@@ -1631,7 +1709,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                   type="button"
                   onClick={stopRecording}
                   className="text-red-600 hover:text-white hover:bg-red-600 p-1.5 rounded-full transition-colors"
-                  title="Arrêter l'enregistrement"
+                  title={t('task_details.stop_recording')}
                 >
                   <FaStop className="w-4 h-4" />
                 </button>
@@ -1642,10 +1720,10 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                 onClick={startRecording}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                 disabled={posting}
-                title="Enregistrer un message vocal"
+                title={t('task_details.record_voice_message')}
               >
                 <FaMicrophone className="text-red-500" />
-                <span>Message vocal</span>
+                <span>{t('task_details.record_voice_message')}</span>
               </button>
             )}
 
@@ -1656,7 +1734,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                   type="button"
                   onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
                   className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  title="Supprimer l'enregistrement"
+                  title={t('task_details.delete_recording')}
                 >
                   <FaTimes className="w-4 h-4" />
                 </button>
@@ -1679,12 +1757,12 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Publication...
+                {t('task_details.publishing')}
               </>
             ) : (
               <>
                 <FaPaperPlane className="w-3.5 h-3.5" />
-                {replyingTo ? 'Publier la réponse' : 'Publier le commentaire'}
+                {replyingTo ? t('task_details.publish_response') : t('task_details.publish_comment')}
               </>
             )}
           </button>
@@ -1700,7 +1778,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         )}
 
         <div className="text-xs text-gray-500 dark:text-gray-400 text-center sm:text-right mt-2">
-          Appuyez sur <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">Entrée</kbd> pour envoyer
+          {t('task_details.press_ctrl_enter_to_send')}
         </div>
       </form>
     </div>
@@ -1714,7 +1792,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         {comments.length === 0 ? (
           <div className="bg-blue-50 dark:bg-blue-900/50 rounded-lg p-6 border border-blue-200 dark:border-blue-800 flex items-center gap-4">
             <FaInfoCircle className="text-blue-500 dark:text-blue-300 text-2xl flex-shrink-0" />
-            <p className="text-blue-800 dark:text-blue-200">Aucune discussion pour l'instant. Soyez le premier à commenter !</p>
+            <p className="text-blue-800 dark:text-blue-200">    {t('task_details.no_discussion_yet')}</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -1779,13 +1857,13 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 rounded-lg"
                               onClick={() => setEditingId(null)}
                             >
-                              Annuler
+                              {t('task_details.cancel')}  
                             </button>
                             <button 
                               type="submit" 
                               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2"
                             >
-                              <FaSave /> Enregistrer
+                              <FaSave /> {t('task_details.save')}     
                             </button>
                           </div>
                         </form>
@@ -1825,7 +1903,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                             }}
                             className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
                           >
-                            <FaReply className="w-3.5 h-3.5" /> Répondre
+                            <FaReply className="w-3.5 h-3.5" /> {t('task_details.response')}
                           </button>
                         </div>
                         
@@ -1899,7 +1977,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                                       src={`/storage/${reply.audio_path}`}
                                       className="h-8 max-w-[200px]"
                                     >
-                                      Votre navigateur ne supporte pas l'audio.
+                                      {t('task_details.browser_does_not_support_audio')}
                                     </audio>
                                   </div>
                                 </div>
@@ -1948,7 +2026,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                     <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                       <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4 flex items-center">
                         <FaReply className="mr-2 text-blue-500" />
-                        Répondre à {replyingTo.user?.name || 'ce commentaire'}
+                        {t('task_details.reply_to')} {replyingTo.user?.name || 'ce commentaire'}
                       </h3>
                       
                       <div className="mt-2 w-full">
@@ -2021,7 +2099,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                               onClick={cancelReply}
                               className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 transition-colors"
                             >
-                              Annuler
+                              {t('task_details.cancel')}
                             </button>
 
                             <button
@@ -2040,12 +2118,12 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                   </svg>
-                                  <span>Publication...</span>
+                                  <span>{t('task_details.publishing')}</span>
                                 </>
                               ) : (
                                 <>
                                   <FaPaperPlane className="w-3.5 h-3.5" />
-                                  <span>Publier</span>
+                                  <span>{t('task_details.publish')}</span>
                                 </>
                               )}
                             </button>
@@ -2061,7 +2139,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                               </span>
                               <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                                Enregistrement en cours...
+                                {t('task_details.recording_in_progress')}
                               </span>
                             </div>
                             <div className="text-sm font-mono bg-white dark:bg-gray-700 px-2 py-0.5 rounded">
@@ -2097,17 +2175,17 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       <Modal show={showConfirmValidationModal} onClose={() => setShowConfirmValidationModal(false)} maxWidth="md">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-              Confirmer la validation du paiement
+              {t('task_details.confirm_validation')}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Êtes-vous sûr de vouloir valider ce paiement ? Cette action est irréversible.
+              {t('task_details.confirm_validation_message')}
             </p>
             <div className="mt-6 flex justify-end">
               <button onClick={() => setShowConfirmValidationModal(false)} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-                Annuler
+                {t('task_details.cancel')}
               </button>
               <button onClick={confirmPaymentValidation} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" disabled={validationLoading}>
-                {validationLoading ? 'Validation...' : 'Confirmer'}
+                {validationLoading ? t('task_details.validating') : t('task_details.confirm')}
               </button>
             </div>
           </div>
@@ -2117,17 +2195,17 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         <Modal show={showConfirmDeleteModal} onClose={() => setShowConfirmDeleteModal(false)} maxWidth="sm">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-              Confirmer la suppression de la tâche
+              {t('task_details.confirm_delete')}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Êtes-vous sûr de vouloir supprimer cette tâche ? Cette action est irréversible.
+              {t('task_details.confirm_delete_message')}
             </p>
             <div className="mt-6 flex justify-end">
               <button onClick={() => setShowConfirmDeleteModal(false)} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-                Annuler
+                {t('task_details.cancel')}
               </button>
               <button onClick={confirmDeleteTask} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                Supprimer
+                {t('task_details.delete')}
               </button>
             </div>
           </div>
@@ -2137,17 +2215,17 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         <Modal show={showConfirmDeleteCommentModal} onClose={() => setShowConfirmDeleteCommentModal(false)} maxWidth="sm">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-              Confirmer la suppression du message
+              {t('task_details.confirm_delete_comment')}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Êtes-vous sûr de vouloir supprimer ce message ? Cette action est irréversible.
+              {t('task_details.confirm_delete_comment_message')}
             </p>
             <div className="mt-6 flex justify-end">
               <button onClick={() => setShowConfirmDeleteCommentModal(false)} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-                Annuler
+                  {t('task_details.cancel')}
               </button>
               <button onClick={confirmDeleteComment} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                Supprimer
+                {t('task_details.delete')}
               </button>
             </div>
           </div>

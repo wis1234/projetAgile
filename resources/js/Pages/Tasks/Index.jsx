@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { router, usePage, Link } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 import Notification from '../../Components/Notification';
 import TaskModal from '../../Components/TaskModal';
 import AdminLayout from '../../Layouts/AdminLayout';
@@ -12,36 +13,39 @@ const KanbanIcon = () => (
 );
 
 // Composant pour afficher le badge de statut
-const getStatusBadge = (status) => {
+const getStatusBadge = (status, t) => {
+  const statusText = t(`status.${status}`, { defaultValue: status });
   switch(status) {
     case 'todo':
-      return <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-xs font-bold">À faire</span>;
+      return <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-xs font-bold">{statusText}</span>;
     case 'in_progress':
-      return <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">En cours</span>;
+      return <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{statusText}</span>;
     case 'done':
-      return <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">Terminé</span>;
+      return <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">{statusText}</span>;
     default:
-      return <span className="inline-block px-3 py-1 rounded-full bg-gray-300 text-gray-600 text-xs font-bold">{status}</span>;
+      return <span className="inline-block px-3 py-1 rounded-full bg-gray-300 text-gray-600 text-xs font-bold">{statusText}</span>;
   }
 };
 
 // Composant pour afficher le badge de priorité
-const getPriorityBadge = (priority) => {
+const getPriorityBadge = (priority, t) => {
+  const priorityText = t(`priority.${priority}`, { defaultValue: priority });
   switch(priority) {
     case 'low':
-      return <span className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">Faible</span>;
+      return <span className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">{priorityText}</span>;
     case 'medium':
-      return <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">Moyenne</span>;
+      return <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{priorityText}</span>;
     case 'high':
-      return <span className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">Élevée</span>;
+      return <span className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">{priorityText}</span>;
     default:
-      return <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-600 text-xs font-bold">{priority}</span>;
+      return <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-600 text-xs font-bold">{priorityText}</span>;
   }
 };
 
-function Index({ tasks, filters }) {
+const Index = ({ tasks, filters }) => {
+  const { t } = useTranslation();
   const { flash = {}, errors = {}, auth } = usePage().props;
-  const [notification, setNotification] = useState(flash.success || '');
+  const [notification, setNotification] = useState(flash.success ? t(flash.success) : '');
   const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
   const [search, setSearch] = useState(filters?.search || '');
   const [showModal, setShowModal] = useState(false);
@@ -90,14 +94,14 @@ function Index({ tasks, filters }) {
   }, [flash.success]);
 
   const handleDelete = (id) => {
-    if (confirm('Voulez-vous vraiment supprimer cette tâche ?')) {
+    if (confirm(t('task_delete_confirm'))) {
       router.delete(`/tasks/${id}`, {
         onSuccess: () => {
-          setNotification('Tâche supprimée avec succès');
+          setNotification(t('task_deleted_success'));
           setNotificationType('success');
         },
         onError: () => {
-          setNotification('Erreur lors de la suppression');
+          setNotification(t('task_delete_error'));
           setNotificationType('error');
         }
       });
@@ -142,7 +146,7 @@ function Index({ tasks, filters }) {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
           <div className="flex items-center gap-4">
             <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" />
-            <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">Gestion des Tâches</h1>
+            <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">{t('task_management')}</h1>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
@@ -157,7 +161,7 @@ function Index({ tasks, filters }) {
                 }`}
               >
                 <FaList className="text-xs" />
-                <span className="hidden sm:inline">Tableau</span>
+                <span className="hidden sm:inline">{t('table_view')}</span>
               </button>
               <button
                 onClick={() => setViewMode('cards')}
@@ -168,19 +172,19 @@ function Index({ tasks, filters }) {
                 }`}
               >
                 <FaTh className="text-xs" />
-                <span className="hidden sm:inline">Cartes</span>
+                <span className="hidden sm:inline">{t('cards_view')}</span>
               </button>
             </div>
             
             <Link href="/tasks/create" className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base">
               <FaPlus className="text-sm sm:text-lg" /> 
-              <span className="hidden sm:inline">Nouvelle tâche</span>
-              <span className="sm:hidden">Nouvelle</span>
+              <span className="hidden sm:inline">{t('new_task')}</span>
+              <span className="sm:hidden">{t('new')}</span>
             </Link>
             <Link href="/kanban" className="bg-green-600 hover:bg-green-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base">
               <KanbanIcon /> 
-              <span className="hidden sm:inline">Suivi des tâches</span>
-              <span className="sm:hidden">Suivi</span>
+              <span className="hidden sm:inline">{t('task_tracking')}</span>
+              <span className="sm:hidden">{t('tracking')}</span>
             </Link>
           </div>
         </div>
@@ -189,14 +193,14 @@ function Index({ tasks, filters }) {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200">
           <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
             <div className="md:col-span-2 lg:col-span-3">
-              <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recherche par titre</label>
+              <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('search_by_title')}</label>
               <div className="relative">
                 <input
                   type="text"
                   id="search-input"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder="Rechercher une tâche..."
+                  placeholder={t('search_task_placeholder')}
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
                 />
                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -204,7 +208,7 @@ function Index({ tasks, filters }) {
             </div>
 
             <button type="submit" className="md:col-span-1 lg:col-span-1 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md">
-              <FaSearch /> Appliquer
+              <FaSearch /> {t('apply')}
             </button>
           </form>
         </div>
@@ -215,18 +219,18 @@ function Index({ tasks, filters }) {
             <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
               <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
                 <tr>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Titre</th>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Projet</th>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Statut</th>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Priorité</th>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Assigné à</th>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('title')}</th>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('project')}</th>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('status_label')}</th>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('priority_label')}</th>
+                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('assigned_to')}</th>
                 </tr>
               </thead>
               <tbody>
                 {tasks.data.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="text-center py-10 text-gray-500 dark:text-gray-400 text-lg">
-                      Aucune tâche trouvée pour cette recherche ou filtre.
+                      {t('no_tasks_found')}
                     </td>
                   </tr>
                 ) : tasks.data.map(task => (
@@ -238,10 +242,10 @@ function Index({ tasks, filters }) {
                     <td className="p-4 align-middle font-semibold text-blue-700 dark:text-blue-200 group-hover:underline">{task.title}</td>
                     <td className="p-4 align-middle text-gray-600 dark:text-gray-300">{task.project?.name || <span className="italic text-gray-400">Aucun</span>}</td>
                     <td className="p-4 align-middle">
-                      {getStatusBadge(task.status)}
+                      {getStatusBadge(task.status, t)}
                     </td>
                     <td className="p-4 align-middle">
-                      {getPriorityBadge(task.priority)}
+                      {getPriorityBadge(task.priority, t)}
                     </td>
                     <td className="p-4 align-middle text-gray-600 dark:text-gray-300">
                       {task.assigned_user || task.assignedUser ? (
@@ -252,7 +256,7 @@ function Index({ tasks, filters }) {
                           <span>{(task.assigned_user?.name || task.assignedUser?.name)}</span>
                         </div>
                       ) : (
-                        <span className="italic text-gray-400">Non assigné</span>
+                        <span className="italic text-gray-400">{t('unassigned')}</span>
                       )}
                     </td>
                   </tr>
@@ -266,8 +270,8 @@ function Index({ tasks, filters }) {
             {tasks.data.length === 0 ? (
               <div className="col-span-full text-center py-16">
                 <FaTasks className="mx-auto text-6xl text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-xl text-gray-500 dark:text-gray-400">Aucune tâche trouvée</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">Créez votre première tâche pour commencer</p>
+                <p className="text-xl text-gray-500 dark:text-gray-400">{t('no_tasks_found')}</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">{t('create_first_task')}</p>
               </div>
             ) : tasks.data.map(task => (
               <div
@@ -281,14 +285,14 @@ function Index({ tasks, filters }) {
                     {task.title}
                   </h3>
                   <div className="flex-shrink-0">
-                    {getPriorityBadge(task.priority)}
+                    {getPriorityBadge(task.priority, t)}
                   </div>
                 </div>
 
                 {/* Project Info */}
                 {task.project && (
                   <div className="mb-3">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Projet</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('project')}</p>
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <FaProjectDiagram className="text-blue-500 text-sm" />
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
@@ -296,7 +300,7 @@ function Index({ tasks, filters }) {
                       </span>
                       {task.project_is_muted && (
                         <span className="ml-2 px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full flex-shrink-0">
-                            Sourdine
+                            {t('muted')}
                         </span>
                       )}
                     </div>
@@ -306,11 +310,11 @@ function Index({ tasks, filters }) {
                 {/* Status and Assignee */}
                 <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Statut</p>
-                    {getStatusBadge(task.status)}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('status')}</p>
+                    {getStatusBadge(task.status, t)}
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assigné à</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('assigned_to')}</p>
                     {task.assigned_user || task.assignedUser ? (
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 text-xs font-semibold">
@@ -321,7 +325,7 @@ function Index({ tasks, filters }) {
                         </span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400 italic">Non assigné</span>
+                      <span className="text-xs text-gray-400 italic">{t('unassigned')}</span>
                     )}
                   </div>
                 </div>
@@ -331,7 +335,7 @@ function Index({ tasks, filters }) {
                   <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                       <FaCalendarAlt className="text-xs" />
-                      <span>Échéance: {new Date(task.due_date).toLocaleDateString('fr-FR')}</span>
+                      <span>{t('due_date')}: {new Date(task.due_date).toLocaleDateString('fr-FR')}</span>
                     </div>
                   </div>
                 )}
@@ -360,5 +364,18 @@ function Index({ tasks, filters }) {
   );
 }
 
-Index.layout = page => <AdminLayout children={page} />;
-export default Index; 
+// Création d'un composant wrapper pour gérer le layout
+const IndexWithLayout = (props) => {
+  const { t } = useTranslation();
+  
+  return (
+    <AdminLayout title={t('task_management')}>
+      <Index {...props} />
+    </AdminLayout>
+  );
+};
+
+// Configuration du layout pour Inertia
+IndexWithLayout.layout = (page) => page;
+
+export default IndexWithLayout; 

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { router, Link, usePage } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { FaProjectDiagram, FaPlus, FaUser, FaUsers, FaTasks, FaEye, FaSearch, FaCalendarAlt, FaUserFriends, FaTable, FaTh, FaClock, FaChartLine, FaList, FaVolumeMute } from 'react-icons/fa';
 
 export default function Index({ projects, filters }) {
+    const { t, i18n } = useTranslation();
     const { flash = {} } = usePage().props;
     const [search, setSearch] = useState(filters?.search || '');
     const [notification, setNotification] = useState(flash.success || '');
@@ -11,6 +13,20 @@ export default function Index({ projects, filters }) {
     // État pour le mode de vue (cartes par défaut sur mobile/tablet, tableau sur desktop)
     const [viewMode, setViewMode] = useState('table');
     const [isMobile, setIsMobile] = useState(false);
+    
+    // Forcer le re-rendu lors du changement de langue
+    const [language, setLanguage] = useState(i18n.language);
+    
+    useEffect(() => {
+        const handleLanguageChange = (lng) => {
+            setLanguage(lng);
+        };
+        
+        i18n.on('languageChanged', handleLanguageChange);
+        return () => {
+            i18n.off('languageChanged', handleLanguageChange);
+        };
+    }, [i18n]);
     
     // Détecter si on est sur mobile/tablette au chargement
     useEffect(() => {
@@ -93,14 +109,14 @@ export default function Index({ projects, filters }) {
         // Utiliser le statut réel du projet pour déterminer le libellé
         const status = project.status || 'nouveau';
         const labels = {
-            'nouveau': 'Nouveau',
-            'demarrage': 'Démarrage',
-            'en_cours': 'En cours',
-            'avance': 'Avancé',
-            'termine': 'Terminé',
-            'suspendu': 'Suspendu',
+            'nouveau': t('project_status_new'),
+            'demarrage': t('project_status_starting'),
+            'en_cours': t('project_status_in_progress'),
+            'avance': t('project_status_advanced'),
+            'termine': t('project_status_completed'),
+            'suspendu': t('project_status_suspended'),
         };
-        return labels[status] || 'Nouveau';
+        return labels[status] || t('project_status_new');
     };
 
     return (
@@ -112,7 +128,7 @@ export default function Index({ projects, filters }) {
                         <div className="flex items-center gap-3 sm:gap-4">
                             <FaProjectDiagram className="text-3xl sm:text-4xl text-blue-600 dark:text-blue-400 flex-shrink-0" />
                             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
-                                Gestion des Projets
+                                {t('project_management')}
                             </h1>
                         </div>
                         
@@ -128,7 +144,7 @@ export default function Index({ projects, filters }) {
                                     }`}
                                 >
                                     <FaList className="text-xs" />
-                                    <span className="hidden sm:inline">Tableau</span>
+                                    <span className="hidden sm:inline">{t('table_view')}</span>
                                 </button>
                                 <button
                                     onClick={() => setViewMode('cards')}
@@ -139,7 +155,7 @@ export default function Index({ projects, filters }) {
                                     }`}
                                 >
                                     <FaTh className="text-xs" />
-                                    <span className="hidden sm:inline">Cartes</span>
+                                    <span className="hidden sm:inline">{t('cards_view')}</span>
                                 </button>
                             </div>
                             
@@ -149,8 +165,8 @@ export default function Index({ projects, filters }) {
                                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base"
                             >
                                 <FaPlus className="text-sm sm:text-lg" /> 
-                                <span className="hidden sm:inline">Nouveau projet</span>
-                                <span className="sm:hidden">Nouveau</span>
+                                <span className="hidden sm:inline">{t('new_project')}</span>
+                                <span className="sm:hidden">{t('new')}</span>
                             </Link>
                         </div>
                     </div>
@@ -161,7 +177,7 @@ export default function Index({ projects, filters }) {
                     <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
                         <div className="lg:col-span-3">
                             <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Recherche par nom de projet
+                                {t('project_search_placeholder')}
                             </label>
                             <div className="relative">
                                 <input
@@ -170,7 +186,7 @@ export default function Index({ projects, filters }) {
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200"
-                                    placeholder="Rechercher un projet..."
+                                    placeholder={t('project_search_placeholder')}
                                 />
                                 <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                             </div>
@@ -180,7 +196,7 @@ export default function Index({ projects, filters }) {
                             className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md"
                         >
                             <FaSearch />
-                            <span className="hidden sm:inline">Rechercher</span>
+                            <span className="hidden sm:inline">{t('project_search_button')}</span>
                         </button>
                     </form>
                 </div>
@@ -367,7 +383,7 @@ export default function Index({ projects, filters }) {
                     {projects?.data?.length > 0 && projects?.links?.length > 0 ? (
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div className="text-sm text-gray-700 dark:text-gray-300 order-2 sm:order-1">
-                                Affichage de {projects.from || 0} à {projects.to || 0} sur {projects.total || 0} résultat{projects.total !== 1 ? 's' : ''}
+                                {`${t('showing_results')} ${projects.from || 0} ${t('to')} ${projects.to || 0} ${t('on_results')} ${projects.total || 0} ${projects.total !== 1 ? t('results') : t('result')}`.replace(/\s+/g, ' ').trim()}
                             </div>
                             <div className="flex flex-wrap justify-center gap-1 sm:gap-2 order-1 sm:order-2">
                                 {projects.links.map((link, index) => {

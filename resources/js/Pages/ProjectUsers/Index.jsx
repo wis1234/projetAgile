@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
+import i18n from 'i18next';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { 
     FaUsers, 
@@ -45,6 +47,7 @@ const sanitizeProjectData = (project) => {
 };
 
 export default function Index({ projects = {}, filters = {} }) {
+    const { t } = useTranslation();
     const { flash = {} } = usePage().props;
     const [viewMode, setViewMode] = useState('table');
     const [notification, setNotification] = useState(null);
@@ -115,9 +118,9 @@ export default function Index({ projects = {}, filters = {} }) {
 
     const getRoleLabel = (role) => {
         switch (role) {
-            case 'manager': return 'Manager';
-            case 'member': return 'Membre';
-            default: return 'Autre';
+            case 'manager': return t('role_manager');
+            case 'member': return t('role_member');
+            default: return t('role_other');
         }
     };
 
@@ -154,10 +157,10 @@ export default function Index({ projects = {}, filters = {} }) {
                                 </div>
                                 <div>
                                     <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
-                                        Membres des projets
+                                        {t('project_members')}
                                     </h1>
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                        Gérez les membres assignés aux projets
+                                        {t('manage_project_members')}
                                     </p>
                                 </div>
                             </div>
@@ -174,7 +177,7 @@ export default function Index({ projects = {}, filters = {} }) {
                                         }`}
                                     >
                                         <FaTable className="text-xs" />
-                                        <span className="hidden sm:inline">Tableau</span>
+                                        <span className="hidden sm:inline">{t('table_view')}</span>
                                     </button>
                                     <button
                                         onClick={() => setViewMode('cards')}
@@ -185,7 +188,7 @@ export default function Index({ projects = {}, filters = {} }) {
                                         }`}
                                     >
                                         <FaTh className="text-xs" />
-                                        <span className="hidden sm:inline">Cartes</span>
+                                        <span className="hidden sm:inline">{t('cards_view')}</span>
                                     </button>
                                 </div>
 
@@ -195,8 +198,8 @@ export default function Index({ projects = {}, filters = {} }) {
                                     className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg font-semibold shadow-sm flex items-center gap-2 transition-all duration-200 transform hover:scale-105 whitespace-nowrap"
                                 >
                                     <FaUserPlus className="text-sm" />
-                                    <span className="hidden sm:inline">Ajouter un membre</span>
-                                    <span className="sm:hidden">Ajouter</span>
+                                    <span className="hidden sm:inline">{t('add_member')}</span>
+                                    <span className="sm:hidden">{t('add')}</span>
                                 </Link>
                             </div>
                         </div>
@@ -373,7 +376,7 @@ export default function Index({ projects = {}, filters = {} }) {
                                                         {project.users && project.users.length > 0 ? (
                                                             <div className="space-y-2">
                                                                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                                                    Membres assignés
+                                                                    {t('assigned_members')}
                                                                 </h4>
                                                                 <div className="space-y-2 max-h-32 overflow-y-auto">
                                                                     {project.users.map(user => (
@@ -399,7 +402,7 @@ export default function Index({ projects = {}, filters = {} }) {
                                                         ) : (
                                                             <div className="text-center py-4">
                                                                 <div className="text-gray-400 dark:text-gray-500 text-sm">
-                                                                    Aucun membre assigné
+                                                                    {t('no_members_assigned')}
                                                                 </div>
                                                             </div>
                                                         )}
