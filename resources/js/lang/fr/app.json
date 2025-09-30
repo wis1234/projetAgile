@@ -245,6 +245,14 @@
   "period": "Période",
   "no_sprints_found": "Aucun sprint trouvé",
   "not_available": "N/A",
+  "pagination": {
+    "showing": "Affichage de",
+    "to": "à",
+    "of": "sur",
+    "results": "résultats",
+    "previous": "Précédent",
+    "next": "Suivant"
+  },
   "pagination_info": "Affichage de {from} à {to} sur {total} résultats",
   "pagination_previous": "«",
   "pagination_next": "»",
@@ -335,6 +343,14 @@
     "low": "Basse",
     "medium": "Moyenne",
     "high": "Haute"
+  },
+  "task_stats": {
+    "user_stats": "Statistiques par utilisateur",
+    "tasks": "tâches",
+    "completed_on_time": "Terminées à temps",
+    "completed_late": "Terminées en retard",
+    "on_time": "à temps",
+    "late": "en retard"
   },
   "task_details_page": "Détail de la tâche",
   "time_remaining": "Temps restant",

@@ -47,15 +47,23 @@
     "in_progress": "In Progress",
     "done": "Done",
     "pending": "Pending",
-    "validated": "Validated",
     "paid": "Paid"
   },
   "priority": {
-    "low": "Low",
+    "low": "low",
     "medium": "Medium",
-    "high": "High"
+    "high": "High",
+    "urgent": "Urgent",
+    "critical": "Critical"
   },
-  "select_project": "Select a project",
+  "task_stats": {
+    "user_stats": "User Statistics",
+    "tasks": "tasks",
+    "completed_on_time": "Completed on time",
+    "completed_late": "Completed late",
+    "on_time": "on time",
+    "late": "late"
+  },
   "add_task": "Add Task",
   "total_tasks": "Total Tasks",
   "dashboard": "Dashboard",
@@ -385,14 +393,21 @@
     "assigned_to": "Assigned To",
     "not_assigned": "Not Assigned",
     "overdue": "Overdue",
-    "time_remaining": "Time Remaining",
-    "attachments": "Attachments",
+    "task_stats": {
+      "user_stats": "User Statistics",
+      "tasks": "Tasks",
+      "completed_on_time": "Completed on time",
+      "completed_late": "Completed late",
+      "on_time": "On time",
+      "late": "Late"
+    },
+    "time_remaining": "Time remaining",
+    "deadline_met": "Deadline met",
     "comments": "Comments",
     "add_comment": "Add a Comment",
     "comment_placeholder": "Write your comment here...",
     "post_comment": "Post",
     "edit_comment": "Edit",
-    "delete_comment": "Delete",
     "cancel_edit": "Cancel",
     "save_changes": "Save Changes",
     "no_attachments": "No attachments yet",
