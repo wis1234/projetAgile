@@ -57,6 +57,8 @@
     "urgent": "Urgent",
     "critical": "Critical"
   },
+  "tasks_evolution": "Tasks Evolution",
+  "completed_tasks": "Completed Tasks",
   "task_stats": {
     "user_stats": "User Statistics",
     "tasks": "tasks",
@@ -149,6 +151,8 @@
   "tasks": "Tasks",
   "task": "Task",
   "tasks_section_title": "Tasks",
+  "show_all_tasks": "Show all tasks",
+  "show_less": "Show less",
   "new_task": "New Task",
   "create_task": "Create Task",
   "no_tasks_for_project": "No tasks for this project",

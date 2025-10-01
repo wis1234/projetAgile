@@ -370,7 +370,7 @@ export default function AdminLayout({ children }) {
           </div>
           <div className="flex items-center gap-4 dark:text-gray-200">
             {/* Language Switcher */}
-            <div className="relative group" ref={useRef(null)}>
+            <div className="relative z-[60] group" ref={useRef(null)}>
               <button 
                 className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isChangingLanguage ? 'opacity-70 cursor-not-allowed' : ''}`}
                 onClick={() => !isChangingLanguage && setLanguageOpen(prev => !prev)}
@@ -424,7 +424,7 @@ export default function AdminLayout({ children }) {
               </button>
               {languageOpen && (
                 <div 
-                  className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700"
+                  className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-[9999] border border-gray-200 dark:border-gray-700"
                   role="menu"
                   aria-orientation="vertical"
                   aria-labelledby="language-menu"

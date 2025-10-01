@@ -110,6 +110,8 @@
   "tasks_done": "tâches terminées",
   "tasks_total_count": "tâches au total",
   "tasks_section_title": "Tâches",
+  "show_all_tasks": "Afficher toutes les tâches",
+  "show_less": "Afficher moins",
   "new_task": "Nouvelle tâche",
   "no_tasks_for_project": "Aucune tâche pour ce projet",
   "create_first_task": "Créez votre première tâche pour commencer à organiser le travail",
@@ -347,6 +349,7 @@
     "label": "Priorité",
     "high": "Haute"
   },
+  "tasks_evolution": "Evolution des tâches",
   "task_stats": {
     "user_stats": "Statistiques par utilisateur",
     "tasks": "tâches",

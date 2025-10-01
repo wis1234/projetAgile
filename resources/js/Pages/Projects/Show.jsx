@@ -2,170 +2,125 @@ import React, { useState, useEffect } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import AdminLayout from '@/Layouts/AdminLayout';
-import Tutorial from '@/Components/Tutorial';
-import TutorialSettings from '@/Components/TutorialSettings';
-import { projectShowTutorial } from '@/tutorials/projectTutorials';
 import { 
   FaProjectDiagram, FaUsers, FaTasks, FaEdit, FaEye, FaArrowLeft, FaCalendarAlt,
-  FaUserFriends, FaClipboardList, FaBolt, FaRocket, FaUserPlus, FaFileExport,
+  FaUserFriends, FaClipboardList, FaRocket, FaUserPlus, FaFileExport,
   FaChevronDown, FaFileAlt, FaFilePdf, FaFileWord, FaTrash, FaChartLine, FaCommentDots,
-  FaCheckCircle, FaClock, FaExclamationTriangle, FaPlay, FaPause, FaStop, FaChartBar,
-  FaChartPie, FaCalendarCheck, FaCrown, FaUser, FaShieldAlt, FaPlus, FaEnvelope,
-  FaPhone, FaGlobe, FaCode, FaLightbulb, FaExternalLinkAlt, FaQuestionCircle,
-  FaArrowUp, FaArrowDown, FaEquals
+  FaCheckCircle, FaClock, FaPlay, FaChartBar, FaCrown, FaUser, FaShieldAlt, 
+  FaPlus, FaGlobe, FaExternalLinkAlt, FaQuestionCircle, FaArrowUp, FaArrowDown, 
+  FaEquals, FaExclamationTriangle
 } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
 import Modal from '../../Components/Modal';
 
-// Fonctions utilitaires pour les statuts et priorités
 const getStatusInfo = (status, t) => {
   const statusMap = {
-    // English statuses
-    'todo': { 
-      color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-      icon: <FaClock className="mr-1.5" />,
-      text: t('status_todo')
-    },
-    'in_progress': { 
-      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      icon: <FaPlay className="mr-1.5" />,
-      text: t('status_in_progress')
-    },
-    'done': { 
-      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      icon: <FaCheckCircle className="mr-1.5" />,
-      text: t('status_done')
-    },
-    'pending': { 
-      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-      icon: <FaPause className="mr-1.5" />,
-      text: t('status_pending')
-    },
-    // French statuses
-    'nouveau': { 
-      color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-      icon: <FaClock className="mr-1.5" />,
-      text: t('status_new')
-    },
-    'en_cours': { 
-      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      icon: <FaPlay className="mr-1.5" />,
-      text: t('status_in_progress')
-    },
-    'termine': { 
-      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      icon: <FaCheckCircle className="mr-1.5" />,
-      text: t('status_done')
-    },
-    'en_attente': { 
-      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-      icon: <FaPause className="mr-1.5" />,
-      text: t('status_pending')
-    }
+    'todo': { color: 'bg-gray-100 text-gray-800', icon: <FaClock className="mr-1.5" />, text: t('status_todo') },
+    'in_progress': { color: 'bg-blue-100 text-blue-800', icon: <FaPlay className="mr-1.5" />, text: t('status_in_progress') },
+    'done': { color: 'bg-green-100 text-green-800', icon: <FaCheckCircle className="mr-1.5" />, text: t('status_done') },
   };
-
-  return statusMap[status] || { 
-    color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-    icon: <FaQuestionCircle className="mr-1.5" />,
-    text: status
-  };
+  return statusMap[status] || { color: 'bg-gray-100 text-gray-800', icon: <FaQuestionCircle className="mr-1.5" />, text: status };
 };
 
 const getPriorityInfo = (priority, t) => {
   const priorityMap = {
-    'high': {
-      color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-      icon: <FaArrowUp className="mr-1.5" />,
-      text: t('priority_high')
+    // English priorities
+    'high': { 
+      color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200', 
+      icon: <FaArrowUp className="mr-1.5" />, 
+      text: t('priority.high'),
+      order: 1
     },
-    'medium': {
-      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-      icon: <FaEquals className="mr-1.5" />,
-      text: t('priority_medium')
+    'medium': { 
+      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200', 
+      icon: <FaEquals className="mr-1.5" />, 
+      text: t('priority.medium'),
+      order: 2
     },
-    'low': {
-      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      icon: <FaArrowDown className="mr-1.5" />,
-      text: t('priority_low')
+    'low': { 
+      color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200', 
+      icon: <FaArrowDown className="mr-1.5" />, 
+      text: t('priority.low'),
+      order: 3
     },
-    'haute': {
-      color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-      icon: <FaArrowUp className="mr-1.5" />,
-      text: t('priority_high')
+    // French priorities
+    'haute': { 
+      color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200', 
+      icon: <FaArrowUp className="mr-1.5" />, 
+      text: t('priority.high'),
+      order: 1
     },
-    'moyenne': {
-      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-      icon: <FaEquals className="mr-1.5" />,
-      text: t('priority_medium')
+    'moyenne': { 
+      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200', 
+      icon: <FaEquals className="mr-1.5" />, 
+      text: t('priority.medium'),
+      order: 2
     },
-    'basse': {
-      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      icon: <FaArrowDown className="mr-1.5" />,
-      text: t('priority_low')
+    'basse': { 
+      color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200', 
+      icon: <FaArrowDown className="mr-1.5" />, 
+      text: t('priority.low'),
+      order: 3
     }
   };
-
-  return priorityMap[priority] || {
+  
+  return priorityMap[priority?.toLowerCase()] || { 
     color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-    icon: <FaQuestionCircle className="mr-1.5" />,
-    text: priority
+    icon: <FaQuestionCircle className="mr-1.5" />, 
+    text: priority,
+    order: 0
   };
 };
 
 function Show({ project, tasks = [], auth, stats = {} }) {
   const { t, i18n } = useTranslation();
-  // État pour gérer l'affichage des tutoriels
-  const [showProjectTutorial, setShowProjectTutorial] = useState(true);
-  const [showSprintTutorial, setShowSprintTutorial] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showAllTasks, setShowAllTasks] = useState(false);
   const { flash = {} } = usePage().props;
   
-  // Sanitize and validate user roles
   const userRoles = Array.isArray(auth?.user?.roles) ? auth.user.roles : [];
   const isAdmin = userRoles.includes('admin');
   const isManager = userRoles.includes('manager');
+  const isMember = userRoles.includes('member');
 
-  // Force re-render on language change
-  const [language, setLanguage] = useState(i18n.language);
+  // Trier les tâches par date de création (les plus récentes en premier)
+  const sortedTasks = tasks?.data ? [...(tasks.data || [])].sort((a, b) => 
+    new Date(b.created_at) - new Date(a.created_at)
+  ) : [];
   
-  useEffect(() => {
-    const handleLanguageChange = (lng) => {
-      setLanguage(lng);
-    };
-    
-    i18n.on('languageChanged', handleLanguageChange);
-    return () => {
-      i18n.off('languageChanged', handleLanguageChange);
-    };
-  }, [i18n]);
+  // Afficher uniquement les 5 dernières tâches si showAllTasks est false
+  const displayedTasks = showAllTasks ? sortedTasks : sortedTasks.slice(0, 5);
+  const hasMoreTasks = sortedTasks.length > 5;
 
-  // Gérer l'affichage du tutoriel de sprint après la création d'un projet
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (flash.showSprintTutorial) {
-        setShowSprintTutorial(true);
-      }
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [flash.showSprintTutorial]);
+  const handleDelete = () => {
+    setDeleteLoading(true);
+    router.delete(route('projects.destroy', project.id), {
+      onSuccess: () => {
+        setDeleteLoading(false);
+        setShowDeleteModal(false);
+      },
+      onError: () => {
+        setDeleteLoading(false);
+      },
+      preserveScroll: true
+    });
+  };
 
-  // Préparation des données pour le graphique d'évolution (30 derniers jours)
+  // Préparation données graphique
   const last30Days = Array.from({length: 30}, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() - (29 - i));
     return date.toISOString().split('T')[0];
   });
 
-  // Compter les tâches par date
   const taskCounts = last30Days.map(date => {
-    const tasksData = tasks.data || []; // Handle paginated tasks data
+    const tasksData = tasks.data || [];
     const tasksForDate = tasksData.filter(task => {
       const taskDate = new Date(task.created_at).toISOString().split('T')[0];
       return taskDate === date;
     });
-    
     return {
       date,
       total: tasksForDate.length,
@@ -173,23 +128,15 @@ function Show({ project, tasks = [], auth, stats = {} }) {
     };
   });
 
-  // Calculer les totaux cumulés
   let cumulativeTotal = 0;
   let cumulativeDone = 0;
   
   const chartData = taskCounts.map(day => {
     cumulativeTotal += day.total;
     cumulativeDone += day.done;
-    
-    return {
-      ...day,
-      cumulativeTotal,
-      cumulativeDone,
-      inProgress: cumulativeTotal - cumulativeDone
-    };
+    return { ...day, cumulativeTotal, cumulativeDone };
   });
   
-  // Données pour le graphique
   const trendChartData = {
     labels: last30Days.map(date => new Date(date).toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'})),
     datasets: [
@@ -199,7 +146,7 @@ function Show({ project, tasks = [], auth, stats = {} }) {
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 2,
-        tension: 0.3,
+        tension: 0.4,
         fill: true
       },
       {
@@ -208,877 +155,492 @@ function Show({ project, tasks = [], auth, stats = {} }) {
         borderColor: 'rgb(16, 185, 129)',
         backgroundColor: 'rgba(16, 185, 129, 0.1)',
         borderWidth: 2,
-        tension: 0.3,
+        tension: 0.4,
         fill: true
       }
     ],
   };
 
-  // Configuration des options du graphique
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          usePointStyle: true,
-          padding: 20
-        }
-      },
+      legend: { position: 'top', labels: { usePointStyle: true, padding: 15, font: { size: 11 } } },
       tooltip: {
         mode: 'index',
         intersect: false,
-        callbacks: {
-          label: function(context) {
-            let label = context.dataset.label || '';
-            if (label) label += ': ';
-            if (context.parsed.y !== null) {
-              label += context.parsed.y + ' ' + (context.parsed.y > 1 ? 'tâches' : 'tâche');
-            }
-            return label;
-          }
-        }
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Nombre de tâches',
-          color: '#6b7280',
-          font: { weight: 'bold' }
-        },
-        grid: { color: 'rgba(0, 0, 0, 0.05)' },
-        ticks: { stepSize: 1, precision: 0 }
-      },
-      x: {
-        grid: { display: false },
-        ticks: {
-          maxRotation: 45,
-          minRotation: 45
-        }
-      }
-    }
-  };
-
-  const trendChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        enabled: true,
-        backgroundColor: 'rgb(0 0 0 / 70%)',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        borderRadius: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
         padding: 12,
-        displayColors: false,
-        callbacks: {
-            label: (context) => ` ${context.parsed.y} tâches terminées`
-        }
-      },
+        borderRadius: 8
+      }
     },
     scales: {
-      x: { 
-          grid: { 
-            display: false 
-          },
-          ticks: { 
-            color: '#9ca3af' 
-          }
-      },
-      y: { 
-          beginAtZero: true, 
-          grid: { 
-            color: 'rgba(229, 231, 235, 0.5)'
-          },
-          ticks: { 
-            color: '#9ca3af'
-          }
-      },
-    },
-  };
-
-  // Helpers pour badges
-  const getStatusBadge = (status) => {
-    const statusMap = {
-      // English statuses
-      'todo': { 
-        color: 'bg-blue-200 text-blue-800',
-        text: t('status_todo')
-      },
-      'in_progress': { 
-        color: 'bg-yellow-200 text-yellow-800',
-        text: t('status_in_progress')
-      },
-      'done': { 
-        color: 'bg-green-200 text-green-800',
-        text: t('status_done')
-      },
-      'pending': { 
-        color: 'bg-purple-200 text-purple-800',
-        text: t('status_pending')
-      },
-      // French statuses
-      'nouveau': { 
-        color: 'bg-blue-200 text-blue-800',
-        text: t('status_todo')
-      },
-      'en_cours': { 
-        color: 'bg-yellow-200 text-yellow-800',
-        text: t('status_in_progress')
-      },
-      'termine': { 
-        color: 'bg-green-200 text-green-800',
-        text: t('status_done')
-      },
-      'en_attente': { 
-        color: 'bg-purple-200 text-purple-800',
-        text: t('status_pending')
-      },
-      // Status with prefix
-      'status_todo': { 
-        color: 'bg-blue-200 text-blue-800',
-        text: t('status_todo')
-      },
-      'status_in_progress': { 
-        color: 'bg-yellow-200 text-yellow-800',
-        text: t('status_in_progress')
-      },
-      'status_done': { 
-        color: 'bg-green-200 text-green-800',
-        text: t('status_done')
-      },
-      'status_pending': { 
-        color: 'bg-purple-200 text-purple-800',
-        text: t('status_pending')
-      },
-      // Default
-      'default': {
-        color: 'bg-gray-200 text-gray-800',
-        text: status || t('not_assigned')
-      }
-    };
-    
-    const statusInfo = statusMap[status] || statusMap['default'];
-    return (
-      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.color}`}>
-        {statusInfo.text}
-      </span>
-    );
-  };
-
-  const getPriorityBadge = (priority) => {
-    const priorityMap = {
-      // English priorities
-      'high': {
-        color: 'bg-red-200 text-red-800',
-        text: t('high')
-      },
-      'medium': {
-        color: 'bg-orange-200 text-orange-800',
-        text: t('medium')
-      },
-      'low': {
-        color: 'bg-blue-200 text-blue-800',
-        text: t('low')
-      },
-      // French priorities
-      'haute': {
-        color: 'bg-red-200 text-red-800',
-        text: t('high')
-      },
-      'moyenne': {
-        color: 'bg-orange-200 text-orange-800',
-        text: t('medium')
-      },
-      'basse': {
-        color: 'bg-blue-200 text-blue-800',
-        text: t('low')
-      },
-      // Priority with prefix
-      'priority_high': {
-        color: 'bg-red-200 text-red-800',
-        text: t('high')
-      },
-      'priority_medium': {
-        color: 'bg-orange-200 text-orange-800',
-        text: t('medium')
-      },
-      'priority_low': {
-        color: 'bg-blue-200 text-blue-800',
-        text: t('low')
-      },
-      // Default
-      'default': {
-        color: 'bg-gray-200 text-gray-700',
-        text: t('not_assigned')
-      }
-    };
-    
-    const priorityInfo = priorityMap[priority] || priorityMap['default'];
-    return (
-      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${priorityInfo.color}`}>
-        {priorityInfo.text}
-      </span>
-    );
-  };
-
-  const handleDelete = async () => {
-    setDeleteLoading(true);
-    try {
-      await router.delete(route('projects.destroy', project.id), {
-        preserveScroll: true,
-        onSuccess: () => {
-          setShowDeleteModal(false);
-          // Une notification de succès sera affichée via Inertia
-        },
-        onError: () => {
-          setDeleteLoading(false);
-        },
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-      });
-    } catch (e) {
-      setDeleteLoading(false);
+      y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.05)' }, ticks: { stepSize: 1 } },
+      x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } } }
     }
   };
 
   return (
-    <>
-      <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
-        {/* Header sticky */}
-        <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-4 px-4">
-            <div className="flex items-center gap-3">
-                <FaProjectDiagram className="text-2xl text-blue-600" />
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">{t('project_details_title')}</h1>
-            </div>
-            <Link
-                href="/projects"
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 font-semibold transition flex items-center justify-center gap-2 rounded-lg"
-            >
-                <FaArrowLeft /> {t('back_to_projects')}
-            </Link>
-          </div>
-        </header>
-        <main className="w-full flex flex-col items-center p-2 sm:p-4">
-          <div className="w-full max-w-full px-2 sm:px-4">
-
-            {flash.success && (
-              <div className="mb-6 px-4 py-3 rounded-lg bg-green-100 text-green-800 font-semibold border border-green-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <main className="w-full">
+          {/* Messages flash */}
+          {flash.success && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+              <div className="px-4 py-3 rounded-md bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 font-medium">
                 {flash.success}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Informations du projet */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
-              {/* Carte principale du projet */}
-              <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                    <FaProjectDiagram className="text-white text-2xl" />
+          {/* En-tête du projet */}
+          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                    <FaProjectDiagram className="text-white text-xl" />
                   </div>
                   <div>
-                    <h2 className="text-3xl font-extrabold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent dark:from-blue-400 dark:to-blue-300">
-                      {project.name}
-                    </h2>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      <FaCalendarAlt className="text-blue-500" />
-                      <span>{t('project_created_on')} {new Date(project.created_at).toLocaleDateString(i18n.language, {day: '2-digit', month: 'long', year: 'numeric'})}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-6">
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                      <FaClipboardList className="text-blue-500" /> {t('project_description_label')}
-                    </h3>
-                    <p className="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-100 dark:border-gray-600 mb-4">
-                      {project.description || t('no_description')}
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{project.name}</h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
+                      <FaCalendarAlt className="text-xs" />
+                      {new Date(project.created_at).toLocaleDateString(i18n.language, {day: '2-digit', month: 'long', year: 'numeric'})}
                     </p>
                   </div>
-                  
-                  {project.meeting_link && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                        <FaGlobe className="text-blue-500" /> {t('meeting_link_title')}
-                      </h3>
-                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
-                        <a 
-                          href={project.meeting_link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 break-all flex items-center gap-2"
-                        >
-                          <FaExternalLinkAlt className="flex-shrink-0" />
-                          {project.meeting_link}
-                        </a>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                          {t('click_to_join_meeting')}
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </div>
-
-              {/* Carte des membres */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">{t('project_members')} ({project.users?.length || 0})</h3>
-                  <Link 
-                    href={route('project-users.show', project.id)}
-                    className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1"
-                  >
-                    <FaEye className="text-sm" />
-                    <span>{t('view_all')}</span>
-                  </Link>
-                </div>
-                <div className="space-y-3">
-                  {project.users && project.users.length > 0 ? (
-                    project.users.map(user => (
-                      <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                        <div className="relative">
-                          <img 
-                            src={user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3b82f6&color=fff`} 
-                            alt={user.name} 
-                            className="w-11 h-11 rounded-full border-2 border-blue-200 dark:border-blue-800 object-cover" 
-                          />
-                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-gray-800 dark:text-gray-200 truncate">{user.name}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.email}</div>
-                          <div className="flex items-center justify-between mt-2">
-                            <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
-                              user.role === 'admin' 
-                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
-                                : user.role === 'manager' 
-                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                  : user.role === 'observer'
-                                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            }`}>
-                              {user.role === 'admin' ? (
-                                <FaShieldAlt className="text-red-500" />
-                              ) : user.role === 'manager' ? (
-                                <FaCrown className="text-yellow-500" />
-                              ) : user.role === 'observer' ? (
-                                <FaEye className="text-purple-500" />
-                              ) : (
-                                <FaUser className="text-blue-500" />
-                              )}
-                              {user.role === 'admin' 
-                                ? t('admin') 
-                                : user.role === 'manager' 
-                                  ? t('manager')
-                                  : user.role === 'observer'
-                                    ? t('observer')
-                                    : t('member')}
-                            </div>
-                            {user.pivot_created_at && (
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {new Date(user.pivot_created_at).toLocaleDateString('fr-FR')}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-6 text-gray-400 dark:text-gray-500">
-                      <FaUserFriends className="mx-auto text-3xl mb-2" />
-                      <p>{t('no_members_in_project')}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Actions Rapides */}
-            <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
-              <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
-                <FaBolt className="text-yellow-500" />
-                <span>{t('quick_actions')}</span>
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Bouton Ajouter un Sprint */}
                 <Link
-                  href={route('projects.sprints.create', { project: project.id })}
-                  className="group relative overflow-hidden bg-gradient-to-br from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white p-4 rounded-xl flex flex-col items-center justify-center text-center h-full min-h-[120px]"
+                  href="/projects"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium transition-all self-start sm:self-center"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="relative z-10">
-                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3 mx-auto">
-                      <FaRocket className="text-2xl text-white" />
-                    </div>
-                    <h4 className="font-semibold text-lg mb-1">{t('add_sprint')}</h4>
-                    <p className="text-sm opacity-80">{t('plan_new_goal')}</p>
-                  </div>
+                  <FaArrowLeft className="text-sm" />
+                  {t('back_to_projects')}
                 </Link>
-
-                {/* Bouton Ajouter un Membre */}
-                {(isAdmin || isManager) && (
-                  <Link
-                    href={route('project-users.create')}
-                    className="group relative overflow-hidden bg-gradient-to-br from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white p-4 rounded-xl flex flex-col items-center justify-center text-center h-full min-h-[120px]"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div className="relative z-10">
-                      <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3 mx-auto">
-                        <FaUserPlus className="text-2xl text-white" />
-                      </div>
-                      <h4 className="font-semibold text-lg mb-1">{t('add_member')}</h4>
-                      <p className="text-sm opacity-80">{t('collaborate_in_team')}</p>
-                    </div>
-                  </Link>
-                )}
-
-                {/* Bouton Ajouter une Tâche */}
-                <Link
-                  href={route('tasks.create', { project_id: project.id })}
-                  className="group relative overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white p-4 rounded-xl flex flex-col items-center justify-center text-center h-full min-h-[120px]"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="relative z-10">
-                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3 mx-auto">
-                      <FaTasks className="text-2xl text-white" />
-                    </div>
-                    <h4 className="font-semibold text-lg mb-1">{t('add_task')}</h4>
-                    <p className="text-sm opacity-80">{t('create_new_activity')}</p>
-                  </div>
-                </Link>
-
-                {/* Bouton Exporter le suivi */}
-                <div className="relative group h-full">
-                  <button 
-                    className="w-full h-full group relative overflow-hidden bg-gradient-to-br from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white p-4 rounded-xl flex flex-col items-center justify-center text-center min-h-[120px]"
-                  >
-                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3 mx-auto">
-                      <FaFileExport className="text-2xl text-white" />
-                    </div>
-                    <h4 className="font-semibold text-lg mb-1">{t('export')}</h4>
-                    <p className="text-sm opacity-80">{t('download_reports')}</p>
-                    <FaChevronDown className="absolute bottom-2 right-2 text-white/50 group-hover:text-white transition-colors" />
-                  </button>
-                  
-                  <div className="absolute z-20 hidden group-hover:block w-full bg-white dark:bg-gray-800 rounded-xl overflow-hidden mt-2 border border-gray-200 dark:border-gray-700">
-                    <a 
-                      href={`/projects/${project.id}/suivi-global/txt`}
-                      className="block px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                        <FaFileAlt className="text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="text-left">
-                        <div className="font-medium">{t('txt_format')}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('simple_and_light')}</div>
-                      </div>
-                    </a>
-                    <a 
-                      href={`/projects/${project.id}/suivi-global/pdf`}
-                      className="block px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors border-t border-gray-100 dark:border-gray-700"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
-                        <FaFilePdf className="text-red-600 dark:text-red-400" />
-                      </div>
-                      <div className="text-left">
-                        <div className="font-medium">{t('pdf_format')}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('ideal_for_sharing')}</div>
-                      </div>
-                    </a>
-                    <a 
-                      href={`/projects/${project.id}/suivi-global/docx`}
-                      className="block px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors border-t border-gray-100 dark:border-gray-700"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                        <FaFileWord className="text-blue-700 dark:text-blue-400" />
-                      </div>
-                      <div className="text-left">
-                        <div className="font-medium">{t('word_format')}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('easily_editable')}</div>
-                      </div>
-                    </a>
-                  </div>
-                </div>
-                {(isAdmin || isManager) ? (
-                  <>
-                    <Link
-                      href={`/tasks/create?project_id=${project.id}`}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-3 rounded-lg font-medium"
-                    >
-                      <FaTasks className="text-lg" />
-                      <span>{t('create_task')}</span>
-                    </Link>
-
-                    <Link
-                     href={route('project-users.show', project.id)}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-4 py-3 rounded-lg font-medium"
-                    >
-                      <FaUserFriends className="text-lg" />
-                      <span>{t('view_members')}</span>
-                    </Link>
-
-                    <Link
-                      href={`/projects/${project.id}/edit`}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-3 rounded-lg font-medium"
-                    >
-                      <FaEdit className="text-lg" />
-                      <span>{t('edit_project')}</span>
-                    </Link>
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-3 rounded-lg font-medium w-full"
-                    >
-                      <FaTrash className="text-lg" />
-                      <span>{t('delete_project')}</span>
-                    </button>
-                  </>
-                ) : (
-                  <div className="col-span-full text-center text-gray-500 dark:text-gray-400 text-sm italic p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    {t('only_admin_manager_actions')}
-                  </div>
-                )}
               </div>
-            </div>
-
-            {/* Graphique d'évolution des tâches */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                  <FaChartLine className="text-blue-500" /> {t('tasks_evolution_title')}
-                </h3>
-                <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                  <div className="flex items-center gap-1 text-sm">
-                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                    <span className="text-gray-600 dark:text-gray-300">{t('tasks_total')}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-sm">
-                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                    <span className="text-gray-600 dark:text-gray-300">{t('tasks_completed')}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="h-64 sm:h-72 w-full">
-                <Line data={trendChartData} options={chartOptions} />
-              </div>
-              
-              <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                <p>{t('tasks_evolution_description')}</p>
-                <p className="text-xs mt-1">{t('tasks_evolution_note')}</p>
-              </div>
-              
-              <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
-                <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{stats.todoTasksCount || 0}</span> {t('tasks_todo')}
-                </div>
-                <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{stats.inProgressTasksCount || 0}</span> {t('tasks_in_progress')}
-                </div>
-                <div className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{stats.doneTasksCount || 0}</span> {t('tasks_done')}
-                </div>
-                <div className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full">
-                  <span className="font-semibold">{stats.totalTasks || 0}</span> {t('tasks_total_count')}
-                </div>
-              </div>
-            </div>
-
-            {/* Tâches du projet */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                  <FaTasks className="text-blue-500" /> {t('tasks_section_title')} ({tasks?.total || 0})
-                </h3>
-                
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link 
-                    href={route('tasks.create', { project_id: project.id })}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors duration-200 whitespace-nowrap"
-                  >
-                    <FaPlus size={12} />
-                    <span>{t('new_task')}</span>
-                  </Link>
-                  
-                  {tasks?.meta && (
-                    <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      <span className="font-medium">{tasks.meta.from || 0}-{tasks.meta.to || 0}</span> {t('showing_results', { from: tasks.meta.from || 0, to: tasks.meta.to || 0, total: tasks.meta.total || 0 })}
-                      <span className="font-medium">{tasks.meta.total || 0}</span> {t('tasks', { count: tasks.meta.total || 0 })}
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {(!tasks?.data || tasks.data.length === 0) ? (
-                <div className="text-center py-12 px-4">
-                  <FaTasks className="text-5xl mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">{t('no_tasks_for_project')}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{t('create_first_task')}</p>
-                  <Link 
-                    href={route('tasks.create', { project_id: project.id })}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200"
-                  >
-                    <FaPlus />
-                    <span>{t('create_task')}</span>
-                  </Link>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-700/50">
-                      <tr>
-                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          {t('task')}
-                        </th>
-                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
-                          {t('assigned_to')}
-                        </th>
-                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          {t('status.label')}
-                        </th>
-                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          {t('priority.label')}
-                        </th>
-                        <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
-                          {t('deadline')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {tasks.data && tasks.data.map(task => (
-                        <tr 
-                          key={task.id} 
-                          className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition cursor-pointer"
-                          onClick={() => router.visit(route('tasks.show', task.id))}
-                        >
-                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0 mr-3">
-                                {getStatusInfo(task.status, t).icon}
-                              </div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                                {task.title}
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs">
-                              {task.description ? 
-                                (task.description.split(' ').slice(0, 2).join(' ') + (task.description.split(' ').length > 2 ? '...' : '')) : 
-                                t('no_description_short')}
-                            </div>
-                          </td>
-                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
-                            {task.assigned_user ? (
-                              <div className="flex items-center">
-                                <img 
-                                  className="h-8 w-8 rounded-full mr-3" 
-                                  src={task.assigned_user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_user.name)}&background=3b82f6&color=fff`} 
-                                  alt={task.assigned_user.name} 
-                                />
-                                <div className="text-sm text-gray-900 dark:text-gray-100">
-                                  {task.assigned_user.name}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="text-sm text-gray-500 dark:text-gray-400">{t('unassigned')}</span>
-                            )}
-                          </td>
-                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
-                            <div className="flex items-center">
-                              {getStatusBadge(task.status)}
-                            </div>
-                          </td>
-                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap">
-                            <div className="flex items-center">
-                              {getPriorityBadge(task.priority)}
-                            </div>
-                          </td>
-                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {task.due_date ? new Date(task.due_date).toLocaleDateString(i18n.language, {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            }) : '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  
-                  {/* Pagination */}
-                  {tasks.links && tasks.links.length > 3 && (
-                    <div className="mt-6 flex items-center justify-between px-6 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 sm:px-6 rounded-b-lg">
-                      <div className="flex-1 flex justify-between sm:hidden">
-                        {tasks.links[0].url && (
-                          <Link 
-                            href={tasks.links[0].url} 
-                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700"
-                            preserveScroll
-                          >
-                            {t('previous')}
-                          </Link>
-                        )}
-                        {tasks.links[tasks.links.length - 1].url && (
-                          <Link 
-                            href={tasks.links[tasks.links.length - 1].url} 
-                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700"
-                            preserveScroll
-                          >
-                            {t('next')}
-                          </Link>
-                        )}
-                      </div>
-                      <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">
-                            {t('showing_results_range', { from: tasks.meta.from, to: tasks.meta.to, total: tasks.meta.total })}
-                          </p>
-                        </div>
-                        <div>
-                          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                            {tasks.links.map((link, index) => (
-                              <Link
-                                key={index}
-                                href={link.url || '#'}
-                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                                  link.active
-                                    ? 'z-10 bg-blue-50 border-blue-500 text-blue-600 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-200'
-                                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
-                                } ${!link.url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                preserveScroll
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                              />
-                            ))}
-                          </nav>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Statistiques et graphique */}
-          <div className="w-full max-w-full px-2 sm:px-4 mb-8">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                <StatCard icon={<FaCheckCircle className="text-green-500 text-3xl" />} label={t('completed_tasks')} value={stats.doneTasksCount ?? 0} />
-                <StatCard icon={<FaFileAlt className="text-blue-500 text-3xl" />} label={t('files')} value={stats.filesCount ?? 0} />
-                <StatCard icon={<FaCommentDots className="text-purple-500 text-3xl" />} label={t('comments')} value={stats.commentsCount ?? 0} />
-                <StatCard icon={<FaUsers className="text-yellow-500 text-3xl" />} label={t('members')} value={project.users?.length ?? 0} />
+          {/* Contenu principal */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {/* Layout en 2 colonnes */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Colonne principale */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Carte infos projet */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <FaClipboardList className="text-blue-500" />
+                  {t('project_description_label')}
+                </h3>
+                <p className="text-gray-700 dark:text-gray-300 leading-relaxed bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  {project.description || t('no_description')}
+                </p>
+
+                {project.meeting_link && (
+                  <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaGlobe className="text-blue-600 dark:text-blue-400" />
+                      <span className="font-semibold text-blue-900 dark:text-blue-200">{t('meeting_link_title')}</span>
+                    </div>
+                    <a 
+                      href={project.meeting_link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm break-all flex items-center gap-1"
+                    >
+                      <FaExternalLinkAlt className="text-xs flex-shrink-0" />
+                      {project.meeting_link}
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Stats en cartes */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard icon={<FaCheckCircle className="text-emerald-500 text-2xl" />} label={t('completed_tasks')} value={stats.doneTasksCount ?? 0} color="emerald" />
+                <StatCard icon={<FaClock className="text-blue-500 text-2xl" />} label={t('tasks_in_progress')} value={stats.inProgressTasksCount ?? 0} color="blue" />
+                <StatCard icon={<FaFileAlt className="text-purple-500 text-2xl" />} label={t('files')} value={stats.filesCount ?? 0} color="purple" />
+                <StatCard icon={<FaCommentDots className="text-amber-500 text-2xl" />} label={t('comments')} value={stats.commentsCount ?? 0} color="amber" />
+              </div>
+
+              {/* Liste des tâches */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <FaTasks className="text-blue-500" />
+                    {t('tasks_section_title')} ({tasks?.total || 0})
+                  </h3>
+                  <Link 
+                    href={route('tasks.create', { project_id: project.id })}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <FaPlus className="text-xs" />
+                    {t('new_task')}
+                  </Link>
+                </div>
+
+                {(!tasks?.data || tasks.data.length === 0) ? (
+                  <div className="text-center py-12">
+                    <FaTasks className="text-4xl mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">{t('no_tasks_for_project')}</p>
+                    <Link 
+                      href={route('tasks.create', { project_id: project.id })}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg"
+                    >
+                      <FaPlus />
+                      {t('create_task')}
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {displayedTasks.map(task => (
+                      <div
+                        key={task.id}
+                        onClick={() => router.visit(route('tasks.show', task.id))}
+                        className="group p-4 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-xl border border-gray-200 dark:border-gray-600 hover:border-blue-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-1">
+                              {task.title}
+                            </h4>
+                            {task.description && (
+                              <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
+                                {task.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${getPriorityInfo(task.priority, t).color}`}>
+                                {getPriorityInfo(task.priority, t).icon}
+                                {getPriorityInfo(task.priority, t).text}
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${getStatusInfo(task.status, t).color}`}>
+                                {getStatusInfo(task.status, t).icon}
+                                {getStatusInfo(task.status, t).text}
+                              </span>
+                            </div>
+                          </div>
+                          {task.assigned_user && (
+                            <div className="flex items-center gap-2">
+                              <img 
+                                src={task.assigned_user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_user.name)}`}
+                                alt={task.assigned_user.name}
+                                className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {hasMoreTasks && !showAllTasks && (
+                      <div className="mt-4 text-center">
+                        <Link
+                          href={route('tasks.index', { project: project.id })}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          {t('show_all_tasks')} ({tasks.data.length})
+                          <FaArrowDown className="text-xs" />
+                        </Link>
+                      </div>
+                    )}
+                    
+                    {showAllTasks && (
+                      <div className="mt-4 text-center">
+                        <button
+                          onClick={() => setShowAllTasks(false)}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          {t('show_less')}
+                          <FaArrowUp className="text-xs" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                <FaUsers /> {t('tasks_completed_by_member')}
-              </h3>
-              <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                {project.users?.map(user => {
-                  const tasksData = tasks.data || [];
-                  const userDoneTasks = tasksData.filter(t => t.status === 'done' && t.assigned_to === user.id);
-                  return (
-                    <li key={user.id} className="flex flex-col md:flex-row md:items-center justify-between py-3 gap-2">
-                      <span className="flex items-center gap-3 min-w-[180px]">
-                        <img src={user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`} alt={user.name} className="w-8 h-8 rounded-full border" />
-                        <span className="font-semibold text-gray-700 dark:text-gray-200">{user.name}</span>
-                      </span>
-                      <span className="flex-1 flex flex-wrap gap-2 items-center">
-                        {userDoneTasks.length > 0 ? userDoneTasks.map(t => (
-                          <span key={t.id} className="inline-flex items-center px-2.5 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded-full border border-green-200 dark:border-green-700">
-                            <FaCheckCircle className="mr-1.5 text-green-500" /> {t.title}
+            {/* Sidebar droite */}
+            <div className="space-y-6">
+              {/* Actions rapides compactes */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3 uppercase tracking-wide">
+                  {t('quick_actions')}
+                </h3>
+                <div className="space-y-2">
+                  <Link
+                    href={route('projects.sprints.create', { project: project.id })}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-colors group"
+                  >
+                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <FaRocket className="text-white text-sm" />
+                    </div>
+                    <span className="font-medium text-sm">{t('add_sprint')}</span>
+                  </Link>
+
+                  {(isAdmin || isManager) && (
+                    <Link
+                      href={route('project-users.create')}
+                      className="flex items-center gap-3 w-full px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors group"
+                    >
+                      <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <FaUserPlus className="text-white text-sm" />
+                      </div>
+                      <span className="font-medium text-sm">{t('add_member')}</span>
+                    </Link>
+                  )}
+
+                  <Link
+                    href={route('tasks.create', { project_id: project.id })}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors group"
+                  >
+                    <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <FaTasks className="text-white text-sm" />
+                    </div>
+                    <span className="font-medium text-sm">{t('add_task')}</span>
+                  </Link>
+
+                  {/* Export dropdown */}
+                  <div className="relative group/export">
+                    <button className="flex items-center gap-3 w-full px-3 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg transition-colors">
+                      <div className="w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center">
+                        <FaFileExport className="text-white text-sm" />
+                      </div>
+                      <span className="font-medium text-sm flex-1 text-left">{t('export')}</span>
+                      <FaChevronDown className="text-xs" />
+                    </button>
+                    
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg border border-gray-200 shadow-lg opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all z-50">
+                      <a 
+                        href={`/projects/${project.id}/suivi-global/txt`}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
+                          <FaFileAlt className="text-blue-600 text-sm" />
+                        </div>
+                        <div className="text-left">
+                          <div className="font-medium">{t('txt_format')}</div>
+                          <div className="text-xs text-gray-500">{t('simple_and_light')}</div>
+                        </div>
+                      </a>
+                      <a 
+                        href={`/projects/${project.id}/suivi-global/pdf`} 
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <div className="w-6 h-6 bg-red-100 rounded flex items-center justify-center">
+                          <FaFilePdf className="text-red-600 text-sm" />
+                        </div>
+                        <div className="text-left">
+                          <div className="font-medium">PDF</div>
+                          <div className="text-xs text-gray-500">{t('ideal_for_sharing')}</div>
+                        </div>
+                      </a>
+                      <a 
+                        href={`/projects/${project.id}/suivi-global/docx`} 
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <div className="w-6 h-6 bg-blue-50 rounded flex items-center justify-center">
+                          <FaFileWord className="text-blue-700 text-sm" />
+                        </div>
+                        <div className="text-left">
+                          <div className="font-medium">Word</div>
+                          <div className="text-xs text-gray-500">{t('easily_editable')}</div>
+                        </div>
+                      </a>
+                    </div>
+                  </div>
+
+                  {(isAdmin || isManager) && (
+                    <>
+                      <Link
+                        href={`/projects/${project.id}/edit`}
+                        className="flex items-center gap-3 w-full px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors group"
+                      >
+                        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <FaEdit className="text-white text-sm" />
+                        </div>
+                        <span className="font-medium text-sm">{t('edit_project')}</span>
+                      </Link>
+                      
+                      <button
+                        onClick={() => setShowDeleteModal(true)}
+                        className="flex items-center gap-3 w-full px-3 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors group"
+                      >
+                        <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <FaTrash className="text-white text-sm" />
+                        </div>
+                        <span className="font-medium text-sm">{t('delete_project')}</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Membres */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">
+                    {t('project_members')} ({project.users?.length || 0})
+                  </h3>
+                  <Link href={route('project-users.show', project.id)} className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
+                    {t('view_all')}
+                  </Link>
+                </div>
+                <div className="space-y-2">
+                  {project.users && project.users.slice(0, 5).map(user => (
+                    <div key={user.id} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <img 
+                        src={user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}` }
+                        alt={user.name}
+                        className="w-9 h-9 rounded-full border-2 border-white dark:border-gray-800 shadow-sm"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                      </div>
+                      {user.role === 'admin' ? (
+                        <FaShieldAlt className="text-red-500 text-sm flex-shrink-0" />
+                      ) : user.role === 'manager' ? (
+                        <FaCrown className="text-amber-500 text-sm flex-shrink-0" />
+                      ) : (
+                        <FaUser className="text-blue-500 text-sm flex-shrink-0" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Progression par membre */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wide">
+                  {t('tasks_completed_by_member')}
+                </h3>
+                <div className="space-y-3">
+                  {project.users?.slice(0, 4).map(user => {
+                    const tasksData = tasks.data || [];
+                    const userDoneTasks = tasksData.filter(t => t.status === 'done' && t.assigned_to === user.id);
+                    return (
+                      <div key={user.id} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src={user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`} 
+                            className="w-7 h-7 rounded-full border border-gray-200 dark:border-gray-600"
+                            alt={user.name}
+                          />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{user.name.split(' ')[0]}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-emerald-500" 
+                                style={{width: `${Math.min((userDoneTasks.length / (tasksData.length || 1)) * 100, 100)}%`}}
+                              ></div>
+                          </div>
+                          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                            {userDoneTasks.length}
                           </span>
-                        )) : <span className="text-gray-400 text-xs italic">{t('no_completed_tasks')}</span>}
-                      </span>
-                      <span className="text-blue-600 font-bold text-lg min-w-[32px] text-right">{stats.doneTasksByUser?.[user.id] ?? 0}</span>
-                    </li>
+                        </div>
+                    </div>
                   );
                 })}
-              </ul>
+                </div>
+              </div>
             </div>
           </div>
-        </main>
-      </div>
 
-      {/* Modal de confirmation de suppression */}
-      <Modal show={showDeleteModal} onClose={() => setShowDeleteModal(false)} maxWidth="md">
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-              <FaTrash className="text-red-600 text-xl" />
+          {/* Graphique en pleine largeur en bas */}
+          <div className="mt-6 bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <FaChartLine className="text-blue-500" />
+                {t('tasks_evolution')}
+              </h3>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                  <span className="text-gray-600 dark:text-gray-300">{t('total_tasks')}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                  <span className="text-gray-600 dark:text-gray-300">{t('completed_tasks')}</span>
+                </div>
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-gray-800">{t('confirm_deletion')}</h2>
-          </div>
-          
-          <div className="mb-6">
-            <p className="text-gray-700 dark:text-gray-300 mb-3">
-              {t('confirm_delete_project', { name: project.name })}
-            </p>
-            <div className="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg border border-red-200 dark:border-red-700">
-              <p className="text-red-700 dark:text-red-300 text-sm font-semibold mb-2 flex items-center gap-2">
-                <FaExclamationTriangle /> {t('irreversible_action')}
-              </p>
-              <p className="text-red-600 dark:text-red-400 text-sm">
-                {t('delete_warning')}
-              </p>
+            <div className="h-64">
+              <Line data={trendChartData} options={chartOptions} />
             </div>
           </div>
-          
-          <div className="flex justify-end gap-3">
-            <button
-              className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold transition"
-              onClick={() => setShowDeleteModal(false)}
-              disabled={deleteLoading}
-            >
-              {t('cancel')}
-            </button>
-            <button
-              className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition flex items-center gap-2 disabled:opacity-50"
-              onClick={handleDelete}
-              disabled={deleteLoading}
-            >
-              {deleteLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  {t('deleting_project')}...
-                </>
-              ) : (
-                <>
-                  <FaTrash /> {t('delete_project_permanently')}
-                </>
-              )}
-            </button>
-          </div>
+
+          {/* Modal suppression */}
+          <Modal show={showDeleteModal} onClose={() => setShowDeleteModal(false)} maxWidth="md">
+            <div className="p-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 mx-auto bg-red-100 rounded-full flex items-center justify-center">
+                  <FaExclamationTriangle className="w-6 h-6 text-red-600" />
+                </div>
+              </div>
+              <div className="text-center">
+                <h3 className="text-lg font-medium text-gray-900">{t('delete_project_title')}</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  {t('delete_project_confirm', { name: project.name })}
+                </p>
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleteLoading}
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  onClick={handleDelete}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? (
+                    <FaSpinner className="animate-spin -ml-1 mr-2 h-4 w-4 inline" />
+                  ) : (
+                    <FaTrash className="mr-2 h-4 w-4 inline" />
+                  )}
+                  {deleteLoading ? t('deleting') : t('delete_project_permanently')}
+                </button>
+              </div>
+            </div>
+          </Modal>
         </div>
-      </Modal>
-    </>
+      </main>
+    </div>
   );
 }
 
-const StatCard = ({ icon, label, value }) => (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-xl transition-shadow duration-300 ease-in-out">
+const StatCard = ({ icon, label, value, color }) => {
+  const colorClasses = {
+    emerald: 'from-emerald-50 to-emerald-100 border-emerald-200',
+    blue: 'from-blue-50 to-blue-100 border-blue-200',
+    purple: 'from-purple-50 to-purple-100 border-purple-200',
+    amber: 'from-amber-50 to-amber-100 border-amber-200',
+  };
+
+  return (
+    <div className={`bg-gradient-to-br ${colorClasses[color]} rounded-xl p-4 border shadow-sm`}>
+      <div className="flex items-center justify-between mb-2">
         {icon}
-        <div className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 mt-2">{value}</div>
-        <div className="text-gray-500 dark:text-gray-400 text-sm mt-1">{label}</div>
+      </div>
+      <div className="text-2xl font-bold text-gray-900">{value}</div>
+      <div className="text-xs text-gray-600 mt-1">{label}</div>
     </div>
   );
+};
 
-Show.layout = page => (
-  <AdminLayout>
-    {page}
-  </AdminLayout>
-);
+Show.layout = page => <AdminLayout>{page}</AdminLayout>;
 
 export default Show;
