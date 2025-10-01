@@ -451,6 +451,7 @@
   "no_comments": "Aucun commentaire pour l’instant",
   "cancel": "Annuler",
   "delete": "Supprimer",
+  "no_discussion_yet": "Aucune discussion pour l’instant",
   "uploading": "Téléversement en cours...",
   "upload_error": "Erreur lors du téléversement du fichier",
   "file_too_large": "Fichier trop volumineux (max 10 Mo)",

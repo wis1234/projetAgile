@@ -414,6 +414,7 @@
     "no_comments": "No comments yet",
     "cancel": "Cancel",
     "delete": "Delete",
+    "no_discussion_yet": "No discussion yet",
     "uploading": "Uploading...",
     "upload_error": "Error uploading file",
     "file_too_large": "File is too large (max 10MB)",
