@@ -96,7 +96,7 @@
         <div class="card">
             <!-- Salutation -->
             @if(isset($greeting) && $greeting)
-                <h4 style="margin-top: 0; color: #1f2937;">{{ $greeting }}</h4>
+                <h2 style="margin-top: 0; color: #1f2937;">{{ $greeting }}</h2>
             @endif
             
             <!-- Contenu du message -->
