@@ -53,6 +53,7 @@
     "low": "low",
     "medium": "Medium",
     "high": "High",
+    "label": "Priority",
     "urgent": "Urgent",
     "critical": "Critical"
   },
@@ -452,7 +453,8 @@
       "rejected":"Rejected",
       "todo":"To Do",
       "in_progress":"In Progress",
-      "done":"Done"
+      "done":"Done",
+      "label":"Status"
       
     },
     "payment_method":"Payment Method",

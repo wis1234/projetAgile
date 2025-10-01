@@ -848,10 +848,10 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                           {t('assigned_to')}
                         </th>
                         <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          {t('status')}
+                          {t('status.label')}
                         </th>
                         <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          {t('priority')}
+                          {t('priority.label')}
                         </th>
                         <th scope="col" className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                           {t('deadline')}

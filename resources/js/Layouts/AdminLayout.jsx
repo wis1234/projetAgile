@@ -362,7 +362,7 @@ export default function AdminLayout({ children }) {
           </button>
           <div className="flex items-center">
             <span className="text-xl md:text-2xl font-light tracking-wider text-gray-700 dark:text-white">
-              ProJA DASHBOARD
+              ProJA
             </span>
             <span className="ml-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-medium rounded-full border border-blue-100 dark:border-blue-800">
               v1.0

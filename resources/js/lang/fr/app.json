@@ -337,11 +337,14 @@
     "done": "Terminé",
     "pending": "En attente",
     "validated": "Validé",
+    "label": "Statut",
     "paid": "Payé"
+
   },
   "priority": {
     "low": "Basse",
     "medium": "Moyenne",
+    "label": "Priorité",
     "high": "Haute"
   },
   "task_stats": {
@@ -516,6 +519,7 @@
     "pending": "En attente",
     "paid": "Payé",
     "rejected": "Rejeté"
+
   },
   "payment_method": "Méthode de paiement",
   "methods": {
