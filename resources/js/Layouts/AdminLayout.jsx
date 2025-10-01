@@ -123,7 +123,9 @@ export default function AdminLayout({ children }) {
   // Available languages with their display names and flag codes
   const languages = [
     { code: 'fr', name: 'Français', flag: 'fr' },
-    { code: 'en', name: 'English', flag: 'gb' }
+    { code: 'en', name: 'English', flag: 'gb' },
+    { code: 'fon', name: 'Fɔngbè', flag: 'bj' },
+    { code: 'yo', name: 'Yorùbá', flag: 'ng' }
   ];
 
   useEffect(() => {

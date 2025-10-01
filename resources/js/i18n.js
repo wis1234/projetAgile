@@ -3,6 +3,8 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import enTranslations from './lang/en/app.json';
 import frTranslations from './lang/fr/app.json';
+import fonTranslations from './lang/fon/app.json';
+import yoTranslations from './lang/yo/app.json';
 
 // the translations
 const resources = {
@@ -11,6 +13,12 @@ const resources = {
   },
   fr: {
     translation: frTranslations
+  },
+  fon: {
+    translation: fonTranslations
+  },
+  yo: {
+    translation: yoTranslations
   }
 };
 
