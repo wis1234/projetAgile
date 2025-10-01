@@ -10,6 +10,7 @@ use App\Models\Sprint;
 use App\Events\TaskUpdated;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Notifications\UserActionMailNotification;
+use App\Notifications\TaskAssignedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
@@ -151,18 +152,13 @@ class TaskController extends Controller
                 'uploaded_by' => auth()->id()
             ]);
             
-            // Envoyer une notification à tous les membres du projet
-            $project->notifyMembers('task_created', [
-                'task_id' => $task->id,
-                'task_title' => $task->title,
-                'task_description' => $task->description,
-                'task_status' => $task->status,
-                'task_priority' => $task->priority,
-                'assigned_to' => $task->assigned_to ? $task->assignedUser->name : 'Non assigné',
-                'due_date' => $task->due_date ? $task->due_date->format('d/m/Y') : 'Non définie',
-                'created_by' => auth()->user()->name,
-                'project_name' => $project->name,
-            ]);
+            // Si la tâche est assignée à quelqu'un, envoyer uniquement la notification personnalisée
+            if ($task->assigned_to) {
+                $assignedUser = \App\Models\User::find($task->assigned_to);
+                if ($assignedUser) {
+                    $assignedUser->notify(new TaskAssignedNotification($task));
+                }
+            }
         }
 
         return redirect()->route('tasks.index')
@@ -361,7 +357,16 @@ class TaskController extends Controller
         // Mettre à jour la tâche
         $task->update($validated);
 
-        // Si le statut a changé ou si la tâche a été réassignée, envoyer une notification
+        // Vérifier si la tâche a été assignée à un nouvel utilisateur
+        if ($oldAssignee != $task->assigned_to && $task->assigned_to) {
+            $assignedUser = \App\Models\User::find($task->assigned_to);
+            if ($assignedUser) {
+                // Envoyer une notification personnalisée au nouvel utilisateur assigné
+                $assignedUser->notify(new TaskAssignedNotification($task));
+            }
+        }
+        
+        // Si le statut a changé ou si la tâche a été réassignée, envoyer une notification aux membres du projet
         if ($oldStatus !== $task->status || $oldAssignee != $task->assigned_to) {
             $project = $task->project;
             if ($project) {
