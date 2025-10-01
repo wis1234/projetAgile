@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { router, Link, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { 
     FaUserPlus, 
@@ -10,7 +11,9 @@ import {
     FaCrown,
     FaShieldAlt,
     FaInfoCircle,
-    FaSpinner
+    FaSpinner,
+    FaSearch,
+    FaTimes
 } from 'react-icons/fa';
 
 export default function Create({ projects = [], users = [], roles = [] }) {
@@ -20,6 +23,10 @@ export default function Create({ projects = [], users = [], roles = [] }) {
         user_id: '',
         role: '',
     });
+    const [searchEmail, setSearchEmail] = useState('');
+    const [searchResults, setSearchResults] = useState(null);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchError, setSearchError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [notification, setNotification] = useState(null);
 
@@ -40,27 +47,60 @@ export default function Create({ projects = [], users = [], roles = [] }) {
         setValues({ ...values, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (!values.project_id || !values.user_id || !values.role) {
+            setNotification({
+                type: 'error',
+                message: 'Veuillez remplir tous les champs requis.'
+            });
+            return;
+        }
+        
         setSubmitting(true);
         
-        router.post(route('project-users.store'), values, {
-            onSuccess: () => {
-                setNotification({ type: 'success', message: 'Membre ajouté avec succès!' });
+        try {
+            const response = await axios.post(route('project-users.store'), values);
+            
+            if (response.data.success) {
+                setNotification({ 
+                    type: 'success', 
+                    message: response.data.message || 'Membre ajouté avec succès!' 
+                });
+                
+                // Redirect after a short delay
                 setTimeout(() => {
                     router.visit(route('project-users.index'));
                 }, 1500);
-            },
-            onError: () => {
+            } else {
+                setNotification({
+                    type: 'error',
+                    message: response.data.message || 'Une erreur est survenue lors de l\'ajout du membre.'
+                });
                 setSubmitting(false);
-                setNotification({ type: 'error', message: 'Une erreur est survenue lors de l\'ajout du membre.' });
-            },
-            onFinish: () => {
-                if (!notification || notification.type !== 'success') {
-                    setSubmitting(false);
+            }
+        } catch (error) {
+            console.error('Error adding member:', error);
+            
+            let errorMessage = 'Une erreur est survenue lors de l\'ajout du membre.';
+            
+            if (error.response) {
+                // Handle validation errors
+                if (error.response.status === 422 && error.response.data.errors) {
+                    const errors = error.response.data.errors;
+                    errorMessage = Object.values(errors)[0][0];
+                } else if (error.response.data.message) {
+                    errorMessage = error.response.data.message;
                 }
-            },
-        });
+            }
+            
+            setNotification({
+                type: 'error',
+                message: errorMessage
+            });
+            setSubmitting(false);
+        }
     };
 
     const getRoleIcon = (role) => {
@@ -81,7 +121,69 @@ export default function Create({ projects = [], users = [], roles = [] }) {
     };
 
     const selectedProject = projects.find(p => p.id == values.project_id);
-    const selectedUser = users.find(u => u.id == values.user_id);
+    const selectedUser = searchResults?.user || users.find(u => u.id == values.user_id);
+
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        if (!searchEmail.trim()) {
+            setSearchError('Veuillez entrer une adresse email');
+            return;
+        }
+        
+        setIsSearching(true);
+        setSearchError('');
+        
+        try {
+            // Use the full URL path for the API endpoint
+            const response = await axios.post('/api/users/search-by-email', {
+                email: searchEmail,
+                project_id: values.project_id
+            }, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                withCredentials: true
+            });
+            
+            if (response.data.success) {
+                setSearchResults(response.data);
+                setValues(prev => ({
+                    ...prev,
+                    user_id: response.data.user.id
+                }));
+            } else {
+                setSearchError(response.data.message || 'Une erreur est survenue');
+                setSearchResults(null);
+                setValues(prev => ({
+                    ...prev,
+                    user_id: ''
+                }));
+            }
+        } catch (error) {
+            console.error('Search error:', error);
+            setSearchError('Erreur lors de la recherche. Veuillez réessayer.');
+            setSearchResults(null);
+            setValues(prev => ({
+                ...prev,
+                user_id: ''
+            }));
+        } finally {
+            setIsSearching(false);
+        }
+    };
+    
+    const clearSearch = () => {
+        setSearchEmail('');
+        setSearchResults(null);
+        setSearchError('');
+        setValues(prev => ({
+            ...prev,
+            user_id: ''
+        }));
+    };
 
     return (
         <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
@@ -176,35 +278,89 @@ export default function Create({ projects = [], users = [], roles = [] }) {
                                     )}
                                 </div>
 
-                                {/* User Selection */}
-                                <div>
+                                {/* User Search */}
+                                <div className="lg:col-span-2">
                                     <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-3">
                                         <FaUser className="inline mr-2 text-green-500" />
-                                        Utilisateur *
+                                        Rechercher un utilisateur par email *
                                     </label>
-                                    <select
-                                        name="user_id"
-                                        value={values.user_id}
-                                        onChange={handleChange}
-                                        className={`w-full px-4 py-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                            errors.user_id 
-                                                ? 'border-red-300 dark:border-red-600' 
-                                                : 'border-gray-300 dark:border-gray-600'
-                                        }`}
-                                        required
-                                    >
-                                        <option value="">Sélectionner un utilisateur</option>
-                                        {users.map(user => (
-                                            <option key={user.id} value={user.id}>
-                                                {user.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.user_id && (
+                                    
+                                    <div className="flex gap-2">
+                                        <div className="flex-1 relative">
+                                            <input
+                                                type="email"
+                                                value={searchEmail}
+                                                onChange={(e) => setSearchEmail(e.target.value)}
+                                                placeholder="Entrez l'email de l'utilisateur"
+                                                className={`w-full px-4 py-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                                    searchError || errors.user_id 
+                                                        ? 'border-red-300 dark:border-red-600' 
+                                                        : 'border-gray-300 dark:border-gray-600'
+                                                }`}
+                                                disabled={isSearching}
+                                            />
+                                            {searchEmail && !isSearching && (
+                                                <button
+                                                    type="button"
+                                                    onClick={clearSearch}
+                                                    className="absolute right-12 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200"
+                                                >
+                                                    <FaTimes />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleSearch}
+                                            disabled={!searchEmail.trim() || isSearching}
+                                            className="px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:cursor-not-allowed"
+                                        >
+                                            {isSearching ? (
+                                                <FaSpinner className="animate-spin" />
+                                            ) : (
+                                                <FaSearch />
+                                            )}
+                                            Rechercher
+                                        </button>
+                                    </div>
+                                    
+                                    {(searchError || errors.user_id) && (
                                         <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-                                            <FaInfoCircle className="text-xs" />
-                                            {errors.user_id}
+                                            <FaInfoCircle className="text-xs flex-shrink-0" />
+                                            <span>{searchError || errors.user_id}</span>
                                         </p>
+                                    )}
+                                    
+                                    {searchResults?.user && (
+                                        <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                            <div className="flex items-center gap-3">
+                                                <img 
+                                                    src={searchResults.user.avatar} 
+                                                    alt={searchResults.user.name}
+                                                    className="w-10 h-10 rounded-full border-2 border-white dark:border-gray-700 shadow-sm"
+                                                />
+                                                <div>
+                                                    <p className="font-medium text-gray-900 dark:text-white">
+                                                        {searchResults.user.name}
+                                                    </p>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                                                        {searchResults.user.email}
+                                                    </p>
+                                                    {searchResults.user.roles?.length > 0 && (
+                                                        <div className="mt-1 flex flex-wrap gap-1">
+                                                            {searchResults.user.roles.map(role => (
+                                                                <span 
+                                                                    key={role}
+                                                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
+                                                                >
+                                                                    {role}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
 
@@ -312,8 +468,8 @@ export default function Create({ projects = [], users = [], roles = [] }) {
                             <div className="flex flex-col sm:flex-row gap-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                                 <button
                                     type="submit"
-                                    disabled={submitting || !values.project_id || !values.user_id || !values.role}
-                                    className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed"
+                                    disabled={submitting || !values.project_id || !values.user_id || !values.role || isSearching}
+                                    className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed disabled:opacity-75"
                                 >
                                     {submitting ? (
                                         <>

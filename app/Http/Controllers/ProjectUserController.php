@@ -54,36 +54,30 @@ class ProjectUserController extends Controller
      */
     public function create()
     {
-        try {
-            $this->authorize('create', Project::class);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+        // Get projects where the user is a manager or admin
+        $user = auth()->user();
+        
+        if ($user->hasRole('admin')) {
+            // If user is admin, show all projects
+            $projects = Project::all(['id', 'name']);
+        } else {
+            // Otherwise show only projects where user is a manager
+            $projects = Project::whereHas('users', function($query) use ($user) {
+                $query->where('user_id', $user->id)
+                    ->where('role', 'manager');
+            })->get(['id', 'name']);
         }
         
-        // Only show projects where the authenticated user is a member
-        $projects = Project::whereHas('users', function($query) {
-            $query->where('user_id', auth()->id());
-        })->get(['id', 'name']);
-        
-        // Afficher tous les utilisateurs sauf l'utilisateur actuel
-        $users = User::where('id', '!=', auth()->id())
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-        
-        // Log pour débogage
-        \Log::info('Utilisateurs chargés pour le formulaire d\'ajout de membre:', [
-            'count' => $users->count(),
-            'users' => $users->toArray()
-        ]);
+        // If no projects, user is not authorized to add members to any project
+        if ($projects->isEmpty()) {
+            return \Inertia\Inertia::render('Error403', [
+                'message' => 'Vous n\'êtes pas autorisé à ajouter des membres à un projet.'
+            ])->toResponse(request())->setStatusCode(403);
+        }
         
         return Inertia::render('ProjectUsers/Create', [
             'projects' => $projects,
-            'users' => $users,
             'roles' => self::ALLOWED_ROLES,
-            'debug' => [
-                'users_count' => $users->count(),
-                'current_user_id' => auth()->id()
-            ]
         ]);
     }
 
@@ -92,10 +86,18 @@ class ProjectUserController extends Controller
      */
     public function store(Request $request)
     {
+        $project = Project::findOrFail($request->project_id);
+        
         try {
-            $this->authorize('create', Project::class);
+            $this->authorize('manageMembers', $project);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Non autorisé à ajouter des membres à ce projet.'
+                ], 403);
+            }
+            return redirect()->back()->with('error', 'Non autorisé à ajouter des membres à ce projet.');
         }
 
         $validated = $request->validate([
@@ -129,7 +131,6 @@ class ProjectUserController extends Controller
             'role' => ['required', 'string', Rule::in(self::ALLOWED_ROLES)],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
         $user = User::findOrFail($validated['user_id']);
 
         // Add the user to the project with the specified role
@@ -156,6 +157,14 @@ class ProjectUserController extends Controller
             'role' => $validated['role'],
             'added_by' => auth()->user()->name,
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Utilisateur ajouté au projet avec succès.',
+                'redirect' => route('project-users.index')
+            ]);
+        }
 
         return redirect()->route('project-users.index')
             ->with('success', 'Utilisateur ajouté au projet avec succès.');

@@ -190,6 +190,11 @@ Route::middleware('auth')->group(function () {
     });
 });
 
+// User search API endpoint
+Route::post('/api/users/search-by-email', [App\Http\Controllers\Api\UserController::class, 'searchByEmail'])
+    ->name('api.users.search-by-email')
+    ->middleware(['auth', 'verified']);
+
 // Webhook FedaPay pour les paiements
 Route::post('/webhooks/fedapay', [App\Http\Controllers\WebhookController::class, 'handleFedapayWebhook'])
     ->name('webhooks.fedapay')
