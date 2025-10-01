@@ -47,7 +47,10 @@
     "in_progress": "In Progress",
     "done": "Done",
     "pending": "Pending",
-    "paid": "Paid"
+    "paid": "Paid",
+    "completed": "Completed",
+    "validated": "Validated",
+    "rejected": "Rejected"
   },
   "priority": {
     "low": "low",

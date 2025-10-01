@@ -44,9 +44,17 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
     const isPast = endDate < now;
 
     if (isPast) {
-      return { label: t('completed'), color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' };
+      return { 
+        label: 'Terminé', // Texte en dur
+        color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border border-red-200 dark:border-red-700' 
+      };
     }
-    return { label: t('in_progress'), color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' };
+    
+    // Par défaut, le sprint est en cours
+    return { 
+      label: 'En cours', // Texte en dur
+      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700' 
+    };
   };
 
   return (
@@ -137,7 +145,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                     <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('sprint')}</th>
                     <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('project')}</th>
                     <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('period')}</th>
-                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('status')}</th>
+                    <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Status</th>
                   </tr>
                 </thead>
                 <tbody>

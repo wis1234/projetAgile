@@ -524,8 +524,9 @@
     "validated": "Validé",
     "pending": "En attente",
     "paid": "Payé",
-    "rejected": "Rejeté"
-
+    "rejected": "Rejeté",
+    "completed": "Terminé",
+    "in_progress": "En cours"
   },
   "payment_method": "Méthode de paiement",
   "methods": {
