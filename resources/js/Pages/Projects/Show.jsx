@@ -13,6 +13,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
 import Modal from '../../Components/Modal';
+import ZoomMeeting from '../../Components/ZoomMeeting';
 
 const getStatusInfo = (status, t) => {
   const statusMap = {
@@ -260,6 +261,11 @@ function Show({ project, tasks = [], auth, stats = {} }) {
                 <StatCard icon={<FaClock className="text-blue-500 text-2xl" />} label={t('tasks_in_progress')} value={stats.inProgressTasksCount ?? 0} color="blue" />
                 <StatCard icon={<FaFileAlt className="text-purple-500 text-2xl" />} label={t('files')} value={stats.filesCount ?? 0} color="purple" />
                 <StatCard icon={<FaCommentDots className="text-amber-500 text-2xl" />} label={t('comments')} value={stats.commentsCount ?? 0} color="amber" />
+              </div>
+
+              {/* Réunion Zoom */}
+              <div className="mt-6">
+                <ZoomMeeting project={project} />
               </div>
 
               {/* Liste des tâches */}

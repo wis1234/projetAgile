@@ -48,4 +48,11 @@ return [
         'environment' => env('FEDAPAY_ENV', 'live'), // 'live' ou 'sandbox'
     ],
 
+    'zoom' => [
+        'client_id' => env('ZOOM_CLIENT_ID'),
+        'client_secret' => env('ZOOM_CLIENT_SECRET'),
+        'account_id' => env('ZOOM_ACCOUNT_ID'),
+        'default_user_email' => env('ZOOM_DEFAULT_USER_EMAIL'),
+    ],
+
 ];

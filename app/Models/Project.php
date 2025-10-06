@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Notifications\ProjectNotification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Project extends Model
 {
@@ -138,9 +140,30 @@ class Project extends Model
         });
     }
 
-    public function users() {
-        return $this->belongsToMany(User::class)->withPivot(['role', 'is_muted'])->withTimestamps();
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'project_user')
+            ->withPivot('role', 'is_muted')
+            ->withTimestamps();
     }
+
+    /**
+     * Get all of the zoomMeetings for the project.
+     */
+    public function zoomMeetings(): HasMany
+    {
+        return $this->hasMany(ZoomMeeting::class);
+    }
+    
+    public function activeZoomMeeting(): HasOne
+    {
+        return $this->hasOne(ZoomMeeting::class)
+            ->where('start_time', '<=', now())
+            ->whereRaw('DATE_ADD(start_time, INTERVAL duration MINUTE) >= ?', [now()])
+            ->where('status', '!=', 'ended')
+            ->latest();
+    }
+    
     public function sprints() {
         return $this->hasMany(Sprint::class);
     }

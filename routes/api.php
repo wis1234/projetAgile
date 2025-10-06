@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\ZoomMeetingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,8 +21,16 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 // Protected API routes
-Route::middleware(['auth:sanctum', 'web'])->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
     // Search user by email
     Route::post('/users/search-by-email', [UserController::class, 'searchByEmail'])
         ->name('api.users.search-by-email');
+        
+    // Zoom Meeting Routes
+    Route::prefix('projects/{project}')->group(function () {
+        Route::get('/zoom/active', [ZoomMeetingController::class, 'active'])->name('api.zoom.active');
+        Route::post('/zoom/meetings', [ZoomMeetingController::class, 'store'])->name('api.zoom.store');
+        Route::get('/zoom/meetings/{meeting}', [ZoomMeetingController::class, 'show'])->name('api.zoom.show');
+        Route::put('/zoom/meetings/{meeting}/end', [ZoomMeetingController::class, 'end'])->name('api.zoom.end');
+    });
 });

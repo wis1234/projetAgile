@@ -66,6 +66,8 @@
         "@tiptap/react": "^3.0.9",
         "@tiptap/starter-kit": "^3.0.9",
         "@types/react-datepicker": "^6.2.0",
+        "@zoom/meetingsdk": "^4.0.7",
+        "@zoom/videosdk": "^2.2.12",
         "chart.js": "^4.5.0",
         "date-fns": "^4.1.0",
         "dropbox": "^10.34.0",

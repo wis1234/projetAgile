@@ -192,8 +192,17 @@ Route::middleware('auth')->group(function () {
 
 // User search API endpoint
 Route::post('/api/users/search-by-email', [App\Http\Controllers\Api\UserController::class, 'searchByEmail'])
-    ->name('api.users.search-by-email')
-    ->middleware(['auth', 'verified']);
+    ->name('api.users.search-by-email');
+
+// Zoom Meeting Routes
+Route::middleware(['auth'])->group(function () {
+    Route::prefix('api/projects/{project}')->group(function () {
+        Route::get('/zoom/active', [App\Http\Controllers\ZoomMeetingController::class, 'active'])->name('api.zoom.active');
+        Route::post('/zoom/meetings', [App\Http\Controllers\ZoomMeetingController::class, 'store'])->name('api.zoom.store');
+        Route::get('/zoom/meetings/{meeting}', [App\Http\Controllers\ZoomMeetingController::class, 'show'])->name('api.zoom.show');
+        Route::put('/zoom/meetings/{meeting}/end', [App\Http\Controllers\ZoomMeetingController::class, 'end'])->name('api.zoom.end');
+    });
+});
 
 // Webhook FedaPay pour les paiements
 Route::post('/webhooks/fedapay', [App\Http\Controllers\WebhookController::class, 'handleFedapayWebhook'])
