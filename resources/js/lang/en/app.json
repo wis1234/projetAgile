@@ -530,7 +530,11 @@
     "refreshing": "Refreshing...",
     "description": "Drag and drop tasks to organize your work",
     "task_delete_error": "Error deleting task"
+  },
+  "job_offers": {
+    "title": "Job Offers",
+    "subtitle": "Join dynamic team",
+    "cta": "View Offers"
   }
-
 
 }

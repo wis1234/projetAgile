@@ -1,6 +1,8 @@
 {
     "app_name": "ProJA",
     "dashboard": "Tábìlì Ìṣakoso",
+    "recent_activities": "Àwọn iṣẹ́ tuntun",
+    "view_all_activities": "Wò gbogbo àwọn iṣẹ́",
     "dashboard_subtitle": "Àwọn ìṣirò àti iṣẹ́-ṣíṣe àyè mi",
     "projects": "Àwọn Iṣẹ́-ṣíṣe",
     "view_more": "Wò kùnrá",
@@ -571,5 +573,10 @@
       "refreshing": "Ń túnṣe...",
       "description": "Fa àti ju àwọn iṣẹ́ wọlé láti ṣe àkóso wọn",
       "task_delete_error": "Aṣiṣe nigbati a ń pa iṣẹ́ rẹ̀"
+    },
+    "job_offers": {
+     "title": "Iṣẹ́ tuntun",
+     "subtitle": "Ɖo iṣẹ́ tuntun ɖo e nọ́ ka wẹ́n lẹ́ ɖo mẹ́",
+     "cta": "Ɖo iṣẹ́ tuntun"
     }
   }

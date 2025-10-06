@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from '@inertiajs/react';
 import { FaUserPlus, FaChevronRight } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 const RecruitmentCard = () => {
+  const { t } = useTranslation();
   const backgrounds = [
     'https://images.unsplash.com/photo-1521791136064-7986c2920216?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
     'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
@@ -36,15 +38,15 @@ const RecruitmentCard = () => {
       {/* Contenu de la carte */}
       <div className="relative z-10 h-full flex flex-col justify-between p-4 text-white">
         <div>
-          <h3 className="text-xl font-bold mb-1">Nos offres d' emploi!</h3>
-          <p className="text-sm opacity-90">Rejoignez une équipe dynamique</p>
+          <h3 className="text-xl font-bold mb-1">{t('job_offers.title')}</h3>
+          <p className="text-sm opacity-90">{t ('job_offers.subtitle')}</p>
         </div>
         
         <Link 
           href="/recruitment"
           className="inline-flex items-center justify-between px-4 py-2 bg-white bg-opacity-20 backdrop-blur-sm rounded-lg hover:bg-opacity-30 transition-all group-hover:translate-x-1"
         >
-          <span className="font-medium">Voir les offres</span>
+          <span className="font-medium">{t('job_offers.cta')}</span>
           <FaChevronRight className="ml-2 h-3 w-3 opacity-70 group-hover:translate-x-1 transition-transform" />
         </Link>
       </div>

@@ -1,6 +1,8 @@
 {
     "app_name": "ProJA",
     "dashboard": "Agbaza",
+    "recent_activities": "Nuwlanwla yɛyɛ lɛ",
+    "view_all_activities": "Kpɔ nuwlanwla yɛyɛ lɛ bɛ ɖeɖe",
     "dashboard_subtitle": "Kpɔn tɔn kpodo nukɔn nuwlanwlan tɔn lɛ kpan ɖo nùɖuɖu tɔn mɛ",
     "projects": "Akpaɖatɛn lɛ",
     "view_more": "Kpɔ ɖeɖe",
@@ -570,5 +572,10 @@
       "refreshing": "Yiyi ɖo nɔ wa...",
       "description": "Ɖo nudobagbe lɛ ɖo e nɔ ka wɛn lɛ ɖo mɛ",
       "task_delete_error": "Jɛjɛ ɖo nudobagbe ɔ bɔ ɖo mɛ"
+    },
+    "job_offers": {
+      "title": "Nudobagbe lɛ tɔn gbɛnzinkɔn",
+      "subtitle": "Ɖo nudobagbe lɛ ɖo e nɔ ka wɛn lɛ ɖo mɛ",
+      "cta": "Ɖo nudobagbe lɛ"
     }
   }

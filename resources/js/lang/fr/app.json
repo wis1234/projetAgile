@@ -35,6 +35,8 @@
   "search_project_placeholder": "Rechercher un projet...",
   "table_view": "Vue tableau",
   "cards_view": "Vue cartes",
+  "recent_activities": "Activités récentes",
+  "view_all_activities": "Voir toutes les activités",
   "project_management": "Gestion des Projets",
   "members": "Membres",
   "sprints": "Sprints",
@@ -590,6 +592,11 @@
   "refreshing": "Mise à jour en cours...",
   "description": "Glissez et déposez les tâches pour les organiser",
   "task_delete_error": "Erreur lors de la suppression de la tâche"
+},
+"job_offers": {
+  "title": "Offres d'emploi",
+  "subtitle": "Rejoignez une équipe dynamique",
+  "cta": "Voir les offres"
 }
 
 }
