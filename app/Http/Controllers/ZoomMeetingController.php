@@ -190,6 +190,34 @@ class ZoomMeetingController extends Controller
     /**
      * End the specified meeting.
      */
+    /**
+     * Get recent meetings for a project
+     */
+    public function recent(Project $project)
+    {
+        $this->authorize('view', $project);
+
+        $meetings = $project->zoomMeetings()
+            ->orderBy('start_time', 'desc')
+            ->take(4) // Récupère les 5 dernières réunions
+            ->get()
+            ->map(function ($meeting) {
+                return array_merge($meeting->toArray(), [
+                    'is_active' => $meeting->isActive(),
+                    'is_upcoming' => $meeting->isUpcoming(),
+                    'is_ended' => $meeting->isEnded(),
+                ]);
+            });
+
+        return response()->json([
+            'success' => true,
+            'meetings' => $meetings
+        ]);
+    }
+
+    /**
+     * End the specified meeting.
+     */
     public function end(Project $project, ZoomMeeting $meeting)
     {
         $this->authorize('update', $project);

@@ -29,6 +29,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Zoom Meeting Routes
     Route::prefix('projects/{project}')->group(function () {
         Route::get('/zoom/active', [ZoomMeetingController::class, 'active'])->name('api.zoom.active');
+        Route::get('/zoom/recent', [ZoomMeetingController::class, 'recent'])->name('api.zoom.recent');
         Route::post('/zoom/meetings', [ZoomMeetingController::class, 'store'])->name('api.zoom.store');
         Route::get('/zoom/meetings/{meeting}', [ZoomMeetingController::class, 'show'])->name('api.zoom.show');
         Route::put('/zoom/meetings/{meeting}/end', [ZoomMeetingController::class, 'end'])->name('api.zoom.end');

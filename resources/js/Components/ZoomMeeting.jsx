@@ -11,6 +11,8 @@ export default function ZoomMeeting({ project }) {
     const { auth } = usePage().props;
     const [isLoading, setIsLoading] = useState(false);
     const [activeMeeting, setActiveMeeting] = useState(null);
+    const [recentMeetings, setRecentMeetings] = useState([]);
+    const [isLoadingMeetings, setIsLoadingMeetings] = useState(false);
     const [showStartMeetingModal, setShowStartMeetingModal] = useState(false);
     const [showZoomEmbed, setShowZoomEmbed] = useState(false);
     const [notifications, setNotifications] = useState([]);
@@ -92,9 +94,37 @@ export default function ZoomMeeting({ project }) {
         }
     };
 
-    // Charger la réunion active au chargement du composant
+    // Charger les réunions récentes
+    const fetchRecentMeetings = async () => {
+        try {
+            setIsLoadingMeetings(true);
+            const response = await fetch(route('api.zoom.recent', { project: project.id }), {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                },
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Impossible de charger les réunions récentes');
+            }
+
+            const result = await response.json();
+            if (result.success && Array.isArray(result.meetings)) {
+                setRecentMeetings(result.meetings);
+            }
+        } catch (error) {
+            handleError(error, 'Erreur lors du chargement des réunions');
+        } finally {
+            setIsLoadingMeetings(false);
+        }
+    };
+
+    // Charger les données au montage du composant
     useEffect(() => {
         fetchActiveMeeting();
+        fetchRecentMeetings();
     }, [project.id]);
 
     // Vérifier périodiquement l'état de la réunion
@@ -171,6 +201,9 @@ export default function ZoomMeeting({ project }) {
             setActiveMeeting(result.meeting);
             setShowStartMeetingModal(false);
             handleSuccess('Réunion créée avec succès !');
+            
+            // Recharger les réunions récentes
+            await fetchRecentMeetings();
             
             // Réinitialiser le formulaire
             setData({
@@ -547,6 +580,88 @@ export default function ZoomMeeting({ project }) {
                     </div>
                 </div>
             )}
+
+            {/* Section des réunions récentes */}
+            <div className="mt-8">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Réunions récentes</h3>
+                {isLoadingMeetings ? (
+                    <div className="flex justify-center py-4">
+                        <FaSpinner className="animate-spin h-6 w-6 text-blue-500" />
+                    </div>
+                ) : recentMeetings.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        {recentMeetings.map((meeting) => {
+                            const isUpcoming = isMeetingUpcoming(meeting);
+                            const isActive = isMeetingActive(meeting);
+                            
+                            return (
+                                <div 
+                                    key={meeting.id}
+                                    className={`border rounded-lg p-4 ${
+                                        isUpcoming 
+                                            ? 'border-blue-300 bg-blue-50' 
+                                            : isActive
+                                            ? 'border-green-300 bg-green-50'
+                                            : 'border-gray-200'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h4 className={`font-medium ${
+                                                isUpcoming ? 'text-blue-800' : 
+                                                isActive ? 'text-green-800' : 'text-gray-800'
+                                            }`}>
+                                                {meeting.topic}
+                                            </h4>
+                                            <p className="text-sm text-gray-600 mt-1">
+                                                <FaClock className="inline mr-1" />
+                                                {formatMeetingTime(meeting.start_time, meeting.duration)}
+                                            </p>
+                                            {meeting.agenda && (
+                                                <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                                                    {meeting.agenda}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            {isUpcoming ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    <FaUserClock className="mr-1" /> À venir
+                                                </span>
+                                            ) : isActive ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    <FaVideo className="mr-1" /> En cours
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                    <FaCheck className="mr-1" /> Terminé
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex space-x-2">
+                                        {(isUpcoming || isActive) && (
+                                            <a
+                                                href={meeting.join_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                            >
+                                                <FaDoorOpen className="mr-1" /> Rejoindre
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="text-center py-6 bg-gray-50 rounded-lg">
+                        <FaVideo className="mx-auto h-8 w-8 text-gray-400" />
+                        <p className="mt-2 text-sm text-gray-500">Aucune réunion récente</p>
+                    </div>
+                )}
+            </div>
 
             {/* Intégration de la réunion Zoom */}
             {showZoomEmbed && activeMeeting?.join_url && (

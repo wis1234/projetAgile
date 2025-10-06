@@ -19,6 +19,15 @@ Route::get('/', function () {
 
 // Routes protégées par authentification
 Route::middleware('auth')->group(function () {
+    // Routes Zoom
+    Route::prefix('projects/{project}')->group(function () {
+        Route::get('/zoom/active', [\App\Http\Controllers\ZoomMeetingController::class, 'active'])->name('api.zoom.active');
+        Route::get('/zoom/recent', [\App\Http\Controllers\ZoomMeetingController::class, 'recent'])->name('api.zoom.recent');
+        Route::post('/zoom/meetings', [\App\Http\Controllers\ZoomMeetingController::class, 'store'])->name('api.zoom.store');
+        Route::get('/zoom/meetings/{meeting}', [\App\Http\Controllers\ZoomMeetingController::class, 'show'])->name('api.zoom.show');
+        Route::put('/zoom/meetings/{meeting}/end', [\App\Http\Controllers\ZoomMeetingController::class, 'end'])->name('api.zoom.end');
+    });
+    
     // Subscription routes
     Route::get('/subscriptions', [App\Http\Controllers\SubscriptionController::class, 'index'])->name('subscriptions.index');
     Route::get('/subscriptions/checkout/{plan}', [App\Http\Controllers\SubscriptionController::class, 'checkout'])->name('subscriptions.checkout');
