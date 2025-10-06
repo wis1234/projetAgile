@@ -35,6 +35,12 @@ class Kernel extends ConsoleKernel
                  ->everyFiveMinutes()
                  ->withoutOverlapping()
                  ->sendOutputTo(storage_path('logs/recruitments-close.log'));
+                 
+        // Envoie des rappels pour les réunions à venir
+        $schedule->command('meetings:send-reminders')
+                 ->everyMinute()
+                 ->withoutOverlapping()
+                 ->sendOutputTo(storage_path('logs/meeting-reminders.log'));
     }
 
     /**

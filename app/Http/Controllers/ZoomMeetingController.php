@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use App\Notifications\MeetingReminder;
 
 class ZoomMeetingController extends Controller
 {
@@ -96,7 +97,7 @@ class ZoomMeetingController extends Controller
 
             $project->zoomMeetings()->save($meeting);
 
-            // Notifier les membres du projet
+            // Notifier les membres du projet via le système de notification
             $project->notifyMembers('zoom_meeting_created', [
                 'meeting_id' => $meeting->id,
                 'meeting_topic' => $meeting->topic,
@@ -105,6 +106,17 @@ class ZoomMeetingController extends Controller
                 'join_url' => $meeting->join_url,
                 'user_name' => Auth::user()->name,
             ]);
+
+            // Envoyer des notifications par email à tous les membres du projet
+            if ($project->users && $project->users->isNotEmpty()) {
+                foreach ($project->users as $user) {
+                    // Vérifier si l'utilisateur a activé les notifications par email
+                    // Si la colonne n'existe pas, on envoie quand même la notification
+                    if (!isset($user->email_notifications) || $user->email_notifications) {
+                        $user->notify(new \App\Notifications\MeetingReminder($meeting));
+                    }
+                }
+            }
 
             return response()->json([
                 'success' => true,
