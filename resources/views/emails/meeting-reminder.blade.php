@@ -102,8 +102,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <img src="{{ asset('images/logo-white.png') }}" alt="Logo" class="logo">
-            <h1>{{ $isReminder ? '🔔 Rappel de réunion' : '📅 Nouvelle réunion planifiée' }}</h1>
+        <img src="{{ asset('logo-proja.png') }}" alt="{{ config('app.name') }}" class="logo">
+        <h1>{{ $isReminder ? '🔔 Rappel de réunion' : '📅 Nouvelle réunion planifiée' }}</h1>
         </div>
         
         <div class="content">

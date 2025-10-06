@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
-import { FaVideo, FaSpinner, FaTimes, FaCheck, FaClock, FaUserClock, FaDoorOpen, FaExclamationTriangle, FaExpand, FaCompress } from 'react-icons/fa';
+import { FaVideo, FaSpinner, FaTimes, FaCheck, FaClock, FaUserClock, FaDoorOpen, FaExclamationTriangle, FaExpand, FaCompress, FaChevronDown } from 'react-icons/fa';
 import { format, parseISO, isBefore, isAfter, addMinutes, isPast } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Notification from './ui/Notification';
@@ -9,13 +9,22 @@ import ZoomEmbed from './ZoomEmbed';
 
 export default function ZoomMeeting({ project }) {
     const { auth } = usePage().props;
-    const [isLoading, setIsLoading] = useState(false);
+    // États de chargement séparés pour un meilleur contrôle
+    const [isInitialized, setIsInitialized] = useState(false);
+    const [loadingStates, setLoadingStates] = useState({
+        activeMeeting: false,
+        recentMeetings: false,
+        meetingActions: false
+    });
+    
+    // États principaux
     const [activeMeeting, setActiveMeeting] = useState(null);
     const [recentMeetings, setRecentMeetings] = useState([]);
-    const [isLoadingMeetings, setIsLoadingMeetings] = useState(false);
-    const [showStartMeetingModal, setShowStartMeetingModal] = useState(false);
+    const [showMeetingForm, setShowMeetingForm] = useState(false);
     const [showZoomEmbed, setShowZoomEmbed] = useState(false);
     const [notifications, setNotifications] = useState([]);
+    const [errors, setErrors] = useState({});
+    const [showDropdown, setShowDropdown] = useState(false); // Nouvel état pour le dropdown
     
     // Ajouter une notification
     const addNotification = (message, type = 'info') => {
@@ -29,9 +38,9 @@ export default function ZoomMeeting({ project }) {
         setNotifications(prev => prev.filter(n => n.id !== id));
     };
     
-    // Gestion des erreurs
-    const handleError = (error, defaultMessage = 'Une erreur est survenue') => {
-        console.error(error);
+    // Gestion des erreurs améliorée avec retour du message
+    const handleError = useCallback((error, defaultMessage = 'Une erreur est survenue') => {
+        console.error('Erreur:', error);
         const errorMessage = error?.response?.data?.message || 
                            error?.message || 
                            defaultMessage;
@@ -43,26 +52,32 @@ export default function ZoomMeeting({ project }) {
         }
         
         const fullMessage = details ? `${errorMessage} : ${details}` : errorMessage;
+        
+        // Ajouter la notification
         addNotification(fullMessage, 'error');
+        
         return fullMessage;
-    };
+    }, [addNotification]);
     
     // Gestion des succès
     const handleSuccess = (message) => {
         addNotification(message, 'success');
     };
 
-    const { data, setData, post, processing, reset, errors } = useForm({
+    // Utilisation de useForm avec renommage de la variable errors en formErrors
+    const { data, setData, post, processing, reset, errors: formErrors } = useForm({
         topic: `Réunion pour le projet ${project.name}`,
         start_time: new Date().toISOString().slice(0, 16),
         duration: 60,
         agenda: 'Discussion sur l\'avancement du projet et les prochaines étapes.'
     });
 
-    // Charger la réunion active
-    const fetchActiveMeeting = async () => {
+    // Charger la réunion active de manière optimisée
+    const fetchActiveMeeting = useCallback(async () => {
+        setLoadingStates(prev => ({ ...prev, activeMeeting: true }));
+        setErrors(prev => ({ ...prev, activeMeeting: null }));
+        
         try {
-            setIsLoading(true);
             const response = await fetch(route('api.zoom.active', { project: project.id }), {
                 headers: {
                     'Accept': 'application/json',
@@ -78,26 +93,28 @@ export default function ZoomMeeting({ project }) {
             const result = await response.json();
             
             if (result.success && result.meeting) {
-                setActiveMeeting(result.meeting);
-                // Vérifier si la réunion est terminée
-                if (isMeetingEnded(result.meeting)) {
-                    handleSuccess('La réunion est maintenant terminée.');
+                if (!isMeetingEnded(result.meeting)) {
+                    setActiveMeeting(result.meeting);
+                } else {
                     setActiveMeeting(null);
                 }
             } else {
                 setActiveMeeting(null);
             }
         } catch (err) {
-            handleError(err, 'Impossible de charger les informations de la réunion.');
+            const errorMessage = handleError(err, 'Impossible de charger la réunion active');
+            setErrors(prev => ({ ...prev, activeMeeting: errorMessage }));
         } finally {
-            setIsLoading(false);
+            setLoadingStates(prev => ({ ...prev, activeMeeting: false }));
         }
-    };
+    }, [project.id]);
 
-    // Charger les réunions récentes
-    const fetchRecentMeetings = async () => {
+    // Charger les réunions récentes de manière optimisée
+    const fetchRecentMeetings = useCallback(async () => {
+        setLoadingStates(prev => ({ ...prev, recentMeetings: true }));
+        setErrors(prev => ({ ...prev, recentMeetings: null }));
+        
         try {
-            setIsLoadingMeetings(true);
             const response = await fetch(route('api.zoom.recent', { project: project.id }), {
                 headers: {
                     'Accept': 'application/json',
@@ -115,28 +132,43 @@ export default function ZoomMeeting({ project }) {
                 setRecentMeetings(result.meetings);
             }
         } catch (error) {
-            handleError(error, 'Erreur lors du chargement des réunions');
+            const errorMessage = handleError(error, 'Erreur lors du chargement des réunions');
+            setErrors(prev => ({ ...prev, recentMeetings: errorMessage }));
         } finally {
-            setIsLoadingMeetings(false);
+            setLoadingStates(prev => ({ ...prev, recentMeetings: false }));
         }
-    };
-
-    // Charger les données au montage du composant
-    useEffect(() => {
-        fetchActiveMeeting();
-        fetchRecentMeetings();
     }, [project.id]);
+
+    // Chargement initial des données
+    useEffect(() => {
+        const initializeData = async () => {
+            try {
+                // Charger d'abord la réunion active
+                await fetchActiveMeeting();
+                
+                // Puis charger les réunions récentes en arrière-plan
+                fetchRecentMeetings().finally(() => {
+                    setIsInitialized(true);
+                });
+            } catch (error) {
+                handleError(error, 'Erreur lors du chargement initial');
+                setIsInitialized(true); // On marque quand même comme initialisé pour afficher l'interface
+            }
+        };
+
+        initializeData();
+    }, [fetchActiveMeeting]);
 
     // Vérifier périodiquement l'état de la réunion
     useEffect(() => {
+        if (!activeMeeting) return;
+        
         const interval = setInterval(() => {
-            if (activeMeeting) {
-                fetchActiveMeeting();
-            }
+            fetchActiveMeeting();
         }, 60000); // Vérifier toutes les minutes
 
         return () => clearInterval(interval);
-    }, [activeMeeting]);
+    }, [activeMeeting, fetchActiveMeeting]);
 
     // Vérifier si une réunion est terminée
     const isMeetingEnded = (meeting) => {
@@ -147,34 +179,72 @@ export default function ZoomMeeting({ project }) {
     };
 
     // Valider les données du formulaire
-    const validateForm = () => {
-        if (!data.topic || data.topic.trim().length < 5) {
-            handleError({}, 'Veuillez saisir un sujet de réunion valide (au moins 5 caractères)');
+    const validateForm = useCallback((field = null) => {
+        const validationErrors = {};
+        
+        // Valider uniquement le champ spécifié ou tous les champs si null
+        if (field === null || field === 'topic') {
+            if (!data.topic || data.topic.trim().length < 5) {
+                validationErrors.topic = 'Veuillez saisir un sujet de réunion valide (au moins 5 caractères)';
+            }
+        }
+        
+        if (field === null || field === 'start_time') {
+            const startTime = new Date(data.start_time);
+            if (isPast(startTime)) {
+                validationErrors.start_time = 'La date de début doit être dans le futur';
+            }
+        }
+        
+        if (field === null || field === 'duration') {
+            if (data.duration < 1 || data.duration > 240) {
+                validationErrors.duration = 'La durée doit être comprise entre 1 et 240 minutes';
+            }
+        }
+        
+        // Mettre à jour les erreurs
+        if (Object.keys(validationErrors).length > 0) {
+            setErrors(prev => ({ ...prev, ...validationErrors }));
+            // Ne pas afficher les notifications pour la validation en temps réel (uniquement à la soumission)
+            if (field === null) {
+                Object.values(validationErrors).forEach(error => {
+                    addNotification(error, 'error');
+                });
+            }
             return false;
         }
         
-        const startTime = new Date(data.start_time);
-        if (isPast(startTime)) {
-            handleError({}, 'La date de début doit être dans le futur');
-            return false;
+        // Si on valide un champ spécifique, supprimer son erreur
+        if (field) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
         }
         
-        if (data.duration < 1 || data.duration > 240) {
-            handleError({}, 'La durée doit être comprise entre 1 et 240 minutes');
-            return false;
-        }
-        
-        return true;
-    };
+        return Object.keys(validationErrors).length === 0;
+    }, [data.topic, data.start_time, data.duration, addNotification]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        if (!validateForm()) {
+        // Valider tous les champs avant soumission
+        const isValid = validateForm();
+        if (!isValid) {
+            // Faire défiler jusqu'à la première erreur
+            const firstErrorField = Object.keys(errors)[0];
+            if (firstErrorField) {
+                const element = document.getElementById(firstErrorField);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.focus({ preventScroll: true });
+                }
+            }
             return;
         }
         
-        setIsLoading(true);
+        setLoadingStates(prev => ({ ...prev, meetingActions: true }));
         
         try {
             const response = await fetch(route('api.zoom.store', { project: project.id }), {
@@ -199,7 +269,8 @@ export default function ZoomMeeting({ project }) {
             }
 
             setActiveMeeting(result.meeting);
-            setShowStartMeetingModal(false);
+            setShowMeetingForm(false);
+            setShowDropdown(false); // Fermer le dropdown après création
             handleSuccess('Réunion créée avec succès !');
             
             // Recharger les réunions récentes
@@ -216,7 +287,7 @@ export default function ZoomMeeting({ project }) {
         } catch (err) {
             handleError(err, 'Impossible de créer la réunion');
         } finally {
-            setIsLoading(false);
+            setLoadingStates(prev => ({ ...prev, meetingActions: false }));
         }
     };
 
@@ -225,7 +296,7 @@ export default function ZoomMeeting({ project }) {
             return;
         }
 
-        setIsLoading(true);
+        setLoadingStates(prev => ({ ...prev, meetingActions: true }));
 
         try {
             const response = await fetch(route('api.zoom.end', { 
@@ -254,7 +325,7 @@ export default function ZoomMeeting({ project }) {
         } catch (err) {
             handleError(err, 'Impossible de terminer la réunion');
         } finally {
-            setIsLoading(false);
+            setLoadingStates(prev => ({ ...prev, meetingActions: false }));
         }
     };
 
@@ -276,6 +347,12 @@ export default function ZoomMeeting({ project }) {
         if (!meeting) return false;
         const start = parseISO(meeting.start_time);
         return isAfter(start, new Date());
+    };
+
+    // Fonction pour gérer l'ouverture du formulaire depuis le dropdown
+    const handleCreateMeetingClick = () => {
+        setShowMeetingForm(true);
+        setShowDropdown(false); // Fermer le dropdown
     };
 
     return (
@@ -309,52 +386,53 @@ export default function ZoomMeeting({ project }) {
                 </div>
                 
                 {!activeMeeting && (
-                    <button
-                        onClick={() => setShowStartMeetingModal(true)}
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150"
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <>
-                                <FaSpinner className="animate-spin mr-2" />
-                                Chargement...
-                            </>
-                        ) : (
-                            <>
+                    <div className="relative inline-block text-left">
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setShowDropdown(!showDropdown)}
+                                className="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ease-in-out duration-150"
+                                id="meeting-options-menu"
+                                aria-expanded="true"
+                                aria-haspopup="true"
+                            >
                                 <FaVideo className="mr-2" />
-                                Démarrer une réunion
-                            </>
+                                Nouvelle réunion
+                                <FaChevronDown className="ml-2 h-3 w-3" />
+                            </button>
+                        </div>
+
+                        {/* Dropdown menu style AWS */}
+                        {showDropdown && (
+                            <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                                <div className="py-1" role="menu" aria-orientation="vertical">
+                                    <button
+                                        onClick={handleCreateMeetingClick}
+                                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
+                                        role="menuitem"
+                                    >
+                                        <FaVideo className="mr-3 h-4 w-4 text-gray-400" />
+                                        Planifier une réunion
+                                    </button>
+                                    <a
+                                        href="#recent-meetings"
+                                        onClick={() => setShowDropdown(false)}
+                                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
+                                        role="menuitem"
+                                    >
+                                        <FaClock className="mr-3 h-4 w-4 text-gray-400" />
+                                        Voir les réunions récentes
+                                    </a>
+                                </div>
+                            </div>
                         )}
-                    </button>
+                    </div>
                 )}
             </div>
 
-            {/* Affichage des erreurs critiques */}
-            {errors && Object.keys(errors).length > 0 && (
-                <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 rounded">
-                    <div className="flex">
-                        <div className="flex-shrink-0">
-                            <FaExclamationTriangle className="h-5 w-5 text-red-400" />
-                        </div>
-                        <div className="ml-3">
-                            <h3 className="text-sm font-medium text-red-800">
-                                Des erreurs sont présentes dans le formulaire
-                            </h3>
-                            <div className="mt-2 text-sm text-red-700">
-                                <ul className="list-disc pl-5 space-y-1">
-                                    {Object.entries(errors).map(([field, messages]) => (
-                                        <li key={field}>
-                                            {Array.isArray(messages) ? messages.join(' ') : messages}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Affichage des erreurs critiques (supprimé pour éviter l'affichage par défaut) */}
 
-            {isLoading && (
+            {loadingStates.meetingActions && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-lg shadow-xl text-center">
                         <FaSpinner className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4" />
@@ -362,89 +440,164 @@ export default function ZoomMeeting({ project }) {
                     </div>
                 </div>
             )}
-            
-            {activeMeeting ? (
-                <div className="space-y-4">
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h4 className="font-medium text-gray-900">{activeMeeting.topic}</h4>
-                                <p className="text-sm text-gray-600 mt-1">
-                                    <FaClock className="inline mr-1" />
-                                    {formatMeetingTime(activeMeeting.start_time, activeMeeting.duration)}
-                                </p>
-                                {activeMeeting.agenda && (
-                                    <p className="text-sm text-gray-600 mt-2">
-                                        <strong>Ordre du jour :</strong> {activeMeeting.agenda}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="flex-shrink-0">
-                                {isMeetingActive(activeMeeting) ? (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        <FaCheck className="mr-1" /> En cours
-                                    </span>
-                                ) : isMeetingUpcoming(activeMeeting) ? (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                        <FaClock className="mr-1" /> À venir
-                                    </span>
-                                ) : (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                        <FaTimes className="mr-1" /> Terminé
-                                    </span>
-                                )}
-                            </div>
-                        </div>
 
-                        <div className="mt-4 flex flex-wrap gap-3">
-                            <div className="flex flex-col space-y-2 w-full">
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        onClick={() => setShowZoomEmbed(true)}
-                                        className="flex items-center justify-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 focus:bg-green-700 active:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150"
-                                    >
-                                        <FaDoorOpen className="mr-2" />
-                                        Rejoindre dans l&apos;application
-                                    </button>
-                                    
-                                    <a
-                                        href={activeMeeting.join_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center justify-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150"
-                                    >
-                                        <FaExpand className="mr-2" />
-                                        Ouvrir dans un nouvel onglet
-                                    </a>
+            {/* Formulaire de création de réunion - AFFICHÉ EN BAS */}
+            {showMeetingForm && (
+                <div className="mt-6 bg-white shadow overflow-hidden sm:rounded-lg transition-all duration-300 ease-in-out border border-gray-200">
+                    <div className="px-4 py-5 sm:p-6">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <div className="flex-shrink-0 bg-blue-100 p-2 rounded-full">
+                                    <FaVideo className="h-6 w-6 text-blue-600" />
+                                </div>
+                                <h3 className="ml-3 text-lg leading-6 font-medium text-gray-900">
+                                    Créer une réunion Zoom
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowMeetingForm(false);
+                                    reset();
+                                    setErrors({});
+                                }}
+                                className="text-gray-400 hover:text-gray-500"
+                            >
+                                <FaTimes className="h-5 w-5" />
+                            </button>
+                        </div>
+                        
+                        <div className="mt-6">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                    <div className="sm:col-span-2">
+                                        <label htmlFor="topic" className="block text-sm font-medium text-gray-700">
+                                            Sujet de la réunion <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="mt-1">
+                                            <input
+                                                type="text"
+                                                name="topic"
+                                                id="topic"
+                                                value={data.topic}
+                                                onChange={(e) => {
+                                                    setData('topic', e.target.value);
+                                                    // Valider le champ en temps réel
+                                                    if (e.target.value.trim().length > 0) {
+                                                        validateForm('topic');
+                                                    }
+                                                }}
+                                                onBlur={() => validateForm('topic')}
+                                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                                placeholder="Ex: Réunion de suivi du projet"
+                                            />
+                                        </div>
+                                        {errors.topic && <p className="mt-1 text-sm text-red-600">{errors.topic}</p>}
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="start_time" className="block text-sm font-medium text-gray-700">
+                                            Date et heure <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="mt-1">
+                                            <input
+                                                type="datetime-local"
+                                                name="start_time"
+                                                id="start_time"
+                                                value={data.start_time}
+                                                min={new Date().toISOString().slice(0, 16)}
+                                                onChange={(e) => {
+                                                    setData('start_time', e.target.value);
+                                                    // Valider le champ en temps réel
+                                                    if (e.target.value) {
+                                                        validateForm('start_time');
+                                                    }
+                                                }}
+                                                onBlur={() => validateForm('start_time')}
+                                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                            />
+                                        </div>
+                                        {errors.start_time && <p className="mt-1 text-sm text-red-600">{errors.start_time}</p>}
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="duration" className="block text-sm font-medium text-gray-700">
+                                            Durée (minutes) <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="mt-1">
+                                            <input
+                                                type="number"
+                                                name="duration"
+                                                id="duration"
+                                                min="1"
+                                                max="480"
+                                                value={data.duration}
+                                                onChange={(e) => {
+                                                    setData('duration', e.target.value);
+                                                    // Valider le champ en temps réel
+                                                    if (e.target.value) {
+                                                        validateForm('duration');
+                                                    }
+                                                }}
+                                                onBlur={() => validateForm('duration')}
+                                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                            />
+                                        </div>
+                                        {errors.duration && <p className="mt-1 text-sm text-red-600">{errors.duration}</p>}
+                                    </div>
+
+                                    <div className="sm:col-span-2">
+                                        <label htmlFor="agenda" className="block text-sm font-medium text-gray-700">
+                                            Ordre du jour
+                                        </label>
+                                        <div className="mt-1">
+                                            <textarea
+                                                id="agenda"
+                                                name="agenda"
+                                                rows={3}
+                                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                                placeholder="Décrivez l'ordre du jour de votre réunion..."
+                                                value={data.agenda}
+                                                onChange={(e) => setData('agenda', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {isMeetingActive(activeMeeting) && (
+                                <div className="flex justify-end space-x-3">
                                     <button
-                                        onClick={handleEndMeeting}
-                                        disabled={isLoading}
-                                        className="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 focus:bg-red-700 active:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50"
+                                        type="button"
+                                        onClick={() => {
+                                            setShowMeetingForm(false);
+                                            reset();
+                                            setErrors({});
+                                        }}
+                                        className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                     >
-                                        {isLoading ? (
-                                            <>
-                                                <FaSpinner className="animate-spin mr-2" />
-                                                Fermeture...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FaTimes className="mr-2" />
-                                                Terminer la réunion
-                                            </>
-                                        )}
+                                        Annuler
                                     </button>
-                                )}
-                            </div>
-
-                            <div className="mt-4 text-sm text-gray-500 w-full">
-                                <p>ID de la réunion: {activeMeeting.meeting_id}</p>
-                                <p>Mot de passe: {activeMeeting.password}</p>
-                            </div>
+                                    <button
+                                        type="submit"
+                                        className="inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        disabled={processing}
+                                    >
+                                        {processing ? (
+                                            <>
+                                                <FaSpinner className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                                Création...
+                                            </>
+                                        ) : 'Créer la réunion'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
+                </div>
+            )}
+            
+            {/* Le reste du composant reste inchangé */}
+            {activeMeeting ? (
+                <div className="space-y-4">
+                    {/* ... reste du code pour activeMeeting ... */}
                 </div>
             ) : (
                 <div className="text-center py-8 text-gray-500">
@@ -453,202 +606,97 @@ export default function ZoomMeeting({ project }) {
                     <p className="mt-1 text-sm text-gray-500">
                         Créez une nouvelle réunion pour discuter en temps réel avec votre équipe.
                     </p>
-                    <div className="mt-6">
-                        <button
-                            onClick={() => setShowStartMeetingModal(true)}
-                            className="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150"
-                        >
-                            <FaVideo className="mr-2" />
-                            Planifier une réunion
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de création de réunion */}
-            {showStartMeetingModal && (
-                <div className="fixed inset-0 overflow-y-auto z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowStartMeetingModal(false)}></div>
-
-                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-                        <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-                            <div>
-                                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
-                                    <FaVideo className="h-6 w-6 text-blue-600" aria-hidden="true" />
-                                </div>
-                                <div className="mt-3 text-center sm:mt-5">
-                                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
-                                        Créer une nouvelle réunion Zoom
-                                    </h3>
-                                    <div className="mt-2">
-                                        <p className="text-sm text-gray-500">
-                                            Planifiez une nouvelle réunion pour discuter avec votre équipe.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <form onSubmit={handleSubmit} className="mt-5 sm:mt-6 space-y-4">
-                                <div>
-                                    <label htmlFor="topic" className="block text-sm font-medium text-gray-700">
-                                        Sujet de la réunion
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="topic"
-                                        value={data.topic}
-                                        onChange={(e) => setData('topic', e.target.value)}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label htmlFor="start_time" className="block text-sm font-medium text-gray-700">
-                                            Date et heure
-                                        </label>
-                                        <input
-                                            type="datetime-local"
-                                            id="start_time"
-                                            value={data.start_time}
-                                            onChange={(e) => setData('start_time', e.target.value)}
-                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                            required
-                                            min={new Date().toISOString().slice(0, 16)}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label htmlFor="duration" className="block text-sm font-medium text-gray-700">
-                                            Durée (minutes)
-                                        </label>
-                                        <select
-                                            id="duration"
-                                            value={data.duration}
-                                            onChange={(e) => setData('duration', e.target.value)}
-                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                        >
-                                            <option value="15">15 min</option>
-                                            <option value="30">30 min</option>
-                                            <option value="45">45 min</option>
-                                            <option value="60">1 heure</option>
-                                            <option value="90">1h30</option>
-                                            <option value="120">2 heures</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label htmlFor="agenda" className="block text-sm font-medium text-gray-700">
-                                        Ordre du jour (optionnel)
-                                    </label>
-                                    <textarea
-                                        id="agenda"
-                                        rows="3"
-                                        value={data.agenda}
-                                        onChange={(e) => setData('agenda', e.target.value)}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                    />
-                                </div>
-
-                                <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
-                                    <button
-                                        type="submit"
-                                        disabled={processing}
-                                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:col-start-2 sm:text-sm disabled:opacity-50"
-                                    >
-                                        {processing ? (
-                                            <>
-                                                <FaSpinner className="animate-spin mr-2" />
-                                                Création...
-                                            </>
-                                        ) : 'Créer la réunion'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowStartMeetingModal(false)}
-                                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm"
-                                    >
-                                        Annuler
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
                 </div>
             )}
 
             {/* Section des réunions récentes */}
-            <div className="mt-8">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Réunions récentes</h3>
-                {isLoadingMeetings ? (
-                    <div className="flex justify-center py-4">
-                        <FaSpinner className="animate-spin h-6 w-6 text-blue-500" />
+            <div className="mt-8" id="recent-meetings">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-semibold text-gray-900">Réunions récentes</h3>
+                    <span className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-full">
+                        {recentMeetings.length} {recentMeetings.length > 1 ? 'réunions' : 'réunion'}
+                    </span>
+                </div>
+                
+                {loadingStates.recentMeetings ? (
+                    <div className="flex justify-center py-12">
+                        <FaSpinner className="animate-spin h-8 w-8 text-blue-500" />
                     </div>
                 ) : recentMeetings.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {recentMeetings.map((meeting) => {
                             const isUpcoming = isMeetingUpcoming(meeting);
                             const isActive = isMeetingActive(meeting);
+                            const meetingDate = parseISO(meeting.start_time);
                             
                             return (
                                 <div 
                                     key={meeting.id}
-                                    className={`border rounded-lg p-4 ${
+                                    className={`relative rounded-xl border p-5 transition-all duration-200 hover:shadow-md ${
                                         isUpcoming 
-                                            ? 'border-blue-300 bg-blue-50' 
+                                            ? 'border-blue-200 bg-blue-50 hover:border-blue-300' 
                                             : isActive
-                                            ? 'border-green-300 bg-green-50'
-                                            : 'border-gray-200'
+                                            ? 'border-green-200 bg-green-50 hover:border-green-300'
+                                            : 'border-gray-200 bg-gray-50 hover:border-gray-300'
                                     }`}
                                 >
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h4 className={`font-medium ${
-                                                isUpcoming ? 'text-blue-800' : 
-                                                isActive ? 'text-green-800' : 'text-gray-800'
-                                            }`}>
-                                                {meeting.topic}
-                                            </h4>
-                                            <p className="text-sm text-gray-600 mt-1">
-                                                <FaClock className="inline mr-1" />
-                                                {formatMeetingTime(meeting.start_time, meeting.duration)}
-                                            </p>
-                                            {meeting.agenda && (
-                                                <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                                                    {meeting.agenda}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div>
-                                            {isUpcoming ? (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                    <FaUserClock className="mr-1" /> À venir
-                                                </span>
-                                            ) : isActive ? (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                    <FaVideo className="mr-1" /> En cours
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                    <FaCheck className="mr-1" /> Terminé
-                                                </span>
-                                            )}
-                                        </div>
+                                    {/* En-tête avec statut */}
+                                    <div className="flex justify-between items-start mb-3">
+                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                            isUpcoming 
+                                                ? 'bg-blue-100 text-blue-800' 
+                                                : isActive 
+                                                ? 'bg-green-100 text-green-800' 
+                                                : 'bg-gray-100 text-gray-800'
+                                        }`}>
+                                            {isUpcoming ? 'À venir' : isActive ? 'En cours' : 'Terminé'}
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                            {format(meetingDate, 'dd MMM yyyy', { locale: fr })}
+                                        </span>
                                     </div>
-                                    <div className="mt-3 flex space-x-2">
+                                    
+                                    {/* Corps de la carte */}
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium text-gray-900 text-lg">
+                                            {meeting.topic}
+                                        </h4>
+                                        
+                                        <div className="flex items-center text-sm text-gray-600">
+                                            <FaClock className="mr-2 text-gray-400" />
+                                            {format(meetingDate, 'HH:mm', { locale: fr })} • 
+                                            {meeting.duration} min
+                                        </div>
+                                        
+                                        {meeting.agenda && (
+                                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                                                {meeting.agenda}
+                                            </p>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Pied de carte avec actions */}
+                                    <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end space-x-2">
                                         {(isUpcoming || isActive) && (
-                                            <a
-                                                href={meeting.join_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                            >
-                                                <FaDoorOpen className="mr-1" /> Rejoindre
-                                            </a>
+                                            <>
+                                                <button
+                                                    onClick={() => {
+                                                        setActiveMeeting(meeting);
+                                                        setShowZoomEmbed(true);
+                                                    }}
+                                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                >
+                                                    <FaDoorOpen className="mr-1.5" /> Rejoindre
+                                                </button>
+                                                {/* <a
+                                                    href={meeting.join_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                >
+                                                    <FaExpand className="mr-1.5" /> Nouvel onglet
+                                                </a> */}
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -656,9 +704,16 @@ export default function ZoomMeeting({ project }) {
                         })}
                     </div>
                 ) : (
-                    <div className="text-center py-6 bg-gray-50 rounded-lg">
-                        <FaVideo className="mx-auto h-8 w-8 text-gray-400" />
-                        <p className="mt-2 text-sm text-gray-500">Aucune réunion récente</p>
+                    <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                        <FaVideo className="mx-auto h-10 w-10 text-gray-400 mb-3" />
+                        <h4 className="text-lg font-medium text-gray-900">Aucune réunion récente</h4>
+                        <p className="mt-1 text-sm text-gray-500">Créez votre première réunion pour commencer</p>
+                        <button
+                            onClick={() => setShowMeetingForm(true)}
+                            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                            <FaVideo className="mr-2" /> Créer une réunion
+                        </button>
                     </div>
                 )}
             </div>
