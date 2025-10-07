@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         \App\Providers\DropboxServiceProvider::class,
         \Spatie\Permission\PermissionServiceProvider::class,
+        \App\Providers\EmailVerificationServiceProvider::class,
     ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',

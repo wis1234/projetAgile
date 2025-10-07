@@ -210,9 +210,15 @@ class RegisteredUserController extends Controller
             // Connecter automatiquement l'utilisateur
             Auth::login($user);
 
-            // Rediriger vers le tableau de bord avec un message de succès
-            return redirect()->route('dashboard')
-                ->with('success', 'Votre compte a été créé avec succès !');
+            // Envoyer l'email de vérification
+            $user->sendEmailVerificationNotification();
+
+            // Déconnecter l'utilisateur pour forcer la vérification
+            Auth::logout();
+
+            // Rediriger vers la page de connexion avec un message pour vérifier l'email
+            return redirect()->route('login')
+                ->with('status', 'Un lien de vérification a été envoyé à votre adresse email. Veuillez vérifier votre boîte de réception pour activer votre compte.');
 
         } catch (\Exception $e) {
             // Journalisation des erreurs en cas d'échec
