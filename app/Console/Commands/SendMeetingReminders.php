@@ -18,14 +18,14 @@ class SendMeetingReminders extends Command
      *
      * @var string
      */
-    protected $signature = 'zoom:send-start-notifications';
+    protected $signature = 'zoom:send-start-notifications {--minutes=5 : Nombre de minutes avant le début pour envoyer la notification}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Envoie des notifications quand une réunion Zoom commence';
+    protected $description = 'Envoie des notifications pour les réunions Zoom à venir';
 
     /**
      * Execute the console command.
@@ -33,17 +33,20 @@ class SendMeetingReminders extends Command
     public function handle()
     {
         $now = now();
+        $minutesBefore = (int)$this->option('minutes');
+        $windowStart = $now->copy()->addMinutes($minutesBefore);
+        $windowEnd = $windowStart->copy()->addMinute();
         
-        // Trouver les réunions qui commencent maintenant (à la minute près)
-        $meetings = ZoomMeeting::where('start_time', '<=', $now)
-            ->where('started_notification_sent', false)
-            ->where(function($query) use ($now) {
-                // Vérifier que la réunion n'est pas terminée (dans les 24h pour éviter les faux positifs)
-                $query->whereRaw('DATE_ADD(start_time, INTERVAL duration MINUTE) >= ?', [$now->copy()->subDay()])
-                      ->whereRaw('DATE_ADD(start_time, INTERVAL duration MINUTE) >= ?', [$now]);
-            })
+        $this->info("Recherche des réunions entre {$windowStart} et {$windowEnd}");
+        
+        // Trouver les réunions qui commencent dans la fenêtre de temps
+        $meetings = ZoomMeeting::whereBetween('start_time', [$windowStart, $windowEnd])
+            ->where('notification_sent', false)
+            ->where('start_time', '>', $now) // Ne pas notifier pour les réunions déjà commencées
             ->with('project.users')
             ->get();
+            
+        $this->info("Trouvé " . $meetings->count() . " réunions à notifier");
 
         foreach ($meetings as $meeting) {
             try {
@@ -62,9 +65,9 @@ class SendMeetingReminders extends Command
                     }
                     
                     // Marquer que la notification a été envoyée
-                    $meeting->update(['started_notification_sent' => true]);
+                    $meeting->update(['notification_sent' => true]);
                     
-                    $this->info("Notification de début envoyée pour la réunion : " . $meeting->topic);
+                    $this->info("Notification envoyée pour la réunion : " . $meeting->topic . " (ID: " . $meeting->id . ")");
                 }
             } catch (\Exception $e) {
                 $this->error("Erreur lors de l'envoi de la notification pour la réunion " . $meeting->id . ": " . $e->getMessage());
