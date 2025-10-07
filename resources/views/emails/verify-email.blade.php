@@ -24,6 +24,7 @@
             padding: 30px 0;
             text-align: center;
             border-radius: 8px 8px 0 0;
+            color:  #ffffff;
         }
         .logo {
             color: #ffffff;
@@ -88,7 +89,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <a href="{{ config('app.url') }}" class="logo">ProjA</a>
+            <a href="{{ config('app.url') }}" class="logo">ProJA</a>
         </div>
         
         <div class="content">
