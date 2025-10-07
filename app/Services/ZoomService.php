@@ -73,24 +73,33 @@ class ZoomService
                 ]
             ]);
 
-            $response = $client->post("$this->baseUrl/users/$userId/meetings", [
-                'json' => [
-                    'topic' => $data['topic'],
-                    'type' => 2, // Scheduled meeting
-                    'start_time' => $data['start_time'],
-                    'duration' => $data['duration'] ?? 60, // Default 60 minutes
-                    'timezone' => config('app.timezone'),
-                    'password' => $this->generateMeetingPassword(),
-                    'settings' => [
-                        'host_video' => true,
-                        'participant_video' => true,
-                        'join_before_host' => false,
-                        'mute_upon_entry' => true,
-                        'waiting_room' => true,
-                        'approval_type' => 1, // Manually approve participants
-                        'auto_recording' => 'cloud',
-                    ],
+            // Préparer les données de la réunion
+            $meetingData = [
+                'topic' => $data['topic'],
+                'type' => 2, // Scheduled meeting
+                'start_time' => $data['start_time'],
+                'duration' => $data['duration'] ?? 60, // Default 60 minutes
+                'timezone' => config('app.timezone'),
+                'password' => $this->generateMeetingPassword(),
+                'agenda' => $data['agenda'] ?? 'Réunion Zoom',
+                'settings' => [
+                    'host_video' => $data['settings']['host_video'] ?? true,
+                    'participant_video' => $data['settings']['participant_video'] ?? true,
+                    'join_before_host' => $data['settings']['join_before_host'] ?? false,
+                    'mute_upon_entry' => $data['settings']['mute_upon_entry'] ?? false,
+                    'waiting_room' => $data['settings']['waiting_room'] ?? true,
+                    'approval_type' => $data['settings']['approval_type'] ?? 1, // 1 = Manually approve participants
+                    'auto_recording' => $data['settings']['auto_recording'] ?? 'cloud',
                 ]
+            ];
+
+            // Nettoyer les valeurs nulles
+            $meetingData = array_filter($meetingData, function($value) {
+                return $value !== null;
+            });
+
+            $response = $client->post("$this->baseUrl/users/$userId/meetings", [
+                'json' => $meetingData
             ]);
 
             return json_decode($response->getBody(), true);

@@ -115,7 +115,13 @@
                     <div>
                         <strong>Date et heure :</strong><br>
                         {{ $meeting->start_time->format('l j F Y') }}<br>
-                        De {{ $meeting->start_time->format('H:i') }} à {{ $meeting->start_time->addMinutes($meeting->duration)->format('H:i') }}
+                        <!-- Ligne UTC existante -->
+                        De {{ $meeting->start_time->format('H:i') }} à {{ $meeting->start_time->copy()->addMinutes($meeting->duration)->format('H:i') }} (UTC)
+
+                        <!-- Nouvelle ligne : BENIN TIME (Africa/Porto-Novo / WAT) -->
+                        <br>BENIN TIME — De {{ $meeting->start_time->copy()->setTimezone('Africa/Porto-Novo')->format('H:i') }}
+                        à {{ $meeting->start_time->copy()->addMinutes($meeting->duration)->setTimezone('Africa/Porto-Novo')->format('H:i') }} (WAT)
+
                         @if($isReminder)
                             <br><span style="color: #ef4444; font-weight: 500;">(Démarre bientôt !)</span>
                         @endif

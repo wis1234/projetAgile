@@ -311,6 +311,94 @@ class ProjectNotification extends Notification implements ShouldQueue
                 $actionUrl = $taskId ? route('tasks.show', $taskId) : route('projects.show', $projectId);
                 break;
 
+            case 'project_status_changed':
+                $newStatus = $this->getStatusText($this->data['new_status'] ?? '');
+                $oldStatus = $this->getStatusText($this->data['old_status'] ?? '');
+                $changedBy = $this->data['changed_by'] ?? 'un utilisateur';
+                
+                $messageContent = "
+                    <style>{$styles}</style>
+                    <div class='card'>
+                        <h2 style='color: #1f2937; margin-top: 0;'>Changement de statut pour le projet <strong>{$projectName}</strong></h2>
+                        
+                        <div style='background: #f9fafb; padding: 15px; border-radius: 8px; margin: 15px 0;'>
+                            <p style='margin: 5px 0;'><strong>📊 Statut modifié par :</strong> {$changedBy}</p>
+                            <div style='display: flex; align-items: center; margin: 10px 0;'>
+                                <span style='padding: 4px 12px; border-radius: 12px; background-color: #e5e7eb; color: #4b5563;'>
+                                    {$oldStatus}
+                                </span>
+                                <span style='margin: 0 15px; color: #6b7280;'>→</span>
+                                <span style='padding: 4px 12px; border-radius: 12px; background-color: #4F46E5; color: white; font-weight: 500;'>
+                                    {$newStatus}
+                                </span>
+                            </div>
+                            <p style='margin: 5px 0;'><strong>📅 Date du changement :</strong> " . now()->format('d/m/Y à H:i') . "</p>
+                        </div>
+                        
+                        <div style='margin: 20px 0;'>
+                            <a href='" . route('projects.show', $this->data['project_id']) . "' 
+                               style='background-color: #4F46E5; color: white; padding: 10px 20px; 
+                                      text-decoration: none; border-radius: 6px; display: inline-block;'>
+                                👀 Voir le projet
+                            </a>
+                        </div>
+                    </div>
+                ";
+                $showActionButton = false;
+                $actionText = '👀 Voir le projet';
+                $actionUrl = route('projects.show', $this->data['project_id']);
+                break;
+                
+            case 'meeting_reminder':
+                $meetingTitle = $this->data['meeting_title'] ?? 'Réunion';
+                $meetingTime = $this->data['meeting_time'] ?? null;
+                $location = $this->data['location'] ?? 'en ligne';
+                $organizer = $this->data['organizer_name'] ?? 'un organisateur';
+                $meetingUrl = $this->data['meeting_url'] ?? null;
+                
+                $timeMessage = $meetingTime ? "prévue pour le <strong>" . \Carbon\Carbon::parse($meetingTime)->format('d/m/Y à H:i') . "</strong>" : "bientôt";
+                
+                $meetingLink = '';
+                if ($meetingUrl) {
+                    $meetingLink = "
+                        <div style='margin: 15px 0;'>
+                            <a href='{$meetingUrl}' 
+                               style='background-color: #4F46E5; color: white; padding: 10px 20px; 
+                                      text-decoration: none; border-radius: 6px; display: inline-block;'>
+                                🎯 Rejoindre la réunion
+                            </a>
+                        </div>";
+                }
+                
+                $messageContent = "
+                    <style>{$styles}</style>
+                    <div class='card'>
+                        <h2 style='color: #1f2937; margin-top: 0;'>🔔 Rappel : Réunion à venir</h2>
+                        <h3 style='color: #374151;'>{$meetingTitle}</h3>
+                        
+                        <div style='background: #f9fafb; padding: 15px; border-radius: 8px; margin: 15px 0;'>
+                            <p>La réunion <strong>{$meetingTitle}</strong> {$timeMessage} va bientôt commencer.</p>
+                            
+                            <div style='margin: 15px 0;'>
+                                <p style='margin: 5px 0;'><strong>📅 Date :</strong> " . \Carbon\Carbon::parse($meetingTime)->format('d/m/Y') . "</p>
+                                <p style='margin: 5px 0;'><strong>🕒 Heure :</strong> " . \Carbon\Carbon::parse($meetingTime)->format('H:i') . "</p>
+                                <p style='margin: 5px 0;'><strong>📍 Lieu :</strong> {$location}</p>
+                                <p style='margin: 5px 0;'><strong>👤 Organisateur :</strong> {$organizer}</p>
+                            </div>
+                            
+                            {$meetingLink}
+                            
+                            <p style='margin: 15px 0 0 0; color: #6b7280; font-size: 14px;'>
+                                Vous recevez ce rappel 1 heure avant le début de la réunion.
+                            </p>
+                        </div>
+                    </div>
+                ";
+                $showActionButton = false;
+                $actionText = '🎯 Rejoindre la réunion';
+                $actionUrl = $meetingUrl ?? '#';
+                break;
+                
             default:
                 $messageContent = "Une mise à jour a été effectuée sur le projet.";
                 $actionText = null;

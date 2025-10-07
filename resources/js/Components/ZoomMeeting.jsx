@@ -71,6 +71,13 @@ export default function ZoomMeeting({ project }) {
         duration: 60,
         agenda: 'Discussion sur l\'avancement du projet et les prochaines étapes.'
     });
+    
+    // S'assurer que l'agenda a toujours une valeur par défaut
+    useEffect(() => {
+        if (!data.agenda) {
+            setData('agenda', 'Discussion sur l\'avancement du projet et les prochaines étapes.');
+        }
+    }, [data.agenda]);
 
     // Charger la réunion active de manière optimisée
     const fetchActiveMeeting = useCallback(async () => {
@@ -229,6 +236,21 @@ export default function ZoomMeeting({ project }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
+        // Vérifier si c'est un rappel (moins d'1h avant la réunion)
+        const meetingTime = new Date(data.start_time);
+        const now = new Date();
+        const timeDiff = meetingTime - now;
+        const isReminder = timeDiff > 0 && timeDiff <= 60 * 60 * 1000; // Moins d'1h
+        
+        // Préparer les données avec des valeurs par défaut
+        const formData = {
+            topic: data.topic.trim(),
+            start_time: data.start_time,
+            duration: parseInt(data.duration, 10),
+            agenda: data.agenda || 'Réunion pour le projet ' + project.name,
+            is_reminder: isReminder
+        };
+        
         // Valider tous les champs avant soumission
         const isValid = validateForm();
         if (!isValid) {
@@ -256,10 +278,7 @@ export default function ZoomMeeting({ project }) {
                     'X-Requested-With': 'XMLHttpRequest'
                 },
                 credentials: 'include',
-                body: JSON.stringify({
-                    ...data,
-                    topic: data.topic.trim()
-                })
+                body: JSON.stringify(formData)
             });
 
             const result = await response.json();
@@ -369,38 +388,35 @@ export default function ZoomMeeting({ project }) {
                 ))}
             </div>
             
-            {/* En-tête */}
-            <div className="flex justify-between items-center mb-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                 <div className="flex items-center">
-                    <div className="p-2 bg-blue-100 rounded-full mr-3">
+                    <div className="p-2 bg-blue-100 rounded-full mr-3 flex-shrink-0">
                         <FaVideo className="text-blue-600 text-xl" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h2 className="text-xl font-semibold text-gray-900">
                             Réunion Zoom
-                        </h3>
+                        </h2>
                         <p className="text-sm text-gray-500">
                             Gérez vos réunions en ligne pour le projet
                         </p>
                     </div>
                 </div>
                 
-                {!activeMeeting && (
-                    <div className="relative inline-block text-left">
-                        <div>
-                            <button
-                                type="button"
-                                onClick={() => setShowDropdown(!showDropdown)}
-                                className="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ease-in-out duration-150"
-                                id="meeting-options-menu"
-                                aria-expanded="true"
-                                aria-haspopup="true"
-                            >
-                                <FaVideo className="mr-2" />
-                                Nouvelle réunion
-                                <FaChevronDown className="ml-2 h-3 w-3" />
-                            </button>
-                        </div>
+                <div className="relative w-full sm:w-auto">
+                    <button
+                        type="button"
+                        onClick={() => setShowDropdown(!showDropdown)}
+                        className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2.5 bg-blue-600 border border-transparent rounded-md font-medium text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                        id="meeting-options-menu"
+                        aria-expanded={showDropdown}
+                        aria-haspopup="true"
+                    >
+                        <FaVideo className="mr-2" />
+                        Nouvelle réunion
+                        <FaChevronDown className={`ml-2 h-3 w-3 transition-transform duration-200 ${showDropdown ? 'transform rotate-180' : ''}`} />
+                    </button>
 
                         {/* Dropdown menu style AWS */}
                         {showDropdown && (
@@ -427,7 +443,7 @@ export default function ZoomMeeting({ project }) {
                             </div>
                         )}
                     </div>
-                )}
+                
             </div>
 
             {/* Affichage des erreurs critiques (supprimé pour éviter l'affichage par défaut) */}
@@ -496,7 +512,7 @@ export default function ZoomMeeting({ project }) {
 
                                     <div>
                                         <label htmlFor="start_time" className="block text-sm font-medium text-gray-700">
-                                            Date et heure <span className="text-red-500">*</span>
+                                            Date et heure (UTC) <span className="text-red-500">*</span>
                                         </label>
                                         <div className="mt-1">
                                             <input
@@ -657,46 +673,55 @@ export default function ZoomMeeting({ project }) {
                                     </div>
                                     
                                     {/* Corps de la carte */}
-                                    <div className="space-y-2">
-                                        <h4 className="font-medium text-gray-900 text-lg">
+                                    <div className="space-y-1.5">
+                                        <h4 className="font-medium text-gray-900 text-sm">
                                             {meeting.topic}
                                         </h4>
                                         
-                                        <div className="flex items-center text-sm text-gray-600">
-                                            <FaClock className="mr-2 text-gray-400" />
-                                            {format(meetingDate, 'HH:mm', { locale: fr })} • 
-                                            {meeting.duration} min
+                                        <div className="space-y-1">
+                                            <div className="flex items-center text-xs text-gray-600">
+                                                <FaClock className="mr-2 text-gray-400 flex-shrink-0" />
+                                                <span className="font-medium">Date: </span>
+                                                <span className="ml-1">
+                                                    {format(meetingDate, 'dd/MM/yyyy HH:mm', { timeZone: 'UTC' })} (UTC+1)
+                                                    <br />
+                                                    Durée: {meeting.duration} min
+                                                </span>
+                                            </div>
+                                            
+                                            {meeting.agenda && (
+                                                <div className="flex text-xs text-gray-600">
+                                                    <span className="font-medium mr-1">Ordre du jour :</span>
+                                                    <p className="text-gray-600 line-clamp-2">
+                                                        {meeting.agenda}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
-                                        
-                                        {meeting.agenda && (
-                                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                                                {meeting.agenda}
-                                            </p>
-                                        )}
                                     </div>
                                     
                                     {/* Pied de carte avec actions */}
                                     <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end space-x-2">
                                         {(isUpcoming || isActive) && (
-                                            <>
-                                                <button
-                                                    onClick={() => {
-                                                        setActiveMeeting(meeting);
-                                                        setShowZoomEmbed(true);
-                                                    }}
-                                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                                >
-                                                    <FaDoorOpen className="mr-1.5" /> Rejoindre
-                                                </button>
-                                                {/* <a
-                                                    href={meeting.join_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                                >
-                                                    <FaExpand className="mr-1.5" /> Nouvel onglet
-                                                </a> */}
-                                            </>
+                                                <div className="flex space-x-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setActiveMeeting(meeting);
+                                                            setShowZoomEmbed(true);
+                                                        }}
+                                                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                    >
+                                                        <FaDoorOpen className="mr-1.5" /> Rejoindre
+                                                    </button>
+                                                    {/* <a
+                                                        href={meeting.join_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                    >
+                                                        <FaExpand className="mr-1.5" /> Nouvel onglet
+                                                    </a> */}
+                                                </div>
                                         )}
                                     </div>
                                 </div>

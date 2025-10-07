@@ -7,6 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use App\Models\ZoomMeeting;
+use Illuminate\Support\Facades\Mail;
 
 class MeetingReminder extends Notification implements ShouldQueue
 {
@@ -44,16 +45,13 @@ class MeetingReminder extends Notification implements ShouldQueue
     /**
      * Get the mail representation of the notification.
      */
+    /**
+     * Get the mail representation of the notification.
+     */
     public function toMail(object $notifiable): MailMessage
     {
-        $meeting = $this->meeting;
-        
-        $subject = $this->isReminder 
-            ? "🔔 Rappel : Réunion " . $meeting->topic . " bientôt"
-            : "📅 Nouvelle réunion : " . $meeting->topic;
-            
         return (new MailMessage)
-            ->subject($subject)
+            ->subject($this->subject())
             ->view('emails.meeting-reminder', [
                 'meeting' => $this->meeting,
                 'isReminder' => $this->isReminder,
@@ -66,10 +64,31 @@ class MeetingReminder extends Notification implements ShouldQueue
      *
      * @return array<string, mixed>
      */
+    /**
+     * Get the subject line for the notification.
+     *
+     * @return string
+     */
+    public function subject()
+    {
+        return $this->isReminder 
+            ? "🔔 Rappel : Réunion " . $this->meeting->topic . " bientôt"
+            : "📅 Nouvelle réunion : " . $this->meeting->topic;
+    }
+
+    /**
+     * Get the array representation of the notification.
+     *
+     * @return array<string, mixed>
+     */
     public function toArray(object $notifiable): array
     {
         return [
-            //
+            'meeting_id' => $this->meeting->id,
+            'is_reminder' => $this->isReminder,
+            'topic' => $this->meeting->topic,
+            'start_time' => $this->meeting->start_time,
+            'join_url' => $this->meeting->join_url
         ];
     }
 }

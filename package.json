@@ -70,6 +70,7 @@
         "@zoom/videosdk": "^2.2.12",
         "chart.js": "^4.5.0",
         "date-fns": "^4.1.0",
+        "date-fns-tz": "^3.2.0",
         "dropbox": "^10.34.0",
         "fedapay-reactjs": "^1.1.2",
         "framer-motion": "^12.23.12",
