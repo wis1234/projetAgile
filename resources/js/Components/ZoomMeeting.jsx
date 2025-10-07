@@ -116,13 +116,17 @@ export default function ZoomMeeting({ project }) {
         }
     }, [project.id]);
 
-    // Charger les réunions récentes de manière optimisée
+    // Charger les 6 réunions les plus récentes (en cours et terminées)
     const fetchRecentMeetings = useCallback(async () => {
         setLoadingStates(prev => ({ ...prev, recentMeetings: true }));
         setErrors(prev => ({ ...prev, recentMeetings: null }));
         
         try {
-            const response = await fetch(route('api.zoom.recent', { project: project.id }), {
+            // Récupérer toutes les réunions récentes (limitées à 6 par le backend)
+            const response = await fetch(route('api.zoom.recent', { 
+                project: project.id,
+                limit: 6 // Demander explicitement les 6 dernières réunions
+            }), {
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -136,7 +140,11 @@ export default function ZoomMeeting({ project }) {
 
             const result = await response.json();
             if (result.success && Array.isArray(result.meetings)) {
-                setRecentMeetings(result.meetings);
+                // Trier les réunions par date de début décroissante
+                const sortedMeetings = [...result.meetings].sort((a, b) => 
+                    new Date(b.start_time) - new Date(a.start_time)
+                );
+                setRecentMeetings(sortedMeetings);
             }
         } catch (error) {
             const errorMessage = handleError(error, 'Erreur lors du chargement des réunions');
@@ -625,18 +633,32 @@ export default function ZoomMeeting({ project }) {
                 </div>
             )}
 
-            {/* Section des réunions récentes */}
+            {/* Section des 6 réunions les plus récentes */}
             <div className="mt-8" id="recent-meetings">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-semibold text-gray-900">Réunions récentes</h3>
-                    <span className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-full">
-                        {recentMeetings.length} {recentMeetings.length > 1 ? 'réunions' : 'réunion'}
-                    </span>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+                    <div>
+                        <h3 className="text-xl font-semibold text-gray-900">Dernières réunions</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Les 6 réunions les plus récentes, y compris les appels en cours et terminés
+                        </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <span className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-full whitespace-nowrap">
+                            {recentMeetings.length} {recentMeetings.length > 1 ? 'réunions' : 'réunion'}
+                        </span>
+                        {recentMeetings.some(m => isMeetingActive(m)) && (
+                            <span className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-full flex items-center">
+                                <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
+                                En cours
+                            </span>
+                        )}
+                    </div>
                 </div>
                 
                 {loadingStates.recentMeetings ? (
                     <div className="flex justify-center py-12">
                         <FaSpinner className="animate-spin h-8 w-8 text-blue-500" />
+                        <span className="sr-only">Chargement des réunions...</span>
                     </div>
                 ) : recentMeetings.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -732,13 +754,14 @@ export default function ZoomMeeting({ project }) {
                     <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
                         <FaVideo className="mx-auto h-10 w-10 text-gray-400 mb-3" />
                         <h4 className="text-lg font-medium text-gray-900">Aucune réunion récente</h4>
-                        <p className="mt-1 text-sm text-gray-500">Créez votre première réunion pour commencer</p>
+                        <p className="mt-1 text-sm text-gray-500 mb-4">Créez votre première réunion pour commencer</p>
                         <button
                             onClick={() => setShowMeetingForm(true)}
-                            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
                         >
-                            <FaVideo className="mr-2" /> Créer une réunion
+                            <FaVideo className="mr-2" /> Planifier une réunion
                         </button>
+                        <p className="mt-3 text-xs text-gray-400">Les 6 prochaines réunions apparaîtront ici</p>
                     </div>
                 )}
             </div>

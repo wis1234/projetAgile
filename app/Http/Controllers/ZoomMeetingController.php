@@ -322,17 +322,19 @@ class ZoomMeetingController extends Controller
             $project = Project::findOrFail($projectId);
             $this->authorize('view', $project);
 
+            // Récupérer les 6 dernières réunions, peu importe leur date de début
             $meetings = $project->zoomMeetings()
-                ->where('start_time', '>=', now())
-                ->orderBy('start_time', 'asc')
-                ->take(3)
+                ->orderBy('start_time', 'desc') // Les plus récentes d'abord
+                ->take(6)
                 ->get()
                 ->map(function ($meeting) use ($project) {
                     $startTime = $meeting->start_time;
                     $endTime = $startTime ? $startTime->copy()->addMinutes($meeting->duration) : null;
                     $now = now();
                     
+                    // Déterminer si la réunion est en cours, à venir ou terminée
                     $isActive = $startTime && $endTime && $now->between($startTime, $endTime);
+                    $isUpcoming = $startTime && $now->lt($startTime);
                     $isUpcoming = $startTime && $now->lt($startTime);
                     $isEnded = $endTime && $now->gt($endTime);
                     
