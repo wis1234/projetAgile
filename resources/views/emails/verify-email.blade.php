@@ -94,7 +94,7 @@
         <div class="content">
             <h1>Bonjour {{ $user->name }} !</h1>
             
-            <p>Merci de vous être inscrit sur <strong>ProjA</strong> !</p>
+            <p>Merci de vous être inscrit sur <strong>ProJA</strong> !</p>
             
             <p>Pour commencer à utiliser votre compte, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :</p>
             
