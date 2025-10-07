@@ -691,7 +691,7 @@ export default function ZoomMeeting({ project }) {
                                             
                                             {meeting.agenda && (
                                                 <div className="flex text-xs text-gray-600">
-                                                    <span className="font-medium mr-1">Ordre du jour :</span>
+                                                    <span className="font-medium mr-1">Motif:</span>
                                                     <p className="text-gray-600 line-clamp-2">
                                                         {meeting.agenda}
                                                     </p>
