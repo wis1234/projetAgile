@@ -41,6 +41,12 @@ class Kernel extends ConsoleKernel
                  ->everyMinute()
                  ->withoutOverlapping()
                  ->sendOutputTo(storage_path('logs/meeting-reminders.log'));
+                 
+        // Envoie des notifications quand une réunion commence
+        $schedule->command('zoom:send-start-notifications')
+                 ->everyMinute()
+                 ->withoutOverlapping()
+                 ->sendOutputTo(storage_path('logs/zoom-start-notifications.log'));
     }
 
     /**

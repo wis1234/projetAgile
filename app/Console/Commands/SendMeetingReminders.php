@@ -2,12 +2,14 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Meeting;
+use App\Models\ZoomMeeting;
 use App\Models\Project;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\MeetingStartedNotification;
 use Illuminate\Support\Facades\Notification;
-use App\Notifications\MeetingReminder;
 
 class SendMeetingReminders extends Command
 {
@@ -16,14 +18,14 @@ class SendMeetingReminders extends Command
      *
      * @var string
      */
-    protected $signature = 'meetings:send-reminders';
+    protected $signature = 'zoom:send-start-notifications';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Envoie des rappels pour les réunions à venir';
+    protected $description = 'Envoie des notifications quand une réunion Zoom commence';
 
     /**
      * Execute the console command.
@@ -31,35 +33,49 @@ class SendMeetingReminders extends Command
     public function handle()
     {
         $now = now();
-        $oneHourFromNow = $now->copy()->addHour();
         
-        // Trouver les réunions qui commencent dans 1 heure et n'ont pas encore reçu de rappel
-        $meetings = Meeting::whereBetween('start_time', [$now, $oneHourFromNow])
-            ->where('reminder_sent', false)
-            ->where('start_time', '>', $now)
+        // Trouver les réunions qui commencent maintenant (à la minute près)
+        $meetings = ZoomMeeting::where('start_time', '<=', $now)
+            ->where('started_notification_sent', false)
+            ->where(function($query) use ($now) {
+                // Vérifier que la réunion n'est pas terminée (dans les 24h pour éviter les faux positifs)
+                $query->whereRaw('DATE_ADD(start_time, INTERVAL duration MINUTE) >= ?', [$now->copy()->subDay()])
+                      ->whereRaw('DATE_ADD(start_time, INTERVAL duration MINUTE) >= ?', [$now]);
+            })
+            ->with('project.users')
             ->get();
 
         foreach ($meetings as $meeting) {
             try {
                 // Récupérer le projet associé à la réunion
-                $project = Project::find($meeting->project_id);
+                $project = $meeting->project;
                 
                 if ($project) {
-                    // Envoyer des notifications à tous les membres du projet
-                    foreach ($project->members as $member) {
-                        $member->notify(new MeetingReminder($meeting, true));
+                    // Récupérer tous les utilisateurs du projet
+                    $members = $project->users;
+                    
+                    // Envoyer un email à chaque membre
+                    foreach ($members as $member) {
+                        Mail::to($member->email)->send(
+                            new MeetingStartedNotification($meeting, $project, $member)
+                        );
                     }
                     
-                    // Marquer que le rappel a été envoyé
-                    $meeting->update(['reminder_sent' => true]);
+                    // Marquer que la notification a été envoyée
+                    $meeting->update(['started_notification_sent' => true]);
                     
-                    $this->info("Rappel envoyé pour la réunion : " . $meeting->topic);
+                    $this->info("Notification de début envoyée pour la réunion : " . $meeting->topic);
                 }
             } catch (\Exception $e) {
-                $this->error("Erreur lors de l'envoi du rappel pour la réunion " . $meeting->id . ": " . $e->getMessage());
+                $this->error("Erreur lors de l'envoi de la notification pour la réunion " . $meeting->id . ": " . $e->getMessage());
+                \Log::error("Erreur d'envoi de notification de réunion", [
+                    'meeting_id' => $meeting->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
             }
         }
         
-        $this->info('Traitement des rappels de réunion terminé.');
+        $this->info('Traitement des notifications de début de réunion terminé.');
     }
 }
