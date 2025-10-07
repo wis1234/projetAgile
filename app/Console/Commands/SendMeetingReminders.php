@@ -18,7 +18,7 @@ class SendMeetingReminders extends Command
      *
      * @var string
      */
-    protected $signature = 'zoom:send-start-notifications {--minutes=5 : Nombre de minutes avant le début pour envoyer la notification}';
+    protected $signature = 'zoom:send-start-notifications {--minutes=1 : Nombre de minutes avant le début pour envoyer la notification}';
 
     /**
      * The console command description.
