@@ -194,6 +194,12 @@
                     @if($meeting->agenda)
                     <li><strong>Ordre du jour :</strong> {{ $meeting->agenda }}</li>
                     @endif
+                    @if($meeting->meeting_id)
+                    <li><strong>ID de la réunion :</strong> {{ $meeting->meeting_id }}</li>
+                    @endif
+                    @if($meeting->password)
+                    <li><strong>Mot de passe :</strong> {{ $meeting->password }}</li>
+                    @endif
                 </ul>
             </div>
             
