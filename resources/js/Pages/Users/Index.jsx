@@ -4,10 +4,10 @@ import { Link, usePage } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import ActionButton from '../../Components/ActionButton';
-import { FaUser, FaUsers, FaPlus, FaEdit, FaEye, FaProjectDiagram, FaSearch, FaEnvelope, FaCalendarAlt, FaUserShield, FaTrash, FaCrown, FaUserTie, FaTh, FaList } from 'react-icons/fa';
+import { FaUser, FaUsers, FaPlus, FaEdit, FaEye, FaProjectDiagram, FaSearch, FaEnvelope, FaCalendarAlt, FaUserShield, FaTrash, FaCrown, FaUserTie, FaTh, FaList, FaUserCheck, FaUserClock, FaChartBar } from 'react-icons/fa';
 import Modal from '../../Components/Modal';
 
-export default function Index({ users, filters, roles = [], auth }) {
+export default function Index({ users, filters, roles = [], auth, stats = null }) {
     const { flash = {}, auth: currentAuth } = usePage().props;
     const userAuth = auth?.user || auth;
     const [search, setSearch] = useState(filters?.search || '');
@@ -181,11 +181,88 @@ export default function Index({ users, filters, roles = [], auth }) {
                     </div>
                 )}
 
-                {/* Header section */}
+                {/* Titre principal */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Gestion des Membres</h1>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        Gérez les utilisateurs et leurs rôles dans l'application
+                    </p>
+                </div>
+
+                {/* Stats Section - Visible uniquement pour l'admin */}
+                {userAuth?.role === 'admin' && stats && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        {/* Carte pour le total des utilisateurs */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-blue-500">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Utilisateurs</p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total_users}</p>
+                                </div>
+                                <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
+                                    <FaUsers className="text-2xl" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Carte pour les administrateurs */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-red-500">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Administrateurs</p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.admins_count || 0}</p>
+                                </div>
+                                <div className="p-3 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300">
+                                    <FaUserShield className="text-2xl" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Carte pour les managers */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-green-500">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Managers</p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.managers_count}</p>
+                                </div>
+                                <div className="p-3 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300">
+                                    <FaUserTie className="text-2xl" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Carte pour les membres */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-purple-500">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Membres</p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.members_count || 0}</p>
+                                </div>
+                                <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300">
+                                    <FaUser className="text-2xl" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Header section avec barre de recherche et boutons d'action */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
-                    <div className="flex items-center gap-4">
-                        <FaUsers className="text-4xl text-blue-600 dark:text-blue-400" />
-                        <h1 className="text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">Gestion des Membres</h1>
+                    <div className="flex-1">
+                        <form onSubmit={handleSearchSubmit} className="w-full max-w-md">
+                            {/* <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <FaSearch className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Rechercher un utilisateur..."
+                                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                />
+                            </div> */}
+                        </form>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
                         {/* View Toggle */}

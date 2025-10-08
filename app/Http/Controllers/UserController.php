@@ -42,21 +42,32 @@ class UserController extends Controller
         $users = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
         $roles = Role::orderBy('name')->get();
         
+        // Préparer les statistiques (uniquement pour les admins)
+        $stats = null;
+        if ($currentUser->hasRole('admin')) {
+            $stats = [
+                'total_users' => User::count(),
+                'admins_count' => User::role('admin')->count(),
+                'managers_count' => User::role('manager')->count(),
+                'members_count' => User::role('member')->count()
+            ];
+        }
+        
         // Ajouter l'URL de la photo de profil à l'utilisateur connecté
         $authUser = [
             'id' => $currentUser->id,
             'name' => $currentUser->name,
             'email' => $currentUser->email,
             'profile_photo_url' => $currentUser->profile_photo_url ?? null,
+            'role' => $currentUser->roles->first()?->name ?? 'user',
         ];
-        
+
         return Inertia::render('Users/Index', [
             'users' => $users,
-            'filters' => $request->only('search'),
-            'auth' => [
-                'user' => $authUser
-            ],
+            'filters' => $request->only(['search']),
             'roles' => $roles,
+            'auth' => $authUser,
+            'stats' => $stats,
         ]);
     }
 
@@ -279,35 +290,51 @@ class UserController extends Controller
 
     public function createRole(Request $request)
     {
-        $current = $request->user();
-        if (!$current || $current->email !== 'ronaldoagbohou@gmail.com') {
-            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
-        }
         $validated = $request->validate([
-            'role' => 'required|string|min:2|max:50|regex:/^[a-zA-Z0-9_\-]+$/',
+            'role' => 'required|string|unique:roles,name'
         ]);
-        $role = Role::firstOrCreate(['name' => $validated['role']]);
-        return response()->json(['success' => true, 'role' => $role->name]);
-    }
 
+        try {
+            $role = Role::create(['name' => $validated['role']]);
+            return response()->json(['success' => true, 'message' => 'Rôle créé avec succès']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Erreur lors de la création du rôle: ' . $e->getMessage()], 500);
+        }
+    }
     /**
-     * Supprime un rôle Spatie (sauf admin/user)
+     * Supprime un rôle
      */
-    public function destroyRole(Request $request, $id)
+    public function deleteRole(Role $role)
     {
-        $current = $request->user();
-        if (!$current || $current->email !== 'ronaldoagbohou@gmail.com') {
-            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        try {
+            // Empêcher la suppression des rôles système importants
+            if (in_array($role->name, ['admin', 'user'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ce rôle ne peut pas être supprimé car il est nécessaire au bon fonctionnement du système.'
+                ], 403);
+            }
+
+            // Vérifier si des utilisateurs ont encore ce rôle
+            if ($role->users()->count() > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Impossible de supprimer ce rôle car des utilisateurs l\'utilisent encore.'
+                ], 422);
+            }
+
+            $role->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Rôle supprimé avec succès.'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de la suppression du rôle.'
+            ], 500);
         }
-        $role = Role::findOrFail($id);
-        if (in_array($role->name, ['admin', 'user'])) {
-            return response()->json(['error' => 'Impossible de supprimer ce rôle système.'], 403);
-        }
-        // Vérifie si des utilisateurs ont ce rôle
-        if ($role->users()->count() > 0) {
-            return response()->json(['error' => 'Ce rôle est encore attribué à des utilisateurs.'], 409);
-        }
-        $role->delete();
-        return response()->json(['success' => true]);
     }
 }

@@ -288,6 +288,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/roles/create', [\App\Http\Controllers\UserController::class, 'createRole'])->name('roles.create');
     Route::delete('/roles/{role}', [\App\Http\Controllers\UserController::class, 'deleteRole'])->name('roles.destroy');
+    Route::delete('/roles/{role}/delete', [\App\Http\Controllers\UserController::class, 'deleteRole'])->name('roles.destroy.alternative');
 });
 
 // Gestion des abonnements
