@@ -4,10 +4,13 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import { FaFlagCheckered, FaEdit, FaProjectDiagram, FaArrowLeft, FaTasks, FaUser, FaCalendarAlt, FaInfoCircle } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
-const Show = ({ sprint }) => {
-  const { t } = useTranslation();
 
-  const formatDate = (date) => {
+// Composant principal avec layout intégré
+const Show = ({ sprint }) => {
+
+    const { t } = useTranslation();
+
+      const formatDate = (date) => {
     return new Date(date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
@@ -18,9 +21,9 @@ const Show = ({ sprint }) => {
       done: 'bg-green-200 text-green-800',
     };
     const labels = {
-      todo: t('status.todo'),
-      in_progress: t('status.in_progress'),
-      done: t('status.done'),
+      todo: 'À faire',
+      in_progress: 'En cours',
+      done: 'Terminé',
     };
     return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styles[status] || styles.todo}`}>{labels[status] || status}</span>;
   };
@@ -32,9 +35,9 @@ const Show = ({ sprint }) => {
       high: 'bg-red-200 text-red-800',
     };
     const labels = {
-      low: t('priority.low'),
-      medium: t('priority.medium'),
-      high: t('priority.high'),
+      low: 'Basse',
+      medium: 'Moyenne',
+      high: 'Haute',
     };
     return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styles[priority] || styles.low}`}>{labels[priority] || priority}</span>;
   };
@@ -204,10 +207,7 @@ const Show = ({ sprint }) => {
   );
 };
 
-const Layout = (page) => {
-  const { t } = useTranslation();
-  return <AdminLayout children={page} title={t('sprint_details')} />;
-};
+// Configuration du layout avec le titre statique pour éviter les problèmes de hooks
+Show.layout = page => <AdminLayout title="Détails du sprint">{page}</AdminLayout>;
 
-Show.layout = Layout;
 export default Show;

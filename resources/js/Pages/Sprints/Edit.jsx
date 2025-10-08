@@ -7,6 +7,10 @@ import { Link } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function Edit({ sprint, projects }) {
+  // Set page title
+  useEffect(() => {
+    document.title = 'Modifier le sprint';
+  }, []);
   const { t } = useTranslation();
   const { errors = {}, flash = {}, auth } = usePage().props;
   const [formData, setFormData] = useState({
@@ -306,11 +310,10 @@ function Edit({ sprint, projects }) {
   );
 }
 
-const Layout = (page) => {
-  const { t } = useTranslation();
-  return <AdminLayout children={page} title={t('edit_sprint')} />;
-};
-
-Edit.layout = Layout;
-
-export default Edit;
+export default function EditPage(props) {
+  return (
+    <AdminLayout>
+      <Edit {...props} />
+    </AdminLayout>
+  );
+}
