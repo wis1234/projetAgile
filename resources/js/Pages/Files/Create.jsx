@@ -31,6 +31,7 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
   const [projectId, setProjectId] = useState(urlProjectId || projects[0]?.id || '');
   const [taskId, setTaskId] = useState(urlTaskId || '');
   const [kanbanId, setKanbanId] = useState('');
+  const [selectedTask, setSelectedTask] = useState(null);
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
   const [notification, setNotification] = useState(flash.success || flash.error || '');
@@ -50,6 +51,36 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
     }
   }, [content]);
 
+  // Effet pour charger les détails de la tâche sélectionnée
+  useEffect(() => {
+    const fetchTaskDetails = async () => {
+      if (!taskId) {
+        setSelectedTask(null);
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/tasks/${taskId}/details`);
+        if (!response.ok) throw new Error('Impossible de charger les détails de la tâche');
+        
+        const data = await response.json();
+        if (data.success && data.task) {
+          setSelectedTask(data.task);
+          // Mettre à jour le champ Kanban avec le sprint de la tâche si disponible
+          if (data.task.sprint_id) {
+            setKanbanId(data.task.sprint_id);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des détails de la tâche:', error);
+        setNotification('Erreur lors du chargement des détails de la tâche', 'error');
+      }
+    };
+    
+    fetchTaskDetails();
+  }, [taskId]);
+  
+  // Effet pour gérer les paramètres d'URL
   useEffect(() => {
     if (urlProjectId) setProjectId(urlProjectId);
     if (urlTaskId) setTaskId(urlTaskId);
@@ -407,7 +438,11 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
                 <select
                   id="task"
                   value={taskId}
-                  onChange={(e) => setTaskId(e.target.value)}
+                  onChange={(e) => {
+                    setTaskId(e.target.value);
+                    // Réinitialiser le kanbanId lors du changement de tâche
+                    if (!e.target.value) setKanbanId('');
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                 >
                   <option value="">Sélectionner une tâche (optionnel)</option>
@@ -421,7 +456,7 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
 
               <div>
                 <label htmlFor="kanban" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tableau Kanban (optionnel)
+                  Tableau Kanban (optionnel){selectedTask?.sprint && ` (Sélectionné: ${selectedTask.sprint.name})`}
                 </label>
                 <select
                   id="kanban"

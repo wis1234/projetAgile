@@ -24,14 +24,19 @@
         
         /* En-tête */
         .header {
+            background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+            color: white;
+            padding: 30px 20px;
             text-align: center;
-            padding: 30px 0;
         }
         
         .logo {
-            max-width: 180px;
-            height: auto;
-            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
         }
         
         /* Carte de notification */
@@ -148,25 +153,15 @@
 <body>
     <div class="email-container">
         <div class="header">
-            <img src="{{ asset('logo-proja.png') }}" alt="{{ config('app.name') }}" class="logo">
+            <div class="logo">{{ config('app.name') }}</div>
+            <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Nouvelle Tâche Assignée</h1>
         </div>
         
         <div class="card">
-            <div class="card-header">
-                <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Nouvelle Tâche Assignée</h1>
-            </div>
             
             <div class="card-body">
                 <h2 style="margin: 0 0 10px 0; color: #111827; font-size: 20px;">{{ $task->title }}</h2>
                 
-                <div style="margin-bottom: 20px;">
-                    <span class="badge badge-priority-{{ strtolower($task->priority) }}">
-                        {{ ucfirst($task->priority) }}
-                    </span>
-                    <span class="badge badge-status-{{ strtolower(str_replace(' ', '_', $task->status)) }}">
-                        {{ ucfirst(str_replace('_', ' ', $task->status)) }}
-                    </span>
-                </div>
                 
                 <div class="task-details">
                     <div class="detail-row">
@@ -184,14 +179,44 @@
                         <div class="detail-value">{{ $task->due_date ? \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') : 'Non définie' }}</div>
                     </div>
                     
+                    @php
+                        // Traduction des priorités
+                        $priorities = [
+                            'low' => 'Basse',
+                            'medium' => 'Moyenne',
+                            'high' => 'Haute',
+                            'urgent' => 'Urgente'
+                        ];
+                        
+                        // Traduction des statuts
+                        $statuses = [
+                            'todo' => 'À faire',
+                            'in_progress' => 'En cours',
+                            'in_review' => 'En révision',
+                            'done' => 'Terminé',
+                            'cancelled' => 'Annulé',
+                            'pending' => 'En attente',
+                            'completed' => 'Terminé',
+                            'closed' => 'Fermé'
+                        ];
+                        
+                        $priority = isset($priorities[strtolower($task->priority)]) ? 
+                            $priorities[strtolower($task->priority)] : 
+                            ucfirst($task->priority);
+                            
+                        $status = isset($statuses[strtolower($task->status)]) ? 
+                            $statuses[strtolower($task->status)] : 
+                            ucfirst(str_replace('_', ' ', $task->status));
+                    @endphp
+                    
                     <div class="detail-row">
                         <div class="detail-label">Priorité :</div>
-                        <div class="detail-value">{{ ucfirst($task->priority) }}</div>
+                        <div class="detail-value">{{ $priority }}</div>
                     </div>
                     
                     <div class="detail-row">
                         <div class="detail-label">Statut :</div>
-                        <div class="detail-value">{{ ucfirst(str_replace('_', ' ', $task->status)) }}</div>
+                        <div class="detail-value">{{ $status }}</div>
                     </div>
                     
             

@@ -186,6 +186,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/files/{file}/comments/{comment}', [\App\Http\Controllers\FileCommentController::class, 'update']);
         Route::delete('/files/{file}/comments/{comment}', [\App\Http\Controllers\FileCommentController::class, 'destroy']);
         
+        // Détails d'une tâche
+        Route::get('/tasks/{task}/details', [\App\Http\Controllers\TaskController::class, 'getTaskDetails'])->name('api.tasks.details');
+        
         // Notifications d'activités
         Route::get('/activities/notifications', [ActivityController::class, 'notifications']);
         

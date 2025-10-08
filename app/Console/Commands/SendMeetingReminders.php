@@ -54,20 +54,44 @@ class SendMeetingReminders extends Command
                 $project = $meeting->project;
                 
                 if ($project) {
-                    // Récupérer tous les utilisateurs du projet
-                    $members = $project->users;
-                    
-                    // Envoyer un email à chaque membre
-                    foreach ($members as $member) {
-                        Mail::to($member->email)->send(
-                            new MeetingStartedNotification($meeting, $project, $member)
-                        );
+                    try {
+                        // Récupérer tous les utilisateurs du projet via la relation users
+                        $users = $project->users()->get();
+                        
+                        if ($users->isEmpty()) {
+                            $this->warn("Aucun utilisateur trouvé pour le projet ID: " . $project->id);
+                            continue;
+                        }
+                        
+                        // Envoyer un email à chaque utilisateur
+                        foreach ($users as $user) {
+                            try {
+                                Mail::to($user->email)->send(
+                                    new MeetingStartedNotification($meeting, $project, $user)
+                                );
+                                $this->info("Notification envoyée à " . $user->email . " pour la réunion: " . $meeting->topic);
+                            } catch (\Exception $mailException) {
+                                $this->error("Erreur d'envoi à " . $user->email . ": " . $mailException->getMessage());
+                                \Log::error("Erreur d'envoi de notification à " . $user->email, [
+                                    'error' => $mailException->getMessage(),
+                                    'trace' => $mailException->getTraceAsString()
+                                ]);
+                            }
+                        }
+                        
+                        // Marquer que la notification a été envoyée
+                        $meeting->update(['notification_sent' => true]);
+                        
+                        $this->info("Toutes les notifications ont été envoyées pour la réunion : " . $meeting->topic . " (ID: " . $meeting->id . ")");
+                    } catch (\Exception $e) {
+                        $this->error("Erreur lors de la récupération des utilisateurs: " . $e->getMessage());
+                        \Log::error("Erreur de récupération des utilisateurs", [
+                            'meeting_id' => $meeting->id,
+                            'project_id' => $project->id,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
                     }
-                    
-                    // Marquer que la notification a été envoyée
-                    $meeting->update(['notification_sent' => true]);
-                    
-                    $this->info("Notification envoyée pour la réunion : " . $meeting->topic . " (ID: " . $meeting->id . ")");
                 }
             } catch (\Exception $e) {
                 $this->error("Erreur lors de l'envoi de la notification pour la réunion " . $meeting->id . ": " . $e->getMessage());

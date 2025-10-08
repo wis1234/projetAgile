@@ -229,7 +229,7 @@ const Show = ({ file, auth, canManageFile }) => {
                       <FaFileAlt className="h-5 w-5 text-blue-600" />
                     }
                     title="Type de fichier"
-                    value={currentFile.type || 'Inconnu'}
+                    value={currentFile.type || '-'}
                   />
                   
                   <RelatedInfo 
@@ -237,7 +237,7 @@ const Show = ({ file, auth, canManageFile }) => {
                       <FaClock className="h-5 w-5 text-purple-600" />
                     }
                     title="Date de création"
-                    value={new Date(currentFile.created_at).toLocaleString('fr-FR')}
+                    value={currentFile.created_at ? new Date(currentFile.created_at).toLocaleString('fr-FR') : '-'}
                   />
                   
                   <RelatedInfo 
@@ -245,7 +245,7 @@ const Show = ({ file, auth, canManageFile }) => {
                       <FaClock className="h-5 w-5 text-yellow-600" />
                     }
                     title="Dernière modification"
-                    value={new Date(currentFile.updated_at).toLocaleString('fr-FR')}
+                    value={currentFile.updated_at ? new Date(currentFile.updated_at).toLocaleString('fr-FR') : '-'}
                   />
                 </div>
               </motion.div>
@@ -293,9 +293,8 @@ const Show = ({ file, auth, canManageFile }) => {
                       </div>
                       <div className="ml-3">
                         <h3 className="text-sm font-medium text-gray-900">Tâche</h3>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          <FaTimes className="mr-1.5 h-3 w-3" />
-                          ko
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          Non associée
                         </span>
                       </div>
                     </div>

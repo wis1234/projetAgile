@@ -25,6 +25,7 @@ function Create({ projects = [], sprints = [], users = [] }) {
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('todo');
   const [dueDate, setDueDate] = useState('');
+  const [dueTime, setDueTime] = useState('12:00'); // Heure par défaut à midi
   const [priority, setPriority] = useState('medium');
   const [projectId, setProjectId] = useState(projects[0]?.id || '');
   const [sprintId, setSprintId] = useState(sprints[0]?.id || '');
@@ -39,15 +40,30 @@ function Create({ projects = [], sprints = [], users = [] }) {
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Formater la date au format YYYY-MM-DD pour l'input date
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
+  // Formater la date et l'heure pour l'affichage
+  const formatDateTime = (dateString) => {
+    if (!dateString) return { date: '', time: '12:00' };
     const date = new Date(dateString);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return {
+      date: `${year}-${month}-${day}`,
+      time: `${hours}:${minutes}`
+    };
   };
+
+  // Mettre à jour la date complète quand la date ou l'heure change
+  useEffect(() => {
+    if (dueDate) {
+      const [hours, minutes] = dueTime.split(':');
+      const date = new Date(dueDate);
+      date.setHours(parseInt(hours, 10), parseInt(minutes, 10));
+      setDueDate(date.toISOString().slice(0, 16));
+    }
+  }, [dueTime]);
 
   const hasProjects = projects.length > 0;
 
@@ -67,11 +83,20 @@ function Create({ projects = [], sprints = [], users = [] }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
+    
+    // Formater la date et l'heure au format attendu par le backend (Y-m-d H:i:s)
+    let formattedDueDate = null;
+    if (dueDate) {
+      const [year, month, day] = dueDate.split('T')[0].split('-');
+      const [hours, minutes] = dueTime.split(':');
+      formattedDueDate = `${year}-${month}-${day} ${hours}:${minutes}:00`;
+    }
+    
     router.post('/tasks', {
       title,
       description,
       status,
-      due_date: dueDate,
+      due_date: formattedDueDate,
       priority,
       assigned_to: assignedTo,
       project_id: projectId,
@@ -414,38 +439,61 @@ function Create({ projects = [], sprints = [], users = [] }) {
                 </div>
               </div>
               
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
+              <div className="space-y-2">
+                <div className="flex space-x-2">
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <input 
+                      type="date" 
+                      id="due_date" 
+                      value={dueDate ? formatDateTime(dueDate).date : ''} 
+                      min={formatDateTime(new Date().toISOString()).date}
+                      onChange={e => setDueDate(e.target.value)} 
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" 
+                      disabled={!hasProjects} 
+                    />
+                  </div>
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="time"
+                      id="due_time"
+                      value={dueTime}
+                      onChange={e => setDueTime(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200"
+                      disabled={!hasProjects}
+                    />
+                  </div>
                 </div>
-                <input 
-                  type="date" 
-                  id="due_date" 
-                  value={formatDate(dueDate)} 
-                  min={formatDate(new Date())}
-                  onChange={e => setDueDate(e.target.value)} 
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" 
-                  disabled={!hasProjects} 
-                />
-              </div>
-              
-              <div className="mt-2 flex flex-wrap gap-2">
-                {[1, 3, 7, 14].map(days => {
-                  const date = new Date();
-                  date.setDate(date.getDate() + days);
-                  return (
-                    <button
-                      key={days}
-                      type="button"
-                      onClick={() => setDueDate(date.toISOString().split('T')[0])}
-                      className="text-xs px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                    >
-                      {days === 1 ? 'Demain' : `+${days} jours`}
-                    </button>
-                  );
-                })}
+                
+                <div className="flex flex-wrap gap-2">
+                  {[1, 3, 7, 14].map(days => {
+                    const date = new Date();
+                    date.setDate(date.getDate() + days);
+                    const formattedDate = formatDateTime(date.toISOString());
+                    return (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() => {
+                          setDueDate(date.toISOString().split('T')[0]);
+                          setDueTime('09:00'); // Heure par défaut pour les boutons rapides
+                        }}
+                        className="text-xs px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        {days === 1 ? 'Demain' : `+${days} jours`}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               
               {errors.due_date && <div className="text-red-600 text-sm mt-2 font-medium">{errors.due_date}</div>}

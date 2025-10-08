@@ -68,10 +68,19 @@
             padding-top: 20px;
             border-top: 1px solid #e5e7eb;
         }
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
     <div class="header">
+        <div class="logo">{{ config('app.name') }}</div>
         <h1>Mise à jour de votre abonnement</h1>
     </div>
     

@@ -8,7 +8,32 @@ function Edit({ task, projects = [], sprints = [], users = [] }) {
   const [title, setTitle] = useState(task.title || '');
   const [description, setDescription] = useState(task.description || '');
   const [status, setStatus] = useState(task.status || 'todo');
-  const [dueDate, setDueDate] = useState(task.due_date || '');
+  // Formater la date et l'heure pour l'affichage
+  const formatDateTime = (dateString) => {
+    if (!dateString) return { date: null, time: '12:00' };
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return { date: null, time: '12:00' };
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      
+      return {
+        date: `${year}-${month}-${day}`,
+        time: `${hours}:${minutes}`,
+        isValid: true
+      };
+    } catch (e) {
+      return { date: null, time: '12:00', isValid: false };
+    }
+  };
+
+  const initialDateTime = formatDateTime(task.due_date);
+  const [dueDate, setDueDate] = useState(initialDateTime.date);
+  const [dueTime, setDueTime] = useState(initialDateTime.time);
   const [priority, setPriority] = useState(task.priority || 'medium');
   const [projectId, setProjectId] = useState(task.project_id || projects[0]?.id || '');
   const [sprintId, setSprintId] = useState(task.sprint_id || sprints[0]?.id || '');
@@ -35,11 +60,23 @@ function Edit({ task, projects = [], sprints = [], users = [] }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
+    
+    // Formater la date et l'heure au format attendu par le backend (Y-m-d H:i:s)
+    let formattedDueDate = null;
+    if (dueDate) {
+      const date = new Date(dueDate);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const [hours, minutes] = dueTime.split(':');
+      formattedDueDate = `${year}-${month}-${day} ${hours}:${minutes}:00`;
+    }
+    
     router.put(`/tasks/${task.id}`, {
       title,
       description,
       status,
-      due_date: dueDate,
+      due_date: formattedDueDate,
       priority,
       assigned_to: assignedTo,
       project_id: projectId,
@@ -144,7 +181,22 @@ function Edit({ task, projects = [], sprints = [], users = [] }) {
 
             <div>
               <label htmlFor="due_date" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Date d'échéance</label>
-              <input type="date" id="due_date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" />
+              <div className="flex space-x-2">
+                <input 
+                  type="date" 
+                  id="due_date" 
+                  value={dueDate || ''}
+                  onChange={e => setDueDate(e.target.value)} 
+                  className="w-1/2 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" 
+                />
+                <input 
+                  type="time" 
+                  id="due_time" 
+                  value={dueTime || '12:00'}
+                  onChange={e => setDueTime(e.target.value)}
+                  className="w-1/2 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" 
+                />
+              </div>
               {errors.due_date && <div className="text-red-600 text-sm mt-2 font-medium">{errors.due_date}</div>}
             </div>
 

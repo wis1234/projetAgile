@@ -28,9 +28,18 @@
             margin-bottom: 20px;
         }
         
-        .logo {
+        /* .logo {
             max-width: 150px;
             height: auto;
+        }
+         */
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
         }
         
         /* Carte de contenu */
@@ -89,7 +98,9 @@
     <div class="email-container">
         <!-- En-tête avec logo -->
         <div class="header">
-            <img src="{{ asset('logo-proja.png') }}" alt="Logo" class="logo">
+            <!-- <img src="{{ asset('logo-proja.png') }}" alt="Logo" class="logo"> -->
+            <div class="logo">{{ config('app.name') }}</div>
+
         </div>
         
         <!-- Carte de contenu -->

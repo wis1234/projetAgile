@@ -340,8 +340,8 @@ const Index = ({ tasks: initialTasks = [], filters = {} }) => {
         {/* Task View Section */}
         {viewMode === 'table' ? (
           <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition duration-200 hover:shadow-lg mb-8">
-            <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
-              <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
+            <table className="min-w-full text-sm text-gray-700 dark:text-gray-300 divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <tr>
                   <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('title')}</th>
                   <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('project')}</th>
@@ -363,8 +363,24 @@ const Index = ({ tasks: initialTasks = [], filters = {} }) => {
                     className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
                     onClick={() => router.visit(`/tasks/${task.id}`)}
                   >
-                    <td className="p-4 align-middle font-semibold text-blue-700 dark:text-blue-200 group-hover:underline">{task.title}</td>
-                    <td className="p-4 align-middle text-gray-600 dark:text-gray-300">{task.project?.name || <span className="italic text-gray-400">Aucun</span>}</td>
+                    <td className="p-4 align-middle">
+                      <div className="flex items-center gap-2">
+                        <FaTasks className="text-blue-500 flex-shrink-0" />
+                        <span className="font-semibold text-blue-700 dark:text-blue-200 group-hover:underline">
+                          {task.title}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-4 align-middle">
+                      {task.project?.name ? (
+                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                          <FaProjectDiagram className="text-blue-500" />
+                          <span>{task.project.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">Non assigné</span>
+                      )}
+                    </td>
                     <td className="p-4 align-middle">
                       {getStatusBadge(task.status, t)}
                     </td>

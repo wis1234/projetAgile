@@ -93,7 +93,7 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'status' => 'required|string|in:todo,in_progress,done',
             'priority' => 'required|string|in:low,medium,high',
-            'due_date' => 'nullable|date',
+            'due_date' => ['nullable', 'date_format:Y-m-d H:i:s'],
             'project_id' => 'required|exists:projects,id',
             'sprint_id' => 'required|exists:sprints,id',
             'assigned_to' => 'nullable|exists:users,id',
@@ -195,6 +195,31 @@ class TaskController extends Controller
      * @param  \App\Models\Task  $task
      * @return \Inertia\Response
      */
+    /**
+     * Récupère les détails d'une tâche, y compris le sprint associé
+     *
+     * @param  \App\Models\Task  $task
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getTaskDetails(Task $task)
+    {
+        $this->authorize('view', $task);
+        
+        return response()->json([
+            'success' => true,
+            'task' => [
+                'id' => $task->id,
+                'title' => $task->title,
+                'sprint_id' => $task->sprint_id,
+                'sprint' => $task->sprint ? [
+                    'id' => $task->sprint->id,
+                    'name' => $task->sprint->name,
+                    'status' => $task->sprint->status,
+                ] : null,
+            ]
+        ]);
+    }
+    
     public function show(Task $task)
     {
         try {
@@ -331,7 +356,7 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'status' => 'required|string|in:todo,in_progress,done',
             'priority' => 'required|string|in:low,medium,high',
-            'due_date' => 'nullable|date',
+            'due_date' => ['nullable', 'date_format:Y-m-d H:i:s'],
             'project_id' => 'required|exists:projects,id',
             'sprint_id' => 'required|exists:sprints,id',
             'assigned_to' => 'nullable|exists:users,id',

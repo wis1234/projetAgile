@@ -31,8 +31,12 @@
         }
         
         .logo {
-            max-width: 150px;
-            margin-bottom: 15px;
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
         }
         
         .content {
@@ -102,7 +106,7 @@
 <body>
     <div class="container">
         <div class="header">
-        <img src="{{ asset('logo-proja.png') }}" alt="{{ config('app.name') }}" class="logo">
+        <div class="logo">{{ config('app.name') }}</div>
         <h1>{{ $isReminder ? '🔔 Rappel de réunion' : '📅 Nouvelle réunion planifiée' }}</h1>
         </div>
         
