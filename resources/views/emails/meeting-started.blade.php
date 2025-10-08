@@ -198,8 +198,16 @@
             </div>
             
             <div class="button-container">
-                <a href="{{ $joinUrl }}" class="button">Rejoindre la réunion maintenant</a>
+                <a href="{{ route('projects.show', $project->id) }}" class="button">
+                    Rejoindre mon équipe
+                </a>
             </div>
+            
+            <div class="divider"></div>
+            
+            <!-- <div class="button-container">
+                <a href="{{ $joinUrl }}" class="button">Rejoindre la réunion maintenant</a>
+            </div> -->
             
             <p class="link-note">Ou copiez ce lien dans votre navigateur :</p>
             <a href="{{ $joinUrl }}" class="meeting-link">{{ $joinUrl }}</a>
