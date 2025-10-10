@@ -933,7 +933,18 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     return descriptionMap[reason] || 'Cette tâche est effectuée sans rémunération.';
   };
 
+  // Récupérer l'onglet actif depuis le stockage local ou utiliser 'details' par défaut
   const [activeTab, setActiveTab] = useState('details');
+
+  // Charger l'onglet sauvegardé après le montage du composant
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTab = localStorage.getItem('taskActiveTab');
+      if (savedTab) {
+        setActiveTab(savedTab);
+      }
+    }
+  }, []);
   
   // L'accès est autorisé pour l'admin ou le manager du projet
   const hasAccess = isAdmin || isProjectManager;
@@ -985,13 +996,19 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     }
   }, [comments, readComments, task.id]);
 
-  // Mark comments as read when Discussions tab is clicked
-  const handleTabClick = (tab) => {
+  // Gère le changement d'onglet et la persistance
+  const handleTabClick = useCallback((tab) => {
+    setActiveTab(tab);
+    // Sauvegarder l'onglet actif dans le stockage local
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('taskActiveTab', tab);
+    }
+    
+    // Marquer les commentaires comme lus si on passe à l'onglet commentaires
     if (tab === 'comments') {
       markCommentsAsRead();
     }
-    setActiveTab(tab);
-  };
+  }, [markCommentsAsRead]);
 
   // Calculate unread comments count
   const unreadCommentsCount = comments.filter(comment => 
@@ -1059,7 +1076,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   </h2>
     <nav className="flex flex-wrap gap-2 sm:gap-3" aria-label="Tabs">
       <button
-        onClick={() => setActiveTab('details')}
+        onClick={() => handleTabClick('details')}
         className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
           activeTab === 'details'
             ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/20'
@@ -1077,7 +1094,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
       {task.is_paid && ((hasAccess || !isDeadlinePassed) ? (
         <button
-          onClick={() => setActiveTab('payment')}
+          onClick={() => handleTabClick('payment')}
           className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
             activeTab === 'payment'
               ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md shadow-green-500/20'
@@ -1118,7 +1135,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         </div>
       ) : (
         <button
-          onClick={() => setActiveTab('files')}
+          onClick={() => handleTabClick('files')}
           className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
             activeTab === 'files'
               ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md shadow-purple-500/20'
