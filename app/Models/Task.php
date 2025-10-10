@@ -125,4 +125,12 @@ class Task extends Model
     {
         return $this->hasMany(TaskPayment::class);
     }
+    
+    /**
+     * Get the user assigned to the task.
+     */
+    public function assignedUsers()
+    {
+        return $this->belongsTo(User::class, 'assigned_to')->withDefault();
+    }
 }

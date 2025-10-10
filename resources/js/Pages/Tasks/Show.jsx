@@ -501,11 +501,33 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     }
   };
 
+  const formatCommentDate = (dateString) => {
+    if (!dateString) return 'Date inconnue';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Date invalide';
+      
+      return date.toLocaleString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Erreur de formatage de la date:', error);
+      return 'Date inconnue';
+    }
+  };
+
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation(); // Empêche la propagation de l'événement
+    
     if (!commentContent.trim() && !audioBlob) {
       setError('Veuillez écrire un message ou enregistrer un message vocal.');
-      return;
+      return false;
     }
     
     setPosting(true);
@@ -513,10 +535,8 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     
     try {
       const formData = new FormData();
-      // Toujours s'assurer que le contenu a une valeur, même si c'est juste un espace
       formData.append('content', commentContent.trim() || 'Message vocal');
       if (audioBlob) {
-        // Utiliser le bon type MIME et extension
         formData.append('audio', audioBlob, 'voice_message.webm');
       }
 
@@ -542,16 +562,39 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       
       const newComment = await res.json();
       
+      // Créer un objet utilisateur complet avec les champs nécessaires
+      const userData = {
+        id: auth.user.id,
+        name: auth.user.name,
+        email: auth.user.email,
+        profile_photo_url: auth.user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth.user.name || '')}`,
+        profile_photo_path: auth.user.profile_photo_path,
+        role: auth.user.role
+      };
+      
+      // Créer l'objet commentaire avec toutes les propriétés nécessaires
+      const commentWithUser = {
+        ...newComment,
+        content: newComment.content || commentContent.trim(), // S'assurer que le contenu est bien défini
+        user: userData,
+        created_at: newComment.created_at || new Date().toISOString(),
+        updated_at: newComment.updated_at || new Date().toISOString(),
+        formatted_date: formatCommentDate(newComment.created_at || new Date().toISOString())
+      };
+      
       if (replyingTo) {
         // Si c'est une réponse, on met à jour le commentaire parent
         setComments(prevComments => {
           const updateComments = (comments) => {
             return comments.map(comment => {
-              // Si c'est le commentaire parent, on ajoute la réponse et on trie
+              // Si c'est le commentaire parent, on ajoute la réponse
               if (comment.id === replyingTo) {
                 const updatedReplies = [
-                  ...(comment.replies || []), 
-                  { ...newComment, formatted_date: formatDate(newComment.created_at) }
+                  {
+                    ...commentWithUser,
+                    replies: [] // S'assurer que les réponses sont initialisées
+                  },
+                  ...(comment.replies || [])
                 ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 
                 return {
@@ -577,17 +620,31 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       } else {
         // Sinon, on ajoute un nouveau commentaire en haut de la liste
         setComments(prevComments => [
-          { ...newComment, formatted_date: formatDate(newComment.created_at) },
+          {
+            ...commentWithUser,
+            replies: [] // S'assurer que les réponses sont initialisées
+          },
           ...prevComments
         ]);
       }
       
+      // Réinitialiser le formulaire
       setCommentContent('');
       setAudioBlob(null);
       setAudioUrl(null);
       setReplyingTo(null);
+      
+      // Faire défiler vers le haut pour voir le nouveau commentaire
+      setTimeout(() => {
+        const commentsSection = document.querySelector('#comments-section');
+        if (commentsSection) {
+          commentsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+      
     } catch (e) {
-      setError(e.message || 'Erreur lors de l\'ajout du commentaire');
+      console.error('Erreur lors de l\'ajout du commentaire:', e);
+      setError(e.message || 'Une erreur est survenue lors de l\'ajout du commentaire');
     } finally {
       setPosting(false);
     }
@@ -671,39 +728,74 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
   // Fonction utilitaire pour formater les dates
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+    if (!dateString) return 'Date inconnue';
+    
+    try {
+      const date = new Date(dateString);
+      
+      // Vérifier si la date est valide
+      if (isNaN(date.getTime())) {
+        console.warn('Date invalide reçue:', dateString);
+        return 'Date inconnue';
+      }
+      
+      // Formater la date en français
+      return new Intl.DateTimeFormat('fr-FR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(date);
+    } catch (error) {
+      console.error('Erreur lors du formatage de la date:', error);
+      return 'Date inconnue';
+    }
   };
 
-  useEffect(() => {
-    fetch(`/api/tasks/${task.id}/comments`)
-      .then(res => res.json())
-      .then(comments => {
-        // Trier les commentaires par date de création (du plus récent au plus ancien)
-        const sortedComments = [...comments].sort((a, b) => 
-          new Date(b.created_at) - new Date(a.created_at)
-        );
-        
-        // S'assurer que chaque commentaire a un tableau de réponses trié
-        const processedComments = sortedComments.map(comment => ({
-          ...comment,
-          replies: (comment.replies || []).sort((a, b) => 
-            new Date(b.created_at) - new Date(a.created_at)
-          ),
-          formatted_date: formatDate(comment.created_at)
-        }));
-        
-        setComments(processedComments);
-      })
-      .catch(() => setComments([]))
-      .finally(() => setLoadingComments(false));
+  const loadComments = useCallback(async () => {
+    try {
+      setLoadingComments(true);
+      const response = await fetch(`/api/tasks/${task.id}/comments?include=user`);
+      if (!response.ok) {
+        throw new Error('Erreur lors du chargement des commentaires');
+      }
+      
+      const comments = await response.json();
+      
+      // Trier les commentaires par date de création (du plus récent au plus ancien)
+      const sortedComments = [...comments].sort((a, b) => 
+        new Date(b.created_at) - new Date(a.created_at)
+      );
+      
+      // S'assurer que chaque commentaire a un tableau de réponses trié et des données utilisateur complètes
+      const processedComments = sortedComments.map(comment => ({
+        ...comment,
+        user: comment.user || { name: 'Utilisateur inconnu', profile_photo_url: null },
+        replies: (comment.replies || [])
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          .map(reply => ({
+            ...reply,
+            user: reply.user || { name: 'Utilisateur inconnu', profile_photo_url: null },
+            formatted_date: formatDate(reply.created_at)
+          })),
+        formatted_date: formatDate(comment.created_at)
+      }));
+      
+      setComments(processedComments);
+    } catch (error) {
+      console.error('Erreur:', error);
+      setError('Impossible de charger les commentaires');
+      setComments([]);
+    } finally {
+      setLoadingComments(false);
+    }
   }, [task.id]);
+
+  useEffect(() => {
+    loadComments();
+  }, [loadComments]);
 
   const handleDeleteComment = (commentId) => {
     setCommentToDeleteId(commentId);
@@ -1811,7 +1903,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         ) : t('task_details.write_your_comment')}
       </h3>
       
-      <form onSubmit={handleCommentSubmit} className="space-y-4">
+      <form onSubmit={(e) => { e.preventDefault(); handleCommentSubmit(e); return false; }} className="space-y-4">
         <div className="relative">
           <textarea
             value={commentContent}
@@ -2010,7 +2102,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                         <>
                           <div className="prose dark:prose-invert max-w-none">
                             <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
-                              {comment.content}
+                              {comment.content || ''}
                             </p>
                           </div>
 
@@ -2105,7 +2197,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                                 </span>
                               </div>
                               <p className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-wrap">
-                                {reply.content}
+                                {reply.content || ''}
                               </p>
                               {reply.audio_path && (
                                 <div className="mt-2">

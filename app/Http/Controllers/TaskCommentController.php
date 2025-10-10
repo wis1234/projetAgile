@@ -72,69 +72,43 @@ class TaskCommentController extends Controller
         // Charger les relations nécessaires pour la réponse
         $comment->load('user', 'parent.user');
 
-        // Send email notification to project members and mentioned users
-        $task = \App\Models\Task::with('project.users')->findOrFail($taskId);
-        $projectUsers = $task->project->users ?? collect();
-        $commentAuthorId = Auth::id();
+        // Envoyer la notification de commentaire
+        $task = \App\Models\Task::with(['project.users', 'assignedUsers'])->findOrFail($taskId);
         
-        // Déterminer le type de notification en fonction du contexte
-        $isReply = $comment->parent_id !== null;
-        $subject = $isReply ? 'Nouvelle réponse à un commentaire' : 'Nouveau commentaire sur une tâche';
+        // Récupérer les utilisateurs à notifier
+        $usersToNotify = collect();
         
-        // Construire le message en fonction du contexte
-        $message = $isReply 
-            ? "Une nouvelle réponse a été ajoutée à un commentaire sur la tâche '{$task->title}' par {$comment->user->name} :\n\n"
-            : "Un nouveau commentaire a été ajouté à la tâche '{$task->title}' par {$comment->user->name} :\n\n";
-            
-        if ($comment->content) {
-            $message .= "\"{$comment->content}\"\n\n";
+        // Ajouter les membres du projet
+        if ($task->project && $task->project->users) {
+            $usersToNotify = $usersToNotify->merge($task->project->users);
         }
         
-        if ($isReply && $comment->parent) {
-            $message .= "En réponse à :\n";
-            $message .= $comment->parent->content ? "\"{$comment->parent->content}\\n\n" : "(Message vocal)\n\n";
-            $message .= "— {$comment->parent->user->name}\n\n";
+        // Ajouter l'utilisateur assigné à la tâche s'il existe
+        if ($task->assignedUsers && $task->assignedUsers->id) {
+            $usersToNotify->push($task->assignedUsers);
         }
         
-        if ($comment->audio_path) {
-            $message .= "(Contient un message vocal)\n\n";
+        // Ajouter l'auteur de la tâche s'il existe et est différent de l'utilisateur assigné
+        if ($task->creator && !$usersToNotify->contains('id', $task->creator->id)) {
+            $usersToNotify->push($task->creator);
         }
         
-        $actionUrl = route('tasks.show', $task->id) . '#comment-' . $comment->id;
-        $actionText = $isReply ? 'Voir la réponse' : 'Voir le commentaire';
+        // Éviter les doublons et ne pas notifier l'auteur du commentaire
+        $usersToNotify = $usersToNotify->unique('id')
+            ->filter(function ($user) use ($comment) {
+                return $user && $user->id !== $comment->user_id;
+            });
         
-        // Liste des utilisateurs à notifier
-        $usersToNotify = $projectUsers->filter(function($user) use ($commentAuthorId, $comment) {
-            // Ne pas notifier l'auteur du commentaire
-            if ($user->id === $commentAuthorId) {
-                return false;
-            }
-            
-            // Si c'est une réponse, ne pas notifier la personne qui a posté le commentaire parent
-            // sauf si c'est une réponse à son propre commentaire
-            if ($comment->parent_id && $comment->parent->user_id === $user->id && $comment->parent->user_id !== $commentAuthorId) {
-                return true;
-            }
-            
-            // Pour les commentaires de premier niveau, notifier tous les membres du projet
-            return $comment->parent_id === null;
-        });
-
-        // Envoyer les notifications aux utilisateurs concernés
+        // Envoyer la notification à chaque utilisateur concerné
         foreach ($usersToNotify as $user) {
-            $user->notify(new \App\Notifications\UserActionMailNotification(
-                $subject,
-                $message,
-                $actionUrl,
-                $actionText,
-                [
-                    'task_id' => $task->id,
-                    'comment_id' => $comment->id,
-                ]
-            ));
+            $user->notify(new \App\Notifications\TaskCommentNotification($task, $comment));
         }
-
-        return response()->json($comment, 201);
+        
+        // Retourner la réponse avec le commentaire créé
+        return response()->json([
+            'message' => $request->filled('parent_id') ? 'Réponse ajoutée avec succès' : 'Commentaire ajouté avec succès',
+            'comment' => $comment->load('user')
+        ], 201);
     }
 
     // Supprime un commentaire
