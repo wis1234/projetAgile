@@ -246,7 +246,7 @@
                 </div>
                 
                 <div style="text-align: center; margin-top: 25px;">
-                    <a href="{{ route('tasks.show', $task->id) }}" class="btn">Voir la tâche</a>
+                    <a href="{{ route('tasks.show', $task->id) }}#comments" class="btn">Voir la discussion</a>
                 </div>
             </div>
             <p>Vous recevez cette notification car vous êtes assigné(e) à cette tâche ou avez participé à la discussion.</p>
