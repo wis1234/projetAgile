@@ -5,250 +5,409 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nouvelle Tâche Assignée - {{ config('app.name') }}</title>
     <style type="text/css">
-        /* Reset et styles de base */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body, html {
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             line-height: 1.6;
-            color: #374151;
-            background-color: #f9fafb;
+            color: #1e293b;
+            background-color: #f5f7fa;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         
-        /* Conteneur principal */
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
+        .email-wrapper {
+            max-width: 100%;
+            margin: 0;
+            background-color: #ffffff;
+            overflow: hidden;
         }
         
-        /* En-tête */
         .header {
             background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
-            color: white;
-            padding: 30px 20px;
+            padding: 40px 30px;
             text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 15s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.1); opacity: 0.6; }
         }
         
         .logo {
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 700;
-            margin: 0 0 10px 0;
             color: white;
-            text-decoration: none;
-            display: inline-block;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
         
-        /* Carte de notification */
-        .card {
-            background: #ffffff;
+        .header-title {
+            color: #f8fafc;
+            font-size: 22px;
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+            margin: 0;
+        }
+        
+        .content {
+            padding: 35px 30px;
+        }
+        
+        .greeting {
+            font-size: 16px;
+            color: #475569;
+            margin-bottom: 20px;
+        }
+        
+        .greeting strong {
+            color: #1e293b;
+        }
+        
+        .intro-text {
+            font-size: 15px;
+            color: #64748b;
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }
+        
+        .task-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            overflow: hidden;
-            margin-bottom: 30px;
+            padding: 28px;
+            margin: 25px 0;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
         }
         
-        .card-header {
-            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
+        .task-header {
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
         }
         
-        .card-body {
-            padding: 30px;
+        .task-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 12px;
+            line-height: 1.4;
         }
         
-        /* Badges */
+        .badges-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
         .badge {
             display: inline-block;
-            padding: 6px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-right: 8px;
-            margin-bottom: 8px;
         }
         
-        .badge-priority-high { background-color: #FEE2E2; color: #B91C1C; }
-        .badge-priority-medium { background-color: #FEF3C7; color: #B45309; }
-        .badge-priority-low { background-color: #D1FAE5; color: #047857; }
+        .badge-priority-high { background-color: #fee2e2; color: #b91c1c; }
+        .badge-priority-medium { background-color: #fef3c7; color: #b45309; }
+        .badge-priority-low { background-color: #d1fae5; color: #047857; }
+        .badge-priority-urgent { background-color: #fce7f3; color: #be123c; }
         
-        .badge-status-todo { background-color: #E5E7EB; color: #4B5563; }
-        .badge-status-in_progress { background-color: #DBEAFE; color: #1D4ED8; }
-        .badge-status-done { background-color: #D1FAE5; color: #047857; }
+        .badge-status { background-color: #dbeafe; color: #1d4ed8; }
         
-        /* Détails de la tâche */
-        .task-details {
-            margin: 25px 0;
-            border-top: 1px solid #E5E7EB;
-            border-bottom: 1px solid #E5E7EB;
-            padding: 20px 0;
+        .task-meta {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+            margin: 24px 0;
         }
         
-        .detail-row {
-            display: flex;
+        .meta-item {
+            background: white;
+            padding: 14px 16px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .meta-item:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        }
+        
+        .meta-label {
+            color: #64748b;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 6px;
+        }
+        
+        .meta-value {
+            color: #1e293b;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        
+        .description-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 24px 0;
+            border-left: 4px solid #4361ee;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        }
+        
+        .description-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #4361ee;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             margin-bottom: 12px;
         }
         
-        .detail-label {
-            font-weight: 600;
-            color: #6B7280;
-            width: 120px;
-            flex-shrink: 0;
+        .description-content {
+            color: #475569;
+            font-size: 14px;
+            line-height: 1.7;
         }
         
-        .detail-value {
-            flex-grow: 1;
+        .btn-container {
+            text-align: center;
+            margin: 28px 0 20px;
         }
         
-        /* Bouton d'action */
         .btn {
             display: inline-block;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
             color: white !important;
             text-decoration: none;
-            border-radius: 6px;
+            padding: 14px 36px;
+            border-radius: 10px;
             font-weight: 600;
-            text-align: center;
-            margin: 20px 0;
+            font-size: 15px;
+            box-shadow: 0 4px 14px rgba(67, 97, 238, 0.4);
             transition: all 0.3s ease;
         }
         
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 6px 20px rgba(67, 97, 238, 0.5);
         }
         
-        /* Pied de page */
+        .notification-info {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-left: 4px solid #f59e0b;
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin: 25px 0;
+            font-size: 13px;
+            color: #92400e;
+            line-height: 1.6;
+            box-shadow: 0 2px 6px rgba(245, 158, 11, 0.1);
+        }
+        
         .footer {
+            background: linear-gradient(135deg, rgb(255, 255, 255) 0%, rgb(255, 255, 255) 100%);
+            padding: 28px 30px;
             text-align: center;
-            color: #9CA3AF;
-            font-size: 14px;
-            padding: 20px 0;
-            border-top: 1px solid #E5E7EB;
-            margin-top: 30px;
+            color: #94a3b8;
         }
         
-        /* Responsive */
+        .footer-copyright {
+            font-size: 13px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        
+        .footer-note {
+            font-size: 12px;
+            color: #64748b;
+            margin: 0;
+        }
+        
         @media (max-width: 600px) {
-            .card-body {
-                padding: 20px 15px;
+            .header {
+                padding: 30px 20px;
             }
             
-            .detail-row {
+            .logo {
+                font-size: 28px;
+            }
+            
+            .header-title {
+                font-size: 18px;
+            }
+            
+            .content {
+                padding: 25px 20px;
+            }
+            
+            .task-card {
+                padding: 20px;
+            }
+            
+            .task-meta {
+                grid-template-columns: 1fr;
+            }
+            
+            .badges-container {
                 flex-direction: column;
             }
             
-            .detail-label {
+            .badge {
+                text-align: center;
+            }
+            
+            .btn {
                 width: 100%;
-                margin-bottom: 4px;
+                padding: 14px 20px;
+            }
+            
+            .footer {
+                padding: 24px 20px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="email-container">
+    <div class="email-wrapper">
         <div class="header">
             <div class="logo">{{ config('app.name') }}</div>
-            <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Nouvelle Tâche Assignée</h1>
+            <h1 class="header-title">Nouvelle Tâche Assignée</h1>
         </div>
         
-        <div class="card">
-            
-            <div class="card-body">
-                <h2 style="margin: 0 0 10px 0; color: #111827; font-size: 20px;">{{ $task->title }}</h2>
+        <div class="content">
+            @php
+                $assignedUser = $task->assignedUser;
+                $prenom = $assignedUser ? explode(' ', $assignedUser->name)[0] : 'Utilisateur';
                 
+                // Traduction des priorités
+                $priorities = [
+                    'low' => 'Basse',
+                    'medium' => 'Moyenne',
+                    'high' => 'Haute',
+                    'urgent' => 'Urgente'
+                ];
                 
-                <div class="task-details">
-                    <div class="detail-row">
-                        <div class="detail-label">Projet :</div>
-                        <div class="detail-value">{{ $task->project->name ?? 'N/A' }}</div>
-                    </div>
-                    
-                    <div class="detail-row">
-                        <div class="detail-label">Assigné à :</div>
-                        <div class="detail-value">{{ $task->assignedUser ? $task->assignedUser->name : 'Non assigné' }}</div>
-                    </div>
-                    
-                    <div class="detail-row">
-                        <div class="detail-label">Date d'échéance :</div>
-                        <div class="detail-value">{{ $task->due_date ? \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') : 'Non définie' }}</div>
-                    </div>
-                    
-                    @php
-                        // Traduction des priorités
-                        $priorities = [
-                            'low' => 'Basse',
-                            'medium' => 'Moyenne',
-                            'high' => 'Haute',
-                            'urgent' => 'Urgente'
-                        ];
-                        
-                        // Traduction des statuts
-                        $statuses = [
-                            'todo' => 'À faire',
-                            'in_progress' => 'En cours',
-                            'in_review' => 'En révision',
-                            'done' => 'Terminé',
-                            'cancelled' => 'Annulé',
-                            'pending' => 'En attente',
-                            'completed' => 'Terminé',
-                            'closed' => 'Fermé'
-                        ];
-                        
-                        $priority = isset($priorities[strtolower($task->priority)]) ? 
-                            $priorities[strtolower($task->priority)] : 
-                            ucfirst($task->priority);
-                            
-                        $status = isset($statuses[strtolower($task->status)]) ? 
-                            $statuses[strtolower($task->status)] : 
-                            ucfirst(str_replace('_', ' ', $task->status));
-                    @endphp
-                    
-                    <div class="detail-row">
-                        <div class="detail-label">Priorité :</div>
-                        <div class="detail-value">{{ $priority }}</div>
-                    </div>
-                    
-                    <div class="detail-row">
-                        <div class="detail-label">Statut :</div>
-                        <div class="detail-value">{{ $status }}</div>
-                    </div>
-                    
+                // Traduction des statuts
+                $statuses = [
+                    'todo' => 'À faire',
+                    'in_progress' => 'En cours',
+                    'in_review' => 'En révision',
+                    'done' => 'Terminé',
+                    'cancelled' => 'Annulé',
+                    'pending' => 'En attente',
+                    'completed' => 'Terminé',
+                    'closed' => 'Fermé'
+                ];
+                
+                $priority = $priorities[strtolower($task->priority)] ?? ucfirst($task->priority);
+                $status = $statuses[strtolower($task->status)] ?? ucfirst(str_replace('_', ' ', $task->status));
+                $creator = \App\Models\User::find($task->created_by);
+            @endphp
             
-                    
-                    <div class="detail-row">
-                        <div class="detail-label">Créée par :</div>
-                        <div class="detail-value">
-                            @php
-                                $creator = \App\Models\User::find($task->created_by);
-                            @endphp
-                            {{ $creator ? $creator->name : 'Système' }}
+            <div class="greeting">
+                Salut <strong>{{ $prenom }}</strong> 👋
+            </div>
+            
+            <p class="intro-text">
+                Une nouvelle tâche vous a été assignée par <strong>{{ $creator ? $creator->name : 'le système' }}</strong>. Voici les détails :
+            </p>
+            
+            <div class="task-card">
+                <div class="task-header">
+                    <div class="task-title">{{ $task->title }}</div>
+                    <div class="badges-container" style="display: flex; align-items: center; gap: 10px; font-style: italic; font-size: 0.9em; color: #666; margin: 5px 0;">
+                        <div>
+                            <span style="font-weight: 500;">Priorité :</span>
+                            <span class="badge badge-priority-{{ strtolower($task->priority) }}" style="margin-left: 5px;">
+                                {{ $priority }}
+                            </span>
+                        </div>
+                        <div>
+                            <span style="font-weight: 500;">Statut :</span>
+                            <span class="badge badge-status" style="margin-left: 5px;">
+                                {{ $status }}
+                            </span>
                         </div>
                     </div>
                 </div>
                 
-                <div style="margin: 25px 0;">
-                    <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #4B5563;">Description :</h3>
-                    <div style="background-color: #F9FAFB; padding: 15px; border-radius: 6px; border-left: 3px solid #4F46E5;">
-                        {!! nl2br(e($task->description ?? 'Aucune description fournie.')) !!}
+                <div class="task-meta">
+                    <div class="meta-item">
+                        <span class="meta-label">📁 Projet</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">👤 Assigné à</span>
+                        <span class="meta-value">{{ $assignedUser ? $assignedUser->name : 'Non assigné' }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">📅 Échéance</span>
+                        <span class="meta-value">{{ $task->due_date ? \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') : 'Non définie' }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">✨ Créée par</span>
+                        <span class="meta-value">{{ $creator ? $creator->name : 'Système' }}</span>
                     </div>
                 </div>
                 
-                <div style="text-align: center;">
+                @if($task->description)
+                <div class="description-section">
+                    <div class="description-title">Description</div>
+                    <div class="description-content">
+                        {!! nl2br(e($task->description)) !!}
+                    </div>
+                </div>
+                @endif
+                
+                <div class="btn-container">
                     <a href="{{ route('tasks.show', $task->id) }}" class="btn">Voir la tâche</a>
                 </div>
+            </div>
+            
+            <div class="notification-info">
+                💡 Vous recevez cet email car une nouvelle tâche vous a été assignée. Consultez les détails et commencez à travailler dessus dès que possible.
             </div>
         </div>
         
         <div class="footer">
-            <p style="margin: 0 0 10px 0;">© {{ date('Y') }} {{ config('app.name') }}. Tous droits réservés.</p>
-            <p style="margin: 0; font-size: 12px; color: #9CA3AF;">
-                Cet email a été envoyé automatiquement, merci de ne pas y répondre.
+            <p class="footer-copyright">
+                © {{ date('Y') }} {{ config('app.name') }}. Tous droits réservés.
+            </p>
+            <p class="footer-note">
+                Cet email a été envoyé automatiquement, merci de ne pas y répondre directement.
             </p>
         </div>
     </div>

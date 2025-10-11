@@ -1938,7 +1938,22 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const tableMarkup = '\n<table>\n  <tr>\n    <th>Colonne 1</th>\n    <th>Colonne 2</th>\n  </tr>\n  <tr>\n    <td>Donnée 1</td>\n    <td>Donnée 2</td>\n  </tr>\n</table>\n';
+                  setCommentContent(prev => prev + tableMarkup);
+                }}
+                className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Insérer un tableau"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+            </div>
             {isRecording ? (
               <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg">
                 <div className="flex items-center gap-2">
@@ -2118,9 +2133,18 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                       ) : (
                         <>
                           <div className="prose dark:prose-invert max-w-none">
-                            <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
-                              {comment.content || ''}
-                            </p>
+                            <div 
+                              className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words"
+                              dangerouslySetInnerHTML={{
+                                __html: comment.content
+                                  ? comment.content
+                                      .replace(/<table([^>]*)>/g, '<div class="overflow-x-auto"><table class="min-w-full border-collapse border border-gray-300 dark:border-gray-600" $1>')
+                                      .replace(/<\/table>/g, '</table></div>')
+                                      .replace(/<th([^>]*)>/g, '<th class="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-4 py-2 text-left" $1>')
+                                      .replace(/<td([^>]*)>/g, '<td class="border border-gray-300 dark:border-gray-600 px-4 py-2" $1>')
+                                  : ''
+                              }}
+                            />
                           </div>
 
                           {comment.audio_path && (
