@@ -136,24 +136,35 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
       
       clearTimeout(timeoutId);
       
-      // Vérifier le type de contenu de la réponse
-      const contentType = response.headers.get('content-type');
-      let errorData = {};
+      // Lire la réponse une seule fois
+      const responseText = await response.text();
       
-      if (contentType && contentType.includes('application/json')) {
-        errorData = await response.json().catch(() => ({}));
-      } else if (contentType && contentType.includes('text/html')) {
-        // Si la réponse est du HTML, c'est probablement une page d'erreur
-        const text = await response.text();
-        throw new Error('Le serveur a renvoyé une page HTML au lieu de JSON. Vérifiez la console pour plus de détails.');
+      // Essayer de parser la réponse en JSON
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        // Si le parsing échoue, vérifier si c'est du HTML
+        if (responseText.trim().startsWith('<!DOCTYPE html>') || responseText.includes('<html')) {
+          throw new Error('Le serveur a renvoyé une page HTML au lieu de JSON. Vérifiez la console pour plus de détails.');
+        }
+        throw new Error('Réponse du serveur invalide');
       }
       
+      // Vérifier si la requête a échoué
       if (!response.ok) {
-        throw new Error(errorData.message || `Erreur HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(responseData.message || `Erreur HTTP ${response.status}: ${response.statusText}`);
       }
+      
+      // Vérifier si la création a réussi
+      if (!responseData.success) {
+        throw new Error(responseData.message || 'Échec de la création du fichier');
+      }
+      
+      const fileId = responseData.data?.id;
       
       // Réinitialiser le formulaire après un succès
-      setNotification('Fichier créé avec succès', 'success');
+      setNotification('Fichier créé avec succès. Redirection...', 'success');
       setNotificationType('success');
       setName('');
       setFile(null);
@@ -161,8 +172,43 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
       setDescription('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       
-      // Rediriger vers la liste des fichiers après un court délai
-      setTimeout(() => router.visit('/files'), 1200);
+      // Afficher le loader de l'application
+      const loader = document.createElement('div');
+      loader.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      loader.innerHTML = `
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500"></div>
+        <p class="mt-4 text-white">Redirection en cours...</p>
+      `;
+      document.body.appendChild(loader);
+      
+      try {
+        // Déterminer la cible de redirection (par ordre de priorité)
+        let redirectUrl = '/files'; // Par défaut, rediriger vers la liste des fichiers
+        
+        if (taskId) {
+          // Si le fichier est lié à une tâche, rediriger vers la tâche
+          redirectUrl = `/tasks/${taskId}`;
+        } else if (fileId) {
+          // Sinon, rediriger vers la page de détail du fichier
+          redirectUrl = `/files/${fileId}`;
+        }
+        
+        // Effectuer la redirection avec un délai pour permettre à l'utilisateur de voir le message de succès
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Utiliser window.location pour une redirection plus fiable
+        window.location.href = redirectUrl;
+        
+      } catch (redirectError) {
+        console.error('Erreur lors de la redirection:', redirectError);
+        // En cas d'échec de redirection, recharger la page actuelle
+        window.location.href = '/files';
+      } finally {
+        // Nettoyer le loader
+        if (document.body.contains(loader)) {
+          document.body.removeChild(loader);
+        }
+      }
       
     } catch (error) {
       console.error('Erreur lors de la création du fichier:', error);

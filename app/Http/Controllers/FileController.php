@@ -147,15 +147,60 @@ class FileController extends Controller
             // Journaliser l'action
             activity_log('upload', 'Upload fichier', $fileModel);
 
-            // Notifier tous les membres du projet (sauf l'uploader)
+            // Notifier les utilisateurs concernés
             $project = Project::with('users')->find($validated['project_id']);
             $task = null;
+            
             if ($validated['task_id'] ?? null) {
-                $task = \App\Models\Task::find($validated['task_id']);
+                $task = \App\Models\Task::with(['assignedUsers', 'project.users'])->find($validated['task_id']);
+                
+                // Si le fichier est lié à une tâche, utiliser la notification personnalisée
+                if ($task) {
+                    // Récupérer les utilisateurs à notifier
+                    $usersToNotify = collect();
+                    
+                    // Ajouter les membres du projet
+                    if ($task->project && $task->project->users) {
+                        $usersToNotify = $usersToNotify->merge($task->project->users);
+                    }
+                    
+                    // Ajouter l'utilisateur assigné à la tâche s'il existe
+                    if ($task->assignedUsers) {
+                        $assignedUsers = $task->assignedUsers;
+                        if ($assignedUsers instanceof \Illuminate\Database\Eloquent\Collection) {
+                            if ($assignedUsers->count() > 0) {
+                                $usersToNotify = $usersToNotify->merge($assignedUsers);
+                            }
+                        } else if (is_object($assignedUsers)) {
+                            // Si c'est un seul modèle et non une collection
+                            $usersToNotify->push($assignedUsers);
+                        }
+                    }
+                    
+                    // Ajouter l'auteur de la tâche s'il existe et est différent de l'utilisateur actuel
+                    if ($task->creator && $task->creator->id != $currentUser->id) {
+                        $usersToNotify->push($task->creator);
+                    }
+                    
+                    // Éviter les doublons et ne pas notifier l'uploader
+                    $usersToNotify = $usersToNotify->unique('id')
+                        ->filter(function ($user) use ($currentUser) {
+                            return $user && $user->id !== $currentUser->id;
+                        });
+                    
+                    // Envoyer la notification à chaque utilisateur concerné
+                    foreach ($usersToNotify as $user) {
+                        $user->notify(new \App\Notifications\TaskFileUploadNotification(
+                            $task, 
+                            $fileModel,
+                            $currentUser
+                        ));
+                    }
+                }
             }
             
-            // Envoyer les notifications de manière asynchrone
-            if ($project) {
+            // Notification standard pour les fichiers sans tâche ou en cas d'erreur
+            if ((!$task || $usersToNotify->isEmpty()) && $project) {
                 $membersList = $project->users->map(function($u) {
                     $role = $u->pivot->role ?? '-';
                     return $u->name . ' (' . $role . ')';
