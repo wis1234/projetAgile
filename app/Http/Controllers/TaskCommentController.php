@@ -58,7 +58,21 @@ class TaskCommentController extends Controller
         $audioPath = null;
         if ($request->hasFile('audio')) {
             $audioPath = $request->file('audio')->store('task_comments/audio', 'public');
-        }
+       }
+       
+      // $audioPath = null;
+
+//if ($request->hasFile('audio')) {
+  //  try {
+    //    $path = $request->file('audio')->store('task_comments/audio', 'public');
+      //  $audioPath = 'public/' . $path; // on force le prefix public/
+    //} catch (\Exception $e) {
+      //  \Log::error('Erreur upload audio : ' . $e->getMessage());
+      //  return response()->json(['message' => 'Erreur lors du téléchargement de l’audio.'], 500);
+    //}
+//}
+        
+        
 
         $comment = TaskComment::create([
             'task_id' => $taskId,

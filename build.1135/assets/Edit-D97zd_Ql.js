@@ -1,0 +1,1 @@
+import{j as t}from"./app-BBBzampF.js";import o from"./Form-BRBsgpUq.js";import"./AdminLayout-CYwK1mKr.js";import"./useTranslation-DYHkfKza.js";import"./index-DYNG0dwb.js";function u({plan:r}){return t.jsx(o,{plan:r})}export{u as default};

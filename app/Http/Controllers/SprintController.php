@@ -140,18 +140,69 @@ class SprintController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
-    {
-        $sprint = Sprint::with(['project', 'tasks.assignedUser'])->findOrFail($id);
-        try {
-            $this->authorize('view', $sprint);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
-        }
-        return Inertia::render('Sprints/Show', [
-            'sprint' => $sprint,
-        ]);
+public function show(Request $request, string $id)
+{
+    $sprint = Sprint::with(['project', 'tasks.assignedUser'])->findOrFail($id);
+    
+    try {
+        $this->authorize('view', $sprint);
+    } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
     }
+
+    // Filtres
+    $statusFilter   = $request->input('status');
+    $priorityFilter = $request->input('priority');
+    $searchFilter   = $request->input('search');
+
+    // Transformation + filtrage des tâches
+    $tasks = $sprint->tasks
+        ->when($statusFilter,   fn($col) => $col->filter(fn($t) => $t->status   === $statusFilter))
+        ->when($priorityFilter, fn($col) => $col->filter(fn($t) => $t->priority === $priorityFilter))
+        ->when($searchFilter,   fn($col) => $col->filter(fn($t) => str_contains(strtolower($t->title), strtolower($searchFilter))))
+        ->map(fn($task) => [
+            'id'            => $task->id,
+            'title'         => $task->title,
+            'status'        => $task->status,
+            'priority'      => $task->priority,
+            'due_date'      => $task->due_date,
+            'assigned_user' => $task->assignedUser ? [
+                'id'                => $task->assignedUser->id,
+                'name'              => $task->assignedUser->name,
+                'profile_photo_url' => $task->assignedUser->profile_photo_url,
+            ] : null,
+        ])
+        ->values();
+
+    // Stats sur toutes les tâches (pas filtrées)
+    $allTasks = $sprint->tasks;
+    $stats = [
+        'total'       => $allTasks->count(),
+        'todo'        => $allTasks->where('status', 'todo')->count(),
+        'in_progress' => $allTasks->where('status', 'in_progress')->count(),
+        'done'        => $allTasks->where('status', 'done')->count(),
+        'high'        => $allTasks->where('priority', 'high')->count(),
+    ];
+
+    return Inertia::render('Sprints/Show', [
+        'sprint'  => [
+            'id'          => $sprint->id,
+            'name'        => $sprint->name,
+            'description' => $sprint->description,
+            'start_date'  => $sprint->start_date,
+            'end_date'    => $sprint->end_date,
+            'status'      => $sprint->status,
+            'project'     => $sprint->project ? [
+                'id'   => $sprint->project->id,
+                'name' => $sprint->project->name,
+            ] : null,
+        ],
+        'tasks'   => $tasks,
+        'stats'   => $stats,
+        'filters' => $request->only(['status', 'priority', 'search']),
+    ]);
+}
+
 
     /**
      * Show the form for editing the specified resource.

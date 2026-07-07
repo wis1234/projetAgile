@@ -13,13 +13,14 @@ import {
     FaInfoCircle,
     FaSpinner,
     FaSearch,
-    FaTimes
+    FaTimes,
+    FaCheckCircle
 } from 'react-icons/fa';
 
-export default function Create({ projects = [], users = [], roles = [] }) {
+export default function Create({ projects = [], users = [], roles = [], selectedProjectId = null }) {
     const { errors = {}, flash = {} } = usePage().props;
     const [values, setValues] = useState({
-        project_id: '',
+        project_id: selectedProjectId || '',
         user_id: '',
         role: '',
     });
@@ -29,6 +30,8 @@ export default function Create({ projects = [], users = [], roles = [] }) {
     const [searchError, setSearchError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [notification, setNotification] = useState(null);
+
+    const isProjectPreSelected = !!selectedProjectId && projects.some(p => p.id == selectedProjectId);
 
     useEffect(() => {
         if (flash.success) {
@@ -47,62 +50,65 @@ export default function Create({ projects = [], users = [], roles = [] }) {
         setValues({ ...values, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!values.project_id || !values.user_id || !values.role) {
+        setNotification({
+            type: 'error',
+            message: 'Veuillez remplir tous les champs requis.'
+        });
+        return;
+    }
+    
+    setSubmitting(true);
+    
+    try {
+        const response = await axios.post(route('project-users.store'), values);
         
-        if (!values.project_id || !values.user_id || !values.role) {
-            setNotification({
-                type: 'error',
-                message: 'Veuillez remplir tous les champs requis.'
+        console.log('Réponse backend :', response.data); // Diagnostic
+        
+        if (response.data.success) {
+            setNotification({ 
+                type: 'success', 
+                message: response.data.message || 'Membre ajouté avec succès!' 
             });
-            return;
-        }
-        
-        setSubmitting(true);
-        
-        try {
-            const response = await axios.post(route('project-users.store'), values);
             
-            if (response.data.success) {
-                setNotification({ 
-                    type: 'success', 
-                    message: response.data.message || 'Membre ajouté avec succès!' 
-                });
-                
-                // Redirect after a short delay
-                setTimeout(() => {
-                    router.visit(route('project-users.index'));
-                }, 1500);
-            } else {
-                setNotification({
-                    type: 'error',
-                    message: response.data.message || 'Une erreur est survenue lors de l\'ajout du membre.'
-                });
-                setSubmitting(false);
-            }
-        } catch (error) {
-            console.error('Error adding member:', error);
+            // Construire l'URL de redirection
+            // Priorité à l'URL retournée par le backend, sinon construction manuelle
+            const redirectUrl = response.data.redirect || `/projects/${values.project_id}`;
             
-            let errorMessage = 'Une erreur est survenue lors de l\'ajout du membre.';
-            
-            if (error.response) {
-                // Handle validation errors
-                if (error.response.status === 422 && error.response.data.errors) {
-                    const errors = error.response.data.errors;
-                    errorMessage = Object.values(errors)[0][0];
-                } else if (error.response.data.message) {
-                    errorMessage = error.response.data.message;
-                }
-            }
-            
+            setTimeout(() => {
+                router.visit(redirectUrl);
+            }, 1500);
+        } else {
             setNotification({
                 type: 'error',
-                message: errorMessage
+                message: response.data.message || 'Une erreur est survenue lors de l\'ajout du membre.'
             });
             setSubmitting(false);
         }
-    };
-
+    } catch (error) {
+        console.error('Error adding member:', error);
+        
+        let errorMessage = 'Une erreur est survenue lors de l\'ajout du membre.';
+        
+        if (error.response) {
+            if (error.response.status === 422 && error.response.data.errors) {
+                const errors = error.response.data.errors;
+                errorMessage = Object.values(errors)[0][0];
+            } else if (error.response.data.message) {
+                errorMessage = error.response.data.message;
+            }
+        }
+        
+        setNotification({
+            type: 'error',
+            message: errorMessage
+        });
+        setSubmitting(false);
+    }
+};
     const getRoleIcon = (role) => {
         switch (role) {
             case 'manager': return <FaCrown className="text-yellow-500" />;
@@ -134,7 +140,6 @@ export default function Create({ projects = [], users = [], roles = [] }) {
         setSearchError('');
         
         try {
-            // Use the full URL path for the API endpoint
             const response = await axios.post('/api/users/search-by-email', {
                 email: searchEmail,
                 project_id: values.project_id
@@ -232,11 +237,10 @@ export default function Create({ projects = [], users = [], roles = [] }) {
                         </div>
                     </div>
 
-                    {/* Form */}
+                    {/* Formulaire (inchangé) */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                         <form onSubmit={handleSubmit} className="p-6 sm:p-8">
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                
                                 {/* Project Selection */}
                                 <div className="lg:col-span-2">
                                     <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-3">
@@ -247,11 +251,12 @@ export default function Create({ projects = [], users = [], roles = [] }) {
                                         name="project_id"
                                         value={values.project_id}
                                         onChange={handleChange}
+                                        disabled={isProjectPreSelected}
                                         className={`w-full px-4 py-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                                             errors.project_id 
                                                 ? 'border-red-300 dark:border-red-600' 
                                                 : 'border-gray-300 dark:border-gray-600'
-                                        }`}
+                                        } ${isProjectPreSelected ? 'opacity-75 cursor-not-allowed bg-gray-100 dark:bg-gray-600' : ''}`}
                                         required
                                     >
                                         <option value="">Sélectionner un projet</option>
@@ -267,7 +272,16 @@ export default function Create({ projects = [], users = [], roles = [] }) {
                                             {errors.project_id}
                                         </p>
                                     )}
-                                    {selectedProject && (
+                                    {isProjectPreSelected && selectedProject && (
+                                        <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                            <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
+                                                <FaCheckCircle className="text-green-500" />
+                                                <span className="font-medium">Projet pré-sélectionné :</span>
+                                                <span>{selectedProject.name}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {!isProjectPreSelected && selectedProject && (
                                         <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                                             <div className="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200">
                                                 <FaProjectDiagram />

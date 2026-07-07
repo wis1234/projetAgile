@@ -27,91 +27,97 @@ class DropboxController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function uploadToDropbox($fileId, Request $request)
-    {
-        try {
-            $validated = $request->validate([
-                'path' => 'required|string',
-                'use_filename' => 'sometimes|boolean',
-                'custom_filename' => 'nullable|string|max:255'
-            ]);
+  public function uploadToDropbox($fileId, Request $request)
+{
+    try {
+        $validated = $request->validate([
+            'path' => 'required|string',
+            'use_filename' => 'sometimes|boolean',
+            'custom_filename' => 'nullable|string|max:255',
+        ]);
 
-            // Définir les valeurs par défaut
-            $validated['use_filename'] = $validated['use_filename'] ?? false;
-            $validated['custom_filename'] = $validated['custom_filename'] ?? null;
+        $validated['use_filename'] = $validated['use_filename'] ?? false;
+        $validated['custom_filename'] = $validated['custom_filename'] ?? null;
 
-            $path = trim($validated['path'], '/');
-            if (empty($path)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Le chemin du dossier ne peut pas être vide.'
-                ], 400);
-            }
+        $path = trim($validated['path'], '/');
 
-            $file = File::findOrFail($fileId);
-            
-            // Vérifier si le fichier existe dans le stockage public
-            if (!Storage::disk('public')->exists($file->file_path)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Le fichier source n\'existe pas dans le stockage public.'
-                ], 404);
-            }
-
-            // Utiliser le nom personnalisé fourni dans la requête
-            $filename = $validated['custom_filename'] ?? $file->name;
-            
-            // Obtenir l'extension du fichier original
-            $originalExtension = pathinfo($file->file_path, PATHINFO_EXTENSION);
-            
-            // S'assurer que le nom du fichier a une extension
-            if (!empty($originalExtension) && !str_ends_with(strtolower($filename), '.' . strtolower($originalExtension))) {
-                $filename .= '.' . $originalExtension;
-            }
-
-            // Nettoyer le nom du fichier pour éviter les problèmes de caractères spéciaux
-            $filename = preg_replace('/[^\w\-\.]/', '_', $filename);
-
-            // Chemin complet sur Dropbox
-            $dropboxPath = '/' . trim($path, '/') . '/' . $filename;
-
-            // Lire le contenu du fichier depuis le stockage public
-            $fileContent = Storage::disk('public')->get($file->file_path);
-
-            // Téléverser le fichier vers Dropbox
-            $this->dropbox->upload($dropboxPath, $fileContent);
-
-            // Obtenir le lien de partage
-            $sharedLink = $this->dropbox->createSharedLinkWithSettings($dropboxPath, [
-                'requested_visibility' => 'public'
-            ]);
-
-            // Mettre à jour le modèle de fichier avec le lien Dropbox
-            $file->update([
-                'dropbox_path' => $dropboxPath,
-                'dropbox_link' => $sharedLink['url'] ?? null,
-                'storage_provider' => 'dropbox'
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Fichier téléversé avec succès sur Dropbox.',
-                'data' => [
-                    'dropbox_path' => $dropboxPath,
-                    'dropbox_link' => $sharedLink['url'] ?? null
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Erreur lors du téléversement vers Dropbox : ' . $e->getMessage());
-            
+        if (empty($path)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Une erreur est survenue lors du téléversement du fichier.',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'Le chemin du dossier ne peut pas être vide.'
+            ], 400);
         }
+
+        $file = File::findOrFail($fileId);
+
+        // Même logique que dans FileController::download()
+        $filePath = storage_path(
+            'app/public/' . preg_replace('/^public\//', '', $file->file_path)
+        );
+
+        if (!file_exists($filePath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le fichier source est introuvable.'
+            ], 404);
+        }
+
+        // Lire le contenu du fichier
+        $fileContent = file_get_contents($filePath);
+
+        // Nom du fichier
+        $filename = $validated['custom_filename'] ?: $file->name;
+
+        // Extension
+        $originalExtension = pathinfo($filePath, PATHINFO_EXTENSION);
+
+        if (
+            !empty($originalExtension) &&
+            !str_ends_with(strtolower($filename), '.' . strtolower($originalExtension))
+        ) {
+            $filename .= '.' . $originalExtension;
+        }
+
+        // Nettoyer le nom
+        $filename = preg_replace('/[^\w\-\.]/', '_', $filename);
+
+        // Chemin Dropbox
+        $dropboxPath = '/' . $path . '/' . $filename;
+
+        // Upload
+        $this->dropbox->upload($dropboxPath, $fileContent);
+
+        // Lien de partage
+        $sharedLink = $this->dropbox->createSharedLinkWithSettings($dropboxPath, [
+            'requested_visibility' => 'public',
+        ]);
+
+        // Mise à jour BDD
+        $file->update([
+            'dropbox_path'      => $dropboxPath,
+            'dropbox_link'      => $sharedLink['url'] ?? null,
+            'storage_provider'  => 'dropbox',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Fichier téléversé avec succès sur Dropbox.',
+            'data' => [
+                'dropbox_path' => $dropboxPath,
+                'dropbox_link' => $sharedLink['url'] ?? null,
+            ],
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Erreur lors du téléversement vers Dropbox : ' . $e->getMessage());
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Une erreur est survenue lors du téléversement du fichier.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
 
     /**
      * Télécharge un fichier depuis Dropbox vers le stockage local

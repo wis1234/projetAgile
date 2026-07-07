@@ -333,7 +333,7 @@ export default function Show({ project: initialProject, auth }) {
                                                     </div>
                                                     {user.pivot?.is_muted && (
                                                         <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1">
-                                                            <FaVolumeMute className="text-xs" />
+                                                            <FaVolumeMute className="text-xs" /> suspendu
                                                         </div>
                                                     )}
                                                 </div>

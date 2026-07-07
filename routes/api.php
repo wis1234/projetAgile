@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UserSearchController;
 use App\Http\Controllers\ZoomMeetingController;
 
 /*
@@ -19,6 +20,16 @@ use App\Http\Controllers\ZoomMeetingController;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
+Route::middleware('auth:sanctum')->group(function () {
+    // Recherche d'utilisateurs pour le panneau d'accès
+    Route::get('/users/search', [UserSearchController::class, 'index']);
+});
+
+// Vérification de session (utilisé par le frontend au réveil d'onglet)
+Route::middleware('auth:sanctum')->get('/check-auth', function () {
+    return response()->json(['authenticated' => true]);
+});
+
 
 // Protected API routes
 Route::middleware(['auth:sanctum'])->group(function () {

@@ -1,29 +1,22 @@
 <?php
-
 namespace App\Notifications;
-
 use App\Models\Task;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-
 class TaskDeadlineReminder extends Notification implements ShouldQueue
 {
     use Queueable;
-
     public $task;
-
     public function __construct(Task $task)
     {
         $this->task = $task;
     }
-
     public function via($notifiable)
     {
         return ['mail', 'database'];
     }
-
     public function toMail($notifiable)
     {
         $dueDate = \Carbon\Carbon::parse($this->task->due_date);
@@ -45,9 +38,8 @@ class TaskDeadlineReminder extends Notification implements ShouldQueue
         }
         
         $timeLeftString = 'dans ' . implode(' et ', $timeLeft);
-
         return (new MailMessage)
-            ->subject('📅 Échéance imminente : ' . $this->task->title)
+            ->subject('Échéance imminente : ' . $this->task->title)
             ->markdown('emails.task-deadline-reminder', [
                 'task' => $this->task,
                 'notifiable' => $notifiable,
@@ -55,7 +47,6 @@ class TaskDeadlineReminder extends Notification implements ShouldQueue
                 'timeLeft' => $timeLeftString
             ]);
     }
-
     public function toArray($notifiable)
     {
         return [

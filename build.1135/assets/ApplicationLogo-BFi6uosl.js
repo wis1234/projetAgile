@@ -1,0 +1,1 @@
+import{J as n,j as s}from"./app-BBBzampF.js";function o(t){const{appName:e}=n().props;return s.jsx("span",{...t,className:"font-extrabold text-3xl md:text-4xl tracking-tight text-blue-700 select-none font-sans "+(t.className||""),style:{letterSpacing:"0.05em",...t.style},children:e||"ProJ"})}export{o as A};

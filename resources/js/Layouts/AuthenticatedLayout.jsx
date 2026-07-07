@@ -55,15 +55,15 @@ export default function AuthenticatedLayout({ header, children }) {
                                             className="flex items-center space-x-2 rounded-full bg-white p-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                                         >
                                             <div className="h-8 w-8 overflow-hidden rounded-full border-2 border-blue-400">
-                                                <img 
-                                                    src={user.profile_photo_url} 
-                                                    alt={user.name}
-                                                    className="h-full w-full object-cover"
-                                                    onError={(e) => {
-                                                        e.target.onerror = null;
-                                                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=0D8ABC&color=fff`;
-                                                    }}
-                                                />
+<img 
+    src={user.profile_photo_url ? user.profile_photo_url.replace('storage/', 'storage/public/') : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=0D8ABC&color=fff`} 
+    alt={user.name}
+    className="h-full w-full object-cover"
+    onError={(e) => {
+        e.target.onerror = null;
+        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=0D8ABC&color=fff`;
+    }}
+/>
                                             </div>
                                             <span className="hidden md:inline text-gray-700 dark:text-gray-300">
                                                 {user.name}

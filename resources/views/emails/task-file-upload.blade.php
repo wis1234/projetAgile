@@ -301,11 +301,12 @@
             @endphp
             
             <div class="greeting">
-                Bonjour <strong>{{ $uploader->name }}</strong>,
+                Bonjour ,
             </div>
             
             <p class="intro-text">
-                Un nouveau fichier a été téléversé sur la tâche <strong>{{ $task->title }}</strong> du projet <strong>{{ $task->project->name ?? 'Sans projet' }}</strong>.
+                <strong>{{ $uploader->name }}</strong>
+                 a  téléversé un nouveau fichier sur la tâche <strong>{{ $task->title }}</strong> du projet <strong>{{ $task->project->name ?? 'Sans projet' }}</strong>.
             </p>
             
             <div class="task-card">

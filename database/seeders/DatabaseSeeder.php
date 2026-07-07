@@ -20,17 +20,16 @@ class DatabaseSeeder extends Seeder
         // Appel des seeders nécessaires
         $this->call([
             RoleSeeder::class,
-            SchoolSeeder::class,
             SubscriptionPlansTableSeeder::class,
             SubscriptionsTableSeeder::class,
         ]);
         
         // Création d'un admin par défaut si nécessaire
-        if (!User::where('email', 'admin@proja.com')->exists()) {
+        if (!User::where('email', 'ronaldoagbohou@gmail.com')->exists()) {
             $admin = User::create([
-                'name' => 'Administrateur',
-                'email' => 'admin@proja.com',
-                'password' => Hash::make('password'),
+                'name' => 'Ronaldo Agbohou',
+                'email' => 'ronaldoagbohou@gmail.com',
+                'password' => Hash::make('Falonne1ere.@..'),
                 'email_verified_at' => now(),
                 'role' => 'admin',
             ]);

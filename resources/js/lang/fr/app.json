@@ -1,4 +1,6 @@
 {
+"status_label": "Statut",
+"priority_label": "Priorité",
   "app_name": "ProJA",
   "dashboard": "Tableau de bord",
   "dashboard_subtitle": "Statistiques et activités de mon espace",
