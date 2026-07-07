@@ -73,6 +73,33 @@ class TaskController extends Controller
         if ($request->filled('due_to')) {
             $query->whereDate('due_date', '<=', $request->due_to);
         }
+
+        $summaryQuery = clone $query;
+        $summary = [
+            'total' => (clone $summaryQuery)->count(),
+            'todo' => (clone $summaryQuery)->where('status', 'todo')->count(),
+            'in_progress' => (clone $summaryQuery)->where('status', 'in_progress')->count(),
+            'done' => (clone $summaryQuery)->where('status', 'done')->count(),
+            'overdue' => (clone $summaryQuery)
+                ->whereNotNull('due_date')
+                ->where('due_date', '<', now())
+                ->where('status', '!=', 'done')
+                ->count(),
+        ];
+
+        $myTasksSummaryQuery = (clone $query)->where('assigned_to', $user->id);
+        $myTasksSummary = [
+            'total' => (clone $myTasksSummaryQuery)->count(),
+            'todo' => (clone $myTasksSummaryQuery)->where('status', 'todo')->count(),
+            'in_progress' => (clone $myTasksSummaryQuery)->where('status', 'in_progress')->count(),
+            'done' => (clone $myTasksSummaryQuery)->where('status', 'done')->count(),
+            'overdue' => (clone $myTasksSummaryQuery)
+                ->whereNotNull('due_date')
+                ->where('due_date', '<', now())
+                ->where('status', '!=', 'done')
+                ->count(),
+        ];
+
         $tasks = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString()
             ->through(function($task){
                 $is_muted = false;
@@ -96,6 +123,8 @@ class TaskController extends Controller
         return Inertia::render('Tasks/Index', [
             'tasks' => $tasks,
             'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to']),
+            'summary' => $summary,
+            'myTasksSummary' => $myTasksSummary,
             'projectOptions' => $projectOptions,
             'memberOptions' => $memberOptions,
         ]);
