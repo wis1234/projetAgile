@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Task;
+use App\Models\User;
 use Inertia\Inertia;
 use App\Models\Project;
 use App\Models\Sprint;
@@ -27,6 +28,10 @@ class TaskController extends Controller
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
         $user = auth()->user();
+        $visibleProjectIds = Project::whereHas('users', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->pluck('id');
+
         $query = Task::with([
             'assignedUser', 
             'project' => function($p) use ($user) {
@@ -41,8 +46,32 @@ class TaskController extends Controller
             });
         });
 
-        if ($request->search) {
+        if ($request->filled('search')) {
             $query->where('title', 'like', '%' . $request->search . '%');
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('priority')) {
+            $query->where('priority', $request->priority);
+        }
+
+        if ($request->filled('project_id')) {
+            $query->where('project_id', $request->project_id);
+        }
+
+        if ($request->filled('assigned_to')) {
+            $query->where('assigned_to', $request->assigned_to);
+        }
+
+        if ($request->filled('due_from')) {
+            $query->whereDate('due_date', '>=', $request->due_from);
+        }
+
+        if ($request->filled('due_to')) {
+            $query->whereDate('due_date', '<=', $request->due_to);
         }
         $tasks = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString()
             ->through(function($task){
@@ -56,9 +85,19 @@ class TaskController extends Controller
                 return $task;
             });
 
+        $projectOptions = Project::whereHas('users', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->select('id', 'name')->orderBy('name')->get();
+
+        $memberOptions = User::whereHas('projects', function ($q) use ($visibleProjectIds) {
+            $q->whereIn('projects.id', $visibleProjectIds);
+        })->select('id', 'name')->orderBy('name')->distinct()->get();
+
         return Inertia::render('Tasks/Index', [
             'tasks' => $tasks,
-            'filters' => $request->only('search'),
+            'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to']),
+            'projectOptions' => $projectOptions,
+            'memberOptions' => $memberOptions,
         ]);
     }
 
