@@ -5,16 +5,20 @@ import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-    // Variables d'environnement disponibles côté client
     define: {
-        'process.env': {
-            MIX_RECAPTCHA_SITE_KEY: JSON.stringify(process.env.RECAPTCHA_SITE_KEY || '')
-        }
+        'process.env': {},
+        'import.meta.env.VITE_APP_ENV': JSON.stringify(process.env.VITE_APP_ENV || 'development'),
+        'import.meta.env.VITE_RECAPTCHA_SITE_KEY': JSON.stringify(process.env.VITE_RECAPTCHA_SITE_KEY || ''),
+        'import.meta.env.VITE_DROPBOX_APP_KEY': JSON.stringify(process.env.VITE_DROPBOX_APP_KEY || ''),
+        'import.meta.env.VITE_DROPBOX_APP_SECRET': JSON.stringify(process.env.VITE_DROPBOX_APP_SECRET || ''),
+        'import.meta.env.VITE_DROPBOX_ACCESS_TOKEN': JSON.stringify(process.env.VITE_DROPBOX_ACCESS_TOKEN || ''),
+        'import.meta.env.VITE_DROPBOX_REFRESH_TOKEN': JSON.stringify(process.env.VITE_DROPBOX_REFRESH_TOKEN || '')
     },
     plugins: [
         laravel({
             input: 'resources/js/app.jsx',
             refresh: true,
+            buildDirectory: 'build', // <-- génère directement dans public_html/build
         }),
         react(),
     ],
@@ -32,15 +36,10 @@ export default defineConfig(({ mode }) => ({
             '~bootstrap': path.resolve(__dirname, 'node_modules/bootstrap'),
         },
     },
-    // Exposer les variables d'environnement avec le préfixe VITE_
     envPrefix: 'VITE_',
-    define: {
-        'process.env': {},
-        'import.meta.env.VITE_APP_ENV': JSON.stringify(process.env.VITE_APP_ENV || 'development'),
-        'import.meta.env.VITE_RECAPTCHA_SITE_KEY': JSON.stringify(process.env.VITE_RECAPTCHA_SITE_KEY || ''),
-        'import.meta.env.VITE_DROPBOX_APP_KEY': JSON.stringify(process.env.VITE_DROPBOX_APP_KEY || ''),
-        'import.meta.env.VITE_DROPBOX_APP_SECRET': JSON.stringify(process.env.VITE_DROPBOX_APP_SECRET || ''),
-        'import.meta.env.VITE_DROPBOX_ACCESS_TOKEN': JSON.stringify(process.env.VITE_DROPBOX_ACCESS_TOKEN || ''),
-        'import.meta.env.VITE_DROPBOX_REFRESH_TOKEN': JSON.stringify(process.env.VITE_DROPBOX_REFRESH_TOKEN || '')
+    build: {
+        manifest: true,
+        outDir: 'build', // <-- IMPORTANT : pas de "public/", car index.php est déjà à la racine
+        emptyOutDir: true,
     },
 }));

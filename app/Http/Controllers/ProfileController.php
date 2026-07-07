@@ -62,7 +62,7 @@ class ProfileController extends Controller
                 
                 // Stocker la nouvelle photo
                 $path = $request->file('profile_photo')->store('profile-photos', 'public');
-                $data['profile_photo_path'] = $path;
+                $data['profile_photo_path'] = 'public/' . $path;
             } catch (\Exception $e) {
                 \Log::error('Erreur lors de la mise à jour de la photo de profil : ' . $e->getMessage());
                 return back()->withErrors(['profile_photo' => 'Une erreur est survenue lors du téléchargement de la photo.']);

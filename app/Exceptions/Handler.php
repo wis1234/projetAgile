@@ -2,47 +2,48 @@
 
 namespace App\Exceptions;
 
-use Exception;
 use Inertia\Inertia;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Session\TokenMismatchException;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler; // ← CORRECT
 use Throwable;
 
-class Handler extends Exception
+class Handler extends ExceptionHandler // ← étend le bon parent
 {
     public function render($request, Throwable $exception)
     {
-        // Gestion des erreurs 403 (Accès refusé)
-        if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpException && $exception->getStatusCode() === 403) {
+        // ── 403 Accès refusé ─────────────────────────────────
+        if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpException 
+            && $exception->getStatusCode() === 403) {
             if ($request->hasHeader('X-Inertia')) {
-                return Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+                return Inertia::render('Error403')
+                    ->toResponse($request)
+                    ->setStatusCode(403);
             }
         }
 
-        // Gestion des erreurs 419 (Session expirée / Token CSRF invalide)
+        // ── 419 CSRF expiré ───────────────────────────────────
         if ($exception instanceof TokenMismatchException) {
-            if ($request->hasHeader('X-Inertia') || $request->header('X-Inertia')) {
-                // Pour les requêtes Inertia, on retourne une réponse JSON spéciale
-                return response()->json([
-                    'component' => 'Error419',
-                    'props' => [
-                        'status' => 419,
-                        'message' => 'Votre session a expiré. Veuillez vous reconnecter.'
-                    ]
-                ], 419);
+            if ($request->hasHeader('X-Inertia')) {
+                // Header X-Inertia-Location → Inertia fait une vraie navigation
+                return response()->json(
+                    ['message' => 'Session expirée'],
+                    419
+                )->header('X-Inertia-Location', url('/login'));
             }
-            
-            // Pour les requêtes normales, on redirige vers la page de session expirée
-            return redirect()->route('session.expired');
+            return redirect()->route('login')
+                ->with('error', 'Session expirée. Veuillez vous reconnecter.');
         }
 
-        // Gestion des erreurs d'authentification
+        // ── 401 Session expirée / non authentifié ────────────
         if ($exception instanceof AuthenticationException) {
             if ($request->hasHeader('X-Inertia')) {
-                return Inertia::render('Error419')->toResponse($request)->setStatusCode(401);
+                // Même chose → navigation propre vers login
+                return response()->json(
+                    ['message' => 'Non authentifié'],
+                    401
+                )->header('X-Inertia-Location', url('/login'));
             }
-            
             return redirect()->route('login')
                 ->with('error', 'Veuillez vous connecter pour accéder à cette page.');
         }

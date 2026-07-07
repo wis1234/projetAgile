@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 
 class File extends Model
 {
-    protected $fillable = ['name', 'file_path', 'type', 'size', 'user_id', 'project_id', 'task_id', 'kanban_id', 'description', 'downloads', 'status', 'rejection_reason', 'dropbox_path', 'last_modified_by'];
+    protected $fillable = ['name', 'file_path', 'type', 'size', 'user_id', 'project_id', 'task_id', 'kanban_id', 'description', 'downloads', 'status', 'rejection_reason', 'dropbox_path', 'last_modified_by', 'password_hash', 'is_password_protected'];
 
     /**
      * Get the full URL to the file
@@ -70,4 +70,46 @@ class File extends Model
     public function comments() {
         return $this->hasMany(\App\Models\FileComment::class);
     }
+    
+    
+ // ══════════════════════════════════════════════════════════════
+//  app/Models/File.php  — AJOUTER ces relations
+// ══════════════════════════════════════════════════════════════
+
+public function versions()
+{
+    return $this->hasMany(FileVersion::class)->orderByDesc('version_number');
+}
+
+public function accesses()
+{
+    return $this->hasMany(FileAccess::class);
+}
+
+public function accessFor(User $user): string
+{
+    // Admin global → toujours admin
+    if ($user->hasRole('admin')) return 'admin';
+
+    // Propriétaire du fichier → admin
+    if ($this->user_id === $user->id) return 'admin';
+
+    $access = $this->accesses()
+        ->where('user_id', $user->id)
+        ->first();
+
+    if (! $access) return 'none';
+    return $access->effectivePermission();
+}
+
+public function canUser(User $user, string $permission): bool
+{
+    $order = ['none' => 0, 'view' => 1, 'comment' => 2, 'edit' => 3, 'admin' => 4];
+    $level = $order[$this->accessFor($user)] ?? 0;
+    return $level >= ($order[$permission] ?? 99);
+}
+
+
+    
+    
 }

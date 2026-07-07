@@ -11,7 +11,7 @@ export default function ApplicationLogo(props) {
             }
             style={{ letterSpacing: '0.05em', ...props.style }}
         >
-            {appName || 'ProJ'}
+            {appName || 'ProJa'}
         </span>
     );
 }

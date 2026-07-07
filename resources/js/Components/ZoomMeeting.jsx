@@ -67,7 +67,7 @@ export default function ZoomMeeting({ project }) {
     // Utilisation de useForm avec renommage de la variable errors en formErrors
     const { data, setData, post, processing, reset, errors: formErrors } = useForm({
         topic: `Réunion pour le projet ${project.name}`,
-        start_time: new Date().toISOString().slice(0, 16),
+        start_time: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
         duration: 60,
         agenda: 'Discussion sur l\'avancement du projet et les prochaines étapes.'
     });
@@ -204,12 +204,15 @@ export default function ZoomMeeting({ project }) {
             }
         }
         
-        if (field === null || field === 'start_time') {
-            const startTime = new Date(data.start_time);
-            if (isPast(startTime)) {
-                validationErrors.start_time = 'La date de début doit être dans le futur';
-            }
+if (field === null || field === 'start_time') {
+    if (data.start_time) {
+        const startTime = new Date(data.start_time);
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        if (startTime < tenMinutesAgo) {
+            validationErrors.start_time = 'La date de début doit être dans le futur';
         }
+    }
+}
         
         if (field === null || field === 'duration') {
             if (data.duration < 1 || data.duration > 240) {
@@ -528,7 +531,7 @@ export default function ZoomMeeting({ project }) {
                                                 name="start_time"
                                                 id="start_time"
                                                 value={data.start_time}
-                                                min={new Date().toISOString().slice(0, 16)}
+                                               // min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                                                 onChange={(e) => {
                                                     setData('start_time', e.target.value);
                                                     // Valider le champ en temps réel

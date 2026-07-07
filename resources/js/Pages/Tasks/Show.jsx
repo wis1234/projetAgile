@@ -177,8 +177,8 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, t }
     const completedOnTime = updatedAt <= dueDate;
     return (
       <div className="flex items-center justify-end gap-2">
-        <FaClock className={completedOnTime ? 'text-green-500' : 'text-red-500 animate-pulse'} />
-        <span className={completedOnTime ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+        <FaClock className={completedOnTime ? 'text-blue-500' : 'text-red-500 animate-pulse'} />
+        <span className={completedOnTime ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}>
           {completedOnTime ? t('deadline_met') : t('deadline_exceeded')}
         </span>
       </div>
@@ -521,134 +521,142 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     }
   };
 
-  const handleCommentSubmit = async (e) => {
-    e.preventDefault();
-    e.stopPropagation(); // Empêche la propagation de l'événement
-    
-    if (!commentContent.trim() && !audioBlob) {
-      setError('Veuillez écrire un message ou enregistrer un message vocal.');
-      return false;
-    }
-    
-    setPosting(true);
-    setError('');
-    
-    try {
-      const formData = new FormData();
-      formData.append('content', commentContent.trim() || 'Message vocal');
-      if (audioBlob) {
-        formData.append('audio', audioBlob, 'voice_message.webm');
-      }
+// ─── Génère un ID temporaire unique ───
+const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-      // Si on répond à un commentaire, ajouter le parent_id
-      if (replyingTo) {
-        formData.append('parent_id', replyingTo);
-      }
+// ─── ENVOI OPTIMISTE ───
+const handleCommentSubmit = async (e) => {
+  if (e && e.preventDefault) { e.preventDefault(); e.stopPropagation(); }
 
-      const res = await fetch(`/api/tasks/${task.id}/comments`, {
-        method: 'POST',
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-        },
-        body: formData,
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        setError(errorData.message || 'Erreur lors de l\'ajout du commentaire');
-        return;
-      }
-      
-      const newComment = await res.json();
-      
-      // Créer un objet utilisateur complet avec les champs nécessaires
-      const userData = {
-        id: auth.user.id,
-        name: auth.user.name,
-        email: auth.user.email,
-        profile_photo_url: auth.user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth.user.name || '')}`,
-        profile_photo_path: auth.user.profile_photo_path,
-        role: auth.user.role
-      };
-      
-      // Créer l'objet commentaire avec toutes les propriétés nécessaires
-      const commentWithUser = {
-        ...newComment,
-        content: newComment.content || commentContent.trim(), // S'assurer que le contenu est bien défini
-        user: userData,
-        created_at: newComment.created_at || new Date().toISOString(),
-        updated_at: newComment.updated_at || new Date().toISOString(),
-        formatted_date: formatCommentDate(newComment.created_at || new Date().toISOString())
-      };
-      
-      if (replyingTo) {
-        // Si c'est une réponse, on met à jour le commentaire parent
-        setComments(prevComments => {
-          const updateComments = (comments) => {
-            return comments.map(comment => {
-              // Si c'est le commentaire parent, on ajoute la réponse
-              if (comment.id === replyingTo) {
-                const updatedReplies = [
-                  {
-                    ...commentWithUser,
-                    replies: [] // S'assurer que les réponses sont initialisées
-                  },
-                  ...(comment.replies || [])
-                ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                
-                return {
-                  ...comment,
-                  replies: updatedReplies
-                };
-              }
-              
-              // Sinon, on vérifie les réponses de ce commentaire
-              if (comment.replies?.length > 0) {
-                return {
-                  ...comment,
-                  replies: updateComments(comment.replies)
-                };
-              }
-              
-              return comment;
-            });
-          };
-          
-          return updateComments(prevComments);
-        });
-      } else {
-        // Sinon, on ajoute un nouveau commentaire en haut de la liste
-        setComments(prevComments => [
-          {
-            ...commentWithUser,
-            replies: [] // S'assurer que les réponses sont initialisées
-          },
-          ...prevComments
-        ]);
-      }
-      
-      // Réinitialiser le formulaire
-      setCommentContent('');
-      setAudioBlob(null);
-      setAudioUrl(null);
-      setReplyingTo(null);
-      
-      // Faire défiler vers le haut pour voir le nouveau commentaire
-      setTimeout(() => {
-        const commentsSection = document.querySelector('#comments-section');
-        if (commentsSection) {
-          commentsSection.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 100);
-      
-    } catch (e) {
-      console.error('Erreur lors de l\'ajout du commentaire:', e);
-      setError(e.message || 'Une erreur est survenue lors de l\'ajout du commentaire');
-    } finally {
-      setPosting(false);
-    }
+  if (!commentContent.trim() && !audioBlob) {
+    setError('Veuillez écrire un message ou enregistrer un message vocal.');
+    return false;
+  }
+
+  const tempId = generateTempId();
+  const now = new Date().toISOString();
+
+  // Construire le commentaire optimiste (affiché immédiatement)
+  const optimisticComment = {
+    _tempId: tempId,
+    id: null,              // pas encore d'id serveur
+    _pending: true,
+    _failed: false,
+    content: commentContent.trim() || 'Message vocal',
+    audio_path: audioBlob ? audioUrl : null, // aperçu local
+    created_at: now,
+    updated_at: now,
+    user: {
+      id: auth.user.id,
+      name: auth.user.name,
+      profile_photo_url: auth.user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth.user.name || '')}`,
+      role: auth.user.role,
+    },
+    parent_id: replyingTo || null,
+    replies: [],
   };
+
+  // ─── Affichage immédiat ───
+  if (replyingTo) {
+    setComments(prev => prev.map(c =>
+      c.id === replyingTo
+        ? { ...c, replies: [optimisticComment, ...(c.replies || [])] }
+        : c
+    ));
+  } else {
+    setComments(prev => [optimisticComment, ...prev]);
+  }
+
+  // Vider le formulaire immédiatement
+  const savedContent = commentContent.trim();
+  const savedAudioBlob = audioBlob;
+  const savedReplyingTo = replyingTo;
+  setCommentContent('');
+  setAudioBlob(null);
+  setAudioUrl(null);
+  setReplyingTo(null);
+  setError('');
+
+  // Scroll vers le bas
+  setTimeout(() => {
+    const container = document.getElementById('chat-messages-container');
+    if (container) container.scrollTop = container.scrollHeight;
+  }, 50);
+
+  // ─── Envoi réel en arrière-plan ───
+  try {
+    const formData = new FormData();
+    formData.append('content', savedContent || 'Message vocal');
+    if (savedAudioBlob) formData.append('audio', savedAudioBlob, 'voice_message.webm');
+    if (savedReplyingTo) formData.append('parent_id', savedReplyingTo);
+
+    const res = await fetch(`/api/tasks/${task.id}/comments`, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.message || 'Erreur serveur');
+    }
+
+    const newComment = await res.json();
+    const serverComment = newComment.comment || newComment;
+
+    // ─── Remplacer le commentaire optimiste par la réponse serveur ───
+    const replaceOptimistic = (comments) => comments.map(c => {
+      if (c._tempId === tempId) {
+        return {
+          ...c,
+          ...serverComment,
+          _pending: false,
+          _failed: false,
+          _tempId: tempId,
+          replies: c.replies || [],
+        };
+      }
+      if (c.replies && c.replies.length > 0) {
+        return { ...c, replies: replaceOptimistic(c.replies) };
+      }
+      return c;
+    });
+
+    setComments(prev => replaceOptimistic(prev));
+
+  } catch (err) {
+    console.error('Erreur envoi commentaire:', err);
+
+    // ─── Marquer comme échoué ───
+    const markFailed = (comments) => comments.map(c => {
+      if (c._tempId === tempId) return { ...c, _pending: false, _failed: true };
+      if (c.replies && c.replies.length > 0) return { ...c, replies: markFailed(c.replies) };
+      return c;
+    });
+
+    setComments(prev => markFailed(prev));
+    setError(err.message || 'Échec de l\'envoi. Appuyez sur "Réessayer".');
+  }
+};
+
+// ─── Réessayer un message échoué ───
+const retryComment = async (failedComment) => {
+  // Retirer le message échoué
+  const removeOptimistic = (comments) => comments.filter(c => {
+    if (c._tempId === failedComment._tempId) return false;
+    if (c.replies) c.replies = removeOptimistic(c.replies);
+    return true;
+  });
+  setComments(prev => removeOptimistic(prev));
+
+  // Remettre le contenu dans le formulaire
+  setCommentContent(failedComment.content === 'Message vocal' ? '' : failedComment.content);
+  if (failedComment.parent_id) setReplyingTo(failedComment.parent_id);
+};
+
 
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
@@ -860,13 +868,16 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     setEditContent(comment.content);
   };
 
-  const handleReplyComment = (commentId) => {
-    setReplyingTo(prevId => prevId === commentId ? null : commentId);
-    // Faire défiler jusqu'au formulaire de réponse
-    setTimeout(() => {
-      document.querySelector('#comment-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
-  };
+const handleReplyComment = (commentId) => {
+  setReplyingTo(prevId => prevId === commentId ? null : commentId);
+  // Scroll vers la zone de saisie en bas du chat
+  setTimeout(() => {
+    const textarea = document.querySelector('#chat-messages-container')
+      ?.closest('.flex.flex-col')
+      ?.querySelector('textarea');
+    if (textarea) textarea.focus();
+  }, 100);
+};
 
   const cancelReply = () => {
     setReplyingTo(null);
@@ -1097,7 +1108,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
           onClick={() => handleTabClick('payment')}
           className={`group relative px-5 py-3 rounded-xl font-medium text-sm transition-all duration-300 ease-in-out ${
             activeTab === 'payment'
-              ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md shadow-green-500/20'
+              ? 'bg-gradient-to-r from-blue-500 to-emerald-600 text-white shadow-md shadow-blue-500/20'
               : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
           }`}
         >
@@ -1106,7 +1117,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
             <span>{t('task_details.tab_remuneration')}</span>
           </div>
           {activeTab === 'payment' && (
-            <span className="absolute bottom-0 left-0 w-full h-1 bg-green-400 rounded-full"></span>
+            <span className="absolute bottom-0 left-0 w-full h-1 bg-blue-400 rounded-full"></span>
           )}
         </button>
       ) : (
@@ -1406,7 +1417,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                   <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <Link 
                       href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
-                      className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md`}
+                      className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md`}
                       title={isDeadlinePassed ? t('deadline_expired') : ''}
                     >
                       <FaFileUpload /> {t('actions.upload_file')}
@@ -1536,7 +1547,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                               <p className="text-gray-600 dark:text-gray-300 mb-2 flex items-center justify-between">
                                 <span className="font-medium">{t('common.status')}:</span>
                                 {displayedPayment.status === 'validated' ? (
-                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                                     {t('payment.status.paid')}
                                   </span>
                                 ) : (
@@ -1631,8 +1642,8 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                           
                           {displayedPayment.status === 'validated' && (
                             <div className="mt-5 space-y-4">
-                              <div className="p-4 bg-green-100 dark:bg-green-900 rounded-lg border border-green-300 dark:border-green-700">
-                                <p className="text-green-800 dark:text-green-200 text-sm font-medium text-center flex items-center justify-center gap-2">
+                              <div className="p-4 bg-blue-100 dark:bg-blue-900 rounded-lg border border-blue-300 dark:border-blue-700">
+                                <p className="text-blue-800 dark:text-blue-200 text-sm font-medium text-center flex items-center justify-center gap-2">
                                   <span className="text-lg">✓</span> {t('payment.payment_method_validated')}
                                 </p>
                               </div>
@@ -1646,7 +1657,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                   </div>
                 </div>
                 {validationMessage && (
-                  <div className="mt-6 bg-green-100 border border-green-300 text-green-800 px-4 py-3 rounded-lg text-sm">
+                  <div className="mt-6 bg-blue-100 border border-blue-300 text-blue-800 px-4 py-3 rounded-lg text-sm">
                     {validationMessage}
                   </div>
                 )}
@@ -1678,7 +1689,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                           <p className="text-gray-600 dark:text-gray-300 mb-4">
                             <strong className="mr-2">{t('task_details.status')} :</strong> 
                             {p.status === 'validated' ? (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-blue-900 dark:text-blue-200">
                                 ✅ {t('task_details.validated')}
                               </span>
                             ) : (
@@ -1693,7 +1704,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
                           <button 
                             onClick={() => handleValidatePayment(p.id)} 
                             disabled={validationLoading} 
-                            className="mt-4 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 flex items-center gap-2 justify-center w-full hover:shadow-md"
+                            className="mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 flex items-center gap-2 justify-center w-full hover:shadow-md"
                           >
                             {validationLoading ? (
                               <>
@@ -1753,694 +1764,521 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
             </div>
           )}
           
-          {activeTab === 'files' && (hasAccess || !isDeadlinePassed) && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold flex items-center gap-3 text-blue-700 dark:text-blue-200">
-                  <FaFileUpload /> {t('task_details.resources')}
-                </h2>
-                {/* Upload button visible to all members */}
-                <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  <Link 
-                    href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
-                    className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md`}
-                    title={isDeadlinePassed ? t('deadline_expired') : ''}
-                  >
-                    <FaFileUpload /> {t('task_details.add_file')}
-                  </Link>
-                  {isDeadlinePassed && (
-                    <div className="absolute -bottom-6 left-0 right-0 text-xs text-red-500 text-center">
-                      {t('deadline_expired')}
+{activeTab === 'files' && (hasAccess || !isDeadlinePassed) && (
+  <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+
+    {/* HEADER */}
+    <div className="flex justify-between items-center mb-6">
+      <h2 className="text-2xl font-bold flex items-center gap-3 text-blue-700 dark:text-blue-200">
+        <FaFileUpload /> {t('task_details.resources')}
+      </h2>
+
+      <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
+        <Link 
+          href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
+          className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md`}
+        >
+          <FaFileUpload /> {t('task_details.add_file')}
+        </Link>
+
+        {isDeadlinePassed && (
+          <div className="absolute -bottom-6 left-0 right-0 text-xs text-red-500 text-center">
+            {t('deadline_expired')}
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* FILES */}
+    {task.files && task.files.length > 0 ? (
+      
+      <>
+        {/* ✅ GRID */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          {task.files.map(file => {
+            const isUploadedByAssignedUser =
+              file.user_id === task.assigned_to?.id || file.user_id === task.assigned_to;
+
+            const isImage = file.type?.startsWith("image/");
+            const isPDF = file.type === "application/pdf";
+
+            return (
+              <Link
+                key={file.id}
+                href={`/files/${file.id}`}
+                className="group bg-gray-50 dark:bg-gray-700 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 hover:shadow-lg transition duration-300 flex flex-col"
+              >
+
+                {/* PREVIEW */}
+                <div className="h-40 bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden">
+                  {isImage ? (
+                    <img
+                      src={`/storage/${file.file_path.replace('public/', '')}`}
+                      alt={file.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    />
+                  ) : isPDF ? (
+                    <span className="text-red-500 text-3xl font-bold">PDF</span>
+                  ) : (
+                    <FaFileUpload className="text-3xl text-gray-400" />
+                  )}
+                </div>
+
+                {/* CONTENT */}
+                <div className="p-4 flex flex-col flex-grow">
+
+                  {/* NAME */}
+                  <h3 className="font-semibold text-blue-600 dark:text-blue-300 text-sm line-clamp-2 mb-2 group-hover:underline">
+                    {file.name}
+                  </h3>
+
+                  {/* BADGES */}
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                      isUploadedByAssignedUser
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                    }`}>
+                      {isUploadedByAssignedUser ? 'Traitement' : 'Ressources'}
+                    </span>
+
+                    {file.dropbox_path && (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500 text-white">
+                        Dropbox
+                      </span>
+                    )}
+                  </div>
+
+                  {/* DESCRIPTION */}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">
+                    {file.description || "Aucune description"}
+                  </p>
+
+                  {/* META */}
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    {Math.round(file.size / 1024)} KB •{" "}
+                    {new Date(file.created_at).toLocaleDateString('fr-FR')}
+                  </div>
+
+                  {/* USER */}
+                  <div className="flex items-center justify-between mt-auto">
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={
+                          file.user?.profile_photo_url ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(file.user?.name || '')}&background=3b82f6&color=fff`
+                        }
+                        alt={file.user?.name}
+                        className="w-6 h-6 rounded-full"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-200">
+                        {file.user?.name}
+                      </span>
+                    </div>
+
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      file.user?.role === 'admin' || file.user?.role === 'manager'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                    }`}>
+                      {file.user?.role === 'admin'
+                        ? 'Admin'
+                        : file.user?.role === 'manager'
+                        ? 'Manager'
+                        : 'Membre'}
+                    </span>
+                  </div>
+
+                </div>
+              </Link>
+            );
+          })}
+
+        </div>
+      </>
+
+    ) : (
+      <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3">
+        <FaInfoCircle className="text-blue-600 dark:text-blue-300 text-xl" />
+        <p className="text-blue-800 dark:text-blue-200 italic">
+          Aucun fichier rattaché à cette tâche.
+        </p>
+      </div>
+    )}
+
+  </div>
+)}
+
+
+{activeTab === 'comments' && (
+  <div className="flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8" style={{ height: '85vh', maxHeight: '800px' }}>
+    
+    {/* ─── HEADER STYLE WHATSAPP ─── */}
+<div className="flex items-center justify-between px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white flex-shrink-0">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+          <FaCommentDots className="text-white text-lg" />
+        </div>
+        <div>
+          <p className="font-semibold text-sm leading-tight">Discussions</p>
+          <p className="text-xs text-blue-100">
+            {loadingComments
+              ? t('task_details.loading_comments')
+              : `${comments.length} message${comments.length !== 1 ? 's' : ''}`}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 text-xs bg-yellow-400/20 border border-yellow-300/40 text-yellow-100 px-3 py-1.5 rounded-full">
+        <svg className="w-3.5 h-3.5 text-yellow-200 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.598c.75 1.336-.213 3.003-1.742 3.003H3.48c-1.53 0-2.492-1.667-1.742-3.003L8.257 3.1zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-2a.75.75 0 01-.75-.75v-3.5a.75.75 0 011.5 0v3.5c0 .414-.336.75-.75.75z" clipRule="evenodd" />
+        </svg>
+        <span>{t('task_details.messages_sent_to_mailbox')}</span>
+      </div>
+    </div>
+
+    {/* ─── ZONE DES MESSAGES ─── */}
+    <div
+      id="chat-messages-container"
+      className="flex-1 overflow-y-auto px-4 py-4 space-y-2"
+      style={{ background: 'var(--chat-bg, #ece5dd)', scrollBehavior: 'smooth' }}
+    >
+      <style>{`
+        .dark #chat-messages-container { --chat-bg: #1a1a2e; }
+        .bubble-left { border-radius: 0 16px 16px 16px; }
+        .bubble-right { border-radius: 16px 0 16px 16px; }
+        .bubble-pending { opacity: 0.65; }
+        .tick { font-size: 11px; }
+      `}</style>
+
+      {loadingComments ? (
+        <div className="flex flex-col items-center justify-center h-full gap-3">
+          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t('task_details.loading_comments')}</p>
+        </div>
+      ) : comments.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
+          <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+            <FaCommentDots className="text-3xl text-blue-500 dark:text-blue-400" />
+          </div>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{t('task_details.no_discussion_yet')}</p>
+        </div>
+      ) : (
+        <>
+          {[...comments].reverse().map(comment => {
+            const isMe = comment.user?.id === auth.user.id;
+            const isPending = comment._pending === true;
+            const hasFailed = comment._failed === true;
+
+            return (
+                <div key={comment.id || comment._tempId} className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'} gap-0.5`}>
+                
+                {/* Nom de l'expéditeur (uniquement pour les autres) */}
+                {!isMe && (
+                  <div className="flex items-center gap-2 ml-3 mb-0.5">
+                    <img
+                      src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}&background=1D9E75&color=fff`}
+                      alt={comment.user?.name}
+                      className="w-6 h-6 rounded-full"
+                    />
+                    <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                      {comment.user?.name}
+                      {comment.user?.role === 'manager' && (
+                        <span className="ml-1 text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded-full">Manager</span>
+                      )}
+                      {comment.user?.role === 'admin' && (
+                        <span className="ml-1 text-xs bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded-full">Admin</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                <div className={`flex items-end gap-1.5 max-w-[78%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                  
+                  {/* Bulle */}
+                  <div className={`relative px-3 py-2 shadow-sm ${
+                    isPending ? 'bubble-pending' : ''
+                  } ${
+                    isMe
+                      ? `bubble-right ${hasFailed ? 'bg-red-100 dark:bg-red-900/40' : 'bg-blue-500 dark:bg-blue-600'}`
+                      : 'bubble-left bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600'
+                  }`}>
+
+                    {/* Réponse à un parent */}
+                    {comment.parent && (
+                      <div className={`mb-2 px-2 py-1 rounded text-xs border-l-2 ${
+                        isMe
+                          ? 'border-white/60 bg-white/20 text-white/80'
+                          : 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-gray-600 dark:text-gray-300'
+                      }`}>
+                        <p className="font-medium">{comment.parent.user?.name}</p>
+                        <p className="truncate opacity-80">{comment.parent.content}</p>
+                      </div>
+                    )}
+
+                    {/* Mode édition */}
+                    {editingId === comment.id ? (
+                      <form onSubmit={handleUpdateComment} className="min-w-[200px]">
+                        <textarea
+                          value={editContent}
+                          onChange={e => setEditContent(e.target.value)}
+                          className="w-full p-2 text-sm rounded border border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-white focus:ring-1 focus:ring-blue-500 resize-none"
+                          rows={3}
+                          autoFocus
+                          maxLength={2000}
+                        />
+                        <div className="flex gap-2 mt-1.5 justify-end">
+                          <button type="button" onClick={() => setEditingId(null)} className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300">
+                            {t('task_details.cancel')}
+                          </button>
+                          <button type="submit" className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1">
+                            <FaSave className="w-3 h-3" /> {t('task_details.save')}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        {/* Contenu texte */}
+                        {comment.content && (
+                          <div
+                            className={`text-sm whitespace-pre-wrap break-words leading-relaxed ${isMe ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`}
+                            dangerouslySetInnerHTML={{
+                              __html: comment.content
+                                .replace(/<table([^>]*)>/g, '<div class="overflow-x-auto"><table class="min-w-full border-collapse border border-gray-300 dark:border-gray-600 text-xs" $1>')
+                                .replace(/<\/table>/g, '</table></div>')
+                                .replace(/<th([^>]*)>/g, '<th class="border border-gray-300 px-2 py-1 bg-gray-100 dark:bg-gray-700" $1>')
+                                .replace(/<td([^>]*)>/g, '<td class="border border-gray-300 px-2 py-1" $1>')
+                            }}
+                          />
+                        )}
+
+                        {/* Audio */}
+                        {comment.audio_path && (
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <FaMicrophone className={`w-3.5 h-3.5 flex-shrink-0 ${isMe ? 'text-white/70' : 'text-blue-500'}`} />
+                            <audio controls src={`/storage/public/${comment.audio_path}`} className="h-7 max-w-[200px]" />
+                          </div>
+                        )}
+
+                        {/* Timestamp + statut */}
+                        <div className={`flex items-center gap-1 mt-1 justify-end tick ${isMe ? 'text-white/60' : 'text-gray-400 dark:text-gray-500'}`}>
+                          <span>
+                            {new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {isMe && (
+                            hasFailed
+                              ? <span className="text-red-300 text-xs">✕</span>
+                              : isPending
+                              ? <span className="text-white/60">⏳</span>
+                              : <span>✓✓</span>
+                          )}
+                        </div>
+
+                        {/* Erreur envoi */}
+                        {hasFailed && (
+                          <p className="text-xs text-red-500 mt-1">{t('task_details.send_failed')}
+                            <button
+                              onClick={() => retryComment(comment)}
+                              className="ml-1 underline hover:no-underline"
+                            >{t('task_details.retry')}</button>
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Actions flottantes */}
+                  {!isPending && editingId !== comment.id && (
+                    <div className={`flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${isMe ? 'items-end' : 'items-start'}`}>
+                      <button
+                        onClick={() => handleReplyComment(comment.id)}
+                        className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded"
+                        title={t('task_details.response')}
+                      >
+                        <FaReply className="w-3 h-3" />
+                      </button>
+                      {isMe && (
+                        <>
+                          <button onClick={() => handleEditComment(comment)} className="text-gray-400 hover:text-blue-500 p-1 rounded" title={t('edit')}>
+                            <FaEdit className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => handleDeleteComment(comment.id)} className="text-gray-400 hover:text-red-500 p-1 rounded" title={t('delete')}>
+                            <FaTrash className="w-3 h-3" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
-              
-              {task.files && task.files.length > 0 ? (
-                <ul className="space-y-4">
-                  {task.files.map(file => {
-                    // Determine if the file was uploaded by the assigned user
-                    const isUploadedByAssignedUser = file.user_id === task.assigned_to?.id || file.user_id === task.assigned_to;
-                    
-                    return (
-                      <li key={file.id} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-200 border border-gray-200 dark:border-gray-600 group hover:shadow-sm">
-                        <Link href={`/files/${file.id}`} className="flex flex-col">
-                          <div className="flex items-start justify-between w-full">
-                            <div className="flex items-center gap-4">
-                              <div className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-3 rounded-full bg-blue-100 dark:bg-blue-800 group-hover:bg-blue-200 dark:group-hover:bg-blue-700 transition">
-                                <FaFileUpload className="text-xl" />
-                              </div>
-                              <div>
-                                <div className="font-semibold text-blue-600 dark:text-blue-300 text-lg group-hover:underline">
-                                  {file.name}
-                                  {/* Badge for file type */}
-                                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    isUploadedByAssignedUser 
-                                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' 
-                                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                  } mr-2">
-                                    {isUploadedByAssignedUser ? 'Traitement' : 'Ressources'}
-                                  </span>
-                                  {/* Dropbox badge */}
-                                  {file.dropbox_path && (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white dark:bg-blue-600">
-                                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M6 1.807L0 5.629l6 3.815 5.936-3.759L6 1.807zm12 .01L9.297 5.864 15.466 10.1 24 6.196l-6-4.38zM0 13.274l6 3.819 6.003-3.863L6.004 9.39 0 13.275zm9.297 4.056l6-3.863 5.7 3.86-5.7 3.869-6-3.866z"/>
-                                      </svg>
-                                      Dropbox
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                  {file.description || <span className="italic text-gray-400">Aucune description</span>}
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  <span>{Math.round(file.size / 1024)} KB</span>
-                                  <span>•</span>
-                                  <span>Téléversé le {new Date(file.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                                  <span>•</span>
-                                  <span className="flex items-center gap-1">
-                                    Par <span className="font-medium text-gray-600 dark:text-gray-300">
-                                      {(() => {
-                                        // Find the user in projectMembers or in the project's users list
-                                        const fileUser = projectMembers?.find(u => u.id === file.user_id) || 
-                                                       task.project?.users?.find(u => u.id === file.user_id) || 
-                                                       { name: 'Utilisateur inconnu' };
-                                        return fileUser.name;
-                                      })()}
-                                    </span>
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="flex-shrink-0">
-                                <img 
-                                  src={file.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(file.user?.name || '')}&background=3b82f6&color=fff`} 
-                                  alt={file.user?.name} 
-                                  className="w-6 h-6 rounded-full" 
-                                />
-                              </div>
-                              <span className="text-gray-700 dark:text-gray-200 font-medium">{file.user?.name}</span>
-                              {file.user?.role === 'manager' || file.user?.role === 'admin' ? (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ml-2">
-                                  {file.user?.role === 'admin' ? 'Admin' : 'Manager'}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
-                                  Membre
-                                </span>
-                              )}
-                            </div>
+
+                {/* Réponses imbriquées */}
+                {comment.replies && comment.replies.length > 0 && (
+                  <div className={`flex flex-col gap-1 mt-1 ${isMe ? 'items-end pr-2' : 'items-start pl-8'}`}>
+                    {[...comment.replies].reverse().map(reply => {
+                      const isReplyMe = reply.user?.id === auth.user.id;
+                      return (
+                        <div key={reply.id} className={`max-w-[70%] px-3 py-1.5 shadow-sm text-sm ${
+                          isReplyMe
+                            ? 'bg-blue-400 dark:bg-blue-700 text-white bubble-right'
+                            : 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-500 bubble-left'
+                        }`}>
+                          {!isReplyMe && (
+                            <p className="text-xs font-medium text-blue-600 dark:text-blue-300 mb-0.5">{reply.user?.name}</p>
+                          )}
+                          <p className="whitespace-pre-wrap break-words leading-relaxed">{reply.content}</p>
+                          {reply.audio_path && (
+                            <audio controls src={`/storage/public/${reply.audio_path}`} className="h-7 mt-1 max-w-[180px]" />
+                          )}
+                          <div className={`flex items-center gap-1 mt-0.5 justify-end tick ${isReplyMe ? 'text-white/60' : 'text-gray-400'}`}>
+                            <span>{new Date(reply.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            {isReplyMe && <span>✓✓</span>}
+                            {isReplyMe && reply.user?.id === auth.user.id && (
+                              <button onClick={() => handleDeleteComment(reply.id)} className="ml-1 text-white/50 hover:text-white/80">
+                                <FaTrash className="w-2.5 h-2.5" />
+                              </button>
+                            )}
                           </div>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3">
-                  <FaInfoCircle className="text-blue-600 dark:text-blue-300 text-xl" />
-                  <p className="text-blue-800 dark:text-blue-200 italic">Aucun fichier rattaché à cette tâche.</p>
-                </div>
-              )}
-            </div>
-          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+    </div>
 
-         {activeTab === 'comments' && (
-  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 md:p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-   <h2 className="text-2xl font-bold flex items-center justify-between mb-6 text-blue-700 dark:text-blue-200">
-  {/* Partie gauche : Icône + titre */}
-  <div className="flex items-center gap-3">
-    <FaCommentDots className="text-blue-600 dark:text-blue-300" />
-    <span>Discussions</span>
-
-    {loadingComments && (
-      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
-        {t('task_details.loading_comments')}
-      </span>
+    {/* ─── BARRE REPLY ─── */}
+    {replyingTo && (
+      <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-800 flex-shrink-0">
+        <div className="flex-1 border-l-4 border-blue-500 pl-3">
+          <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-1">
+            <FaReply className="w-3 h-3" /> {t('task_details.reply_to_comment')}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+{(() => {
+  const parent = comments.find(c => c.id === replyingTo) 
+    || comments.flatMap(c => c.replies || []).find(r => r.id === replyingTo);
+  return parent?.content?.substring(0, 60) || '...';
+})()}
+</p>
+        </div>
+        <button onClick={cancelReply} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1">
+          <FaTimes className="w-4 h-4" />
+        </button>
+      </div>
     )}
-  </div>
 
-  {/* Partie droite : Avertissement */}
-  <div className="flex items-center p-2 text-yellow-800 border border-yellow-300 rounded-lg bg-yellow-50 text-sm font-medium">
-    <svg
-      className="flex-shrink-0 w-5 h-5 text-yellow-700 mr-2"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="currentColor"
-      viewBox="0 0 20 20"
-    >
-      <path
-        fillRule="evenodd"
-        d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.598c.75 1.336-.213 3.003-1.742 3.003H3.48c-1.53 0-2.492-1.667-1.742-3.003L8.257 3.1zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-2a.75.75 0 01-.75-.75v-3.5a.75.75 0 011.5 0v3.5c0 .414-.336.75-.75.75z"
-        clipRule="evenodd"
-      />
-    </svg>
-    <span> {t('task_details.messages_sent_to_mailbox')}</span>
-  </div>
-</h2>
+    {/* ─── INPUT STYLE WHATSAPP ─── */}
+    <div className="flex-shrink-0 px-3 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+      {error && (
+        <div className="mb-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-600 dark:text-red-300 flex items-center gap-2">
+          <FaInfoCircle className="flex-shrink-0" />
+          <span>{error}</span>
+          <button onClick={() => setError('')} className="ml-auto"><FaTimes className="w-3 h-3" /></button>
+        </div>
+      )}
 
-    
-    {/* Formulaire de commentaire en haut */}
-    <div className={`mb-8 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 ${replyingTo ? 'ring-2 ring-blue-500/30' : ''}`}>
-      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
-        {replyingTo ? (
-          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-            <FaReply className="w-4 h-4" />
-            <span> {t('task_details.reply_to_comment')}</span>
-            <button
-              type="button"
-              onClick={cancelReply}
-              className="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              title={t('task_details.cancel_reply')}
-            >
-              <FaTimes className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ) : t('task_details.write_your_comment')}
-      </h3>
-      
-      <form onSubmit={(e) => { e.preventDefault(); handleCommentSubmit(e); return false; }} className="space-y-4">
-        <div className="relative">
+      {/* Aperçu audio */}
+      {audioUrl && (
+        <div className="mb-2 flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700">
+          <FaMicrophone className="text-blue-600 w-4 h-4 flex-shrink-0" />
+          <audio controls src={audioUrl} className="h-8 flex-1" />
+          <button onClick={() => { setAudioUrl(null); setAudioBlob(null); }} className="text-red-400 hover:text-red-600 p-1">
+            <FaTimes className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Indicateur d'enregistrement */}
+      {isRecording && (
+        <div className="mb-2 flex items-center gap-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-xl">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+          </span>
+          <span className="text-sm text-red-700 dark:text-red-300 font-medium flex-1">{t('task_details.recording_in_progress')}</span>
+          <span className="font-mono text-sm bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-red-600 dark:text-red-300">{formatTime(recordingTime)}</span>
+          <button onClick={stopRecording} className="text-red-600 hover:text-red-800 p-1">
+            <FaStop className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-end gap-2">
+        {/* Bouton micro */}
+        <button
+          type="button"
+          onClick={isRecording ? stopRecording : startRecording}
+          disabled={posting}
+          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+            isRecording
+              ? 'bg-red-500 hover:bg-red-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+          }`}
+          title={isRecording ? t('task_details.stop_recording') : t('task_details.record_voice_message')}
+        >
+          {isRecording ? <FaStop className="w-4 h-4" /> : <FaMicrophone className="w-4 h-4" />}
+        </button>
+
+        {/* Zone de saisie */}
+        <div className="flex-1 relative">
           <textarea
             value={commentContent}
             onChange={e => setCommentContent(e.target.value)}
-            onKeyDown={handleCommentKeyDown}
-            placeholder={t('task_details.write_your_message_here')}
-            className="w-full min-h-[100px] p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700/50 dark:text-white transition-colors duration-200"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (commentContent.trim() || audioBlob) handleCommentSubmit(e);
+              }
+            }}
+            placeholder={replyingTo ? t('task_details.write_your_message_here') : t('task_details.write_your_message_here')}
+            rows={1}
             disabled={posting || isRecording}
-            required={!audioBlob}
             maxLength={2000}
+            className="w-full px-4 py-2.5 pr-10 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-2xl border-none focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none leading-relaxed"
+            style={{ minHeight: '42px', maxHeight: '120px', overflowY: 'auto' }}
+            onInput={e => {
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+            }}
           />
-          <div className="absolute bottom-3 right-3 text-xs text-gray-400">
-            {commentContent.length}/2000
-          </div>
+          {commentContent.length > 0 && (
+            <span className="absolute right-3 bottom-2 text-xs text-gray-400">{commentContent.length}/2000</span>
+          )}
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const tableMarkup = '\n<table>\n  <tr>\n    <th>Colonne 1</th>\n    <th>Colonne 2</th>\n  </tr>\n  <tr>\n    <td>Donnée 1</td>\n    <td>Donnée 2</td>\n  </tr>\n</table>\n';
-                  setCommentContent(prev => prev + tableMarkup);
-                }}
-                className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title="Insérer un tableau"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
-            </div>
-            {isRecording ? (
-              <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                  </span>
-                  <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                    {t('task_details.recording_in_progress')}         
-                  </span>
-                </div>
-                <div className="text-sm font-mono bg-white dark:bg-gray-700 px-2 py-1 rounded">
-                  {formatTime(recordingTime)}
-                </div>
-                <button
-                  type="button"
-                  onClick={stopRecording}
-                  className="text-red-600 hover:text-white hover:bg-red-600 p-1.5 rounded-full transition-colors"
-                  title={t('task_details.stop_recording')}
-                >
-                  <FaStop className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={startRecording}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                disabled={posting}
-                title={t('task_details.record_voice_message')}
-              >
-                <FaMicrophone className="text-red-500" />
-                <span>{t('task_details.record_voice_message')}</span>
-              </button>
-            )}
-
-            {audioUrl && (
-              <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
-                <audio controls src={audioUrl} className="h-8"></audio>
-                <button
-                  type="button"
-                  onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
-                  className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  title={t('task_details.delete_recording')}
-                >
-                  <FaTimes className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={posting || (!commentContent.trim() && !audioBlob)}
-            className={`px-5 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-              posting 
-                ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed' 
-                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
-            }`}
-          >
-            {posting ? (
-              <>
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {t('task_details.publishing')}
-              </>
-            ) : (
-              <>
-                <FaPaperPlane className="w-3.5 h-3.5" />
-                {replyingTo ? t('task_details.publish_response') : t('task_details.publish_comment')}
-              </>
-            )}
-          </button>
-        </div>
-
-        {error && (
-          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-200 text-sm rounded-r">
-            <div className="flex items-center gap-2">
-              <FaInfoCircle className="flex-shrink-0" />
-              <span>{error}</span>
-            </div>
-          </div>
-        )}
-
-        <div className="text-xs text-gray-500 dark:text-gray-400 text-center sm:text-right mt-2">
-          {t('task_details.press_ctrl_enter_to_send')}
-        </div>
-      </form>
+        {/* Bouton envoyer */}
+        <button
+          type="button"
+          onClick={handleCommentSubmit}
+          disabled={posting || (!commentContent.trim() && !audioBlob) || isRecording}
+          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+            (!commentContent.trim() && !audioBlob) || isRecording
+              ? 'bg-gray-200 dark:bg-gray-600 text-gray-400 cursor-not-allowed'
+              : 'bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg active:scale-95'
+          }`}
+        >
+          {posting ? (
+            <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
+          )}
+        </button>
+      </div>
     </div>
-    
-    {loadingComments ? (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    ) : (
-      <div className="space-y-6">
-        {comments.length === 0 ? (
-          <div className="bg-blue-50 dark:bg-blue-900/50 rounded-lg p-6 border border-blue-200 dark:border-blue-800 flex items-center gap-4">
-            <FaInfoCircle className="text-blue-500 dark:text-blue-300 text-2xl flex-shrink-0" />
-            <p className="text-blue-800 dark:text-blue-200">    {t('task_details.no_discussion_yet')}</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {comments.map(comment => (
-              <div key={comment.id} className="relative group">
-                {/* Commentaire principal */}
-                <div className="bg-gray-50 dark:bg-gray-700/70 rounded-xl p-5 border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 transition-all duration-200">
-                  <div className="flex gap-4">
-                    {/* Avatar utilisateur */}
-                    <div className="flex-shrink-0">
-                      <div className="relative group">
-                        <img 
-                          src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}&background=0D8ABC&color=fff`} 
-                          alt={comment.user?.name} 
-                          className="w-12 h-12 rounded-full border-2 border-blue-300 dark:border-blue-600 object-cover transition-transform duration-200 group-hover:scale-110"
-                        />
-                        {comment.user?.role === 'admin' && (
-                          <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white dark:border-gray-700">
-                            <FaStar className="w-3 h-3" />
-                          </span>
-                        )}
-                      </div>
-                    </div>
+  </div>
+)}
 
-                    {/* Contenu du commentaire */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-blue-700 dark:text-blue-300">
-                            {comment.user?.name || 'Utilisateur inconnu'}
-                          </span>
-                          {comment.user?.role === 'manager' && (
-                            <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200 px-2 py-0.5 rounded-full">
-                              Manager
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(comment.created_at).toLocaleString('fr-FR', {
-                            day: 'numeric',
-                            month: '2-digit',
-                            year: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      </div>
-
-                      {editingId === comment.id ? (
-                        <form onSubmit={handleUpdateComment} className="mt-2">
-                          <textarea 
-                            value={editContent} 
-                            onChange={e => setEditContent(e.target.value)} 
-                            className="w-full min-h-[100px] p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
-                            required 
-                            maxLength={2000}
-                            autoFocus
-                          />
-                          <div className="flex justify-end gap-2 mt-2">
-                            <button 
-                              type="button" 
-                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 rounded-lg"
-                              onClick={() => setEditingId(null)}
-                            >
-                              {t('task_details.cancel')}  
-                            </button>
-                            <button 
-                              type="submit" 
-                              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2"
-                            >
-                              <FaSave /> {t('task_details.save')}     
-                            </button>
-                          </div>
-                        </form>
-                      ) : (
-                        <>
-                          <div className="prose dark:prose-invert max-w-none">
-                            <div 
-                              className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words"
-                              dangerouslySetInnerHTML={{
-                                __html: comment.content
-                                  ? comment.content
-                                      .replace(/<table([^>]*)>/g, '<div class="overflow-x-auto"><table class="min-w-full border-collapse border border-gray-300 dark:border-gray-600" $1>')
-                                      .replace(/<\/table>/g, '</table></div>')
-                                      .replace(/<th([^>]*)>/g, '<th class="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-4 py-2 text-left" $1>')
-                                      .replace(/<td([^>]*)>/g, '<td class="border border-gray-300 dark:border-gray-600 px-4 py-2" $1>')
-                                  : ''
-                              }}
-                            />
-                          </div>
-
-                          {comment.audio_path && (
-                            <div className="mt-3">
-                              <div className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-800/50 rounded-lg">
-                                <FaMicrophone className="text-blue-500 dark:text-blue-400 flex-shrink-0" />
-                                <audio 
-                                  controls 
-                                  src={`/storage/${comment.audio_path}`}
-                                  className="w-full max-w-md"
-                                >
-                                  Votre navigateur ne supporte pas la lecture audio.
-                                </audio>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleReplyComment(comment.id);
-                            }}
-                            className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
-                          >
-                            <FaReply className="w-3.5 h-3.5" /> {t('task_details.response')}
-                          </button>
-                        </div>
-                        
-                        {comment.user?.id === auth.user.id && (
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditComment(comment);
-                              }}
-                              className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                              title="Modifier"
-                            >
-                              <FaEdit className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteComment(comment.id);
-                              }}
-                              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                              title="Supprimer"
-                            >
-                              <FaTrash className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Réponses */}
-                  {comment.replies && comment.replies.length > 0 && (
-                    <div className="mt-4 pl-4 border-l-2 border-gray-200 dark:border-gray-600 space-y-4">
-                      {comment.replies.map(reply => (
-                        <div key={reply.id} className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
-                          <div className="flex gap-3">
-                            <div className="flex-shrink-0">
-                              <img 
-                                src={reply.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user?.name || '')}&background=0D8ABC&color=fff`} 
-                                alt={reply.user?.name} 
-                                className="w-10 h-10 rounded-full border-2 border-blue-200 dark:border-blue-700"
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
-                                <span className="font-medium text-sm text-blue-600 dark:text-blue-400">
-                                  {reply.user?.name || 'Utilisateur inconnu'}
-                                </span>
-                                <span className="text-xs text-gray-400">
-                                  {new Date(reply.created_at).toLocaleString('fr-FR', {
-                                    day: 'numeric',
-                                    month: '2-digit',
-                                    year: '2-digit',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </span>
-                              </div>
-                              <p className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-wrap">
-                                {reply.content || ''}
-                              </p>
-                              {reply.audio_path && (
-                                <div className="mt-2">
-                                  <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800/30 rounded">
-                                    <FaMicrophone className="text-blue-400 dark:text-blue-500 text-xs" />
-                                    <audio 
-                                      controls 
-                                      src={`/storage/${reply.audio_path}`}
-                                      className="h-8 max-w-[200px]"
-                                    >
-                                      {t('task_details.browser_does_not_support_audio')}
-                                    </audio>
-                                  </div>
-                                </div>
-                              )}
-                              {reply.user?.id === auth.user.id && (
-                                <div className="flex justify-end mt-2">
-                                  <button
-                                    onClick={() => handleDeleteComment(reply.id)}
-                                    className="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400"
-                                    title="Supprimer"
-                                  >
-                                    <FaTrash className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Modal de réponse aux commentaires */}
-        {replyingTo && (
-          <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              {/* Overlay */}
-              <div 
-                className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
-                aria-hidden="true"
-                onClick={cancelReply}
-              ></div>
-
-              {/* Centrer le contenu de la modale */}
-              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              
-              {/* Contenu de la modale */}
-              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div className="sm:flex sm:items-start">
-                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                      <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                        <FaReply className="mr-2 text-blue-500" />
-                        {t('task_details.reply_to')} {replyingTo.user?.name || 'ce commentaire'}
-                      </h3>
-                      
-                      <div className="mt-2 w-full">
-                        <div className="relative">
-                          <textarea
-                            value={commentContent}
-                            onChange={e => setCommentContent(e.target.value)}
-                            onKeyDown={handleCommentKeyDown}
-                            placeholder={`Écrire votre réponse à ${replyingTo.user?.name || 'ce commentaire'}...`}
-                            className="w-full min-h-[120px] p-4 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700/50 dark:text-white transition-colors duration-200 resize-none"
-                            disabled={posting || isRecording}
-                            required={!audioBlob}
-                            maxLength={2000}
-                            autoFocus
-                          />
-                          <div className="absolute bottom-3 right-3 text-xs text-gray-400 bg-white/80 dark:bg-gray-700/80 px-2 py-0.5 rounded-full backdrop-blur-sm shadow-sm">
-                            {commentContent.length}/2000
-                          </div>
-                        </div>
-
-                        {/* Barre d'outils */}
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            {/* Bouton d'enregistrement vocal */}
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={isRecording ? stopRecording : startRecording}
-                                disabled={posting}
-                                className={`p-2 rounded-full transition-colors ${
-                                  isRecording
-                                    ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                                    : 'text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-                                }`}
-                                title={isRecording ? "Arrêter l'enregistrement" : "Message vocal"}
-                              >
-                                <FaMicrophone className={`w-5 h-5 ${isRecording ? 'animate-pulse' : ''}`} />
-                              </button>
-                              {isRecording && (
-                                <button
-                                  type="button"
-                                  onClick={stopRecording}
-                                  className="p-2 text-white bg-red-500 rounded-full hover:bg-red-600 transition-colors"
-                                  title="Arrêter l'enregistrement"
-                                >
-                                  <FaStop className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Aperçu audio */}
-                            {audioUrl && (
-                              <div className="flex items-center gap-2 bg-white dark:bg-gray-700 p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
-                                <audio controls src={audioUrl} className="h-8 w-32 sm:w-40" />
-                                <button
-                                  type="button"
-                                  onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
-                                  className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                                  title="Supprimer l'enregistrement"
-                                >
-                                  <FaTimes className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={cancelReply}
-                              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 transition-colors"
-                            >
-                              {t('task_details.cancel')}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={handleCommentSubmit}
-                              disabled={posting || (!commentContent.trim() && !audioBlob)}
-                              className={`px-5 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
-                                posting || (!commentContent.trim() && !audioBlob)
-                                  ? 'bg-gray-200 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
-                                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
-                              }`}
-                            >
-                              {posting ? (
-                                <>
-                                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  <span>{t('task_details.publishing')}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <FaPaperPlane className="w-3.5 h-3.5" />
-                                  <span>{t('task_details.publish')}</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Indicateur d'enregistrement */}
-                        {isRecording && (
-                          <div className="mt-3 flex items-center gap-3 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg animate-pulse">
-                            <div className="flex items-center gap-2">
-                              <span className="relative flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                              </span>
-                              <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                                {t('task_details.recording_in_progress')}
-                              </span>
-                            </div>
-                            <div className="text-sm font-mono bg-white dark:bg-gray-700 px-2 py-0.5 rounded">
-                              {formatTime(recordingTime)}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Message d'erreur */}
-                        {error && (
-                          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-200 text-sm rounded-r-lg">
-                            <div className="flex items-center gap-2">
-                              <FaInfoCircle className="flex-shrink-0" />
-                              <span>{error}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )}
-          </div>
-        )}
+        
+        
       </div>
 
       {/* Confirmation Modal */}
@@ -2456,7 +2294,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
               <button onClick={() => setShowConfirmValidationModal(false)} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                 {t('task_details.cancel')}
               </button>
-              <button onClick={confirmPaymentValidation} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" disabled={validationLoading}>
+              <button onClick={confirmPaymentValidation} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" disabled={validationLoading}>
                 {validationLoading ? t('task_details.validating') : t('task_details.confirm')}
               </button>
             </div>

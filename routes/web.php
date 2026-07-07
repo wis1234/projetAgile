@@ -7,6 +7,12 @@ use Inertia\Inertia;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\RemunerationController;
+use App\Http\Controllers\FileController;
+use App\Http\Controllers\FileVersionController;
+use App\Http\Controllers\FileAccessController;
+use Illuminate\Support\Facades\Artisan;
+
+
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -16,6 +22,11 @@ Route::get('/', function () {
         'phpVersion' => PHP_VERSION,
     ]);
 });
+
+Route::get('/api/users/search', [\App\Http\Controllers\UserSearchController::class, 'index'])
+    ->name('api.users.search')
+    ->middleware(['auth']);
+    
 
 // Routes protégées par authentification
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -101,6 +112,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Ressources principales
     Route::resource('tasks', App\Http\Controllers\TaskController::class);
+  
     
     // Gestion des plans d'abonnement
     Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
@@ -123,8 +135,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
     Route::resource('files', App\Http\Controllers\FileController::class);
-    Route::post('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])
-        ->name('files.update-content');
+   // Route::post('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])
+      //  ->name('files.update-content');
     Route::resource('messages', App\Http\Controllers\MessageController::class);
     Route::resource('audit-logs', App\Http\Controllers\AuditLogController::class);
     Route::resource('project-users', App\Http\Controllers\ProjectUserController::class);
@@ -161,9 +173,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Gestion des fichiers
     Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])->name('files.edit-content');
-    Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])->name('files.updateContent');
+    Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])->name('files.update-content');
     Route::get('files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])->name('files.download');
     Route::post('files/download-multiple', [App\Http\Controllers\FileController::class, 'downloadMultiple'])->name('files.downloadMultiple');
+    
+    
+    
+// Versions
+Route::get('/files/{file}/versions',                [FileVersionController::class, 'index'])  ->name('file-versions.index');
+Route::get('/files/{file}/versions/{version}',       [FileVersionController::class, 'show'])   ->name('file-versions.show');
+Route::post('/files/{file}/versions',               [FileVersionController::class, 'store'])  ->name('file-versions.store');
+Route::post('/files/{file}/versions/{version}/restore', [FileVersionController::class, 'restore'])->name('file-versions.restore');
+
+// Accès
+Route::get('/files/{file}/access',                  [FileAccessController::class, 'index'])   ->name('file-access.index');
+Route::post('/files/{file}/access',                 [FileAccessController::class, 'store'])   ->name('file-access.store');
+Route::delete('/files/{file}/access/{user}',        [FileAccessController::class, 'destroy']) ->name('file-access.destroy');
+
+
+
+    
     
     // Téléchargement des fichiers de tâches
     Route::get('/tasks/{task}/files/{file}/download', [App\Http\Controllers\TaskController::class, 'downloadFile'])
@@ -301,6 +330,11 @@ Route::middleware(['auth', 'verified'])->prefix('subscription')->name('subscript
     Route::get('/success', [\App\Http\Controllers\SubscriptionController::class, 'success'])->name('success');
 });
 
+//password to protect files accross project
+Route::post('/files/{file}/unlock',   [FileController::class, 'unlock'])->name('files.unlock');
+Route::patch('/files/{file}/password', [FileController::class, 'setPassword'])->name('files.password');
+
+
 // Fichiers : accès direct à la vue
 Route::get('/fichiers', function () {
     return Inertia::render('Files/Index');
@@ -403,5 +437,43 @@ if (Route::has('queue.work')) {
         ], 301);
     });
 }
+
+//send task deadline reminder
+Route::get('/run-task-deadline-reminders', function (\Illuminate\Http\Request $request) {
+    // Vérification d'un token secret
+    if ($request->query('token') !== env('CRON_SECRET_TOKEN')) {
+        abort(403, 'Accès non autorisé');
+    }
+
+    $exitCode = Artisan::call('tasks:send-deadline-reminders');
+    $output = Artisan::output();
+
+    return response()->json([
+        'status'    => $exitCode === 0 ? 'success' : 'error',
+        'exit_code' => $exitCode,
+        'output'    => $output,
+    ]);
+});
+
+//send zoom meeting reminder
+Route::get('/run-zoom-notifications', function (\Illuminate\Http\Request $request) {
+    if ($request->query('token') !== env('CRON_SECRET_TOKEN')) {
+        abort(403, 'Accès non autorisé');
+    }
+
+    $exitCode = Artisan::call('zoom:send-start-notifications');
+    $output = Artisan::output();
+
+    return response()->json([
+        'status'    => $exitCode === 0 ? 'success' : 'error',
+        'exit_code' => $exitCode,
+        'output'    => $output,
+    ]);
+});
+
+// Remplace l'accès direct au storage pour les fichiers protégés__AINT WORKING YET
+Route::get('storage/files/{filename}', [FileController::class, 'serveFile'])
+    ->middleware('auth')
+    ->where('filename', '.+');
 
 require __DIR__.'/auth.php';

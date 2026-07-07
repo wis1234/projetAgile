@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 use Illuminate\Support\Facades\App;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Hash;
 
 // Charger le helper personnalisé
 require_once app_path('Helpers/file_helpers.php');
@@ -24,62 +25,171 @@ class FileController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
-    {
-        $user = auth()->user();
-        $query = File::with([
-            'project' => function($p) use ($user) {
-                $p->with(['users' => function($q) use ($user) {
-                    $q->where('user_id', $user->id)->withPivot('is_muted');
-                }]);
-            }, 
-            'user', 
-            'task.project' => function($p) use ($user) {
-                $p->with(['users' => function($q) use ($user) {
-                    $q->where('user_id', $user->id)->withPivot('is_muted');
-                }]);
-            }
-        ]);
+public function index(Request $request)
+{
+    $user = auth()->user();
 
-        if (!$user->hasRole('admin')) {
-            $projectIds = $user->projects()->wherePivot('is_muted', false)->pluck('projects.id');
-            $query->where(function($q) use ($projectIds) {
-                $q->whereIn('project_id', $projectIds)
-                  ->orWhereHas('task', function($q2) use ($projectIds) {
-                      $q2->whereIn('project_id', $projectIds);
-                  });
-            });
-        }
+    // ── 1. Base query avec relations nécessaires ─────────────────
+    $query = File::with([
+        'project:id,name',
+        'user:id,name',
+        'task:id,title,project_id',
+    ]);
 
-        if ($request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%$search%")
-                  ->orWhere('description', 'like', "%$search%")
-                  ->orWhereHas('project', function($q2) use ($search) {
-                      $q2->where('name', 'like', "%$search%");
-                  });
-            });
-        }
+    // ── 2. Restriction par rôle (non-admin = projets non muets) ──
+    if (! $user->hasRole('admin')) {
+        $projectIds = $user->projects()
+            ->wherePivot('is_muted', false)
+            ->pluck('projects.id');
 
-        $files = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString()
-            ->through(function($file){
-                $is_muted = false;
-                $project = $file->project ?? ($file->task ? $file->task->project : null);
-                if ($project && $project->users->isNotEmpty()) {
-                    $is_muted = $project->users->first()->pivot->is_muted;
-                }
-                
-                $file->project_is_muted = $is_muted;
-
-                return $file;
-            });
-
-        return Inertia::render('Files/Index', [
-            'files' => $files,
-            'filters' => $request->only('search'),
-        ]);
+        $query->where(function ($q) use ($projectIds) {
+            $q->whereIn('project_id', $projectIds)
+              ->orWhereHas('task', fn ($q2) =>
+                  $q2->whereIn('project_id', $projectIds)
+              );
+        });
     }
+
+    // ── 3. Filtre texte (nom, description, projet) ───────────────
+    if ($search = trim($request->input('search', ''))) {
+        $query->where(function ($q) use ($search) {
+            $q->where('name',        'like', "%{$search}%")
+              ->orWhere('description','like', "%{$search}%")
+              ->orWhereHas('project', fn ($q2) =>
+                  $q2->where('name', 'like', "%{$search}%")
+              )
+              ->orWhereHas('user', fn ($q2) =>
+                  $q2->where('name', 'like', "%{$search}%")
+              );
+        });
+    }
+
+    // ── 4. Filtre par type MIME ───────────────────────────────────
+    if ($type = $request->input('type', '')) {
+        $mimeMap = [
+            'image'  => fn ($q) => $q->where('type', 'like', 'image/%'),
+            'pdf'    => fn ($q) => $q->where('type', 'like', '%pdf%'),
+            'word'   => fn ($q) => $q->where('type', 'like', '%word%')
+                                     ->orWhere('type', 'like', '%msword%')
+                                     ->orWhere('type', 'like', '%officedocument.word%'),
+            'excel'  => fn ($q) => $q->where('type', 'like', '%excel%')
+                                     ->orWhere('type', 'like', '%spreadsheet%'),
+            'html'   => fn ($q) => $q->where('type', 'like', '%html%')
+                                     ->orWhere('type', 'like', '%javascript%')
+                                     ->orWhere('type', 'like', '%json%'),
+            'other'  => fn ($q) => $q->where('type', 'not like', 'image/%')
+                                     ->where('type', 'not like', '%pdf%')
+                                     ->where('type', 'not like', '%word%')
+                                     ->where('type', 'not like', '%msword%')
+                                     ->where('type', 'not like', '%officedocument.word%')
+                                     ->where('type', 'not like', '%excel%')
+                                     ->where('type', 'not like', '%spreadsheet%')
+                                     ->where('type', 'not like', '%html%'),
+        ];
+
+        if (isset($mimeMap[$type])) {
+            $query->where(function ($q) use ($mimeMap, $type) {
+                ($mimeMap[$type])($q);
+            });
+        }
+    }
+
+    // ── 5. Filtre Dropbox ─────────────────────────────────────────
+    if ($request->boolean('dropbox')) {
+        $query->whereNotNull('dropbox_path');
+    }
+
+    // ── 6. Filtre par projet ──────────────────────────────────────
+    if ($projectId = $request->input('project')) {
+        $query->where('project_id', $projectId);
+    }
+
+    // ── 7. Tri dynamique ──────────────────────────────────────────
+    $sortAllowed = ['created_at', 'name', 'size'];
+    $sortKey = in_array($request->input('sort'), $sortAllowed)
+        ? $request->input('sort')
+        : 'created_at';
+    $sortDir = $request->input('dir') === 'asc' ? 'asc' : 'desc';
+
+    $query->orderBy($sortKey, $sortDir);
+
+    // ── 8. Pagination (conserve les query strings) ────────────────
+    $files = $query->paginate(12)->withQueryString()
+        ->through(function ($file) {
+            // Résoudre project_is_muted sur chaque fichier
+            $project = $file->project ?? ($file->task?->project ?? null);
+
+            $file->project_is_muted = false;
+
+            if ($project) {
+                $pivot = $project->users()
+                    ->where('user_id', auth()->id())
+                    ->first()?->pivot;
+                $file->project_is_muted = (bool) ($pivot?->is_muted ?? false);
+            }
+
+            return $file;
+        });
+
+    // ── 9. Stats globales (sur la scope utilisateur, SANS pagination) ──
+    //    On repart de la même logique de restriction mais sans les filtres
+    //    de recherche/type pour avoir les totaux "vrais".
+    $statsQuery = File::query();
+
+    if (! $user->hasRole('admin')) {
+        $projectIds = $user->projects()
+            ->wherePivot('is_muted', false)
+            ->pluck('projects.id');
+
+        $statsQuery->where(function ($q) use ($projectIds) {
+            $q->whereIn('project_id', $projectIds)
+              ->orWhereHas('task', fn ($q2) =>
+                  $q2->whereIn('project_id', $projectIds)
+              );
+        });
+    }
+
+    $stats = [
+        // Nombre total de fichiers accessibles (tous, sans filtre)
+        'total_files'   => (clone $statsQuery)->count(),
+
+        // Taille totale en octets (somme réelle DB)
+        'total_size'    => (clone $statsQuery)->sum('size'),
+
+        // Fichiers via Dropbox
+        'dropbox_count' => (clone $statsQuery)->whereNotNull('dropbox_path')->count(),
+
+        // Images uniquement
+        'image_count'   => (clone $statsQuery)->where('type', 'like', 'image/%')->count(),
+
+        // Répartition par type (pour un éventuel pie chart futur)
+        'by_type' => [
+            'pdf'   => (clone $statsQuery)->where('type', 'like', '%pdf%')->count(),
+            'word'  => (clone $statsQuery)->where(fn ($q) =>
+                            $q->where('type', 'like', '%word%')
+                              ->orWhere('type', 'like', '%officedocument.word%')
+                        )->count(),
+            'excel' => (clone $statsQuery)->where(fn ($q) =>
+                            $q->where('type', 'like', '%excel%')
+                              ->orWhere('type', 'like', '%spreadsheet%')
+                        )->count(),
+            'image' => (clone $statsQuery)->where('type', 'like', 'image/%')->count(),
+        ],
+    ];
+
+    // ── 10. Projets disponibles pour le filtre dropdown ───────────
+    $projects = $user->hasRole('admin')
+        ? Project::orderBy('name')->get(['id', 'name'])
+        : $user->projects()->orderBy('name')->get(['projects.id', 'projects.name']);
+
+    return Inertia::render('Files/Index', [
+        'files'   => $files,
+        'stats'   => $stats,
+        'projects'=> $projects,
+        'filters' => $request->only(['search', 'type', 'dropbox', 'project', 'sort', 'dir']),
+    ]);
+}
+
 
     /**
      * Show the form for creating a new resource.
@@ -107,7 +217,7 @@ class FileController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+public function store(Request $request)
     {
         $currentUser = auth()->user();
         $project = Project::findOrFail($request->project_id);
@@ -134,7 +244,7 @@ class FileController extends Controller
             // Créer l'entrée en base de données
             $fileModel = File::create([
                 'name' => $validated['name'],
-                'file_path' => $path,
+                'file_path' => 'public/' . $path,
                 'type' => $file->getClientMimeType(),
                 'size' => $file->getSize(),
                 'user_id' => $currentUser->id,
@@ -276,6 +386,7 @@ class FileController extends Controller
      */
     public function show(File $file)
     {
+        $this->authorize('view', $file);
         $file->load(['project', 'user', 'task']);
         $statuses = ['pending', 'validated', 'rejected'];
         $user = auth()->user();
@@ -429,24 +540,60 @@ class FileController extends Controller
         return redirect()->route('files.index')
             ->with('success', 'Fichier supprimé avec succès');
     }
-
-    public function download(File $file)
-    {
-        $currentUser = auth()->user();
-        if (!$currentUser->hasRole('admin') && (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())) {
-            abort(403, 'Vous n\'êtes pas autorisé à télécharger ce fichier.');
-        }
-        if (!$file->file_path || \Storage::disk('public')->exists($file->file_path) === false) {
-            abort(404, 'Fichier non trouvé');
-        }
+    
+    //old version of download function
+    
+      //  public function download(File $file)
+  //  {
+    //    $currentUser = auth()->user();
+    //    if (!$currentUser->hasRole('admin') && (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())) {
+     //       abort(403, 'Vous n\'êtes pas autorisé à télécharger ce fichier.');
+     //   }
+     //   if (!$file->file_path || \Storage::disk('public')->exists($file->file_path) === false) {
+          //  abort(404, 'Fichier non trouvé');
+     //   }
         // Ensure the download filename has the correct extension
-        $extension = pathinfo($file->file_path, PATHINFO_EXTENSION);
-        $filename = $file->name;
-        if ($extension && !str_ends_with($filename, '.' . $extension)) {
-            $filename .= '.' . $extension;
-        }
-        return response()->download(storage_path('app/public/' . $file->file_path), $filename);
+      //  $extension = pathinfo($file->file_path, PATHINFO_EXTENSION);
+      //  $filename = $file->name;
+      //  if ($extension && !str_ends_with($filename, '.' . $extension)) {
+      //      $filename .= '.' . $extension;
+       // }
+      //  return response()->download(storage_path('app/public/' . $file->file_path), $filename);
+   // }
+    
+    
+
+public function download(File $file)
+{
+    $currentUser = auth()->user();
+
+    if (
+        !$currentUser->hasRole('admin') &&
+        (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())
+    ) {
+        abort(403, 'Vous n\'êtes pas autorisé à télécharger ce fichier.');
     }
+
+    if (!$file->file_path) {
+        abort(404, 'Fichier non trouvé');
+    }
+
+    // 🔥 retirer "public/" si présent
+    $path = preg_replace('/^public\//', '', $file->file_path);
+
+    if (!\Storage::disk('public')->exists($path)) {
+        abort(404, 'Fichier non trouvé');
+    }
+
+    $extension = pathinfo($path, PATHINFO_EXTENSION);
+    $filename = $file->name;
+
+    if ($extension && !str_ends_with($filename, '.' . $extension)) {
+        $filename .= '.' . $extension;
+    }
+
+    return \Storage::disk('public')->download($path, $filename);
+}
 
     /**
      * Affiche le formulaire d'édition du contenu d'un fichier
@@ -454,58 +601,84 @@ class FileController extends Controller
      * @param  \App\Models\File  $file
      * @return \Inertia\Response|\Illuminate\Http\RedirectResponse
      */
-    public function editContent(File $file)
-    {
-        $this->authorize('update', $file);
-        
-        // Vérifier si le fichier est éditable (exemple: fichiers texte, pas de binaires)
-        $editableTypes = ['text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json', 'application/xml'];
-        $extension = pathinfo($file->name, PATHINFO_EXTENSION);
-        $isEditable = in_array($file->type, $editableTypes) || in_array(strtolower($extension), ['txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'php']);
-        
-        if (!$isEditable) {
-            return redirect()->back()->with('error', 'Ce type de fichier ne peut pas être édité directement.');
-        }
-        
-        // Charger le contenu du fichier
-        $content = '';
-        $filePath = storage_path('app/public/' . $file->file_path);
-        
-        if (file_exists($filePath) && is_readable($filePath)) {
-            $content = file_get_contents($filePath);
-        } else {
-            return redirect()->back()->with('error', 'Impossible de charger le contenu du fichier.');
-        }
-        
-        $file->load(['lastModifiedBy', 'project.users']);
+public function editContent(File $file)
+{
+    $this->authorize('view', $file);
+     $file->load(['project.users', 'task.project']); // ← ajoute cette ligne
 
-        // Récupérer les membres du projet avec leurs informations de base
-        $projectMembers = [];
-        if ($file->project && $file->project->users) {
-            $projectMembers = $file->project->users->map(function($user) {
-                return [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'avatar' => $user->profile_photo_url ?? null
-                ];
-            });
-        }
+    $this->authorize('update', $file);
 
-        return Inertia::render('Files/EditContent', [
-            'file' => array_merge($file->toArray(), [
-                'content' => $content,
-                'is_editable' => $isEditable,
-                'project' => $file->project ? array_merge($file->project->toArray(), [
-                    'users' => $projectMembers
-                ]) : null
-            ]),
-            'lastModifiedBy' => $file->lastModifiedBy ? [
-                'name' => $file->lastModifiedBy->name,
-                'timestamp' => $file->updated_at->toDateTimeString(),
-            ] : null,
+    $editableTypes = ['text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json'];
+    $extension = pathinfo($file->name, PATHINFO_EXTENSION);
+    $isEditable = in_array($file->type, $editableTypes)
+        || in_array(strtolower($extension), ['txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'php']);
+
+    if (!$isEditable) {
+        return redirect()->back()->with('error', 'Ce type de fichier ne peut pas être édité directement.');
+    }
+
+    $filePath = storage_path('app/public/' . preg_replace('/^public\//', '', $file->file_path));
+    if (!file_exists($filePath) || !is_readable($filePath)) {
+        return redirect()->back()->with('error', 'Impossible de charger le contenu du fichier.');
+    }
+
+    $content = file_get_contents($filePath);
+
+    $file->load(['lastModifiedBy:id,name', 'project.users', 'accesses.user:id,name,email,profile_photo_path']);
+
+    $currentUser = auth()->user();
+    $myPermission = $file->accessFor($currentUser);
+
+    // Collaborateurs actifs (accès non-expiré, non-none)
+    $collaborators = $file->accesses
+        ->filter(fn($a) => $a->effectivePermission() !== 'none')
+        ->map(fn($a) => [
+            'id'                => $a->user->id,
+            'name'              => $a->user->name,
+            'email'             => $a->user->email,
+            'profile_photo_url' => $a->user->profile_photo_path,
+            'permission'        => $a->effectivePermission(),
+        ])->values();
+
+    // Membres du projet pour suggestions @mention
+    $projectMembers = [];
+    if ($file->project?->users) {
+        $projectMembers = $file->project->users->map(fn($u) => [
+            'id'    => $u->id,
+            'name'  => $u->name,
+            'email' => $u->email,
+            'avatar'=> $u->profile_photo_path,
         ]);
     }
+
+    // 5 dernières versions pour l'aperçu rapide
+    $recentVersions = $file->versions()
+        ->with('user:id,name,profile_photo_path')
+        ->select('id','file_id','user_id','label','summary','version_number','created_at')
+        ->limit(5)
+        ->get();
+
+    return \Inertia\Inertia::render('Files/EditContent', [
+        'file' => array_merge($file->toArray(), [
+            'content'    => $content,
+            'is_editable'=> $isEditable,
+            'project'    => $file->project ? [
+                'id'    => $file->project->id,
+                'name'  => $file->project->name,
+                'users' => $projectMembers,
+            ] : null,
+        ]),
+        'lastModifiedBy'  => $file->lastModifiedBy ? [
+            'name'      => $file->lastModifiedBy->name,
+            'timestamp' => $file->updated_at->toDateTimeString(),
+        ] : null,
+        'myPermission'    => $myPermission,
+        'collaborators'   => $collaborators,
+        'recentVersions'  => $recentVersions,
+        'canManageAccess' => $file->canUser($currentUser, 'admin'),
+    ]);
+}
+
 
 
 
@@ -516,41 +689,58 @@ class FileController extends Controller
      * @param  \App\Models\File  $file
      * @return \Illuminate\Http\JsonResponse
      */
-    public function updateContent(Request $request, File $file)
-    {
-        $this->authorize('update', $file);
 
-        $request->validate([
-            'content' => 'required|string',
-        ]);
 
-        try {
-            if (!is_file_editable($file->type, $file->name)) {
-                return back()->with('error', 'Ce type de fichier ne peut pas être modifié.');
-            }
+public function updateContent(Request $request, File $file)
+{
+    $this->authorize('update', $file);
+    $request->validate(['content' => 'required|string']);
 
-            $path = 'files/' . $file->project_id . '/' . $file->name;
-            Storage::disk('public')->put($path, $request->content);
-
-            $file->update([
-                'file_path' => $path,
-                'size' => Storage::disk('public')->size($path),
-                'last_modified_by' => Auth::id(),
-                'updated_at' => now(),
-            ]);
-
-            activity()
-                ->causedBy(auth()->user())
-                ->performedOn($file)
-                ->log('Contenu du fichier mis à jour');
-
-            return back()->with('success', 'Le contenu a été sauvegardé avec succès.');
-
-        } catch (\Exception $e) {
-            Log::error('Erreur lors de la mise à jour du contenu du fichier: ' . $e->getMessage());
-            return back()->with('error', 'Une erreur est survenue lors de la sauvegarde.');
-        }
+    if (!is_file_editable($file->type, $file->name)) {
+        return response()->json(['success' => false, 'message' => 'Ce type de fichier ne peut pas être modifié.'], 422);
     }
+
+    // ── Écriture sur disque ───────────────────────────────
+    $path = 'files/' . $file->project_id . '/' . $file->name;
+    \Storage::disk('public')->put($path, $request->content);
+
+    $file->update([
+        'file_path'        => $path,
+        'size'             => \Storage::disk('public')->size($path),
+        'last_modified_by' => \Auth::id(),
+        'updated_at'       => now(),
+    ]);
+
+    // ── Snapshot automatique ──────────────────────────────
+    $lastVersion = $file->versions()->max('version_number') ?? 0;
+
+    \App\Models\FileVersion::create([
+        'file_id'        => $file->id,
+        'user_id'        => \Auth::id(),
+        'content'        => $request->content,
+        'label'          => null,
+        'summary'        => $request->input('summary'),
+        'version_number' => $lastVersion + 1,
+    ]);
+
+// ── Garder seulement les 100 dernières versions ───────
+$oldVersionIds = $file->versions()
+    ->orderByDesc('version_number')
+    ->skip(100)
+    ->take(PHP_INT_MAX)
+    ->pluck('id');
+
+    if ($oldVersionIds->isNotEmpty()) {
+        \App\Models\FileVersion::whereIn('id', $oldVersionIds)->delete();
+    }
+
+    activity()
+        ->causedBy(auth()->user())
+        ->performedOn($file)
+        ->log('Contenu du fichier mis à jour');
+
+    return response()->json(['success' => true, 'message' => 'Le contenu a été sauvegardé avec succès.']);
+}
 
     /**
      * Télécharger plusieurs fichiers en ZIP
@@ -585,4 +775,96 @@ class FileController extends Controller
         }
         return response()->download($tmpPath, $zipFileName)->deleteFileAfterSend(true);
     }
+    
+    
+    
+    // For non-managers: verify the password
+public function unlock(Request $request, File $file)
+{
+    $this->authorize('view', $file); // ✅ use existing policy
+
+    // ✅ Admin bypass directement
+    if (auth()->user()->hasRole('admin')) {
+        return response()->json(['message' => 'OK (admin bypass)'], 200);
+    }
+    
+    $request->validate(['password' => 'required|string']);
+
+    if (!$file->is_password_protected) {
+        return response()->json(['message' => 'Not protected'], 200);
+    }
+
+    if (!Hash::check($request->password, $file->password_hash)) {
+        return response()->json(['message' => 'Mot de passe incorrect'], 422);
+    }
+
+    return response()->json(['message' => 'OK'], 200);
+}
+
+
+// For managers: set or remove a password
+public function setPassword(Request $request, File $file)
+{
+    $this->authorize('update', $file); // ✅ FIX HERE
+
+    if ($request->action === 'remove') {
+        $file->update([
+            'password_hash' => null,
+            'is_password_protected' => false,
+        ]);
+
+        return response()->json(['message' => 'Protection supprimée']);
+    }
+
+    $request->validate(['password' => 'required|string|min:6']);
+
+    $file->update([
+        'password_hash' => Hash::make($request->password),
+        'is_password_protected' => true,
+    ]);
+
+    return response()->json(['message' => 'Mot de passe enregistré']);
+}
+
+
+
+public function serveFile(Request $request, $filename)
+{
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+
+    // Décoder l'URL (%201 → espace, etc.)
+    $decodedFilename = urldecode($filename);
+
+    // Chercher en base avec le nom décodé
+    $file = File::where('file_path', 'like', '%' . $decodedFilename . '%')
+               ->orWhere('file_path', 'files/' . $decodedFilename)
+               ->orWhere('file_path', 'public/files/' . $decodedFilename)
+               ->first();
+
+    if (!$file) {
+        abort(403); // Fichier non référencé en DB → bloquer
+    }
+
+    $this->authorize('view', $file);
+
+    // Chemin physique réel
+    $physicalPath = public_path('storage/files/' . $decodedFilename);
+
+    if (!file_exists($physicalPath)) {
+        abort(404);
+    }
+
+    $mimeType = $file->type
+        ?? mime_content_type($physicalPath)
+        ?? 'application/octet-stream';
+
+    return response()->file($physicalPath, [
+        'Content-Type'        => $mimeType,
+        'Content-Disposition' => 'inline; filename="' . $file->name . '"',
+    ]);
+}
+
+    
 }

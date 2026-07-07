@@ -1,650 +1,698 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { router, usePage, Link } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
-import Notification from '../../Components/Notification';
-import TaskModal from '../../Components/TaskModal';
 import AdminLayout from '../../Layouts/AdminLayout';
-import ActionButton from '../../Components/ActionButton';
-import { FaSearch, FaTasks, FaEdit, FaTrash, FaEye, FaPlus, FaFilter, FaCalendarAlt, FaProjectDiagram, FaList, FaTh } from 'react-icons/fa';
+import {
+  FaSearch, FaTasks, FaPlus, FaCalendarAlt,
+  FaProjectDiagram, FaList, FaTh, FaFilter,
+  FaSort, FaSortUp, FaSortDown, FaChevronDown,
+  FaChevronUp, FaTimes, FaCheck, FaClock,
+  FaExclamationTriangle, FaUserCircle, FaTrophy,
+  FaFire, FaChartBar
+} from 'react-icons/fa';
+import { HiOutlineViewGrid, HiOutlineViewList } from 'react-icons/hi';
 
-// Icônes Heroicons SVG inline - Remplacées par react-icons si possible
-const KanbanIcon = () => (
-  <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 5.25A2.25 2.25 0 0 1 6 3h12a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 18 21H6a2.25 2.25 0 0 1-2.25-2.25V5.25ZM9 7.5v9M15 7.5v9" /></svg>
+// ── Status & Priority helpers ─────────────────────────────────────────────────
+
+const STATUS_CONFIG = {
+  todo:        { label: 'À faire',      color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300', dot: 'bg-slate-400' },
+  in_progress: { label: 'En cours',     color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300', dot: 'bg-blue-500' },
+  done:        { label: 'Terminé',      color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', dot: 'bg-emerald-500' },
+};
+
+const PRIORITY_CONFIG = {
+  low:    { label: 'Faible',  color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', bar: 'bg-gray-400' },
+  medium: { label: 'Moyenne', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', bar: 'bg-amber-400' },
+  high:   { label: 'Haute',   color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', bar: 'bg-red-500' },
+};
+
+const StatusBadge = ({ status }) => {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.todo;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+};
+
+const PriorityBadge = ({ priority }) => {
+  const cfg = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.low;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.color}`}>
+      {cfg.label}
+    </span>
+  );
+};
+
+// ── Avatar ────────────────────────────────────────────────────────────────────
+
+const Avatar = ({ name = '', url = '', size = 'sm' }) => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const sz = size === 'lg' ? 'w-10 h-10 text-sm' : 'w-7 h-7 text-xs';
+  if (url) return <img src={url} alt={name} className={`${sz} rounded-full object-cover ring-2 ring-white dark:ring-gray-800`} />;
+  return (
+    <div className={`${sz} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold ring-2 ring-white dark:ring-gray-800`}>
+      {initials}
+    </div>
+  );
+};
+
+// ── Summary card ──────────────────────────────────────────────────────────────
+
+const SummaryCard = ({ label, value, icon: Icon, color, sub }) => (
+  <div className={`bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow`}>
+    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color}`}>
+      <Icon className="text-xl text-white" />
+    </div>
+    <div>
+      <p className="text-2xl font-extrabold text-gray-900 dark:text-white">{value ?? 0}</p>
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-red-500 font-semibold mt-0.5">{sub}</p>}
+    </div>
+  </div>
 );
 
-// Composant pour afficher le badge de statut
-const getStatusBadge = (status, t) => {
-  const statusText = t(`status.${status}`, { defaultValue: status });
-  switch(status) {
-    case 'todo':
-      return <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-xs font-bold">{statusText}</span>;
-    case 'in_progress':
-      return <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{statusText}</span>;
-    case 'done':
-      return <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">{statusText}</span>;
-    default:
-      return <span className="inline-block px-3 py-1 rounded-full bg-gray-300 text-gray-600 text-xs font-bold">{statusText}</span>;
-  }
-};
+// ── Filter panel (dynamic, no apply button) ──────────────────────────────────
 
-// Composant pour afficher le badge de priorité
-const getPriorityBadge = (priority, t) => {
-  const priorityText = t(`priority.${priority}`, { defaultValue: priority });
-  switch(priority) {
-    case 'low':
-      return <span className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">{priorityText}</span>;
-    case 'medium':
-      return <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{priorityText}</span>;
-    case 'high':
-      return <span className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">{priorityText}</span>;
-    default:
-      return <span className="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-600 text-xs font-bold">{priorityText}</span>;
-  }
-};
+const FilterPanel = ({ filters, projectOptions, memberOptions, onChange, onReset }) => {
+  const [open, setOpen] = useState(true);
 
-const Index = ({ tasks: initialTasks = [], filters = {} }) => {
-  // 1. Tous les hooks doivent être déclarés en premier, sans condition
-  const { t } = useTranslation();
-  const { flash = {}, errors = {}, auth } = usePage().props;
-  const [isLoading, setIsLoading] = useState(true);
-  const [tasks, setTasks] = useState([]);
-  const [notification, setNotification] = useState('');
-  const [notificationType, setNotificationType] = useState('info');
-  const [search, setSearch] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState('create');
-  const [modalTask, setModalTask] = useState(null);
-  const [viewMode, setViewMode] = useState('table');
-  const [isMobile, setIsMobile] = useState(false);
-  
-  // 2. Initialisation des données
-  useEffect(() => {
-    setIsLoading(true);
-    if (initialTasks) {
-      // Gérer à la fois les tableaux et les objets avec une propriété data
-      if (Array.isArray(initialTasks)) {
-        setTasks(initialTasks);
-      } else if (initialTasks.data) {
-        // Si c'est un objet avec une propriété data (comme une réponse Laravel paginée)
-        setTasks(initialTasks.data || []);
-      } else {
-        setTasks([]);
-      }
-    } else {
-      setTasks([]);
-    }
-    
-    if (filters?.search) {
-      setSearch(filters.search);
-    }
-    if (flash.success) {
-      setNotification(t(flash.success));
-      setNotificationType('success');
-    } else if (flash.error) {
-      setNotification(t(flash.error));
-      setNotificationType('error');
-    }
-    setIsLoading(false);
-  }, [initialTasks, filters, flash, t]);
-  
-  // 3. Détection mobile
-  useEffect(() => {
-    const checkIfMobile = () => {
-      const mobile = window.innerWidth < 1024;
-      setIsMobile(mobile);
-      if (mobile && viewMode !== 'cards') {
-        setViewMode('cards');
-      } else if (!mobile && viewMode !== 'table') {
-        setViewMode('table');
-      }
-    };
-    
-    checkIfMobile();
-    window.addEventListener('resize', checkIfMobile);
-    return () => window.removeEventListener('resize', checkIfMobile);
-  }, [viewMode]);
-  
-  // 4. Écouteur d'événements WebSocket
-  useEffect(() => {
-    if (window.Echo) {
-      const channel = window.Echo.channel('tasks');
-      channel.listen('TaskUpdated', () => {
-        setNotification(t('task_updated'));
-        setNotificationType('success');
-        router.reload({ only: ['tasks'] });
-      });
-      return () => channel.stopListening('TaskUpdated');
-    }
-  }, [t]);
-  
-  // 5. Calcul des statistiques (mémoïsé pour éviter les recalculs inutiles)
-  const { userStats, sortedUserStats } = React.useMemo(() => {
-    const stats = Array.isArray(tasks) ? tasks.reduce((acc, task) => {
-      if (!task?.assigned_user) return acc;
-      
-      const userId = task.assigned_user?.id || task.assigned_user;
-      if (!userId) return acc;
-      
-      if (!acc[userId]) {
-        acc[userId] = {
-          user: task.assigned_user,
-          total: 0,
-          onTime: 0,
-          late: 0
-        };
-      }
-      
-      acc[userId].total++;
-      
-      if (task.status === 'done' || task.status === 'termine') {
-        try {
-          const dueDate = task.due_date ? new Date(task.due_date) : null;
-          const completedAt = (task.completed_at || task.updated_at) ? 
-            new Date(task.completed_at || task.updated_at) : null;
-          
-          if (dueDate && completedAt) {
-            if (completedAt <= dueDate) {
-              acc[userId].onTime++;
-            } else {
-              acc[userId].late++;
-            }
-          }
-        } catch (error) {
-          console.error('Erreur lors du traitement des dates:', error);
-        }
-      }
-      
-      return acc;
-    }, {}) : {};
-    
-    return {
-      userStats: stats || {},
-      sortedUserStats: Object.values(stats || {}).sort((a, b) => (b?.total || 0) - (a?.total || 0))
-    };
-  }, [tasks]);
-  
-  // 6. Gestion des états de chargement et d'erreur
-  const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          <span className="ml-3">{t('loading')}...</span>
-        </div>
-      );
-    }
-    
-    if (!tasks || tasks.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64">
-          <FaTasks className="text-4xl text-gray-400 mb-4" />
-          <p className="text-gray-500 text-lg">{t('no_tasks_found')}</p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring focus:ring-blue-300 disabled:opacity-25 transition"
-          >
-            <FaPlus className="mr-2" />
-            {t('create_task')}
-          </button>
-        </div>
-      );
-    }
-    
-    // Le contenu principal sera rendu ici
-    return null;
-  };
+  const activeCount = Object.values(filters).filter(v => v !== '' && v !== undefined && v !== null).length;
 
-  useEffect(() => {
-    if (window.Echo) {
-      const channel = window.Echo.channel('tasks');
-      channel.listen('TaskUpdated', (e) => {
-        setNotification('Une tâche a été modifiée (ou ajoutée/supprimée)');
-        setNotificationType('success');
-        // Recharge la liste sans perdre les filtres
-        router.reload({ only: ['tasks'] });
-      });
-      return () => {
-        channel.stopListening('TaskUpdated');
-      };
-    }
-  }, []);
+  const set = (key, val) => onChange({ ...filters, [key]: val });
 
-  useEffect(() => {
-    if (flash.success) {
-      setNotification(flash.success);
-      setNotificationType('success');
-    }
-  }, [flash.success]);
-
-  const handleDelete = (id) => {
-    if (confirm(t('task_delete_confirm'))) {
-      router.delete(`/tasks/${id}`, {
-        onSuccess: () => {
-          setNotification(t('task_deleted_success'));
-          setNotificationType('success');
-        },
-        onError: () => {
-          setNotification(t('task_delete_error'));
-          setNotificationType('error');
-        }
-      });
-    }
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    router.get('/tasks', { search }, { preserveState: true, replace: true });
-  };
-
-  const openCreateModal = () => {
-    setModalMode('create');
-    setModalTask(null);
-    setShowModal(true);
-  };
-
-  const openEditModal = (task) => {
-    setModalMode('edit');
-    setModalTask(task);
-    setShowModal(true);
-  };
-
-  const handleModalClose = (refresh = false) => {
-    setShowModal(false);
-    setModalTask(null);
-    if (refresh) {
-      router.reload({ only: ['tasks'] });
-    }
-  };
+  const Select = ({ label, field, options, placeholder = 'Tous' }) => (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</label>
+      <select
+        value={filters[field] || ''}
+        onChange={e => set(field, e.target.value)}
+        className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+      >
+        <option value="">{placeholder}</option>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
 
   return (
-    <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-950 p-0 m-0">
-      <main className="flex-1 flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
-        {notification && (
-          <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-lg shadow-xl text-white transition-all ${notificationType === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
-            {notification}
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+      {/* Toggle bar */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <FaFilter className="text-blue-500" />
+          <span className="font-semibold text-gray-700 dark:text-gray-200">Filtres & Recherche</span>
+          {activeCount > 0 && (
+            <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-0.5 font-bold">
+              {activeCount}
+            </span>
+          )}
+        </div>
+        {open ? <FaChevronUp className="text-gray-400" /> : <FaChevronDown className="text-gray-400" />}
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 border-t border-gray-100 dark:border-gray-700">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+            {/* Search */}
+            <div className="flex flex-col gap-1 sm:col-span-2 xl:col-span-1">
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Recherche</label>
+              <div className="relative">
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                <input
+                  type="text"
+                  value={filters.search || ''}
+                  onChange={e => set('search', e.target.value)}
+                  placeholder="Titre de la tâche..."
+                  className="pl-9 pr-4 py-2 text-sm w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
+
+            <Select
+              label="Statut"
+              field="status"
+              options={[
+                { value: 'todo',        label: 'À faire' },
+                { value: 'in_progress', label: 'En cours' },
+                { value: 'done',        label: 'Terminé' },
+              ]}
+            />
+
+            <Select
+              label="Priorité"
+              field="priority"
+              options={[
+                { value: 'low',    label: 'Faible' },
+                { value: 'medium', label: 'Moyenne' },
+                { value: 'high',   label: 'Haute' },
+              ]}
+            />
+
+            <Select
+              label="Projet"
+              field="project_id"
+              options={projectOptions.map(p => ({ value: p.id, label: p.name }))}
+            />
+
+            <Select
+              label="Assigné à"
+              field="assigned_to"
+              options={memberOptions.map(m => ({ value: m.id, label: m.name }))}
+            />
+
+            {/* Date range */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Échéance — début</label>
+              <input
+                type="date"
+                value={filters.due_from || ''}
+                onChange={e => set('due_from', e.target.value)}
+                className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Échéance — fin</label>
+              <input
+                type="date"
+                value={filters.due_to || ''}
+                onChange={e => set('due_to', e.target.value)}
+                className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Action row */}
+          {activeCount > 0 && (
+            <div className="flex items-center gap-3 mt-5">
+              <button
+                onClick={onReset}
+                className="flex items-center gap-2 text-gray-500 hover:text-red-600 text-sm font-medium transition-colors"
+              >
+                <FaTimes className="text-xs" /> Réinitialiser les filtres
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Sort header ───────────────────────────────────────────────────────────────
+
+const SortHeader = ({ label, field, current, dir, onSort }) => {
+  const active = current === field;
+  return (
+    <button
+      onClick={() => onSort(field)}
+      className="flex items-center gap-1 font-semibold text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
+    >
+      {label}
+      <span className="ml-1 opacity-50 group-hover:opacity-100">
+        {active ? (dir === 'asc' ? <FaSortUp /> : <FaSortDown />) : <FaSort className="text-xs" />}
+      </span>
+    </button>
+  );
+};
+
+// ── User Stats Card (unchanged) ──────────────────────────────────────────────
+
+const UserStatCard = ({ stat, rank }) => {
+  const completion = stat.completion_rate ?? 0;
+  const onTimeRate = stat.on_time_rate ?? 0;
+
+  const rankColors = ['from-yellow-400 to-amber-500', 'from-gray-300 to-gray-400', 'from-amber-600 to-amber-700'];
+  const rankBg     = rankColors[rank] || 'from-blue-400 to-blue-500';
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 group">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {rank < 3 ? (
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${rankBg} flex items-center justify-center text-white text-xs font-extrabold shadow-sm`}>
+              {rank === 0 ? '🥇' : rank === 1 ? '🥈' : '🥉'}
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 text-xs font-bold">
+              #{rank + 1}
+            </div>
+          )}
+          <Avatar name={stat.user?.name || ''} url={stat.user?.profile_photo_url || ''} size="lg" />
+          <div>
+            <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight">{stat.user?.name || 'Inconnu'}</p>
+            <p className="text-xs text-gray-400">{stat.total} tâche{stat.total !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">{completion}%</p>
+          <p className="text-xs text-gray-400">Complété</p>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-3">
+        <div
+          className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-700"
+          style={{ width: `${completion}%` }}
+        />
+      </div>
+
+      {/* Stats grid */}
+      <div className="grid grid-cols-3 gap-2 mt-3">
+        {[
+          { label: 'À faire', val: stat.todo, color: 'text-gray-500 dark:text-gray-400' },
+          { label: 'En cours', val: stat.in_progress, color: 'text-blue-600 dark:text-blue-400' },
+          { label: 'Terminé', val: stat.done, color: 'text-emerald-600 dark:text-emerald-400' },
+        ].map(s => (
+          <div key={s.label} className="text-center bg-gray-50 dark:bg-gray-700/50 rounded-xl py-2 px-1">
+            <p className={`text-base font-extrabold ${s.color}`}>{s.val}</p>
+            <p className="text-xs text-gray-400">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* On-time rate */}
+      {stat.done > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+          <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+            <FaClock className="text-blue-400" /> À temps
+          </span>
+          <span className={`text-xs font-bold ${onTimeRate >= 75 ? 'text-emerald-600' : onTimeRate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+            {onTimeRate}%
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Main Index component ──────────────────────────────────────────────────────
+
+const Index = ({
+  tasks: initialTasks = { data: [], links: [], total: 0 },
+  filters: initialFilters = {},
+  userStats = [],
+  summary = {},
+  myTasksSummary = null,          // ← nouveau : stats "Mes propres tâches"
+  projectOptions = [],
+  memberOptions = [],
+}) => {
+  const { flash = {} } = usePage().props;
+  const [viewMode, setViewMode]   = useState('table');
+  const [filters, setFilters]     = useState(initialFilters);
+  const [showStats, setShowStats] = useState(false);
+  const [displayedUserCount, setDisplayedUserCount] = useState(20); // pagination utilisateurs
+
+  const isFirstRender = useRef(true);
+  const debounceTimer = useRef(null);
+
+  const tasks = Array.isArray(initialTasks) ? initialTasks : (initialTasks.data || []);
+  const pagination = !Array.isArray(initialTasks) ? initialTasks : null;
+
+  // ── Filtres dynamiques (auto-apply avec debounce) ──────────────────────────
+  useEffect(() => {
+    // Ne pas déclencher au premier chargement
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Debounce de 300ms
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      router.get('/tasks', filters, { preserveState: true, replace: true });
+    }, 300);
+
+    return () => clearTimeout(debounceTimer.current);
+  }, [filters]);
+
+  // ── Tri ────────────────────────────────────────────────────────────────────
+  const handleSort = useCallback((field) => {
+    const newDir = filters.sort_by === field && filters.sort_dir === 'asc' ? 'desc' : 'asc';
+    const newFilters = { ...filters, sort_by: field, sort_dir: newDir };
+    setFilters(newFilters);
+    // Le useEffect ci-dessus déclenchera la requête
+  }, [filters]);
+
+  // ── Reset ──────────────────────────────────────────────────────────────────
+  const handleReset = () => {
+    setFilters({});
+    // Pas besoin de router.get ici, le useEffect s'en charge après le set
+  };
+
+  // ── Suppression (non utilisée dans la vue pour l'instant) ──────────────────
+  const handleDelete = (id) => {
+    if (confirm('Supprimer cette tâche ?')) {
+      router.delete(`/tasks/${id}`, { preserveScroll: true });
+    }
+  };
+
+  // ── Pagination locale pour les stats utilisateurs ──────────────────────────
+  const paginatedUserStats = userStats.slice(0, displayedUserCount);
+  const hasMoreUsers = displayedUserCount < userStats.length;
+
+  return (
+    <div className="w-full min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+        {/* ── Flash notification ── */}
+        {flash.success && (
+          <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 px-5 py-3 rounded-2xl shadow-sm">
+            <FaCheck className="flex-shrink-0" />
+            <span className="font-medium text-sm">{flash.success}</span>
+          </div>
+        )}
+        {flash.error && (
+          <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 px-5 py-3 rounded-2xl shadow-sm">
+            <FaExclamationTriangle className="flex-shrink-0" />
+            <span className="font-medium text-sm">{flash.error}</span>
           </div>
         )}
 
-        {/* Header and Controls */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
-          <div className="flex items-center gap-4">
-            <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" />
-            <h1 className="text-3xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">{t('task_management')}</h1>
+        {/* ── Page header ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              Gestion des tâches
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {summary.total ?? 0} tâche{(summary.total ?? 0) !== 1 ? 's' : ''} au total
+            </p>
           </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
-            {/* View Mode Toggle - Responsive */}
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('table')}
-                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition duration-200 ${
-                  viewMode === 'table' 
-                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
-                    : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
-                }`}
-              >
-                <FaList className="text-xs" />
-                <span className="hidden sm:inline">{t('table_view')}</span>
-              </button>
-              <button
-                onClick={() => setViewMode('cards')}
-                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition duration-200 ${
-                  viewMode === 'cards' 
-                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
-                    : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
-                }`}
-              >
-                <FaTh className="text-xs" />
-                <span className="hidden sm:inline">{t('cards_view')}</span>
-              </button>
-            </div>
-            
-            <Link href="/tasks/create" className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base">
-              <FaPlus className="text-sm sm:text-lg" /> 
-              <span className="hidden sm:inline">{t('new_task')}</span>
-              <span className="sm:hidden">{t('new')}</span>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/kanban"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:border-blue-400 hover:text-blue-600 transition-all shadow-sm"
+            >
+              <HiOutlineViewGrid className="text-lg" /> Kanban
             </Link>
-            <Link href="/kanban" className="bg-green-600 hover:bg-green-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base">
-              <KanbanIcon /> 
-              <span className="hidden sm:inline">{t('task_tracking')}</span>
-              <span className="sm:hidden">{t('tracking')}</span>
+            <Link
+              href="/tasks/create"
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm hover:shadow-md"
+            >
+              <FaPlus /> Nouvelle tâche
             </Link>
           </div>
         </div>
 
+        {/* ── Summary cards (global) ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <SummaryCard label="Total"    value={summary.total}       icon={FaTasks}              color="bg-blue-500" />
+          <SummaryCard label="À faire"  value={summary.todo}        icon={FaClock}              color="bg-slate-400" />
+          <SummaryCard label="En cours" value={summary.in_progress} icon={FaFire}               color="bg-amber-500" />
+          <SummaryCard label="Terminé"  value={summary.done}        icon={FaCheck}              color="bg-emerald-500"
+            sub={summary.overdue > 0 ? `${summary.overdue} en retard` : null} />
+        </div>
 
-        {/* Search and Filters Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200">
-          <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
-            <div className="md:col-span-2 lg:col-span-3">
-              <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('search_by_title')}</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="search-input"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder={t('search_task_placeholder')}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
-                />
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              </div>
+        {/* ── Summary cards "Mes propres tâches" (si fournies) ── */}
+        {myTasksSummary && (
+          <>
+            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 mt-2">
+              Mes propres tâches
+            </h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <SummaryCard label="Total"    value={myTasksSummary.total}       icon={FaTasks}  color="bg-indigo-500" />
+              <SummaryCard label="À faire"  value={myTasksSummary.todo}        icon={FaClock}  color="bg-slate-400" />
+              <SummaryCard label="En cours" value={myTasksSummary.in_progress} icon={FaFire}   color="bg-amber-500" />
+              <SummaryCard label="Terminé"  value={myTasksSummary.done}        icon={FaCheck}  color="bg-emerald-500"
+                sub={myTasksSummary.overdue > 0 ? `${myTasksSummary.overdue} en retard` : null} />
             </div>
+          </>
+        )}
 
-            <button type="submit" className="md:col-span-1 lg:col-span-1 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md">
-              <FaSearch /> {t('apply')}
+        {/* ── Filters (dynamic, auto-apply) ── */}
+        <FilterPanel
+          filters={filters}
+          projectOptions={projectOptions}
+          memberOptions={memberOptions}
+          onChange={setFilters}
+          onReset={handleReset}
+        />
+
+        {/* ── View toggle + count ── */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {pagination?.total !== undefined
+              ? `${pagination.from ?? 0}–${pagination.to ?? 0} sur ${pagination.total} résultats`
+              : `${tasks.length} résultats`}
+          </p>
+          <div className="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-1 shadow-sm">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'table'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
+              }`}
+            >
+              <HiOutlineViewList /> Tableau
             </button>
-          </form>
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'cards'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
+              }`}
+            >
+              <HiOutlineViewGrid /> Cartes
+            </button>
+          </div>
         </div>
 
-        {/* Task View Section */}
-        {viewMode === 'table' ? (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition duration-200 hover:shadow-lg mb-8">
-            <table className="min-w-full text-sm text-gray-700 dark:text-gray-300 divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <tr>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('title')}</th>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('project')}</th>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('status_label')}</th>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('priority_label')}</th>
-                  <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">{t('assigned_to')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!tasks || tasks.length === 0 ? (
+        {/* ── TABLE view (aucune colonne d'action) ── */}
+        {viewMode === 'table' && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm divide-y divide-gray-100 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-800/80">
                   <tr>
-                    <td colSpan="6" className="text-center py-10 text-gray-500 dark:text-gray-400 text-lg">
-                      {t('no_tasks_found')}
-                    </td>
+                    {[
+                      { label: 'Titre',      field: 'title' },
+                      { label: 'Projet',     field: null },
+                      { label: 'Statut',     field: 'status' },
+                      { label: 'Priorité',   field: 'priority' },
+                      { label: 'Assigné',    field: null },
+                      { label: 'Échéance',   field: 'due_date' },
+                    ].map(col => (
+                      <th key={col.label} className="px-5 py-3.5 text-left">
+                        {col.field
+                          ? <SortHeader label={col.label} field={col.field} current={filters.sort_by} dir={filters.sort_dir} onSort={handleSort} />
+                          : <span className="font-semibold text-gray-600 dark:text-gray-300">{col.label}</span>
+                        }
+                      </th>
+                    ))}
                   </tr>
-                ) : tasks.map(task => (
-                  <tr
-                    key={task.id}
-                    className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
-                    onClick={() => router.visit(`/tasks/${task.id}`)}
-                  >
-                    <td className="p-4 align-middle">
-                      <div className="flex items-center gap-2">
-                        <FaTasks className="text-blue-500 flex-shrink-0" />
-                        <span className="font-semibold text-blue-700 dark:text-blue-200 group-hover:underline">
-                          {task.title}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-4 align-middle">
-                      {task.project?.name ? (
-                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
-                          <FaProjectDiagram className="text-blue-500" />
-                          <span>{task.project.name}</span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 italic">Non assigné</span>
-                      )}
-                    </td>
-                    <td className="p-4 align-middle">
-                      {getStatusBadge(task.status, t)}
-                    </td>
-                    <td className="p-4 align-middle">
-                      {getPriorityBadge(task.priority, t)}
-                    </td>
-                    <td className="p-4 align-middle text-gray-600 dark:text-gray-300">
-                      {task.assigned_user || task.assignedUser ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 text-xs font-semibold">
-                            {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase()}
-                          </div>
-                          <span>{(task.assigned_user?.name || task.assignedUser?.name)}</span>
-                        </div>
-                      ) : (
-                        <span className="italic text-gray-400">{t('unassigned')}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            
-            {/* Pagination du tableau */}
-            {initialTasks.links && initialTasks.links.length > 1 && (
-              <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 rounded-b-lg">
-                <div className="flex-1 flex justify-between sm:hidden">
-                  <Link
-                    href={initialTasks.prev_page_url || '#'}
-                    className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                      !initialTasks.prev_page_url
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                    disabled={!initialTasks.prev_page_url}
-                  >
-                    {t('pagination.previous')}
-                  </Link>
-                  <Link
-                    href={initialTasks.next_page_url || '#'}
-                    className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                      !initialTasks.next_page_url
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                    disabled={!initialTasks.next_page_url}
-                  >
-                    {t('pagination.next')}
-                  </Link>
-                </div>
-                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      {t('pagination.showing')}{' '}
-                      <span className="font-medium">{initialTasks.from || 0}</span>{' '}
-                      {t('pagination.to')}{' '}
-                      <span className="font-medium">{initialTasks.to || 0}</span>{' '}
-                      {t('pagination.of')}{' '}
-                      <span className="font-medium">{initialTasks.total}</span>{' '}
-                      {t('pagination.results', { count: initialTasks.total })}
-                    </p>
-                  </div>
-                  <div>
-                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                      {initialTasks.links.map((link, index) => (
-                        <Link
-                          key={index}
-                          href={link.url || '#'}
-                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                            link.active
-                              ? 'z-10 bg-blue-50 dark:bg-blue-900 border-blue-500 dark:border-blue-700 text-blue-600 dark:text-blue-300'
-                              : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                          } ${!link.url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          dangerouslySetInnerHTML={{ __html: link.label }}
-                        />
-                      ))}
-                    </nav>
-                  </div>
-                </div>
-              </div>
-            )}
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                  {tasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-16 text-center">
+                        <FaTasks className="mx-auto text-4xl text-gray-300 dark:text-gray-600 mb-3" />
+                        <p className="text-gray-400 dark:text-gray-500 font-medium">Aucune tâche trouvée</p>
+                        <Link href="/tasks/create" className="mt-3 inline-flex items-center gap-2 text-blue-600 hover:underline text-sm font-semibold">
+                          <FaPlus className="text-xs" /> Créer une tâche
+                        </Link>
+                      </td>
+                    </tr>
+                  ) : tasks.map(task => {
+                    const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date();
+                    return (
+                      <tr
+                        key={task.id}
+                        className="hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors cursor-pointer group"
+                        onClick={() => router.visit(`/tasks/${task.id}`)}
+                      >
+                        <td className="px-5 py-4">
+                          <span className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                            {task.title}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          {task.project ? (
+                            <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 text-xs">
+                              <FaProjectDiagram className="text-blue-400 flex-shrink-0" />
+                              <span>{task.project.name}</span>
+                            </div>
+                          ) : <span className="text-gray-300 dark:text-gray-600 text-xs italic">—</span>}
+                        </td>
+                        <td className="px-5 py-4"><StatusBadge status={task.status} /></td>
+                        <td className="px-5 py-4"><PriorityBadge priority={task.priority} /></td>
+                        <td className="px-5 py-4">
+                          {task.assigned_user || task.assignedUser ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar
+                                name={task.assigned_user?.name || task.assignedUser?.name || ''}
+                                url={task.assigned_user?.profile_photo_url || task.assignedUser?.profile_photo_url || ''}
+                              />
+                              <span className="text-xs text-gray-700 dark:text-gray-300 font-medium">
+                                {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ')[0]}
+                              </span>
+                            </div>
+                          ) : <span className="text-gray-300 dark:text-gray-600 text-xs italic">Non assigné</span>}
+                        </td>
+                        <td className="px-5 py-4">
+                          {task.due_date ? (
+                            <span className={`flex items-center gap-1 text-xs font-medium ${isOverdue ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                              {isOverdue && <FaExclamationTriangle className="text-red-400" />}
+                              <FaCalendarAlt className="flex-shrink-0" />
+                              {new Date(task.due_date).toLocaleDateString('fr-FR')}
+                            </span>
+                          ) : <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        ) : (
-          /* Cards View */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-            {!tasks || tasks.length === 0 ? (
-              <div className="col-span-full text-center py-16">
-                <FaTasks className="mx-auto text-6xl text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-xl text-gray-500 dark:text-gray-400">{t('no_tasks_found')}</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">{t('create_first_task')}</p>
+        )}
+
+        {/* ── CARDS view ── */}
+        {viewMode === 'cards' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3">
+            {tasks.length === 0 ? (
+              <div className="col-span-full py-16 text-center">
+                <FaTasks className="mx-auto text-5xl text-gray-300 dark:text-gray-600 mb-4" />
+                <p className="text-gray-400 dark:text-gray-500 font-medium">Aucune tâche trouvée</p>
               </div>
-            ) : tasks.map(task => (
-              <div
-                key={task.id}
-                className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-105 transition-all duration-200 cursor-pointer group"
-                onClick={() => router.visit(`/tasks/${task.id}`)}
-              >
-                {/* Task Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 line-clamp-2">
-                    {task.title}
-                  </h3>
-                  <div className="flex-shrink-0">
-                    {getPriorityBadge(task.priority, t)}
-                  </div>
-                </div>
+            ) : tasks.map(task => {
+              const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date();
+              return (
+                <div
+                  key={task.id}
+                  className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group"
+                  onClick={() => router.visit(`/tasks/${task.id}`)}
+                >
+                  {/* Priority stripe */}
+                  <div className={`w-full h-1 rounded-full mb-4 ${PRIORITY_CONFIG[task.priority]?.bar || 'bg-gray-300'}`} />
 
-                {/* Project Info */}
-                {task.project && (
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('project')}</p>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <FaProjectDiagram className="text-blue-500 text-sm" />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
-                        {task.project.name}
-                      </span>
-                      {task.project_is_muted && (
-                        <span className="ml-2 px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full flex-shrink-0">
-                            {t('muted')}
-                        </span>
-                      )}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 text-sm leading-snug">
+                      {task.title}
+                    </h3>
+                    <StatusBadge status={task.status} />
+                  </div>
+
+                  {task.project && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2 py-1.5">
+                      <FaProjectDiagram className="text-blue-400 flex-shrink-0" />
+                      <span className="truncate">{task.project.name}</span>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Status and Assignee */}
-                <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('status')}</p>
-                    {getStatusBadge(task.status, t)}
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('assigned_to')}</p>
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
                     {task.assigned_user || task.assignedUser ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 text-xs font-semibold">
-                          {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase()}
-                        </div>
-                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
+                      <div className="flex items-center gap-1.5">
+                        <Avatar
+                          name={task.assigned_user?.name || task.assignedUser?.name || ''}
+                          url={task.assigned_user?.profile_photo_url || ''}
+                        />
+                        <span className="text-xs text-gray-600 dark:text-gray-400 font-medium truncate max-w-[80px]">
                           {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ')[0]}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400 italic">{t('unassigned')}</span>
+                      <span className="text-xs text-gray-300 dark:text-gray-600 italic">Non assigné</span>
+                    )}
+
+                    {task.due_date && (
+                      <span className={`flex items-center gap-1 text-xs ${isOverdue ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+                        {isOverdue && <FaExclamationTriangle />}
+                        {new Date(task.due_date).toLocaleDateString('fr-FR')}
+                      </span>
                     )}
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
 
-                {/* Due Date */}
-                {task.due_date && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                      <FaCalendarAlt className="text-xs" />
-                      <span>{t('due_date')}: {new Date(task.due_date).toLocaleDateString('fr-FR')}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
+        {/* ── Pagination ── */}
+        {pagination?.links && pagination.links.length > 3 && (
+          <div className="flex flex-wrap justify-center gap-2">
+            {pagination.links.map((link, i) => (
+              <button
+                key={i}
+                disabled={!link.url}
+                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                className={`min-w-[36px] px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
+                  link.active
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : !link.url
+                    ? 'opacity-30 cursor-not-allowed bg-gray-100 dark:bg-gray-700 text-gray-400'
+                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-blue-400 hover:text-blue-600'
+                }`}
+                dangerouslySetInnerHTML={{ __html: link.label }}
+              />
             ))}
           </div>
         )}
 
-        {/* Pagination */}
-        <div className="flex justify-center gap-3 mb-8">
-          {tasks.links && tasks.links.map((link, i) => (
+        {/* ── User statistics section (3 cartes par ligne, paginé à 20) ── */}
+        {userStats.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            {/* Section header */}
             <button
-              key={i}
-              className={`px-4 py-2 text-sm font-semibold rounded-lg transition duration-200 
-                ${link.active ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-600 hover:text-blue-800 dark:hover:text-white hover:shadow-sm'}
-                ${!link.url ? 'opacity-50 cursor-not-allowed' : ''}
-              `}
-              disabled={!link.url}
-              onClick={() => link.url && router.get(link.url)}
-              dangerouslySetInnerHTML={{ __html: link.label }}
-            />
-          ))}
-        </div>
-
-        
-        {/* Section des statistiques par utilisateur */}
-        {sortedUserStats.length > 0 && (
-          <div className="mb-10 bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-              <FaTasks className="mr-2" />
-              {t('task_stats.user_stats', 'Statistiques par utilisateur')}
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sortedUserStats.map((stats, index) => (
-                <div key={index} className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-800 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 text-xl font-bold mr-4">
-                      {stats.user?.name?.charAt(0) || 'U'}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-800 dark:text-white">
-                        {stats.user?.name || t('common.unknown_user', 'Utilisateur inconnu')}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {stats.total} {t('task_stats.tasks', 'tâches')}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-green-600 dark:text-green-400 font-medium">
-                        {t('task_stats.completed_on_time', 'Terminées à temps')}
-                      </span>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        {stats.onTime}
-                      </span>
-                    </div>
-                    
-                    <div className="flex justify-between text-sm">
-                      <span className="text-red-600 dark:text-red-400 font-medium">
-                        {t('task_stats.completed_late', 'Terminées en retard')}
-                      </span>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        {stats.late}
-                      </span>
-                    </div>
-                    
-                    {stats.total > 0 && (
-                      <div className="pt-2">
-                        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-gradient-to-r from-green-500 to-blue-500"
-                            style={{ 
-                              width: `${(stats.onTime / stats.total) * 100}%`,
-                              transition: 'width 0.5s ease-in-out'
-                            }}
-                          />
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          <span>{Math.round((stats.onTime / stats.total) * 100)}% {t('task_stats.on_time', 'à temps')}</span>
-                          <span>{Math.round((stats.late / stats.total) * 100)}% {t('task_stats.late', 'en retard')}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+              onClick={() => setShowStats(s => !s)}
+              className="w-full flex items-center justify-between px-6 py-5 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <FaChartBar className="text-white" />
                 </div>
-              ))}
-            </div>
+                <div className="text-left">
+                  <p className="font-bold text-gray-900 dark:text-white">Statistiques par membre</p>
+                  <p className="text-xs text-gray-400">{userStats.length} membre{userStats.length !== 1 ? 's' : ''} actif{userStats.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+              {showStats ? <FaChevronUp className="text-gray-400" /> : <FaChevronDown className="text-gray-400" />}
+            </button>
+
+            {showStats && (
+              <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
+                  {paginatedUserStats.map((stat, index) => (
+                    <UserStatCard key={stat.user?.id ?? index} stat={stat} rank={index} />
+                  ))}
+                </div>
+                {hasMoreUsers && (
+                  <div className="mt-6 text-center">
+                    <button
+                      onClick={() => setDisplayedUserCount(prev => prev + 20)}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Afficher plus d'utilisateurs
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
-        
-      </main>
-    </div>
-  );
-}
 
-// Création d'un composant wrapper pour gérer le layout
-const IndexWithLayout = (props) => {
-  const { t } = useTranslation();
-  
-  return (
-    <AdminLayout title={t('task_management')}>
-      <Index {...props} />
-    </AdminLayout>
+      </div>
+    </div>
   );
 };
 
-// Configuration du layout pour Inertia
+// ── Layout wrapper ────────────────────────────────────────────────────────────
+
+const IndexWithLayout = (props) => (
+  <AdminLayout title="Gestion des tâches">
+    <Index {...props} />
+  </AdminLayout>
+);
+
 IndexWithLayout.layout = (page) => page;
 
-export default IndexWithLayout; 
+export default IndexWithLayout;

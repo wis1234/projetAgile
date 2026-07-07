@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { router } from '@inertiajs/react';
 
-// Créer une instance d'axios avec la configuration de base
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+axios.defaults.headers.common['Accept'] = 'application/json';
+axios.defaults.withCredentials = true;
+
+// ── Instance axios configurée ─────────────────────────────
 const axiosInstance = axios.create({
     headers: {
         'X-Requested-With': 'XMLHttpRequest',
@@ -10,95 +14,73 @@ const axiosInstance = axios.create({
     withCredentials: true,
 });
 
-// Intercepteur de requête pour ajouter le token CSRF
-axiosInstance.interceptors.request.use(
-    config => {
-        // Ne pas ajouter le token CSRF pour les requêtes sortantes
-        if (['get', 'head', 'options'].includes(config.method?.toLowerCase())) {
-            return config;
-        }
-        
-        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        if (token) {
-            config.headers['X-CSRF-TOKEN'] = token;
-        }
+// ── Intercepteur requête : ajout CSRF ─────────────────────
+const requestInterceptor = config => {
+    if (['get', 'head', 'options'].includes(config.method?.toLowerCase())) {
         return config;
-    },
-    error => {
-        return Promise.reject(error);
     }
-);
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (token) {
+        config.headers['X-CSRF-TOKEN'] = token;
+    }
+    return config;
+};
 
-// Intercepteur de réponse pour gérer les erreurs
-axiosInstance.interceptors.response.use(
+// Appliquer sur l'instance ET sur axios global (utilisé par Inertia)
+axiosInstance.interceptors.request.use(requestInterceptor, e => Promise.reject(e));
+axios.interceptors.request.use(requestInterceptor, e => Promise.reject(e));
+
+// ── Fonction de redirection vers login ────────────────────
+const redirectToLogin = () => {
+    // Éviter les redirections en boucle si on est déjà sur login
+    if (window.location.pathname === '/login') return;
+    window.location.href = '/login';
+};
+
+// ── Intercepteur réponse ──────────────────────────────────
+const responseInterceptor = [
     response => response,
-    async error => {
+    error => {
         if (!error.response) {
-            // Erreur réseau ou serveur indisponible
             console.error('Erreur réseau - Vérifiez votre connexion');
             return Promise.reject(error);
         }
 
-        const { status, data } = error.response;
-        
+        const { status } = error.response;
+
         switch (status) {
-            case 419: // Session expirée / Token CSRF invalide
-                // Si c'est une requête AJAX, on rejette avec un code spécifique
-                if (error.config.headers['X-Requested-With'] === 'XMLHttpRequest') {
-                    return Promise.reject({ ...error, isSessionExpired: true });
-                }
-                
-                // Pour les requêtes normales, on redirige vers la page de session expirée
-                if (typeof window !== 'undefined') {
-                    // On force une déconnexion propre
-                    try {
-                        await axiosInstance.post('/logout');
-                    } catch (e) {
-                        console.error('Erreur lors de la déconnexion:', e);
-                    }
-                    
-                    // On redirige vers la page de connexion avec un message
-                    window.location.href = '/login?expired=1';
-                }
+            case 401:
+                // Session expirée → redirection propre
+                redirectToLogin();
+                return new Promise(() => {}); // stoppe la chaîne
+
+            case 419:
+                // CSRF expiré → redirection propre (pas de reload)
+                redirectToLogin();
+                return new Promise(() => {}); // stoppe la chaîne
+
+            case 403:
+                // Accès refusé → laisser Inertia gérer (page Error403)
                 break;
-                
-            case 401: // Non authentifié
-                // Rediriger vers la page de connexion avec un message
-                if (typeof window !== 'undefined') {
-                    const returnUrl = window.location.pathname + window.location.search;
-                    router.visit('/login', {
-                        data: {
-                            message: 'Votre session a expiré. Veuillez vous reconnecter.',
-                            status: 401,
-                            return: returnUrl
-                        },
-                        preserveState: false,
-                        replace: true
-                    });
-                }
+
+            case 422:
+                // Validation → laisser le composant gérer
                 break;
-                
-            case 419: // CSRF Token Mismatch
-                // Forcer un rechargement complet de la page pour afficher la page d'erreur 419 personnalisée
-                if (typeof window !== 'undefined') {
-                    window.location.reload();
-                }
+
+            case 500:
+                console.error('Erreur serveur interne');
                 break;
-                
-            case 422: // Erreur de validation
-                // Laisser passer pour que le composant puisse gérer les erreurs de validation
-                break;
-                
-            case 500: // Erreur serveur
-                console.error('Erreur serveur - Veuillez réessayer plus tard');
-                break;
-                
+
             default:
-                console.error(`Erreur ${status} - ${error.response?.data?.message || 'Une erreur est survenue'}`);
+                console.error(`Erreur ${status}`);
         }
-        
+
         return Promise.reject(error);
     }
-);
+];
+
+// Appliquer sur l'instance ET sur axios global
+axiosInstance.interceptors.response.use(...responseInterceptor);
+axios.interceptors.response.use(...responseInterceptor);
 
 export default axiosInstance;
