@@ -170,6 +170,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->where('format', 'txt|pdf|docx')
         ->defaults('format', 'txt')
         ->name('projects.suivi-global');
+    Route::get('/projects/{id}/planning/{format?}', [App\Http\Controllers\ProjectController::class, 'generatePlanning'])
+        ->where('format', 'pdf')
+        ->defaults('format', 'pdf')
+        ->name('projects.planning');
     
     // Gestion des fichiers
     Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])->name('files.edit-content');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\Sprint;
 use App\Models\Task;
 use App\Models\User;
 use App\Events\ProjectUpdated;
@@ -523,6 +524,92 @@ class ProjectController extends Controller
             default:
                 return $this->generateText($data);
         }
+    }
+
+    public function generatePlanning($id, $format = 'pdf')
+    {
+        $project = Project::with(['users' => function ($query) {
+            $query->select('users.id', 'users.name', 'users.email')->withPivot('role');
+        }])->findOrFail($id);
+
+        if (!$project->users->contains(auth()->id())) {
+            abort(403, 'Accès non autorisé à ce projet.');
+        }
+
+        $sprints = Sprint::where('project_id', $project->id)
+            ->select(['id', 'name', 'description', 'start_date', 'end_date', 'project_id'])
+            ->orderBy('start_date')
+            ->orderBy('end_date')
+            ->orderBy('name')
+            ->get();
+
+        $tasks = Task::where('project_id', $project->id)
+            ->select(['id', 'title', 'description', 'due_date', 'status', 'priority', 'assigned_to', 'project_id', 'sprint_id', 'created_at'])
+            ->with(['assignedUser' => function ($query) {
+                $query->select('id', 'name', 'email');
+            }])
+            ->orderByRaw('CASE WHEN due_date IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('due_date')
+            ->orderBy('priority')
+            ->orderBy('title')
+            ->get();
+
+        $taskGroups = $tasks->groupBy('sprint_id');
+        $taskStats = [
+            'total' => $tasks->count(),
+            'completed' => $tasks->where('status', 'done')->count(),
+            'pending' => $tasks->where('status', '!=', 'done')->count(),
+            'late' => $tasks->filter(function ($task) {
+                return $task->due_date && $task->due_date->isPast() && $task->status !== 'done';
+            })->count(),
+        ];
+
+        $data = [
+            'project' => $project,
+            'sprints' => $sprints,
+            'tasks' => $tasks,
+            'taskGroups' => $taskGroups,
+            'taskStats' => $taskStats,
+            'members' => $project->users,
+            'memberNames' => $project->users->pluck('name')->filter()->implode(', '),
+            'generated_at' => now()->format('d/m/Y H:i'),
+        ];
+
+        if (strtolower($format) === 'pdf') {
+            return $this->generatePlanningPdf($data);
+        }
+
+        abort(404, 'Format de planning non pris en charge.');
+    }
+
+    protected function generatePlanningPdf($data)
+    {
+        $options = new \Dompdf\Options();
+        $options->set([
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true,
+            'isPhpEnabled' => true,
+            'isFontSubsettingEnabled' => true,
+            'defaultPaperSize' => 'a4',
+            'defaultFont' => 'dejavu sans',
+            'fontHeightRatio' => 1.1,
+            'dpi' => 140,
+            'enableCssFloat' => true,
+        ]);
+
+        $dompdf = new \Dompdf\Dompdf($options);
+        $html = view('exports.project-planning-pdf', $data)->render();
+        $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        $canvas = $dompdf->getCanvas();
+        $font = $dompdf->getFontMetrics()->getFont('helvetica');
+        $canvas->page_text(525, 800, 'Page {PAGE_NUM} sur {PAGE_COUNT}', $font, 8, [0.5, 0.5, 0.5]);
+
+        $filename = 'planning_' . Str::slug($data['project']->name) . '_' . now()->format('Ymd_His') . '.pdf';
+        return $dompdf->stream($filename, ['Attachment' => true, 'compress' => true]);
     }
 
     protected function generateText($data)

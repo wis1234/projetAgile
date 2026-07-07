@@ -403,6 +403,9 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
                     <a href={`/projects/${project.id}/suivi-global/docx`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-2.5 text-sm border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                       <FaFileWord className="text-blue-700" /> <span>Word</span>
                     </a>
+                    <a href={`/projects/${project.id}/planning/pdf`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-2.5 text-sm border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <FaProjectDiagram className="text-indigo-600" /> <span>Planning PDF</span>
+                    </a>
                   </div>
                 </div>
 
