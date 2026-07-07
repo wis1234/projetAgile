@@ -234,6 +234,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'job_title',
         'company',
         'profile_photo_path',
+        'notification_preferences',
         'role', // Ajouté pour la gestion des rôles
         'school_id', // Ajouté pour la relation avec l'école
         // Champs d'abonnement
