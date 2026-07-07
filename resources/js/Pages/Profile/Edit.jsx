@@ -3,8 +3,9 @@ import { Head } from '@inertiajs/react';
 import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
+import NotificationPreferencesForm from './Partials/NotificationPreferencesForm';
 
-export default function Edit({ mustVerifyEmail, status }) {
+export default function Edit({ mustVerifyEmail, status, notificationPreferences }) {
     return (
         <AdminLayout>
             <Head title="Mon profil" />
@@ -17,6 +18,7 @@ export default function Edit({ mustVerifyEmail, status }) {
                             status={status}
                         />
                     </div>
+                    <NotificationPreferencesForm notificationPreferences={notificationPreferences} />
                     <div className="bg-white dark:bg-gray-800 border border-blue-100 dark:border-gray-800 rounded-lg shadow p-8">
                         <h2 className="text-2xl font-bold text-blue-700 dark:text-blue-200 mb-6">Sécurité</h2>
                         <UpdatePasswordForm />

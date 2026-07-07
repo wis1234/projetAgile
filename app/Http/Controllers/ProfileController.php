@@ -27,9 +27,12 @@ class ProfileController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
+        $user = $request->user();
+
         return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
+            'notificationPreferences' => $user->notification_preferences,
         ]);
     }
 
@@ -85,6 +88,29 @@ class ProfileController extends Controller
             \Log::error('Erreur lors de la mise à jour du profil : ' . $e->getMessage());
             return back()->withErrors(['error' => 'Une erreur est survenue lors de la mise à jour du profil.']);
         }
+    }
+
+    /**
+     * Update the user's notification preferences.
+     */
+    public function updateNotificationPreferences(Request $request)
+    {
+        try {
+            $this->authorize('update', $request->user());
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+        }
+
+        $validated = $request->validate([
+            'notification_preferences' => ['nullable', 'array'],
+            'notification_preferences.*' => ['boolean'],
+        ]);
+
+        $request->user()->update([
+            'notification_preferences' => $validated['notification_preferences'] ?? [],
+        ]);
+
+        return back()->with('success', 'Préférences de notification mises à jour avec succès.');
     }
 
     /**

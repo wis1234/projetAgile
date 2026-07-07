@@ -39,7 +39,11 @@ class TaskCommentNotification extends Notification implements ShouldQueue
      */
     public function via($notifiable)
     {
-        return ['mail', 'database'];
+        if ($notifiable->shouldReceiveNotification('task_updates')) {
+            return ['mail', 'database'];
+        }
+
+        return ['database'];
     }
 
     /**

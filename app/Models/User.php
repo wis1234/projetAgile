@@ -20,6 +20,41 @@ class User extends Authenticatable implements MustVerifyEmail
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasRoles;
 
+    public static function defaultNotificationPreferences(): array
+    {
+        return [
+            'task_updates' => true,
+            'project_updates' => true,
+            'file_updates' => true,
+            'meeting_updates' => true,
+            'recruitment_updates' => true,
+            'subscription_updates' => true,
+            'payment_updates' => true,
+            'security_updates' => true,
+        ];
+    }
+
+    public function getNotificationPreferencesAttribute($value): array
+    {
+        $preferences = is_string($value) ? json_decode($value, true) : $value;
+        $preferences = is_array($preferences) ? $preferences : [];
+
+        return array_replace(self::defaultNotificationPreferences(), $preferences);
+    }
+
+    public function setNotificationPreferencesAttribute($value): void
+    {
+        $preferences = is_array($value) ? $value : [];
+        $normalized = array_intersect_key($preferences, self::defaultNotificationPreferences());
+
+        $this->attributes['notification_preferences'] = json_encode(array_replace(self::defaultNotificationPreferences(), $normalized));
+    }
+
+    public function shouldReceiveNotification(string $key): bool
+    {
+        return (bool) ($this->notification_preferences[$key] ?? true);
+    }
+
     /**
      * Obtenez les abonnements de l'utilisateur.
      */
@@ -253,6 +288,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'subscription_ends_at' => 'datetime',
         'is_subscribed' => 'boolean',
         'bank_details_verified_at' => 'datetime',
+        'notification_preferences' => 'array',
     ];
 
     /**

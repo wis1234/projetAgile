@@ -44,7 +44,11 @@ class SubscriptionConfirmation extends Notification implements ShouldQueue
      */
     public function via($notifiable): array
     {
-        return ['mail', 'database'];
+        if ($notifiable->shouldReceiveNotification('subscription_updates')) {
+            return ['mail', 'database'];
+        }
+
+        return ['database'];
     }
 
     /**

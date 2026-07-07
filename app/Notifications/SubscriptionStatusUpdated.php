@@ -36,7 +36,7 @@ class SubscriptionStatusUpdated extends Notification implements ShouldQueue
      */
     public function via($notifiable)
     {
-        return ['mail'];
+        return $notifiable->shouldReceiveNotification('subscription_updates') ? ['mail'] : [];
     }
 
     /**

@@ -36,7 +36,7 @@ class MeetingReminder extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return $notifiable->shouldReceiveNotification('meeting_updates') ? ['mail'] : [];
     }
 
     /**

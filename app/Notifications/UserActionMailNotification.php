@@ -36,6 +36,12 @@ class UserActionMailNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
+        $preferenceKey = $this->data['preference_key'] ?? null;
+
+        if ($preferenceKey && !$notifiable->shouldReceiveNotification($preferenceKey)) {
+            return [];
+        }
+
         return ['mail'];
     }
 

@@ -32,7 +32,7 @@ class ApplicationStatusChanged extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return $notifiable->shouldReceiveNotification('recruitment_updates') ? ['mail'] : [];
     }
 
     /**
