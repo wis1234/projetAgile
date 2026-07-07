@@ -223,6 +223,7 @@ class FileController extends Controller
                             [
                                 'file_id' => $fileModel->id,
                                 'project_id' => $project->id,
+                                'preference_key' => 'file_updates',
                             ]
                         ));
                     }
@@ -398,6 +399,7 @@ class FileController extends Controller
                         'file_id' => $file->id,
                         'project_id' => $project?->id,
                         'status' => $validated['status'],
+                        'preference_key' => 'file_updates',
                     ]
                 ));
             }

@@ -34,7 +34,7 @@ class TaskFileUploadNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return $notifiable->shouldReceiveNotification('file_updates') ? ['mail'] : [];
     }
 
     /**

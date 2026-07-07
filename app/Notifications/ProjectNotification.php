@@ -36,7 +36,13 @@ class ProjectNotification extends Notification implements ShouldQueue
      */
     public function via($notifiable)
     {
-        return ['mail', 'database'];
+        $preferenceKey = $this->data['preference_key'] ?? 'project_updates';
+
+        if ($notifiable->shouldReceiveNotification($preferenceKey)) {
+            return ['mail', 'database'];
+        }
+
+        return ['database'];
     }
 
     /**

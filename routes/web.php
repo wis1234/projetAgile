@@ -44,6 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Profile routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/notifications', [ProfileController::class, 'updateNotificationPreferences'])->name('profile.preferences.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/profile/bank-details', [ProfileController::class, 'showBankDetails'])->name('profile.bank-details');
     Route::put('/profile/bank-details', [ProfileController::class, 'updateBankDetails'])->name('profile.update-bank-details');

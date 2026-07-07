@@ -50,6 +50,7 @@ class FileCommentController extends Controller
                     [
                         'file_id' => $file->id,
                         'comment_id' => $comment->id,
+                        'preference_key' => 'file_updates',
                     ]
                 ));
             }

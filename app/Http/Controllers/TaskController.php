@@ -318,6 +318,7 @@ class TaskController extends Controller
         $actionText = 'Voir la tâche';
         $user->notify(new UserActionMailNotification($subject, $message, $actionUrl, $actionText, [
             'task_id' => $task->id,
+            'preference_key' => 'payment_updates',
         ]));
 
         return response()->json(['message' => 'Payment validated']);
