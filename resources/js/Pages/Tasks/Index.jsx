@@ -333,7 +333,6 @@ const Index = ({
   const [showStats, setShowStats]     = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  const [progressProjectId, setProgressProjectId] = useState('');
   const [displayedUserCount, setDisplayedUserCount] = useState(20); // pagination utilisateurs
 
   const isFirstRender = useRef(true);
@@ -382,12 +381,14 @@ const Index = ({
 
   useEffect(() => {
     setDisplayedUserCount(20);
-  }, [progressProjectId, userStats.length]);
+  }, [filters.project_id, userStats.length]);
 
   // ── Pagination locale pour les stats utilisateurs ──────────────────────────
+  // La progression réagit désormais au même filtre "Projet" que le panneau
+  // Filtres & Recherche, il n'y a plus de sélecteur dédié dans ce bloc.
   const filteredUserStats = userStats.filter((stat) => {
-    if (!progressProjectId) return true;
-    return stat.project_ids && stat.project_ids.includes(Number(progressProjectId));
+    if (!filters.project_id) return true;
+    return stat.project_ids && stat.project_ids.includes(Number(filters.project_id));
   });
   const paginatedUserStats = filteredUserStats.slice(0, displayedUserCount);
   const hasMoreUsers = displayedUserCount < filteredUserStats.length;
@@ -463,84 +464,6 @@ const Index = ({
           </>
         )}
 
-        {/* ── Progression des membres — entièrement masquée par défaut, ── */}
-        {/* ── ne s'affiche que lorsqu'on clique sur "Voir les progrès" ── */}
-        {showStats && userStats.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden animate-[fadeIn_0.15s_ease-out]">
-            <div className="w-full flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <FaChartBar className="text-white" />
-                </div>
-                <div className="text-left">
-                  <p className="font-bold text-gray-900 dark:text-white">Progression des membres</p>
-                  <p className="text-xs text-gray-400">{filteredUserStats.length} membre{filteredUserStats.length !== 1 ? 's' : ''} actif{filteredUserStats.length !== 1 ? 's' : ''}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowStats(false)}
-                title="Masquer"
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            <div className="px-6 pb-6">
-                {/* Filtre projet propre à la progression */}
-                <div className="flex items-end gap-2 mt-4 max-w-xs">
-                  <div className="flex flex-col gap-1 flex-1">
-                    <label htmlFor="progress-project" className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Projet</label>
-                    <select
-                      id="progress-project"
-                      value={progressProjectId}
-                      onChange={(event) => setProgressProjectId(event.target.value)}
-                      className="rounded-xl border border-gray-200 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
-                    >
-                      <option value="">Tous les projets</option>
-                      {projectOptions.map((project) => (
-                        <option key={project.id} value={project.id}>{project.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {progressProjectId && (
-                    <button
-                      onClick={() => setProgressProjectId('')}
-                      className="inline-flex items-center gap-1 px-3 py-2 text-xs font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
-                      title="Réinitialiser le filtre"
-                    >
-                      <FaTimes /> Réinit.
-                    </button>
-                  )}
-                </div>
-
-                {paginatedUserStats.length > 0 ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
-                      {paginatedUserStats.map((stat, index) => (
-                        <UserStatCard key={stat.user?.id ?? index} stat={stat} rank={index} />
-                      ))}
-                    </div>
-                    {hasMoreUsers && (
-                      <div className="mt-6 text-center">
-                        <button
-                          onClick={() => setDisplayedUserCount(prev => prev + 20)}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        >
-                          Afficher plus d'utilisateurs
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="mt-5 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
-                    Aucune progression à afficher pour ce filtre.
-                  </div>
-                )}
-            </div>
-          </div>
-        )}
-
         {/* ── Controls row ── */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-3 lg:flex-wrap">
           {userStats.length > 0 && (
@@ -576,6 +499,58 @@ const Index = ({
           onChange={setFilters}
           onReset={handleReset}
         />
+
+        {/* ── Progression des membres — entièrement masquée par défaut, ── */}
+        {/* ── ne s'affiche que lorsqu'on clique sur "Voir les progrès". Elle ── */}
+        {/* ── réagit au filtre "Projet" du panneau Filtres & Recherche ci-dessus. ── */}
+        {showStats && userStats.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+            <div className="w-full flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <FaChartBar className="text-white" />
+                </div>
+                <div className="text-left">
+                  <p className="font-bold text-gray-900 dark:text-white">Progression des membres</p>
+                  <p className="text-xs text-gray-400">{filteredUserStats.length} membre{filteredUserStats.length !== 1 ? 's' : ''} actif{filteredUserStats.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowStats(false)}
+                title="Masquer"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="px-6 pb-6">
+              {paginatedUserStats.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
+                    {paginatedUserStats.map((stat, index) => (
+                      <UserStatCard key={stat.user?.id ?? index} stat={stat} rank={index} />
+                    ))}
+                  </div>
+                  {hasMoreUsers && (
+                    <div className="mt-6 text-center">
+                      <button
+                        onClick={() => setDisplayedUserCount(prev => prev + 20)}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        Afficher plus d'utilisateurs
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+                  Aucune progression à afficher pour ce filtre.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── View toggle + count ── */}
         <div className="flex items-center justify-between">
