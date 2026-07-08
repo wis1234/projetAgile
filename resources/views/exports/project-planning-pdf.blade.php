@@ -53,9 +53,8 @@
             margin-bottom: 4px;
         }
 
-        .subtitle {
-            font-size: 9.5pt;
-            color: #444444;
+        .title .title-project {
+            font-weight: bold;
         }
 
         /* ===== META BLOCK ===== */
@@ -324,17 +323,20 @@
             margin: 0 6px;
         }
 
-        .footer .page-num:before {
-            content: "Page " counter(page) " / " counter(pages);
+        .footer .page-current:before {
+            content: counter(page);
+        }
+
+        .footer .page-total:before {
+            content: counter(pages);
         }
     </style>
 </head>
 <body>
-    <a name="top"></a>
+    <div id="top"></div>
     <div class="header">
         <div class="eyebrow">Rapport de projet</div>
-        <div class="title">Planification de projet</div>
-        <div class="subtitle">{{ $project->name }}</div>
+        <div class="title">Planification de projet <span class="title-project">{{ $project->name }}</span></div>
     </div>
 
     <div class="meta-block">
@@ -392,7 +394,7 @@
                 <tr>
                     <th class="col-project">Projet</th>
                     <th class="col-sprint">Sprint / Objectif</th>
-                    <th class="col-task">Tâche (échéance)</th>
+                    <th class="col-task">Tâche</th>
                     <th class="col-owner">Responsable</th>
                     <th class="col-priority">Priorité</th>
                     <th class="col-status">Statut</th>
@@ -408,9 +410,8 @@
                     @endphp
 
                     {{-- Ligne séparateur : une seule ligne pleine largeur, jamais coupée --}}
-                    <tr class="sprint-divider">
+                    <tr class="sprint-divider" id="sprint-{{ $sprint->id }}">
                         <td colspan="6">
-                            <a name="sprint-{{ $sprint->id }}"></a>
                             <span class="sprint-name">{{ $project->name }} &nbsp;&rsaquo;&nbsp; {{ $sprint->name }}</span>
                             <span class="sprint-dates">&nbsp;&nbsp;({{ $startLabel }} &rarr; {{ $endLabel }})</span>
                             @if($sprint->description)
@@ -489,7 +490,7 @@
     <div class="footer">
         <span class="footer-brand">PROJA</span>
         <span class="dot">·</span><a href="#top">&uarr; Sommaire</a>
-        <span class="dot">·</span><span class="page-num"></span>
+        <span class="dot">·</span>Page <span class="page-current"></span> / <span class="page-total"></span>
     </div>
 </body>
 </html>
