@@ -73,31 +73,38 @@ const SummaryCard = ({ label, value, icon: Icon, color, sub }) => (
   </div>
 );
 
-// ── Filter panel toggle button ────────────────────────────────────────────────
+// ── Collapsible panel toggle button (generic, reused for Filtres & Progression) ─
 
-const FilterPanelToggle = () => {
-  const [open, setOpen] = useState(true);
-  
+const PanelToggleButton = ({ icon: Icon, label, openLabel, open, onClick, count, tone = 'default' }) => {
+  const toneClasses = tone === 'accent'
+    ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300'
+    : 'border-gray-200 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 dark:bg-gray-700 dark:text-gray-200';
+
   return (
     <button
-      onClick={() => setOpen(o => !o)}
-      className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 whitespace-nowrap"
+      onClick={onClick}
+      aria-expanded={open}
+      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap ${toneClasses}`}
     >
-      <FaFilter />
-      {open ? 'Masquer' : 'Filtres & Recherche'}
+      <Icon />
+      {open ? (openLabel || label) : label}
+      {typeof count === 'number' && count > 0 && (
+        <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-0.5 font-bold">
+          {count}
+        </span>
+      )}
+      {open ? <FaChevronUp className="text-xs opacity-60" /> : <FaChevronDown className="text-xs opacity-60" />}
     </button>
   );
 };
 
-// ── Filter panel (dynamic, no apply button) ──────────────────────────────────
+// ── Filter panel (dynamic, fully controlled by parent — no internal open state) ─
 
-const FilterPanel = ({ filters, projectOptions, memberOptions, onChange, onReset, open: externalOpen, onToggle }) => {
-  const [internalOpen, setInternalOpen] = useState(true);
-  const open = externalOpen !== undefined ? externalOpen : internalOpen;
-
-  const activeCount = Object.values(filters).filter(v => v !== '' && v !== undefined && v !== null).length;
+const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, onReset }) => {
+  if (!open) return null;
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
+  const activeCount = Object.values(filters).filter(v => v !== '' && v !== undefined && v !== null).length;
 
   const Select = ({ label, field, options, placeholder = 'Tous' }) => (
     <div className="flex flex-col gap-1">
@@ -113,116 +120,87 @@ const FilterPanel = ({ filters, projectOptions, memberOptions, onChange, onReset
     </div>
   );
 
-  const handleToggle = () => {
-    if (externalOpen !== undefined) {
-      onToggle?.();
-    } else {
-      setInternalOpen(o => !o);
-    }
-  };
-
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-      {/* Toggle bar */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <FaFilter className="text-blue-500" />
-          <span className="font-semibold text-gray-700 dark:text-gray-200">Filtres & Recherche</span>
-          {activeCount > 0 && (
-            <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-0.5 font-bold">
-              {activeCount}
-            </span>
-          )}
-        </div>
-        {open ? <FaChevronUp className="text-gray-400" /> : <FaChevronDown className="text-gray-400" />}
-      </button>
-
-      {open && (
-        <div className="px-5 pb-5 border-t border-gray-100 dark:border-gray-700">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
-            {/* Search */}
-            <div className="flex flex-col gap-1 sm:col-span-2 xl:col-span-1">
-              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Recherche</label>
-              <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-                <input
-                  type="text"
-                  value={filters.search || ''}
-                  onChange={e => set('search', e.target.value)}
-                  placeholder="Titre de la tâche..."
-                  className="pl-9 pr-4 py-2 text-sm w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                />
-              </div>
-            </div>
-
-            <Select
-              label="Statut"
-              field="status"
-              options={[
-                { value: 'todo',        label: 'À faire' },
-                { value: 'in_progress', label: 'En cours' },
-                { value: 'done',        label: 'Terminé' },
-              ]}
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 animate-[fadeIn_0.15s_ease-out]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Search */}
+        <div className="flex flex-col gap-1 sm:col-span-2 xl:col-span-1">
+          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Recherche</label>
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+            <input
+              type="text"
+              value={filters.search || ''}
+              onChange={e => set('search', e.target.value)}
+              placeholder="Titre de la tâche..."
+              className="pl-9 pr-4 py-2 text-sm w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
-
-            <Select
-              label="Priorité"
-              field="priority"
-              options={[
-                { value: 'low',    label: 'Faible' },
-                { value: 'medium', label: 'Moyenne' },
-                { value: 'high',   label: 'Haute' },
-              ]}
-            />
-
-            <Select
-              label="Projet"
-              field="project_id"
-              options={projectOptions.map(p => ({ value: p.id, label: p.name }))}
-            />
-
-            <Select
-              label="Assigné à"
-              field="assigned_to"
-              options={memberOptions.map(m => ({ value: m.id, label: m.name }))}
-            />
-
-            {/* Date range */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Échéance — début</label>
-              <input
-                type="date"
-                value={filters.due_from || ''}
-                onChange={e => set('due_from', e.target.value)}
-                className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Échéance — fin</label>
-              <input
-                type="date"
-                value={filters.due_to || ''}
-                onChange={e => set('due_to', e.target.value)}
-                className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
           </div>
+        </div>
 
-          {/* Action row */}
-          {activeCount > 0 && (
-            <div className="flex items-center gap-3 mt-5">
-              <button
-                onClick={onReset}
-                className="flex items-center gap-2 text-gray-500 hover:text-red-600 text-sm font-medium transition-colors"
-              >
-                <FaTimes className="text-xs" /> Réinitialiser les filtres
-              </button>
-            </div>
-          )}
+        <Select
+          label="Statut"
+          field="status"
+          options={[
+            { value: 'todo',        label: 'À faire' },
+            { value: 'in_progress', label: 'En cours' },
+            { value: 'done',        label: 'Terminé' },
+          ]}
+        />
+
+        <Select
+          label="Priorité"
+          field="priority"
+          options={[
+            { value: 'low',    label: 'Faible' },
+            { value: 'medium', label: 'Moyenne' },
+            { value: 'high',   label: 'Haute' },
+          ]}
+        />
+
+        <Select
+          label="Projet"
+          field="project_id"
+          options={projectOptions.map(p => ({ value: p.id, label: p.name }))}
+        />
+
+        <Select
+          label="Assigné à"
+          field="assigned_to"
+          options={memberOptions.map(m => ({ value: m.id, label: m.name }))}
+        />
+
+        {/* Date range */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Échéance — début</label>
+          <input
+            type="date"
+            value={filters.due_from || ''}
+            onChange={e => set('due_from', e.target.value)}
+            className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Échéance — fin</label>
+          <input
+            type="date"
+            value={filters.due_to || ''}
+            onChange={e => set('due_to', e.target.value)}
+            className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Action row */}
+      {activeCount > 0 && (
+        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100 dark:border-gray-700">
+          <button
+            onClick={onReset}
+            className="flex items-center gap-2 text-gray-500 hover:text-red-600 text-sm font-medium transition-colors"
+          >
+            <FaTimes className="text-xs" /> Réinitialiser les filtres ({activeCount})
+          </button>
         </div>
       )}
     </div>
@@ -349,7 +327,12 @@ const Index = ({
   const { flash = {} } = usePage().props;
   const [viewMode, setViewMode]   = useState('table');
   const [filters, setFilters]     = useState(initialFilters);
-  const [showStats, setShowStats] = useState(false);
+
+  // Les deux panneaux repliables sont masqués par défaut : au chargement de la
+  // page on ne voit que les cartes de stats et le tableau.
+  const [showStats, setShowStats]     = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
   const [progressProjectId, setProgressProjectId] = useState('');
   const [displayedUserCount, setDisplayedUserCount] = useState(20); // pagination utilisateurs
 
@@ -408,6 +391,8 @@ const Index = ({
   });
   const paginatedUserStats = filteredUserStats.slice(0, displayedUserCount);
   const hasMoreUsers = displayedUserCount < filteredUserStats.length;
+
+  const activeFilterCount = Object.values(filters).filter(v => v !== '' && v !== undefined && v !== null).length;
 
   return (
     <div className="w-full min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -478,55 +463,112 @@ const Index = ({
           </>
         )}
 
-        {/* ── Controls row (responsive) ── */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-3 lg:flex-wrap">
-          {/* Voir les progrès button */}
-          {userStats.length > 0 && (
+        {/* ── Progression des membres — juste sous les stats, repliée par défaut ── */}
+        {userStats.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
             <button
-              onClick={() => setShowStats((value) => !value)}
-              className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300 whitespace-nowrap"
+              onClick={() => setShowStats(s => !s)}
+              aria-expanded={showStats}
+              className="w-full flex items-center justify-between px-6 py-5 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
             >
-              <FaChartBar />
-              {showStats ? 'Masquer' : 'Voir les progrès'}
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <FaChartBar className="text-white" />
+                </div>
+                <div className="text-left">
+                  <p className="font-bold text-gray-900 dark:text-white">Progression des membres</p>
+                  <p className="text-xs text-gray-400">{filteredUserStats.length} membre{filteredUserStats.length !== 1 ? 's' : ''} actif{filteredUserStats.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+              {showStats ? <FaChevronUp className="text-gray-400" /> : <FaChevronDown className="text-gray-400" />}
             </button>
-          )}
 
-          {/* Project filter */}
-          <div className="flex items-end gap-2 flex-1 min-w-[200px] lg:flex-initial lg:min-w-0">
-            <div className="flex flex-col gap-1 flex-1 lg:flex-initial">
-              <label htmlFor="progress-project" className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Projet</label>
-              <select
-                id="progress-project"
-                value={progressProjectId}
-                onChange={(event) => setProgressProjectId(event.target.value)}
-                className="rounded-xl border border-gray-200 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
-              >
-                <option value="">Tous les projets</option>
-                {projectOptions.map((project) => (
-                  <option key={project.id} value={project.id}>{project.name}</option>
-                ))}
-              </select>
-            </div>
-            {progressProjectId && (
-              <button
-                onClick={() => setProgressProjectId('')}
-                className="inline-flex items-center gap-1 px-3 py-2 text-xs font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
-                title="Réinitialiser le filtre"
-              >
-                <FaTimes /> Réinit.
-              </button>
+            {showStats && (
+              <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-700">
+                {/* Filtre projet propre à la progression */}
+                <div className="flex items-end gap-2 mt-4 max-w-xs">
+                  <div className="flex flex-col gap-1 flex-1">
+                    <label htmlFor="progress-project" className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Projet</label>
+                    <select
+                      id="progress-project"
+                      value={progressProjectId}
+                      onChange={(event) => setProgressProjectId(event.target.value)}
+                      className="rounded-xl border border-gray-200 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
+                    >
+                      <option value="">Tous les projets</option>
+                      {projectOptions.map((project) => (
+                        <option key={project.id} value={project.id}>{project.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {progressProjectId && (
+                    <button
+                      onClick={() => setProgressProjectId('')}
+                      className="inline-flex items-center gap-1 px-3 py-2 text-xs font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+                      title="Réinitialiser le filtre"
+                    >
+                      <FaTimes /> Réinit.
+                    </button>
+                  )}
+                </div>
+
+                {paginatedUserStats.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
+                      {paginatedUserStats.map((stat, index) => (
+                        <UserStatCard key={stat.user?.id ?? index} stat={stat} rank={index} />
+                      ))}
+                    </div>
+                    {hasMoreUsers && (
+                      <div className="mt-6 text-center">
+                        <button
+                          onClick={() => setDisplayedUserCount(prev => prev + 20)}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                          Afficher plus d'utilisateurs
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="mt-5 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+                    Aucune progression à afficher pour ce filtre.
+                  </div>
+                )}
+              </div>
             )}
           </div>
+        )}
+
+        {/* ── Controls row ── */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-3 lg:flex-wrap">
+          {userStats.length > 0 && (
+            <PanelToggleButton
+              icon={FaChartBar}
+              label="Voir les progrès"
+              openLabel="Masquer les progrès"
+              open={showStats}
+              onClick={() => setShowStats(s => !s)}
+              tone="accent"
+            />
+          )}
+
+          <PanelToggleButton
+            icon={FaFilter}
+            label="Filtres & Recherche"
+            openLabel="Masquer les filtres"
+            open={showFilters}
+            onClick={() => setShowFilters(f => !f)}
+            count={activeFilterCount}
+          />
 
           {/* Spacer */}
           <div className="flex-1 hidden lg:block" />
-
-          {/* Filters & Search (integrated toggle) */}
-          <FilterPanelToggle />
         </div>
 
-        {/* ── Filters (dynamic, auto-apply) ── */}
+        {/* ── Filters (dynamic, auto-apply, masqué par défaut) ── */}
         <FilterPanel
+          open={showFilters}
           filters={filters}
           projectOptions={projectOptions}
           memberOptions={memberOptions}
@@ -733,56 +775,6 @@ const Index = ({
                 dangerouslySetInnerHTML={{ __html: link.label }}
               />
             ))}
-          </div>
-        )}
-
-        {/* ── User statistics section (3 cartes par ligne, paginé à 20) ── */}
-        {userStats.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-            {/* Section header */}
-            <button
-              onClick={() => setShowStats(s => !s)}
-              className="w-full flex items-center justify-between px-6 py-5 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <FaChartBar className="text-white" />
-                </div>
-                <div className="text-left">
-                  <p className="font-bold text-gray-900 dark:text-white">Progression des membres</p>
-                  <p className="text-xs text-gray-400">{filteredUserStats.length} membre{filteredUserStats.length !== 1 ? 's' : ''} actif{filteredUserStats.length !== 1 ? 's' : ''}</p>
-                </div>
-              </div>
-              {showStats ? <FaChevronUp className="text-gray-400" /> : <FaChevronDown className="text-gray-400" />}
-            </button>
-
-            {showStats && (
-              <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-700">
-                {paginatedUserStats.length > 0 ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
-                      {paginatedUserStats.map((stat, index) => (
-                        <UserStatCard key={stat.user?.id ?? index} stat={stat} rank={index} />
-                      ))}
-                    </div>
-                    {hasMoreUsers && (
-                      <div className="mt-6 text-center">
-                        <button
-                          onClick={() => setDisplayedUserCount(prev => prev + 20)}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        >
-                          Afficher plus d'utilisateurs
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="mt-5 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
-                    Aucune progression à afficher pour ce filtre.
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
 
