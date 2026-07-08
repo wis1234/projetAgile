@@ -15,6 +15,7 @@ use App\Notifications\TaskAssignedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class TaskController extends Controller
 {
@@ -100,6 +101,76 @@ class TaskController extends Controller
                 ->count(),
         ];
 
+        $progressTasks = (clone $query)
+            ->select(['id', 'project_id', 'assigned_to', 'status', 'due_date', 'updated_at'])
+            ->with([
+                'assignedUser' => function ($q) {
+                    $q->select('id', 'name', 'profile_photo_path');
+                },
+                'project' => function ($q) {
+                    $q->select('id', 'name');
+                },
+            ])
+            ->get()
+            ->filter(fn ($task) => $task->assigned_to && $task->assignedUser);
+
+        $userStats = $progressTasks
+            ->groupBy(fn ($task) => $task->assigned_to . ':' . ($task->project_id ?? 0))
+            ->map(function ($tasks) use ($user) {
+                $firstTask = $tasks->first();
+                $total = $tasks->count();
+                $todo = $tasks->where('status', 'todo')->count();
+                $inProgress = $tasks->where('status', 'in_progress')->count();
+                $done = $tasks->where('status', 'done')->count();
+
+                $completedOnTime = 0;
+                $completedLate = 0;
+
+                foreach ($tasks as $task) {
+                    if ($task->status !== 'done') {
+                        continue;
+                    }
+
+                    $isOnTime = true;
+                    if ($task->due_date) {
+                        $dueDate = Carbon::parse($task->due_date);
+                        $updatedAt = $task->updated_at ? Carbon::parse($task->updated_at) : null;
+                        $isOnTime = $updatedAt ? $updatedAt->lte($dueDate) : true;
+                    }
+
+                    if ($isOnTime) {
+                        $completedOnTime++;
+                    } else {
+                        $completedLate++;
+                    }
+                }
+
+                $completionRate = $total > 0 ? round(($done / $total) * 100, 1) : 0;
+                $onTimeRate = $done > 0 ? round(($completedOnTime / $done) * 100, 1) : 0;
+                $lateRate = $done > 0 ? round(($completedLate / $done) * 100, 1) : 0;
+
+                return [
+                    'user' => [
+                        'id' => $firstTask->assignedUser->id,
+                        'name' => $firstTask->assignedUser->name,
+                        'profile_photo_url' => $firstTask->assignedUser->profile_photo_url ?? null,
+                    ],
+                    'project_id' => $firstTask->project_id,
+                    'project_name' => $firstTask->project?->name,
+                    'total' => $total,
+                    'todo' => $todo,
+                    'in_progress' => $inProgress,
+                    'done' => $done,
+                    'completion_rate' => $completionRate,
+                    'on_time_rate' => $onTimeRate,
+                    'late_rate' => $lateRate,
+                    'is_current_user' => $firstTask->assignedUser->id === $user->id,
+                ];
+            })
+            ->sortByDesc('completion_rate')
+            ->values()
+            ->all();
+
         $tasks = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString()
             ->through(function($task){
                 $is_muted = false;
@@ -125,6 +196,7 @@ class TaskController extends Controller
             'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to']),
             'summary' => $summary,
             'myTasksSummary' => $myTasksSummary,
+            'userStats' => $userStats,
             'projectOptions' => $projectOptions,
             'memberOptions' => $memberOptions,
         ]);

@@ -246,7 +246,14 @@ const UserStatCard = ({ stat, rank }) => {
           )}
           <Avatar name={stat.user?.name || ''} url={stat.user?.profile_photo_url || ''} size="lg" />
           <div>
-            <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight">{stat.user?.name || 'Inconnu'}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight">{stat.user?.name || 'Inconnu'}</p>
+              {stat.is_current_user && (
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                  Moi
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-400">{stat.total} tâche{stat.total !== 1 ? 's' : ''}</p>
           </div>
         </div>
@@ -278,15 +285,25 @@ const UserStatCard = ({ stat, rank }) => {
         ))}
       </div>
 
-      {/* On-time rate */}
+      {/* Completion rates */}
       {stat.done > 0 && (
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
-          <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-            <FaClock className="text-blue-400" /> À temps
-          </span>
-          <span className={`text-xs font-bold ${onTimeRate >= 75 ? 'text-emerald-600' : onTimeRate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
-            {onTimeRate}%
-          </span>
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+              <FaClock className="text-blue-400" /> À temps
+            </span>
+            <span className={`font-bold ${onTimeRate >= 75 ? 'text-emerald-600' : onTimeRate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+              {onTimeRate}%
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+              <FaExclamationTriangle className="text-amber-500" /> En retard
+            </span>
+            <span className={`font-bold ${stat.late_rate >= 25 ? 'text-red-500' : 'text-amber-600'}`}>
+              {stat.late_rate ?? 0}%
+            </span>
+          </div>
         </div>
       )}
     </div>
@@ -308,6 +325,7 @@ const Index = ({
   const [viewMode, setViewMode]   = useState('table');
   const [filters, setFilters]     = useState(initialFilters);
   const [showStats, setShowStats] = useState(false);
+  const [progressProjectId, setProgressProjectId] = useState('');
   const [displayedUserCount, setDisplayedUserCount] = useState(20); // pagination utilisateurs
 
   const isFirstRender = useRef(true);
@@ -354,9 +372,17 @@ const Index = ({
     }
   };
 
+  useEffect(() => {
+    setDisplayedUserCount(20);
+  }, [progressProjectId, userStats.length]);
+
   // ── Pagination locale pour les stats utilisateurs ──────────────────────────
-  const paginatedUserStats = userStats.slice(0, displayedUserCount);
-  const hasMoreUsers = displayedUserCount < userStats.length;
+  const filteredUserStats = userStats.filter((stat) => {
+    if (!progressProjectId) return true;
+    return Number(stat.project_id) === Number(progressProjectId);
+  });
+  const paginatedUserStats = filteredUserStats.slice(0, displayedUserCount);
+  const hasMoreUsers = displayedUserCount < filteredUserStats.length;
 
   return (
     <div className="w-full min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -425,6 +451,32 @@ const Index = ({
                 sub={myTasksSummary.overdue > 0 ? `${myTasksSummary.overdue} en retard` : null} />
             </div>
           </>
+        )}
+
+        {userStats.length > 0 && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              onClick={() => setShowStats((value) => !value)}
+              className="inline-flex items-center gap-2 self-start rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300"
+            >
+              <FaChartBar />
+              {showStats ? 'Masquer les progrès' : 'Voir les progrès'}
+            </button>
+            <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              <label htmlFor="progress-project" className="font-medium">Projet</label>
+              <select
+                id="progress-project"
+                value={progressProjectId}
+                onChange={(event) => setProgressProjectId(event.target.value)}
+                className="rounded-lg border border-gray-200 bg-transparent px-2 py-1 text-sm outline-none focus:border-blue-500 dark:border-gray-600"
+              >
+                <option value="">Tous les projets</option>
+                {projectOptions.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         )}
 
         {/* ── Filters (dynamic, auto-apply) ── */}
@@ -507,7 +559,7 @@ const Index = ({
                     return (
                       <tr
                         key={task.id}
-                        className="hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors cursor-pointer group"
+                        className="border-b border-gray-100 dark:border-gray-700/70 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
                         onClick={() => router.visit(`/tasks/${task.id}`)}
                       >
                         <td className="px-5 py-4">
@@ -651,8 +703,8 @@ const Index = ({
                   <FaChartBar className="text-white" />
                 </div>
                 <div className="text-left">
-                  <p className="font-bold text-gray-900 dark:text-white">Statistiques par membre</p>
-                  <p className="text-xs text-gray-400">{userStats.length} membre{userStats.length !== 1 ? 's' : ''} actif{userStats.length !== 1 ? 's' : ''}</p>
+                  <p className="font-bold text-gray-900 dark:text-white">Progression des membres</p>
+                  <p className="text-xs text-gray-400">{filteredUserStats.length} membre{filteredUserStats.length !== 1 ? 's' : ''} actif{filteredUserStats.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
               {showStats ? <FaChevronUp className="text-gray-400" /> : <FaChevronDown className="text-gray-400" />}
@@ -660,19 +712,27 @@ const Index = ({
 
             {showStats && (
               <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-700">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
-                  {paginatedUserStats.map((stat, index) => (
-                    <UserStatCard key={stat.user?.id ?? index} stat={stat} rank={index} />
-                  ))}
-                </div>
-                {hasMoreUsers && (
-                  <div className="mt-6 text-center">
-                    <button
-                      onClick={() => setDisplayedUserCount(prev => prev + 20)}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                    >
-                      Afficher plus d'utilisateurs
-                    </button>
+                {paginatedUserStats.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
+                      {paginatedUserStats.map((stat, index) => (
+                        <UserStatCard key={stat.user?.id ?? index} stat={stat} rank={index} />
+                      ))}
+                    </div>
+                    {hasMoreUsers && (
+                      <div className="mt-6 text-center">
+                        <button
+                          onClick={() => setDisplayedUserCount(prev => prev + 20)}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                          Afficher plus d'utilisateurs
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="mt-5 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+                    Aucune progression à afficher pour ce filtre.
                   </div>
                 )}
               </div>
