@@ -463,14 +463,11 @@ const Index = ({
           </>
         )}
 
-        {/* ── Progression des membres — juste sous les stats, repliée par défaut ── */}
-        {userStats.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-            <button
-              onClick={() => setShowStats(s => !s)}
-              aria-expanded={showStats}
-              className="w-full flex items-center justify-between px-6 py-5 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
-            >
+        {/* ── Progression des membres — entièrement masquée par défaut, ── */}
+        {/* ── ne s'affiche que lorsqu'on clique sur "Voir les progrès" ── */}
+        {showStats && userStats.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+            <div className="w-full flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-700">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
                   <FaChartBar className="text-white" />
@@ -480,11 +477,16 @@ const Index = ({
                   <p className="text-xs text-gray-400">{filteredUserStats.length} membre{filteredUserStats.length !== 1 ? 's' : ''} actif{filteredUserStats.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
-              {showStats ? <FaChevronUp className="text-gray-400" /> : <FaChevronDown className="text-gray-400" />}
-            </button>
+              <button
+                onClick={() => setShowStats(false)}
+                title="Masquer"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+              >
+                <FaTimes />
+              </button>
+            </div>
 
-            {showStats && (
-              <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-700">
+            <div className="px-6 pb-6">
                 {/* Filtre projet propre à la progression */}
                 <div className="flex items-end gap-2 mt-4 max-w-xs">
                   <div className="flex flex-col gap-1 flex-1">
@@ -535,8 +537,7 @@ const Index = ({
                     Aucune progression à afficher pour ce filtre.
                   </div>
                 )}
-              </div>
-            )}
+            </div>
           </div>
         )}
 
