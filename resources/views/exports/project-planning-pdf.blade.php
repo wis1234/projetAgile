@@ -335,8 +335,8 @@
 <body>
     <div id="top"></div>
     <div class="header">
-        <div class="eyebrow">Rapport de projet</div>
-        <div class="title">Planification de projet <span class="title-project">{{ $project->name }}</span></div>
+        <div class="eyebrow">Planing overview</div>
+        <div class="title">Planification du projet <span class="title-project">{{ $project->name }}</span></div>
     </div>
 
     <div class="meta-block">
