@@ -115,18 +115,18 @@ class TaskController extends Controller
             ->filter(fn ($task) => $task->assigned_to && $task->assignedUser);
 
         $userStats = $progressTasks
-            ->groupBy(fn ($task) => $task->assigned_to . ':' . ($task->project_id ?? 0))
-            ->map(function ($tasks) use ($user) {
-                $firstTask = $tasks->first();
-                $total = $tasks->count();
-                $todo = $tasks->where('status', 'todo')->count();
-                $inProgress = $tasks->where('status', 'in_progress')->count();
-                $done = $tasks->where('status', 'done')->count();
+            ->groupBy(fn ($task) => $task->assigned_to)
+            ->map(function ($userTasks) use ($user) {
+                $firstTask = $userTasks->first();
+                $total = $userTasks->count();
+                $todo = $userTasks->where('status', 'todo')->count();
+                $inProgress = $userTasks->where('status', 'in_progress')->count();
+                $done = $userTasks->where('status', 'done')->count();
 
                 $completedOnTime = 0;
                 $completedLate = 0;
 
-                foreach ($tasks as $task) {
+                foreach ($userTasks as $task) {
                     if ($task->status !== 'done') {
                         continue;
                     }
@@ -149,14 +149,15 @@ class TaskController extends Controller
                 $onTimeRate = $done > 0 ? round(($completedOnTime / $done) * 100, 1) : 0;
                 $lateRate = $done > 0 ? round(($completedLate / $done) * 100, 1) : 0;
 
+                $projectsInvolved = $userTasks->pluck('project_id')->unique()->values()->all();
+
                 return [
                     'user' => [
                         'id' => $firstTask->assignedUser->id,
                         'name' => $firstTask->assignedUser->name,
                         'profile_photo_url' => $firstTask->assignedUser->profile_photo_url ?? null,
                     ],
-                    'project_id' => $firstTask->project_id,
-                    'project_name' => $firstTask->project?->name,
+                    'project_ids' => $projectsInvolved,
                     'total' => $total,
                     'todo' => $todo,
                     'in_progress' => $inProgress,

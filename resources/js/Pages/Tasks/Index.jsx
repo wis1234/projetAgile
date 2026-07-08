@@ -73,10 +73,27 @@ const SummaryCard = ({ label, value, icon: Icon, color, sub }) => (
   </div>
 );
 
+// ── Filter panel toggle button ────────────────────────────────────────────────
+
+const FilterPanelToggle = () => {
+  const [open, setOpen] = useState(true);
+  
+  return (
+    <button
+      onClick={() => setOpen(o => !o)}
+      className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 whitespace-nowrap"
+    >
+      <FaFilter />
+      {open ? 'Masquer' : 'Filtres & Recherche'}
+    </button>
+  );
+};
+
 // ── Filter panel (dynamic, no apply button) ──────────────────────────────────
 
-const FilterPanel = ({ filters, projectOptions, memberOptions, onChange, onReset }) => {
-  const [open, setOpen] = useState(true);
+const FilterPanel = ({ filters, projectOptions, memberOptions, onChange, onReset, open: externalOpen, onToggle }) => {
+  const [internalOpen, setInternalOpen] = useState(true);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
 
   const activeCount = Object.values(filters).filter(v => v !== '' && v !== undefined && v !== null).length;
 
@@ -95,6 +112,14 @@ const FilterPanel = ({ filters, projectOptions, memberOptions, onChange, onReset
       </select>
     </div>
   );
+
+  const handleToggle = () => {
+    if (externalOpen !== undefined) {
+      onToggle?.();
+    } else {
+      setInternalOpen(o => !o);
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
@@ -379,7 +404,7 @@ const Index = ({
   // ── Pagination locale pour les stats utilisateurs ──────────────────────────
   const filteredUserStats = userStats.filter((stat) => {
     if (!progressProjectId) return true;
-    return Number(stat.project_id) === Number(progressProjectId);
+    return stat.project_ids && stat.project_ids.includes(Number(progressProjectId));
   });
   const paginatedUserStats = filteredUserStats.slice(0, displayedUserCount);
   const hasMoreUsers = displayedUserCount < filteredUserStats.length;
@@ -453,22 +478,28 @@ const Index = ({
           </>
         )}
 
-        {userStats.length > 0 && (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* ── Controls row (responsive) ── */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-3 lg:flex-wrap">
+          {/* Voir les progrès button */}
+          {userStats.length > 0 && (
             <button
               onClick={() => setShowStats((value) => !value)}
-              className="inline-flex items-center gap-2 self-start rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300"
+              className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300 whitespace-nowrap"
             >
               <FaChartBar />
-              {showStats ? 'Masquer les progrès' : 'Voir les progrès'}
+              {showStats ? 'Masquer' : 'Voir les progrès'}
             </button>
-            <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              <label htmlFor="progress-project" className="font-medium">Projet</label>
+          )}
+
+          {/* Project filter */}
+          <div className="flex items-end gap-2 flex-1 min-w-[200px] lg:flex-initial lg:min-w-0">
+            <div className="flex flex-col gap-1 flex-1 lg:flex-initial">
+              <label htmlFor="progress-project" className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Projet</label>
               <select
                 id="progress-project"
                 value={progressProjectId}
                 onChange={(event) => setProgressProjectId(event.target.value)}
-                className="rounded-lg border border-gray-200 bg-transparent px-2 py-1 text-sm outline-none focus:border-blue-500 dark:border-gray-600"
+                className="rounded-xl border border-gray-200 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
               >
                 <option value="">Tous les projets</option>
                 {projectOptions.map((project) => (
@@ -476,8 +507,23 @@ const Index = ({
                 ))}
               </select>
             </div>
+            {progressProjectId && (
+              <button
+                onClick={() => setProgressProjectId('')}
+                className="inline-flex items-center gap-1 px-3 py-2 text-xs font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+                title="Réinitialiser le filtre"
+              >
+                <FaTimes /> Réinit.
+              </button>
+            )}
           </div>
-        )}
+
+          {/* Spacer */}
+          <div className="flex-1 hidden lg:block" />
+
+          {/* Filters & Search (integrated toggle) */}
+          <FilterPanelToggle />
+        </div>
 
         {/* ── Filters (dynamic, auto-apply) ── */}
         <FilterPanel
