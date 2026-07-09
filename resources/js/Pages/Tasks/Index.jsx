@@ -8,7 +8,7 @@ import {
   FaSort, FaSortUp, FaSortDown, FaChevronDown,
   FaChevronUp, FaTimes, FaCheck, FaClock,
   FaExclamationTriangle, FaUserCircle, FaTrophy,
-  FaFire, FaChartBar
+  FaFire, FaChartBar, FaLock
 } from 'react-icons/fa';
 import { HiOutlineViewGrid, HiOutlineViewList } from 'react-icons/hi';
 
@@ -439,6 +439,24 @@ const Index = ({
           </div>
         </div>
 
+        {/* ── Info Alert for Locked Tasks ── */}
+        <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-r-2xl shadow-sm">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <FaLock className="h-5 w-5 text-amber-500" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200">Attention</h3>
+              <div className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                <p>
+                  Si le <span className="font-bold underline">sprint d'une tâche est terminé</span>, celle-ci sera <span className="font-bold">bloquée</span> (lecture seule).
+                  Pour la modifier, le sprint doit être prolongé par un gestionnaire.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ── Summary cards (global) ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <SummaryCard label="Total"    value={summary.total}       icon={FaTasks}              color="bg-blue-500" />
@@ -623,13 +641,16 @@ const Index = ({
                     return (
                       <tr
                         key={task.id}
-                        className="border-b border-gray-100 dark:border-gray-700/70 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
+                        className={`border-b border-gray-100 dark:border-gray-700/70 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md ${task.is_locked ? 'opacity-75' : ''}`}
                         onClick={() => router.visit(`/tasks/${task.id}`)}
                       >
                         <td className="px-5 py-4">
-                          <span className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {task.title}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {task.is_locked && <FaLock className="text-amber-500 text-xs flex-shrink-0" title="Verrouillé (Sprint terminé)" />}
+                            <span className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              {task.title}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-5 py-4">
                           {task.project ? (
@@ -685,7 +706,7 @@ const Index = ({
               return (
                 <div
                   key={task.id}
-                  className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group"
+                  className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group ${task.is_locked ? 'ring-1 ring-amber-200' : ''}`}
                   onClick={() => router.visit(`/tasks/${task.id}`)}
                 >
                   {/* Priority stripe */}
@@ -693,6 +714,7 @@ const Index = ({
 
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <h3 className="font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 text-sm leading-snug">
+                      {task.is_locked && <FaLock className="inline-block mr-1.5 text-amber-500 text-xs mb-0.5" />}
                       {task.title}
                     </h3>
                     <StatusBadge status={task.status} />

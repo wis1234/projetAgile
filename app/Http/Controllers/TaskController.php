@@ -34,7 +34,7 @@ class TaskController extends Controller
         })->pluck('id');
 
         $query = Task::with([
-            'assignedUser', 
+            'assignedUser',
             'project' => function($p) use ($user) {
                 $p->with(['users' => function($q) use ($user) {
                     $q->where('user_id', $user->id);
@@ -178,8 +178,13 @@ class TaskController extends Controller
                 if ($task->project && $task->project->users->isNotEmpty()) {
                     $is_muted = $task->project->users->first()->pivot->is_muted;
                 }
-                
+
                 $task->project_is_muted = $is_muted;
+
+                $task->is_locked = false;
+                if ($task->sprint && $task->sprint->end_date) {
+                    $task->is_locked = Carbon::parse($task->sprint->end_date)->isPast();
+                }
 
                 return $task;
             });
@@ -228,7 +233,7 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
-        
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -248,8 +253,8 @@ class TaskController extends Controller
         ]);
 
         $validated['created_by'] = auth()->id();
-        $validated['payment_status'] = $validated['is_paid'] ? 
-            \App\Models\Task::PAYMENT_STATUS_UNPAID : 
+        $validated['payment_status'] = $validated['is_paid'] ?
+            \App\Models\Task::PAYMENT_STATUS_UNPAID :
             \App\Models\Task::PAYMENT_STATUS_UNPAID;
 
         // Si c'est une tâche bénévole, marquer comme payée
@@ -260,25 +265,25 @@ class TaskController extends Controller
         }
 
         $task = Task::create($validated);
-        
+
         // Créer un fichier de suivi pour la tâche
         $project = Project::find($validated['project_id']);
-        
+
         if ($project) {
             // Créer le dossier du projet s'il n'existe pas
             $projectPath = 'projects/' . Str::slug($project->name) . '/tasks';
             Storage::disk('public')->makeDirectory($projectPath, 0755, true);
-            
+
             // Créer le fichier de suivi
             $fileName = 'Suivi de la tâche ' . Str::slug($task->title) ;
             $filePath = $projectPath . '/' . $fileName;
-            
+
             $content = "Ce fichier est destiné au suivi de la tâche " . $task->title . "\n\n";
             $content .= "Vous pouvez utiliser ce fichier pour noter les mises à jour, les commentaires ou toute information utile concernant cette tâche.\n";
             $content .= "Tous les membres de l'équipe peuvent collaborer sur ce document.\n";
-            
+
             Storage::disk('public')->put($filePath, $content);
-            
+
             // Enregistrer le fichier dans la base de données
             \App\Models\File::create([
                 'name' => $fileName,
@@ -292,7 +297,7 @@ class TaskController extends Controller
                 'status' => 'active',
                 'uploaded_by' => auth()->id()
             ]);
-            
+
             // Si la tâche est assignée à quelqu'un, envoyer uniquement la notification personnalisée
             if ($task->assigned_to) {
                 $assignedUser = \App\Models\User::find($task->assigned_to);
@@ -317,19 +322,19 @@ class TaskController extends Controller
     {
         // Vérifier que l'utilisateur a accès à la tâche
         $this->authorize('view', $task);
-        
+
         // Trouver le fichier dans les pièces jointes de la tâche
         $file = $task->files()->findOrFail($file);
-        
+
         // Vérifier que le fichier existe dans le stockage
         if (!Storage::disk('public')->exists($file->file_path)) {
             abort(404, 'Le fichier demandé n\'existe plus.');
         }
-        
+
         // Télécharger le fichier
         return Storage::disk('public')->download($file->file_path, $file->name);
     }
-    
+
     /**
      * Affiche les détails d'une tâche
      *
@@ -345,7 +350,7 @@ class TaskController extends Controller
     public function getTaskDetails(Task $task)
     {
         $this->authorize('view', $task);
-        
+
         return response()->json([
             'success' => true,
             'task' => [
@@ -360,7 +365,7 @@ class TaskController extends Controller
             ]
         ]);
     }
-    
+
     public function show(Task $task)
     {
         try {
@@ -368,7 +373,7 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
-        
+
         // Charger les relations nécessaires avec les rôles
         $task->load([
             'project.users' => function($query) {
@@ -380,9 +385,13 @@ class TaskController extends Controller
             'files',
             'comments.user'
         ]);
-        
+
+        $task->is_locked = $task->sprint && $task->sprint->end_date
+            ? Carbon::parse($task->sprint->end_date)->isPast()
+            : false;
+
         $user = auth()->user();
-        $payments = collect(); 
+        $payments = collect();
 
         if ($user->hasRole('admin') || $task->project->users()->where('user_id', $user->id)->wherePivot('role', 'manager')->exists()) {
             // Admin or project manager: retrieve all payments for the task
@@ -397,7 +406,7 @@ class TaskController extends Controller
 
         // Ajouter le rôle de l'utilisateur actuel pour faciliter la vérification côté frontend
         $currentUserRole = $task->project->users->find($user->id)?->pivot->role;
-        
+
         return Inertia::render('Tasks/Show', [
             'task' => $task,
             'payments' => $payments,
@@ -416,7 +425,7 @@ class TaskController extends Controller
         if (!$isProjectMember) {
             return response()->json(['message' => 'Unauthorized to save payment information for this task' . $task->id], 403);
         }
-        
+
         $validated = $request->validate([
             'payment_method' => 'required|in:mtn,moov,celtis',
             'phone_number' => 'required|string|max:20',
@@ -472,6 +481,11 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
+
+        $task->is_locked = $task->sprint && $task->sprint->end_date
+            ? Carbon::parse($task->sprint->end_date)->isPast()
+            : false;
+
         $currentUser = auth()->user();
         $projects = $currentUser->hasRole('admin')
             ? Project::with(['users:id,name'])->get(['id', 'name'])
@@ -532,7 +546,7 @@ class TaskController extends Controller
                 $assignedUser->notify(new TaskAssignedNotification($task));
             }
         }
-        
+
         // Si le statut a changé ou si la tâche a été réassignée, envoyer une notification aux membres du projet
         if ($oldStatus !== $task->status || $oldAssignee != $task->assigned_to) {
             $project = $task->project;
@@ -622,7 +636,7 @@ class TaskController extends Controller
             },
             'project.users.roles'
         ]);
-        
+
         // Vérifier s'il y a des paiements
         if ($task->payments->isEmpty()) {
             abort(404, 'Aucun paiement trouvé pour cette tâche');
@@ -638,7 +652,7 @@ class TaskController extends Controller
 
         // Récupérer l'utilisateur du paiement
         $user = $payment->user;
-        
+
         // Récupérer le premier gestionnaire du projet
         $projectManager = $task->project->users->first();
 
