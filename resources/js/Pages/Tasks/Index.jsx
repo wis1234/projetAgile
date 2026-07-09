@@ -323,6 +323,7 @@ const Index = ({
   myTasksSummary = null,
   projectOptions = [],
   memberOptions = [],
+  globalLockedSprint = null,
 }) => {
   const { flash = {} } = usePage().props;
   const [viewMode, setViewMode]   = useState('table');
@@ -339,10 +340,6 @@ const Index = ({
 
   const tasks = Array.isArray(initialTasks) ? initialTasks : (initialTasks.data || []);
   const pagination = !Array.isArray(initialTasks) ? initialTasks : null;
-
-  // Check if any task is locked
-  const lockedTask = tasks.find(t => t.is_locked);
-  const showLockedAlert = lockedTask && !isAlertDismissed;
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -426,32 +423,24 @@ const Index = ({
         </div>
 
         {/* ── Info Alert for Locked Tasks (Dismissible & Conditional) ── */}
-        {showLockedAlert && (
+        {globalLockedSprint && !isAlertDismissed && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-r-2xl shadow-sm relative animate-[fadeIn_0.3s_ease-out]">
             <div className="flex items-start">
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 mt-0.5">
                 <FaLock className="h-5 w-5 text-amber-500" />
               </div>
               <div className="ml-3 pr-8">
                 <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200">Attention</h3>
                 <div className="mt-1 text-sm text-amber-700 dark:text-amber-300">
                   <p>
-                    Si le <span className="font-bold underline">sprint d'une tâche est terminé</span>, celle-ci sera <span className="font-bold">bloquée</span> (lecture seule).
-                    Pour la modifier, le sprint doit être prolongé par un gestionnaire.
-                    {lockedTask.sprint && (
-                      <Link
-                        href={`/sprints/${lockedTask.sprint.id}`}
-                        className="ml-2 font-bold underline text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 transition-colors"
-                      >
-                        Voir le sprint concerné →
-                      </Link>
-                    )}
+                    Le délai alloué au sprint/objectif (<Link href={`/sprints/${globalLockedSprint.id}`} className="font-bold underline text-amber-600 hover:text-amber-800">{globalLockedSprint.name}</Link>) est dépassé, toutes les tâches non terminées y afférent sont <span className="font-bold">bloquées</span> jusqu'à ce qu'un chef de projet le prolonge.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAlertDismissed(true)}
                 className="absolute top-4 right-4 text-amber-500 hover:text-amber-700 transition-colors"
+                title="Fermer"
               >
                 <FaTimes />
               </button>

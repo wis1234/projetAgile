@@ -47,6 +47,14 @@ class TaskController extends Controller
             });
         });
 
+        // Verification globale pour l'alerte (tous les sprints terminés avec des tâches inachevées)
+        $lockedSprint = Sprint::whereIn('project_id', $visibleProjectIds)
+            ->where('end_date', '<', now())
+            ->whereHas('tasks', function($q) {
+                $q->where('status', '!=', 'done');
+            })
+            ->first();
+
         if ($request->filled('search')) {
             $query->where('title', 'like', '%' . $request->search . '%');
         }
@@ -182,7 +190,7 @@ class TaskController extends Controller
                 $task->project_is_muted = $is_muted;
 
                 $task->is_locked = false;
-                if ($task->sprint && $task->sprint->end_date) {
+                if ($task->sprint && $task->sprint->end_date && $task->status !== 'done') {
                     $task->is_locked = Carbon::parse($task->sprint->end_date)->isPast();
                 }
 
@@ -205,6 +213,7 @@ class TaskController extends Controller
             'userStats' => $userStats,
             'projectOptions' => $projectOptions,
             'memberOptions' => $memberOptions,
+            'globalLockedSprint' => $lockedSprint,
         ]);
     }
 
@@ -386,7 +395,7 @@ class TaskController extends Controller
             'comments.user'
         ]);
 
-        $task->is_locked = $task->sprint && $task->sprint->end_date
+        $task->is_locked = $task->sprint && $task->sprint->end_date && $task->status !== 'done'
             ? Carbon::parse($task->sprint->end_date)->isPast()
             : false;
 
@@ -482,7 +491,7 @@ class TaskController extends Controller
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
 
-        $task->is_locked = $task->sprint && $task->sprint->end_date
+        $task->is_locked = $task->sprint && $task->sprint->end_date && $task->status !== 'done'
             ? Carbon::parse($task->sprint->end_date)->isPast()
             : false;
 
@@ -596,13 +605,28 @@ class TaskController extends Controller
                 $q2->where('user_id', auth()->id());
             });
         })->get()->map(function($task) {
-            $task->is_locked = $task->sprint && $task->sprint->end_date
+            $task->is_locked = $task->sprint && $task->sprint->end_date && $task->status !== 'done'
                 ? Carbon::parse($task->sprint->end_date)->isPast()
                 : false;
             return $task;
         })->groupBy('status');
 
-        return Inertia::render('Tasks/Kanban', ['tasks' => $tasks]);
+        $user = auth()->user();
+        $visibleProjectIds = Project::whereHas('users', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->pluck('id');
+
+        $lockedSprint = Sprint::whereIn('project_id', $visibleProjectIds)
+            ->where('end_date', '<', now())
+            ->whereHas('tasks', function($q) {
+                $q->where('status', '!=', 'done');
+            })
+            ->first();
+
+        return Inertia::render('Tasks/Kanban', [
+            'tasks' => $tasks,
+            'globalLockedSprint' => $lockedSprint,
+        ]);
     }
 
     public function comment(Request $request, Task $task)

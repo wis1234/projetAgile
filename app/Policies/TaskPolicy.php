@@ -10,16 +10,22 @@ class TaskPolicy
 {
     /**
      * Check if the task is locked due to a finished sprint.
+     * Only unfinished tasks belonging to an expired sprint are locked.
      */
     private function isLocked(Task $task): bool
     {
+        // "toutes les tâches inachevees seront bloquées"
+        if ($task->status === 'done') {
+            return false;
+        }
+
         if (!$task->sprint_id) {
             return false;
         }
 
         $task->loadMissing('sprint');
 
-        if (!$task->sprint) {
+        if (!$task->sprint || !$task->sprint->end_date) {
             return false;
         }
 
@@ -56,9 +62,9 @@ class TaskPolicy
         $isLocked = $this->isLocked($task);
         $isManager = $this->isProjectManager($user, $task);
 
-        // Si la tâche est verrouillée (sprint terminé), seuls les managers peuvent y accéder
-        if ($isLocked) {
-            return $isManager;
+        // Si la tâche est verrouillée (sprint terminé et inachevée), seuls les managers peuvent y accéder (Show page)
+        if ($isLocked && !$isManager) {
+            return false;
         }
 
         if (!$task->project) {
@@ -80,10 +86,10 @@ class TaskPolicy
         $isLocked = $this->isLocked($task);
         $isManager = $this->isProjectManager($user, $task);
 
-        // Si verrouillée, seul l'admin peut modifier (ou manager si on veut, mais la demande dit bloqué jusqu'à ce que le sprint soit prolongé)
-        // La demande dit : "bloque les page show edit ... sauf les manager". Donc les managers gardent l'accès.
-        if ($isLocked) {
-            return $isManager;
+        // Seuls les managers peuvent modifier, même si c'est verrouillé (pour permettre de débloquer ou ajuster)
+        // Mais si c'est verrouillé et que l'utilisateur n'est pas manager, on bloque.
+        if ($isLocked && !$isManager) {
+            return false;
         }
 
         return $isManager;
@@ -100,8 +106,8 @@ class TaskPolicy
             return true;
         }
 
-        if ($this->isLocked($task)) {
-            return $this->isProjectManager($user, $task);
+        if ($this->isLocked($task) && !$this->isProjectManager($user, $task)) {
+            return false;
         }
 
         if (!$task->project) {
