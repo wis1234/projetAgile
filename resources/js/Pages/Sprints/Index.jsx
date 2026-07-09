@@ -2,18 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { router, Link, usePage } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { FaFlagCheckered, FaPlus, FaSearch, FaTable, FaTh, FaProjectDiagram, FaCalendarAlt, FaList } from 'react-icons/fa';
+import { FaFlagCheckered, FaPlus, FaSearch, FaTable, FaTh, FaProjectDiagram, FaCalendarAlt, FaList, FaFilter } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
-const Index = ({ sprints, filters: initialFilters = {} }) => {
+const Index = ({ sprints, filters: initialFilters = {}, projects = [] }) => {
   const { t } = useTranslation();
   const { flash = {} } = usePage().props;
-  
-  // Debug: Afficher la structure des données reçues
-  useEffect(() => {
-    console.log('Sprints data:', sprints);
-  }, [sprints]);
-  const [search, setSearch] = useState(initialFilters.search || '');
+
+  const [filters, setFilters] = useState({
+    search: initialFilters.search || '',
+    project_id: initialFilters.project_id || '',
+    status: initialFilters.status || '',
+  });
+
   const [viewMode, setViewMode] = useState('table'); // 'table' par défaut
   const [notification, setNotification] = useState(null);
 
@@ -25,12 +26,23 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
     }
   }, [flash.success]);
 
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    router.get(route('sprints.index'), { search }, { 
-      preserveState: true, 
+    router.get(route('sprints.index'), filters, {
+      preserveState: true,
       replace: true
     });
+  };
+
+  const resetFilters = () => {
+    const emptyFilters = { search: '', project_id: '', status: '' };
+    setFilters(emptyFilters);
+    router.get(route('sprints.index'), emptyFilters);
   };
 
   const formatDate = (date) => {
@@ -44,16 +56,15 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
     const isPast = endDate < now;
 
     if (isPast) {
-      return { 
-        label: 'Terminé', // Texte en dur
-        color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border border-red-200 dark:border-red-700' 
+      return {
+        label: t('completed') || 'Terminé',
+        color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border border-red-200 dark:border-red-700'
       };
     }
-    
-    // Par défaut, le sprint est en cours
-    return { 
-      label: 'En cours', // Texte en dur
-      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700' 
+
+    return {
+      label: t('active') || 'En cours',
+      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700'
     };
   };
 
@@ -74,8 +85,8 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                 <button
                   onClick={() => setViewMode('table')}
                   className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition duration-200 ${
-                    viewMode === 'table' 
-                      ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+                    viewMode === 'table'
+                      ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
                   }`}
                 >
@@ -85,8 +96,8 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                 <button
                   onClick={() => setViewMode('cards')}
                   className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition duration-200 ${
-                    viewMode === 'cards' 
-                      ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+                    viewMode === 'cards'
+                      ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
                   }`}
                 >
@@ -94,11 +105,11 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                   <span className="hidden sm:inline">{t('cards')}</span>
                 </button>
               </div>
-              <Link 
+              <Link
                 href={route('sprints.create')}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap text-sm sm:text-base"
               >
-                <FaPlus className="text-sm sm:text-lg" /> 
+                <FaPlus className="text-sm sm:text-lg" />
                 <span className="hidden sm:inline">{t('new_sprint')}</span>
                 <span className="sm:hidden">{t('new')}</span>
               </Link>
@@ -106,32 +117,80 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-200 dark:border-gray-700 transition duration-200">
-          <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
-            <div className="lg:col-span-3">
-              <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('search_by_sprint_name')}
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="search-input"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200"
-                  placeholder={t('search_sprint_placeholder')}
-                />
-                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        {/* Search & Filters */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-200 dark:border-gray-700 shadow-sm">
+          <form onSubmit={handleSearchSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Search */}
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                  {t('search')}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="search"
+                    value={filters.search}
+                    onChange={handleFilterChange}
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200"
+                    placeholder={t('search_sprint_placeholder')}
+                  />
+                  <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                </div>
+              </div>
+
+              {/* Project Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                  {t('project')}
+                </label>
+                <select
+                  name="project_id"
+                  value={filters.project_id}
+                  onChange={handleFilterChange}
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200"
+                >
+                  <option value="">{t('all_projects')}</option>
+                  {projects.map(project => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                  Status
+                </label>
+                <select
+                  name="status"
+                  value={filters.status}
+                  onChange={handleFilterChange}
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200"
+                >
+                  <option value="">{t('all_status') || 'Tous les statuts'}</option>
+                  <option value="active">{t('active') || 'En cours'}</option>
+                  <option value="completed">{t('completed') || 'Terminé'}</option>
+                </select>
               </div>
             </div>
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md"
-            >
-              <FaSearch />
-              <span className="hidden sm:inline">{t('search')}</span>
-            </button>
+
+            <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+              >
+                {t('reset') || 'Réinitialiser'}
+              </button>
+              <button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2 transition duration-200 shadow-sm hover:shadow-md"
+              >
+                <FaFilter className="text-sm" />
+                {t('apply_filters') || 'Appliquer les filtres'}
+              </button>
+            </div>
           </form>
         </div>
 
@@ -156,8 +215,8 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                       </td>
                     </tr>
                   ) : sprints.data?.map(sprint => (
-                    <tr 
-                      key={sprint.id} 
+                    <tr
+                      key={sprint.id}
                       className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
                       onClick={() => router.get(route('sprints.show', sprint.id))}
                     >
@@ -198,7 +257,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
             </div>
           </div>
         ) : (
-          <motion.div 
+          <motion.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -264,22 +323,22 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
                   .replace('{total}', sprints.total || 0)}
               </div>
             )}
-            
+
             <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg p-2 shadow">
               {sprints.links.map((link, index) => {
                 let label = link.label;
                 if (label.includes('Previous')) label = t('pagination_previous');
                 if (label.includes('Next')) label = t('pagination_next');
-                
+
                 return (
                   <Link
                     key={index}
                     href={link.url || '#'}
                     className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-medium
-                      ${link.active 
-                        ? 'bg-blue-600 text-white' 
-                        : link.url 
-                          ? 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' 
+                      ${link.active
+                        ? 'bg-blue-600 text-white'
+                        : link.url
+                          ? 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                           : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                       }`}
                     disabled={!link.url}
@@ -294,7 +353,7 @@ const Index = ({ sprints, filters: initialFilters = {} }) => {
 
         {/* Notification */}
         {notification && (
-          <motion.div 
+          <motion.div
             className={`fixed top-4 right-4 z-50 px-4 sm:px-6 py-3 sm:py-4 rounded-lg shadow-xl text-white transition-all text-sm sm:text-base max-w-sm ${
               notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
             }`}

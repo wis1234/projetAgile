@@ -22,11 +22,11 @@ class SprintController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
-        
+
         // Récupération des sprints avec pagination
         $perPage = $request->input('per_page', 10);
         $user = auth()->user();
-        
+
         // Récupération des données paginées
         $sprints = Sprint::with(['project' => function($query) {
                 $query->select('id', 'name');
@@ -40,10 +40,20 @@ class SprintController extends Controller
             ->when($request->search, function($query, $search) {
                 $query->where('name', 'like', "%{$search}%");
             })
+            ->when($request->project_id, function($query, $projectId) {
+                $query->where('project_id', $projectId);
+            })
+            ->when($request->status, function($query, $status) {
+                if ($status === 'completed') {
+                    $query->where('end_date', '<', now());
+                } elseif ($status === 'active') {
+                    $query->where('end_date', '>=', now());
+                }
+            })
             ->orderBy('start_date', 'desc')
             ->paginate($perPage)
             ->withQueryString();
-            
+
         // Transformation des données pour le frontend
         $sprints->getCollection()->transform(function ($sprint) {
             $is_muted = false;
@@ -66,10 +76,18 @@ class SprintController extends Controller
                 'updated_at' => $sprint->updated_at,
             ];
         });
-            
+
+        // Récupération des projets pour le filtre
+        $projects = $user->hasRole('admin')
+            ? Project::all(['id', 'name'])
+            : Project::whereHas('users', function($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })->get(['id', 'name']);
+
         return Inertia::render('Sprints/Index', [
             'sprints' => $sprints,
-            'filters' => $request->only('search'),
+            'filters' => $request->only(['search', 'project_id', 'status']),
+            'projects' => $projects,
         ]);
     }
 
@@ -91,7 +109,7 @@ class SprintController extends Controller
             'projects' => $projects,
         ]);
     }
-    
+
     /**
      * Show the form for creating a new sprint for a specific project.
      */
@@ -99,17 +117,17 @@ class SprintController extends Controller
     {
         try {
             $this->authorize('create', Sprint::class);
-            
+
             // Vérifier que l'utilisateur a accès au projet
             if (!auth()->user()->hasRole('admin') && !$project->users->contains(auth()->id())) {
                 return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
             }
-            
+
             return Inertia::render('Sprints/Create', [
                 'projects' => [$project->only(['id', 'name'])],
                 'selectedProjectId' => $project->id,
             ]);
-            
+
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
@@ -143,7 +161,7 @@ class SprintController extends Controller
 public function show(Request $request, string $id)
 {
     $sprint = Sprint::with(['project', 'tasks.assignedUser'])->findOrFail($id);
-    
+
     try {
         $this->authorize('view', $sprint);
     } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
