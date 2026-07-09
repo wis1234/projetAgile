@@ -320,20 +320,19 @@ const Index = ({
   filters: initialFilters = {},
   userStats = [],
   summary = {},
-  myTasksSummary = null,          // ← nouveau : stats "Mes propres tâches"
+  myTasksSummary = null,
   projectOptions = [],
   memberOptions = [],
 }) => {
   const { flash = {} } = usePage().props;
   const [viewMode, setViewMode]   = useState('table');
   const [filters, setFilters]     = useState(initialFilters);
+  const [isAlertDismissed, setIsAlertDismissed] = useState(false);
 
-  // Les deux panneaux repliables sont masqués par défaut : au chargement de la
-  // page on ne voit que les cartes de stats et le tableau.
   const [showStats, setShowStats]     = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  const [displayedUserCount, setDisplayedUserCount] = useState(20); // pagination utilisateurs
+  const [displayedUserCount, setDisplayedUserCount] = useState(20);
 
   const isFirstRender = useRef(true);
   const debounceTimer = useRef(null);
@@ -341,15 +340,16 @@ const Index = ({
   const tasks = Array.isArray(initialTasks) ? initialTasks : (initialTasks.data || []);
   const pagination = !Array.isArray(initialTasks) ? initialTasks : null;
 
-  // ── Filtres dynamiques (auto-apply avec debounce) ──────────────────────────
+  // Check if any task is locked
+  const lockedTask = tasks.find(t => t.is_locked);
+  const showLockedAlert = lockedTask && !isAlertDismissed;
+
   useEffect(() => {
-    // Ne pas déclencher au premier chargement
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
 
-    // Debounce de 300ms
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       router.get('/tasks', filters, { preserveState: true, replace: true });
@@ -358,34 +358,20 @@ const Index = ({
     return () => clearTimeout(debounceTimer.current);
   }, [filters]);
 
-  // ── Tri ────────────────────────────────────────────────────────────────────
   const handleSort = useCallback((field) => {
     const newDir = filters.sort_by === field && filters.sort_dir === 'asc' ? 'desc' : 'asc';
     const newFilters = { ...filters, sort_by: field, sort_dir: newDir };
     setFilters(newFilters);
-    // Le useEffect ci-dessus déclenchera la requête
   }, [filters]);
 
-  // ── Reset ──────────────────────────────────────────────────────────────────
   const handleReset = () => {
     setFilters({});
-    // Pas besoin de router.get ici, le useEffect s'en charge après le set
-  };
-
-  // ── Suppression (non utilisée dans la vue pour l'instant) ──────────────────
-  const handleDelete = (id) => {
-    if (confirm('Supprimer cette tâche ?')) {
-      router.delete(`/tasks/${id}`, { preserveScroll: true });
-    }
   };
 
   useEffect(() => {
     setDisplayedUserCount(20);
   }, [filters.project_id, userStats.length]);
 
-  // ── Pagination locale pour les stats utilisateurs ──────────────────────────
-  // La progression réagit désormais au même filtre "Projet" que le panneau
-  // Filtres & Recherche, il n'y a plus de sélecteur dédié dans ce bloc.
   const filteredUserStats = userStats.filter((stat) => {
     if (!filters.project_id) return true;
     return stat.project_ids && stat.project_ids.includes(Number(filters.project_id));
@@ -439,23 +425,39 @@ const Index = ({
           </div>
         </div>
 
-        {/* ── Info Alert for Locked Tasks ── */}
-        <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-r-2xl shadow-sm">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <FaLock className="h-5 w-5 text-amber-500" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200">Attention</h3>
-              <div className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-                <p>
-                  Si le <span className="font-bold underline">sprint d'une tâche est terminé</span>, celle-ci sera <span className="font-bold">bloquée</span> (lecture seule).
-                  Pour la modifier, le sprint doit être prolongé par un gestionnaire.
-                </p>
+        {/* ── Info Alert for Locked Tasks (Dismissible & Conditional) ── */}
+        {showLockedAlert && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-r-2xl shadow-sm relative animate-[fadeIn_0.3s_ease-out]">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <FaLock className="h-5 w-5 text-amber-500" />
               </div>
+              <div className="ml-3 pr-8">
+                <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200">Attention</h3>
+                <div className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                  <p>
+                    Si le <span className="font-bold underline">sprint d'une tâche est terminé</span>, celle-ci sera <span className="font-bold">bloquée</span> (lecture seule).
+                    Pour la modifier, le sprint doit être prolongé par un gestionnaire.
+                    {lockedTask.sprint && (
+                      <Link
+                        href={`/sprints/${lockedTask.sprint.id}`}
+                        className="ml-2 font-bold underline text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 transition-colors"
+                      >
+                        Voir le sprint concerné →
+                      </Link>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAlertDismissed(true)}
+                className="absolute top-4 right-4 text-amber-500 hover:text-amber-700 transition-colors"
+              >
+                <FaTimes />
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
         {/* ── Summary cards (global) ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -466,7 +468,7 @@ const Index = ({
             sub={summary.overdue > 0 ? `${summary.overdue} en retard` : null} />
         </div>
 
-        {/* ── Summary cards "Mes propres tâches" (si fournies) ── */}
+        {/* ── Summary cards "Mes propres tâches" ── */}
         {myTasksSummary && (
           <>
             <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 mt-2">
@@ -504,11 +506,10 @@ const Index = ({
             count={activeFilterCount}
           />
 
-          {/* Spacer */}
           <div className="flex-1 hidden lg:block" />
         </div>
 
-        {/* ── Filters (dynamic, auto-apply, masqué par défaut) ── */}
+        {/* ── Filters ── */}
         <FilterPanel
           open={showFilters}
           filters={filters}
@@ -518,9 +519,7 @@ const Index = ({
           onReset={handleReset}
         />
 
-        {/* ── Progression des membres — entièrement masquée par défaut, ── */}
-        {/* ── ne s'affiche que lorsqu'on clique sur "Voir les progrès". Elle ── */}
-        {/* ── réagit au filtre "Projet" du panneau Filtres & Recherche ci-dessus. ── */}
+        {/* ── Progression des membres ── */}
         {showStats && userStats.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden animate-[fadeIn_0.15s_ease-out]">
             <div className="w-full flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-700">
@@ -601,7 +600,7 @@ const Index = ({
           </div>
         </div>
 
-        {/* ── TABLE view (aucune colonne d'action) ── */}
+        {/* ── TABLE view ── */}
         {viewMode === 'table' && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
@@ -641,7 +640,7 @@ const Index = ({
                     return (
                       <tr
                         key={task.id}
-                        className={`border-b border-gray-100 dark:border-gray-700/70 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md ${task.is_locked ? 'opacity-75' : ''}`}
+                        className={`border-b border-gray-100 dark:border-gray-700/70 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md ${task.is_locked ? 'opacity-75 bg-gray-50/50' : ''}`}
                         onClick={() => router.visit(`/tasks/${task.id}`)}
                       >
                         <td className="px-5 py-4">
@@ -706,10 +705,9 @@ const Index = ({
               return (
                 <div
                   key={task.id}
-                  className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group ${task.is_locked ? 'ring-1 ring-amber-200' : ''}`}
+                  className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group ${task.is_locked ? 'ring-1 ring-amber-200 opacity-80' : ''}`}
                   onClick={() => router.visit(`/tasks/${task.id}`)}
                 >
-                  {/* Priority stripe */}
                   <div className={`w-full h-1 rounded-full mb-4 ${PRIORITY_CONFIG[task.priority]?.bar || 'bg-gray-300'}`} />
 
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -780,8 +778,6 @@ const Index = ({
     </div>
   );
 };
-
-// ── Layout wrapper ────────────────────────────────────────────────────────────
 
 const IndexWithLayout = (props) => (
   <AdminLayout title="Gestion des tâches">

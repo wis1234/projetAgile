@@ -26,6 +26,22 @@ class TaskPolicy
         return Carbon::parse($task->sprint->end_date)->isPast();
     }
 
+    /**
+     * Check if the user is a manager of the project.
+     */
+    private function isProjectManager(User $user, Task $task): bool
+    {
+        if (!$task->project) {
+            return false;
+        }
+
+        return $task->project->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'manager')
+            ->wherePivot('is_muted', false)
+            ->exists();
+    }
+
     public function viewAny(User $user)
     {
         return $user->hasRole('admin') || $user->projects()->exists();
@@ -35,6 +51,14 @@ class TaskPolicy
     {
         if ($user->hasRole('admin')) {
             return true;
+        }
+
+        $isLocked = $this->isLocked($task);
+        $isManager = $this->isProjectManager($user, $task);
+
+        // Si la tâche est verrouillée (sprint terminé), seuls les managers peuvent y accéder
+        if ($isLocked) {
+            return $isManager;
         }
 
         if (!$task->project) {
@@ -49,42 +73,35 @@ class TaskPolicy
 
     public function update(User $user, Task $task)
     {
-        if ($this->isLocked($task) && !$user->hasRole('admin')) {
-            return false;
-        }
-
         if ($user->hasRole('admin')) {
             return true;
         }
 
-        if (!$task->project) {
-            return false;
+        $isLocked = $this->isLocked($task);
+        $isManager = $this->isProjectManager($user, $task);
+
+        // Si verrouillée, seul l'admin peut modifier (ou manager si on veut, mais la demande dit bloqué jusqu'à ce que le sprint soit prolongé)
+        // La demande dit : "bloque les page show edit ... sauf les manager". Donc les managers gardent l'accès.
+        if ($isLocked) {
+            return $isManager;
         }
 
-        return $task->project->users()
-            ->where('user_id', $user->id)
-            ->wherePivot('role', 'manager')
-            ->wherePivot('is_muted', false)
-            ->exists();
+        return $isManager;
     }
 
     public function delete(User $user, Task $task)
     {
-        if ($this->isLocked($task) && !$user->hasRole('admin')) {
-            return false;
-        }
-
         return $this->update($user, $task);
     }
 
     public function comment(User $user, Task $task)
     {
-        if ($this->isLocked($task) && !$user->hasRole('admin')) {
-            return false;
-        }
-
         if ($user->hasRole('admin')) {
             return true;
+        }
+
+        if ($this->isLocked($task)) {
+            return $this->isProjectManager($user, $task);
         }
 
         if (!$task->project) {
@@ -116,14 +133,6 @@ class TaskPolicy
             return true;
         }
 
-        if (!$task->project) {
-            return false;
-        }
-
-        return $task->project->users()
-            ->where('user_id', $user->id)
-            ->wherePivot('role', 'manager')
-            ->wherePivot('is_muted', false)
-            ->exists();
+        return $this->isProjectManager($user, $task);
     }
 }

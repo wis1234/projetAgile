@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, router } from '@inertiajs/react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { useTranslation } from 'react-i18next';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { FaLock, FaTimes, FaExclamationTriangle } from 'react-icons/fa';
 
 const Kanban = ({ tasks }) => {
   const { t } = useTranslation();
+  const [isAlertDismissed, setIsAlertDismissed] = useState(false);
 
   const STATUS_COLUMNS = [
-    { 
-      key: 'todo', 
-      label: t('status.todo'), 
+    {
+      key: 'todo',
+      label: t('status.todo'),
       color: 'bg-gray-50 dark:bg-gray-800/60',
       borderColor: 'border-gray-200 dark:border-gray-700/50',
       textColor: 'text-gray-700 dark:text-gray-200',
@@ -20,9 +22,9 @@ const Kanban = ({ tasks }) => {
         </svg>
       )
     },
-    { 
-      key: 'in_progress', 
-      label: t('status.in_progress'), 
+    {
+      key: 'in_progress',
+      label: t('status.in_progress'),
       color: 'bg-blue-50/80 dark:bg-blue-900/30',
       borderColor: 'border-blue-200 dark:border-blue-800/50',
       textColor: 'text-blue-700 dark:text-blue-300',
@@ -32,9 +34,9 @@ const Kanban = ({ tasks }) => {
         </svg>
       )
     },
-    { 
-      key: 'done', 
-      label: t('status.done'), 
+    {
+      key: 'done',
+      label: t('status.done'),
       color: 'bg-green-50/80 dark:bg-green-900/20',
       borderColor: 'border-green-200 dark:border-green-800/50',
       textColor: 'text-green-700 dark:text-green-300',
@@ -55,17 +57,30 @@ const Kanban = ({ tasks }) => {
     return cols;
   });
 
+  // Check for locked tasks to show alert
+  const allTasksArray = Object.values(columns).flat();
+  const lockedTask = allTasksArray.find(t => t.is_locked);
+
   const onDragEnd = (result) => {
     const { source, destination, draggableId } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+    // Find the task and check if it's locked
     const sourceCol = columns[source.droppableId];
+    const movedTask = sourceCol[source.index];
+
+    if (movedTask.is_locked) {
+        alert("Cette tâche est verrouillée car son sprint est terminé.");
+        return;
+    }
+
     const destCol = columns[destination.droppableId];
     const [moved] = sourceCol.splice(source.index, 1);
     moved.status = destination.droppableId;
     destCol.splice(destination.index, 0, moved);
     setColumns({ ...columns, [source.droppableId]: sourceCol, [destination.droppableId]: destCol });
-    // Appel backend pour MAJ statut
+
     router.put(`/tasks/${draggableId}`, { status: destination.droppableId }, { preserveState: true });
   };
 
@@ -91,8 +106,8 @@ const Kanban = ({ tasks }) => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Link 
-                  href="/tasks" 
+                <Link
+                  href="/tasks"
                   className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors duration-150"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,8 +115,8 @@ const Kanban = ({ tasks }) => {
                   </svg>
                   {t('kanban.list_view')}
                 </Link>
-                <Link 
-                  href="/tasks/create" 
+                <Link
+                  href="/tasks/create"
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-lg shadow-sm transition-all duration-150 hover:shadow-md"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,6 +126,34 @@ const Kanban = ({ tasks }) => {
                 </Link>
               </div>
             </div>
+
+            {/* Locked tasks alert */}
+            {lockedTask && !isAlertDismissed && (
+                <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-3 rounded-r-xl shadow-sm relative animate-[fadeIn_0.3s_ease-out]">
+                    <div className="flex items-start">
+                        <FaLock className="mt-0.5 h-4 w-4 text-amber-500 flex-shrink-0" />
+                        <div className="ml-3 pr-8 text-xs sm:text-sm text-amber-800 dark:text-amber-200">
+                            <span className="font-bold">Attention: </span>
+                            Si le sprint d'une tâche est terminé, celle-ci sera bloquée (lecture seule).
+                            Pour la modifier, le sprint doit être prolongé par un gestionnaire.
+                            {lockedTask.sprint && (
+                                <Link
+                                    href={`/sprints/${lockedTask.sprint.id}`}
+                                    className="ml-2 font-bold underline text-amber-600 hover:text-amber-800 transition-colors"
+                                >
+                                    Voir le sprint concerné →
+                                </Link>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setIsAlertDismissed(true)}
+                            className="absolute top-3 right-3 text-amber-500 hover:text-amber-700 transition-colors"
+                        >
+                            <FaTimes size={12} />
+                        </button>
+                    </div>
+                </div>
+            )}
           </div>
           <DragDropContext onDragEnd={onDragEnd}>
             <div className="flex-1 overflow-y-auto p-4 sm:p-6">
@@ -146,18 +189,25 @@ const Kanban = ({ tasks }) => {
                         ) : (
                           <div className="space-y-3">
                         {columns[col.key].map((task, idx) => (
-                          <Draggable draggableId={String(task.id)} index={idx} key={task.id}>
+                          <Draggable
+                            draggableId={String(task.id)}
+                            index={idx}
+                            key={task.id}
+                            isDragDisabled={task.is_locked}
+                          >
                             {(provided, snapshot) => (
                               <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
-                                className={`group relative bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700/50 flex flex-col gap-3 transition-all duration-200 ${snapshot.isDragging ? 'ring-2 ring-blue-400 scale-100 shadow-lg z-10' : 'hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800/50'}`}
+                                className={`group relative bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700/50 flex flex-col gap-3 transition-all duration-200 ${snapshot.isDragging ? 'ring-2 ring-blue-400 scale-100 shadow-lg z-10' : 'hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800/50'} ${task.is_locked ? 'opacity-75 bg-gray-50/30 grayscale-[0.2]' : ''}`}
+                                onClick={() => !task.is_locked && router.visit(`/tasks/${task.id}`)}
                               >
                                 {/* En-tête avec priorité et menu d'actions */}
                                 <div className="flex justify-between items-start gap-2">
                                   <div className="flex-1">
-                                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm leading-tight line-clamp-2">
+                                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm leading-tight line-clamp-2 flex items-center gap-1.5">
+                                      {task.is_locked && <FaLock className="text-amber-500 text-[10px] flex-shrink-0" />}
                                       {task.title}
                                     </h3>
                                   </div>
@@ -169,21 +219,16 @@ const Kanban = ({ tasks }) => {
                                     }`}>
                                       {task.priority || '—'}
                                     </span>
-                                    <button className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-opacity">
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                                      </svg>
-                                    </button>
                                   </div>
                                 </div>
-                                
+
                                 {/* Description */}
                                 {task.description && (
                                   <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2">
                                     {task.description}
                                   </p>
                                 )}
-                                
+
                                 {/* Pied de carte avec date et assignés */}
                                 <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/50 flex justify-between items-center">
                                   {task.due_date ? (
@@ -198,8 +243,8 @@ const Kanban = ({ tasks }) => {
                                   )}
                                   <div className="flex -space-x-1.5">
                                     {task.assignees?.slice(0, 3).map((assignee, idx) => (
-                                      <div 
-                                        key={idx} 
+                                      <div
+                                        key={idx}
                                         className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs font-medium text-white shadow-sm"
                                         title={assignee.name || t('kanban.not_assigned')}
                                       >
@@ -207,7 +252,7 @@ const Kanban = ({ tasks }) => {
                                       </div>
                                     ))}
                                     {task.assignees?.length > 3 && (
-                                      <div 
+                                      <div
                                         className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 shadow-sm"
                                         title={t('kanban.more_assignees', { count: task.assignees.length - 3 })}
                                       >
@@ -233,11 +278,11 @@ const Kanban = ({ tasks }) => {
           </DragDropContext>
         </div>
       </main>
-      
+
       {/* Bouton flottant pour mobile */}
       <div className="fixed bottom-6 right-6 md:hidden">
-        <Link 
-          href="/tasks/create" 
+        <Link
+          href="/tasks/create"
           className="flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 transition-transform hover:scale-105"
           title={t('kanban.new_task')}
         >
@@ -251,4 +296,4 @@ const Kanban = ({ tasks }) => {
 }
 
 Kanban.layout = page => <AdminLayout children={page} />;
-export default Kanban; 
+export default Kanban;

@@ -591,11 +591,16 @@ class TaskController extends Controller
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
-        $tasks = Task::whereHas('project', function ($q) {
+        $tasks = Task::with('sprint')->whereHas('project', function ($q) {
             $q->whereHas('users', function ($q2) {
                 $q2->where('user_id', auth()->id());
             });
-        })->get()->groupBy('status');
+        })->get()->map(function($task) {
+            $task->is_locked = $task->sprint && $task->sprint->end_date
+                ? Carbon::parse($task->sprint->end_date)->isPast()
+                : false;
+            return $task;
+        })->groupBy('status');
 
         return Inertia::render('Tasks/Kanban', ['tasks' => $tasks]);
     }
