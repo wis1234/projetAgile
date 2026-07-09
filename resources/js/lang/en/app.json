@@ -1,11 +1,11 @@
 {
   "app_name": "ProJA",
   "all_rights_reserved": "All rights reserved",
-  
+
   "validation": {
     "check_errors": "Please correct the errors before continuing"
   },
-  
+
   "sprint_created_success": "Sprint created successfully",
   "sprint_creation_error": "Error creating sprint",
   "create_sprint": "Create Sprint",
@@ -89,14 +89,14 @@
   "recruitment": "Recruitment",
   "my_subscription": "My Subscription",
   "remunerations": "Remunerations",
-  
+
   "change_language": "Change language",
   "current_language": "Current language",
   "selected": "Selected",
   "changing_language": "Changing language...",
   "language_changed": "Language changed to {{language}}",
   "error_changing_language": "Error changing language",
-  
+
   "project_management": "Project Management",
   "my_projects": "My Projects",
   "new_project": "New Project",
@@ -115,14 +115,14 @@
   "project_creation_error": "Error creating project",
   "project_not_found": "Project not found",
   "no_projects_found": "No projects found",
-  
+
   "project_status_new": "New",
   "project_status_starting": "Starting",
   "project_status_in_progress": "In Progress",
   "project_status_advanced": "Advanced",
   "project_status_completed": "Completed",
   "project_status_suspended": "Suspended",
-  
+
   "project_members": "Members",
   "manage_project_members": "Manage project team members",
   "project_members_management": "Project Members Management",
@@ -139,7 +139,7 @@
   "members_count": "{{count}} member",
   "members_count_plural": "{{count}} members",
   "project_members_list_description": "List of users assigned to this project with their roles",
-  
+
   "role_manager": "Project Manager",
   "role_member": "Member",
   "role_observer": "Observer",
@@ -150,7 +150,7 @@
   "member_description": "Can participate in the project and view tasks",
   "observer": "Observer",
   "observer_description": "Can only view the project",
-  
+
   "tasks": "Tasks",
   "task": "Task",
   "tasks_section_title": "Tasks",
@@ -183,7 +183,7 @@
   "not_assigned": "Not assigned",
   "start_date": "Start Date",
   "end_date": "End Date",
-  
+
   "edit_sprint": "Edit Sprint",
   "sprint_updated_success": "Sprint updated successfully",
   "sprint_update_error": "Error updating sprint",
@@ -194,7 +194,7 @@
   "sprint_save_changes": "Save changes",
   "sprint_saving": "Saving...",
   "sprint_go_back": "Back to sprint details",
-  
+
   "high": "High",
   "medium": "Medium",
   "low": "Low",
@@ -237,6 +237,11 @@
   "pagination_previous": "«",
   "pagination_next": "»",
   "completed": "Completed",
+  "active": "In progress",
+  "all_projects": "All projects",
+  "all_status": "All status",
+  "reset": "Reset",
+  "apply_filters": "Apply filters",
   "save_changes": "Save changes",
   "add": "Add",
   "edit": "Edit",
@@ -254,7 +259,7 @@
   "create_new_activity": "Create a new activity",
   "export": "Export",
   "download_reports": "Download reports",
-  
+
   "table_view": "Table view",
   "cards_view": "Cards view",
   "quick_actions": "Quick Actions",
@@ -264,64 +269,64 @@
   "no_description_short": "No description",
   "date_unknown": "Date unknown",
   "email_not_available": "Email not available",
-  
+
   "search_project_placeholder": "Search for a project...",
   "project_search_button": "Search",
-  
+
   "meeting_link_label": "Meeting Link (optional)",
   "meeting_link_placeholder": "https://meet.google.com/...",
   "meeting_link_help": "Link to a virtual meeting room (Google Meet, Zoom, etc.)",
   "meeting_link_title": "Meeting Link",
   "click_to_join_meeting": "Click to join the meeting",
-  
+
   "txt_format": "TXT Format",
   "simple_and_light": "Simple and lightweight",
   "pdf_format": "PDF Format",
   "ideal_for_sharing": "Ideal for sharing",
   "word_format": "Word Format",
   "easily_editable": "Easily editable",
-  
+
   "unknown_user": "Unknown User",
   "active_team_members": "Active Team Members",
   "enable_notifications": "Enable notifications",
   "mute_notifications": "Mute notifications",
   "enable": "Enable",
   "muted": "Muted",
-  
+
   "initial_project_status": "Initial Project Status",
   "project_creation_tips_title": "Project Creation Tips:",
   "project_creation_tip1": "Choose a descriptive and unique name for your project",
   "project_creation_tip2": "The description helps team members understand the goal",
   "project_creation_tip3": "The \"New\" status is recommended for a project in preparation",
   "project_creation_tip4": "You can modify this information after creation",
-  
+
   "project_details_title": "Project Details",
   "only_admin_manager_actions": "Only administrators and managers can perform actions on this project.",
   "start_by_creating_project": "Start by creating a project and adding members to it.",
-  
+
   "confirm_deletion": "Confirm Deletion",
   "confirm_deletion_message": "Are you sure you want to delete the project",
   "warning_irreversible_action": "Warning: This action is irreversible!",
   "deletion_warning": "Deleting this project will also delete all associated data.",
-  
+
   "showing_results": "Showing",
   "showing_results_range": "Showing {{from}} to {{to}} of {{total}} results",
   "to": "to",
   "on_results": "of",
   "result": "result",
   "results": "results",
-  
+
   "roles_and_permissions": "Roles and Permissions",
-  
+
   "files": "Files",
-  
+
   "sprints": "Sprints",
   "add_sprint": "Add Sprint",
-  
+
   "task_tracking": "Task Tracking",
-  
+
   "users": "Users",
-  
+
   "created_on": "Created on",
   "plan_new_goal": "Plan a new goal",
   "collaborate_in_team": "Collaborate with your team",
@@ -333,7 +338,7 @@
   "delete_project_permanently": "Delete Permanently",
   "admin": "Admin",
   "manager": "Manager",
-  
+
   "task_details": {
     "title": "Task Title",
     "status": "Task Status",
@@ -435,14 +440,14 @@
     "save":"Save",
     "status":"Status",
     "type":"Type",
-    "select":"Select"   
+    "select":"Select"
   },
 
   "actions":{
     "edit_task":"Edit Task",
     "delete_task":"Delete Task",
     "upload_file":"Upload File"
-    
+
   },
 
   "payment": {
@@ -465,7 +470,7 @@
       "in_progress":"In Progress",
       "done":"Done",
       "label":"Status"
-      
+
     },
     "payment_method":"Payment Method",
     "methods":{

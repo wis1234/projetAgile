@@ -162,7 +162,7 @@
   "cancel": "Annuler",
   "deleting": "Suppression...",
   "delete_permanently": "Supprimer définitivement",
-  
+
   "project_members_list": "Membres des projets",
   "manage_project_members": "Gérez les membres assignés aux projets",
   "project_members_management": "Gestion des membres du projet",
@@ -203,7 +203,7 @@
   "members_count": "{{count}} membre",
   "members_count_plural": "{{count}} membres",
   "showing_results_range": "Affichage de {{from}} à {{to}} sur {{total}} résultats",
-  
+
   "edit_member": "Modifier le membre",
   "project_member_edit_title": "Modifier un membre du projet",
   "project_member_edit_description": "Modifiez les informations du membre de l'équipe du projet.",
@@ -221,13 +221,13 @@
   "validation_select_role": "Veuillez sélectionner un rôle",
   "last_updated": "Dernière mise à jour",
   "update_member": "Mettre à jour le membre",
-  
+
   "to": "à",
-  
+
   "validation": {
     "check_errors": "Veuillez corriger les erreurs avant de continuer"
   },
-  
+
   "sprint_created_success": "Sprint créé avec succès",
   "sprint_creation_error": "Erreur lors de la création du sprint",
   "create_sprint": "Créer un sprint",
@@ -266,6 +266,12 @@
   "pagination_previous": "«",
   "pagination_next": "»",
   "completed": "Terminé",
+  "active": "En cours",
+  "all_projects": "Tous les projets",
+  "all_status": "Tous les statuts",
+  "reset": "Réinitialiser",
+  "apply_filters": "Appliquer les filtres",
+  "project": "Projet",
   "in_progress": "En cours",
   "on_results": "sur",
   "result": "résultat",
@@ -306,7 +312,7 @@
   "start_date": "Date de début",
   "end_date": "Date de fin",
   "completed_tasks": "Tâches terminées",
-  
+
   "edit_sprint": "Modifier le Sprint",
   "sprint_updated_success": "Sprint mis à jour avec succès",
   "sprint_update_error": "Erreur lors de la mise à jour du sprint",
@@ -379,7 +385,7 @@
   "edit": "Modifier",
   "delete": "Supprimer",
   "navigation_tabs": "Onglets de navigation",
- 
+
 "task_details": {
   "title": "Titre de la tâche",
   "status": "Statut de la tâche",
@@ -495,7 +501,7 @@
   "details_saved": "Détails enregistrés avec succès",
   "operator": "Opérateur",
   "payment_method_validated": "Méthode de paiement validée",
-  
+
     "description": "Description",
     "created_at": "Créée le",
     "due_date": "Échéance",
@@ -522,7 +528,7 @@
     "upload_error": "Erreur lors du téléchargement du fichier",
     "file_too_large": "Le fichier est trop volumineux (max 10MB)",
     "invalid_file_type": "Type de fichier non pris en charge",
-  
+
 
   "status": {
     "validated": "Validé",
@@ -560,6 +566,7 @@
   }
 },
 "recording": {
+  "status": "Statut",
   "start": "Démarrer l’enregistrement",
   "stop": "Arrêter l’enregistrement",
   "send": "Envoyer l’audio",
