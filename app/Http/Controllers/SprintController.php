@@ -258,7 +258,31 @@ public function show(Request $request, string $id)
             'end_date' => 'required|date|after_or_equal:start_date',
             'project_id' => 'required|exists:projects,id',
         ]);
+
+        $oldEndDate = $sprint->end_date ? \Carbon\Carbon::parse($sprint->end_date) : null;
+        $newEndDate = \Carbon\Carbon::parse($validated['end_date']);
+
         $sprint->update($validated);
+
+        // Si la nouvelle date de fin est ultérieure à l'ancienne (le sprint est prolongé)
+        if ($oldEndDate && $newEndDate->gt($oldEndDate)) {
+            $sprint->load(['tasks', 'project.users']);
+            $completedTasks = $sprint->tasks->where('status', 'done');
+            $unfinishedTasks = $sprint->tasks->where('status', '!=', 'done');
+
+            if ($sprint->project && $sprint->project->users->isNotEmpty()) {
+                \Illuminate\Support\Facades\Notification::send(
+                    $sprint->project->users,
+                    new \App\Notifications\SprintDeadlineExtendedNotification(
+                        $sprint, 
+                        $oldEndDate->toDateTimeString(), 
+                        $completedTasks, 
+                        $unfinishedTasks
+                    )
+                );
+            }
+        }
+
         event(new SprintUpdated($sprint));
         return redirect()->route('sprints.index');
     }
