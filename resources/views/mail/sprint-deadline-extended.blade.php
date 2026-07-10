@@ -1,342 +1,97 @@
-```html
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prolongation du délai du sprint - {{ config('app.name') }}</title>
-
+    <title>Prolongation du délai du sprint</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-        * {
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            background: #f7f7f7;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            line-height: 1.6;
-            color: #1e293b;
-            background-color: #f5f7fa;
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px 30px;
         }
-
-        .email-wrapper {
-            max-width: 100%;
-            background: white;
-            overflow: hidden;
+        h2 {
+            margin-bottom: 10px;
+            color: #222;
         }
-
-        .header {
-            background: linear-gradient(135deg, #4361ee 10%, #6d28d9 100%);
-            padding: 40px 30px;
-            text-align: center;
-        }
-
-        .logo {
-            font-size: 32px;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 12px;
-        }
-
-        .header-title {
-            color: #f8fafc;
-            font-size: 20px;
-            font-weight: 500;
-        }
-
-        .content {
-            padding: 35px 30px;
-        }
-
-        .greeting {
-            font-size: 16px;
-            color: #475569;
-            margin-bottom: 20px;
-        }
-
-        .intro-text {
-            font-size: 15px;
-            color: #64748b;
-            margin-bottom: 25px;
-        }
-
-        .task-card {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border-radius: 12px;
-            padding: 24px;
-            margin: 25px 0;
-            border: 1px solid #e2e8f0;
-        }
-
-        .task-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #0f172a;
-            margin-bottom: 18px;
-        }
-
-        .task-meta {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-
-        .meta-item {
-            background: white;
-            padding: 12px 14px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-        }
-
-        .meta-label {
-            display: block;
-            font-size: 13px;
-            color: #64748b;
-            margin-bottom: 4px;
-        }
-
-        .meta-value {
-            font-weight: 600;
-            color: #1e293b;
-        }
-
-        .success-box {
-            background: #ecfdf5;
-            border-left: 4px solid #10b981;
-            padding: 18px;
-            border-radius: 8px;
+        .section {
             margin-top: 20px;
         }
-
-        .warning-box {
-            background: #fff7ed;
-            border-left: 4px solid #f97316;
-            padding: 18px;
-            border-radius: 8px;
-            margin-top: 20px;
-        }
-
         ul {
+            margin-top: 10px;
             padding-left: 20px;
-            margin-top: 10px;
         }
-
-        li {
-            margin-bottom: 8px;
-            color: #475569;
-        }
-
         .footer {
-            padding: 28px 30px;
-            text-align: center;
-            color: #94a3b8;
-            background: white;
-        }
-
-        .footer-copyright {
+            margin-top: 30px;
             font-size: 13px;
-            font-weight: 500;
+            color: #777;
+            text-align: center;
         }
-
-        .footer-note {
-            font-size: 12px;
-            margin-top: 10px;
-            color: #64748b;
-        }
-
-
-        @media(max-width:600px){
-            .task-meta{
-                grid-template-columns:1fr;
-            }
-        }
-
     </style>
 </head>
 
-
 <body>
 
-<div class="email-wrapper">
+<div class="container">
 
-    <div class="header">
-        <div class="logo">
-            ProJA
-        </div>
+    <h2>Prolongation du délai d'atteinte d'objectif</h2>
 
-        <div class="header-title">
-            Alerte : Prolongation du délai du sprint
-        </div>
+    <p>Bonjour à toute l’équipe,</p>
+
+    <p>
+        Le délai prévu pour le sprint/objectif <strong>{{ $sprint->name }}</strong> a été prolongé afin de permettre la finalisation des tâches restantes.
+    </p>
+
+    <div class="section">
+        <p><strong>Ancienne date de fin :</strong> {{ \Carbon\Carbon::parse($oldEndDate)->translatedFormat('d F Y à H:i') }}</p>
+        <p><strong>Nouvelle date de fin :</strong> {{ \Carbon\Carbon::parse($sprint->end_date)->translatedFormat('d F Y à H:i') }}</p>
     </div>
 
-
-    <div class="content">
-
-
-        <div class="greeting">
-            Bonjour à toute l'équipe,
-        </div>
-
-
-        <p class="intro-text">
-            Le délai initialement prévu pour le sprint/objectif 
-            <strong>{{ $sprint->name }}</strong>
-            a été prolongé afin de permettre la finalisation des tâches restantes.
-        </p>
-
-
-
-        <div class="task-card">
-
-            <div class="task-title">
-                Sprint : {{ $sprint->name }}
-            </div>
-
-
-            <div class="task-meta">
-
-                <div class="meta-item">
-                    <span class="meta-label">
-                        Ancienne date de fin
-                    </span>
-
-                    <span class="meta-value">
-                        {{ \Carbon\Carbon::parse($oldEndDate)->translatedFormat('d F Y à H:i') }}
-                    </span>
-                </div>
-
-
-                <div class="meta-item">
-                    <span class="meta-label">
-                        Nouvelle date de fin
-                    </span>
-
-                    <span class="meta-value">
-                        {{ \Carbon\Carbon::parse($sprint->end_date)->translatedFormat('d F Y à H:i') }}
-                    </span>
-                </div>
-
-            </div>
-
-
-
-            <div class="success-box">
-
-                <strong>
-                    ✅ Tâches achevées jusqu'à ce jour
-                </strong>
-
-
-                @if($completedTasks->isNotEmpty())
-
-                    <ul>
-                        @foreach($completedTasks as $task)
-
-                            <li>
-                                {{ $task->title }}
-                            </li>
-
-                        @endforeach
-                    </ul>
-
-                @else
-
-                    <p>
-                        Aucune tâche n'a été achevée pour l'instant.
-                    </p>
-
-                @endif
-
-            </div>
-
-
-
-            <div class="warning-box">
-
-                <strong>
-                    ⏳ Tâches non achevées
-                </strong>
-
-
-                @if($unfinishedTasks->isNotEmpty())
-
-                    <ul>
-
-                        @foreach($unfinishedTasks as $task)
-
-                            <li>
-                                {{ $task->title }}
-
-                                (
-                                {{ $task->status === 'in_progress' 
-                                    ? 'En cours' 
-                                    : 'À faire'
-                                }}
-                                )
-
-                            </li>
-
-                        @endforeach
-
-                    </ul>
-
-
-                @else
-
-                    <p>
-                        Toutes les tâches sont terminées.
-                    </p>
-
-                @endif
-
-            </div>
-
-
-
-        </div>
-
-
-
-        <p style="margin-top:24px;font-size:14px;color:#64748b">
-
-            ⚠️ <strong>Rappel important :</strong>
-
-            Nous vous invitons à mobiliser tous les moyens nécessaires
-            pour finaliser les tâches restantes.
-            Un nouveau report du sprint pourrait avoir un impact important
-            sur le calendrier global du projet.
-
-            La collaboration et l'engagement de chacun sont essentiels
-            pour atteindre les objectifs fixés.
-
-        </p>
-
-
-
+    <div class="section">
+        <strong>Tâches achevées :</strong>
+        @if($completedTasks->isNotEmpty())
+            <ul>
+                @foreach($completedTasks as $task)
+                    <li>{{ $task->title }}</li>
+                @endforeach
+            </ul>
+        @else
+            <p>Aucune tâche achevée pour le moment.</p>
+        @endif
     </div>
 
+    <div class="section">
+        <strong>Tâches restantes :</strong>
+        @if($unfinishedTasks->isNotEmpty())
+            <ul>
+                @foreach($unfinishedTasks as $task)
+                    <li>{{ $task->title }} ({{ $task->status === 'in_progress' ? 'En cours' : 'À faire' }})</li>
+                @endforeach
+            </ul>
+        @else
+            <p>Toutes les tâches sont terminées.</p>
+        @endif
+    </div>
 
+    <div class="section">
+        <p>
+            Merci de veiller à l’avancement des activités afin d’éviter un nouveau report, qui pourrait impacter le calendrier global du projet.
+        </p>
+    </div>
 
     <div class="footer">
-
-        <p class="footer-copyright">
-            © {{ date('Y') }} {{ config('app.name') }}. Tous droits réservés.
-        </p>
-
-
-        <p class="footer-note">
-            Cet email a été envoyé automatiquement, merci de ne pas y répondre directement.
-        </p>
-
+        <p>© {{ date('Y') }} {{ config('app.name') }} — Message automatique, merci de ne pas répondre.</p>
     </div>
-
 
 </div>
 
-
 </body>
 </html>
-```
