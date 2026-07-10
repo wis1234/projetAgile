@@ -443,12 +443,17 @@ const Index = ({
                   <ul className="mt-3 space-y-2 list-disc list-inside">
                     {lockedSprints.map(sprint => (
                       <li key={sprint.id} className="ml-1">
-                        <Trans
-                          i18nKey="task_lock_alert_item"
-                          values={{ sprintName: sprint.name, projectName: sprint.project?.name }}
-                        >
-                          Sprint <Link href={`/sprints/${sprint.id}`} className="font-bold underline text-amber-600 hover:text-amber-800 dark:text-amber-400">{{sprintName}}</Link> du projet <span className="font-semibold">{{projectName}}</span>
-                        </Trans>
+                        <span>
+                          Sprint{' '}
+                          <Link
+                            href={`/sprints/${sprint.id}`}
+                            className="font-bold underline text-amber-600 hover:text-amber-800 dark:text-amber-400"
+                          >
+                            {sprint.name}
+                          </Link>
+                          {' '}du projet{' '}
+                          <span className="font-semibold">{sprint.project?.name}</span>
+                        </span>
                       </li>
                     ))}
                   </ul>
