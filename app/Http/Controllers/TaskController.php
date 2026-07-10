@@ -48,13 +48,13 @@ class TaskController extends Controller
         });
 
         // Verification globale pour l'alerte (tous les sprints terminés avec des tâches inachevées)
-        $lockedSprint = Sprint::whereIn('project_id', $visibleProjectIds)
+        $lockedSprints = Sprint::with('project')
+            ->whereIn('project_id', $visibleProjectIds)
             ->where('end_date', '<', now())
             ->whereHas('tasks', function($q) {
                 $q->where('status', '!=', 'done');
             })
-            ->first();
-
+            ->get();
         if ($request->filled('search')) {
             $query->where('title', 'like', '%' . $request->search . '%');
         }
@@ -213,7 +213,7 @@ class TaskController extends Controller
             'userStats' => $userStats,
             'projectOptions' => $projectOptions,
             'memberOptions' => $memberOptions,
-            'globalLockedSprint' => $lockedSprint,
+            'lockedSprints' => $lockedSprints,
         ]);
     }
 
