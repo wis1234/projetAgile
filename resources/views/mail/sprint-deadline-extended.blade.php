@@ -161,15 +161,47 @@
 
 <div class="email-wrapper">
 
-    <div class="header">
-        <div class="logo">
-            ProJA
-        </div>
+<div class="header" style="
+    background: linear-gradient(135deg, #4361ee 10%, #6d28d9 100%);
+    padding: 40px 30px;
+    text-align: center;
+">
 
-        <div class="header-title">
-            Alerte : Prolongation du délai de sprint(objectif)
-        </div>
-    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td align="center" style="text-align:center;">
+
+                <div class="logo" style="
+                    font-size:32px;
+                    font-weight:700;
+                    color:white;
+                    margin:0 auto 12px auto;
+                    text-align:center;
+                    width:100%;
+                    display:block;
+                    line-height:1.2;
+                ">
+                    ProJA
+                </div>
+
+
+                <div class="header-title" style="
+                    color:#f8fafc;
+                    font-size:20px;
+                    font-weight:500;
+                    text-align:center;
+                    width:100%;
+                    display:block;
+                    line-height:1.4;
+                ">
+                    Alerte : Prolongation du délai du sprint
+                </div>
+
+            </td>
+        </tr>
+    </table>
+
+</div>
 
 
     <div class="content">
