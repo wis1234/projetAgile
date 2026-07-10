@@ -194,7 +194,7 @@
                     display:block;
                     line-height:1.4;
                 ">
-                    Alerte : Prolongation du délai du sprint
+                    Alerte : Prolongation du délai d'un sprint(objectif)
                 </div>
 
             </td>
@@ -213,7 +213,7 @@
 
 
         <p class="intro-text">
-            Le délai initialement prévu pour le sprint/objectif 
+            Le délai initialement prévu pour le sprint(objectif) 
             <strong>{{ $sprint->name }}</strong>
             a été prolongé afin de permettre la finalisation des tâches restantes.
         </p>
