@@ -577,5 +577,11 @@
       "title": "Nudobagbe lɛ tɔn gbɛnzinkɔn",
       "subtitle": "Ɖo nudobagbe lɛ ɖo e nɔ ka wɛn lɛ ɖo mɛ",
       "cta": "Ɖo nudobagbe lɛ"
-    }
+    },
+    "attention": "Jiɖo",
+    "task_lock_alert_intro_before": "Xwè e wɛ ɖo ɖo gbedekpɔn (lɛ)/nukpɔn (lɛ) e lɛ ɖo gudo ɔ wu. Nudobagbe wɛwɛ mɛ nɔ ɖo mɛ lɛ bɛ ɖo",
+    "task_lock_alert_intro_locked_word": "kpɛ ɖo mɛ",
+    "task_lock_alert_intro_after": "kaka hwɛ e mɛɖaxo ɖokpo na na e hun ɔ :",
+    "task_lock_alert_of_project": "ɖo akpaɖatɛn"
   }
+}

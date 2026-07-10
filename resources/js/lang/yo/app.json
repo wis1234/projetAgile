@@ -578,5 +578,12 @@
      "title": "Iṣẹ́ tuntun",
      "subtitle": "Ɖo iṣẹ́ tuntun ɖo e nọ́ ka wẹ́n lẹ́ ɖo mẹ́",
      "cta": "Ɖo iṣẹ́ tuntun"
-    }
+    },
+
+    "attention": "Ìfiyèsí",
+    "task_lock_alert_intro_before": "Àkókò tí a yàn fún ìgbà ìdárayá/ète tí ó tẹ̀le wọ̀nyí ti pari. Gbogbo àwọn iṣẹ́ tí kò tíì ṣẹ́ tó jẹ́ mọ́ wọn",
+    "task_lock_alert_intro_locked_word": "ti dídó",
+    "task_lock_alert_intro_after": "títí tí olùdarí iṣẹ́ kan fi gun wọn sẹ́yìn:",
+    "task_lock_alert_of_project": "ti iṣẹ́"
   }
+}

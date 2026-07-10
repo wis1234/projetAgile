@@ -606,6 +606,12 @@
   "title": "Offres d'emploi",
   "subtitle": "Rejoignez une équipe dynamique",
   "cta": "Voir les offres"
-}
+},
+
+"attention": "Attention",
+"task_lock_alert_intro_before": "Le délai alloué au(x) sprint(s)/objectif(s) suivant(s) est dépassé. Toutes les tâches non terminées y afférentes sont",
+"task_lock_alert_intro_locked_word": "bloquées",
+"task_lock_alert_intro_after": "jusqu'à ce qu'un chef de projet le prolonge :",
+"task_lock_alert_of_project": "du projet"
 
 }

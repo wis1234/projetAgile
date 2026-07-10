@@ -540,6 +540,12 @@
     "title": "Job Offers",
     "subtitle": "Join dynamic team",
     "cta": "View Offers"
-  }
+  },
+
+  "attention": "Attention",
+  "task_lock_alert_intro_before": "The time allocated to the following sprint(s)/goal(s) has elapsed. All unfinished tasks related to them are",
+  "task_lock_alert_intro_locked_word": "blocked",
+  "task_lock_alert_intro_after": "until a project manager extends them:",
+  "task_lock_alert_of_project": "of project"
 
 }
