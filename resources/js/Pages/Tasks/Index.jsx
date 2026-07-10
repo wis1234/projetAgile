@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { router, usePage, Link } from '@inertiajs/react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import AdminLayout from '../../Layouts/AdminLayout';
 import {
   FaSearch, FaTasks, FaPlus, FaCalendarAlt,
@@ -323,8 +323,9 @@ const Index = ({
   myTasksSummary = null,
   projectOptions = [],
   memberOptions = [],
-  globalLockedSprint = null,
+  lockedSprints = [],
 }) => {
+  const { t } = useTranslation();
   const { flash = {} } = usePage().props;
   const [viewMode, setViewMode]   = useState('table');
   const [filters, setFilters]     = useState(initialFilters);
@@ -340,6 +341,8 @@ const Index = ({
 
   const tasks = Array.isArray(initialTasks) ? initialTasks : (initialTasks.data || []);
   const pagination = !Array.isArray(initialTasks) ? initialTasks : null;
+
+  const showLockedAlert = lockedSprints.length > 0 && !isAlertDismissed;
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -422,24 +425,38 @@ const Index = ({
           </div>
         </div>
 
-        {/* ── Info Alert for Locked Tasks (Dismissible & Conditional) ── */}
-        {globalLockedSprint && !isAlertDismissed && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-r-2xl shadow-sm relative animate-[fadeIn_0.3s_ease-out]">
+        {/* ── Enhanced Multi-Sprint Lock Alert ── */}
+        {showLockedAlert && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-5 rounded-r-2xl shadow-sm relative animate-[fadeIn_0.3s_ease-out]">
             <div className="flex items-start">
               <div className="flex-shrink-0 mt-0.5">
                 <FaLock className="h-5 w-5 text-amber-500" />
               </div>
-              <div className="ml-3 pr-8">
-                <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200">Attention</h3>
-                <div className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-                  <p>
-                    Le délai alloué au sprint/objectif (<Link href={`/sprints/${globalLockedSprint.id}`} className="font-bold underline text-amber-600 hover:text-amber-800">{globalLockedSprint.name}</Link>) est dépassé, toutes les tâches non terminées y afférent sont <span className="font-bold">bloquées</span> jusqu'à ce qu'un chef de projet le prolonge.
-                  </p>
+              <div className="ml-4 pr-8">
+                <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
+                  {t('attention')}
+                </h3>
+                <div className="mt-2 text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
+                  <Trans i18nKey="task_lock_alert_intro">
+                    Le délai alloué au(x) sprint(s)/objectif(s) suivant(s) est dépassé. Toutes les tâches non terminées y afférentes sont <span className="font-bold">bloquées</span> jusqu'à ce qu'un chef de projet le prolonge :
+                  </Trans>
+                  <ul className="mt-3 space-y-2 list-disc list-inside">
+                    {lockedSprints.map(sprint => (
+                      <li key={sprint.id} className="ml-1">
+                        <Trans
+                          i18nKey="task_lock_alert_item"
+                          values={{ sprintName: sprint.name, projectName: sprint.project?.name }}
+                        >
+                          Sprint <Link href={`/sprints/${sprint.id}`} className="font-bold underline text-amber-600 hover:text-amber-800 dark:text-amber-400">{{sprintName}}</Link> du projet <span className="font-semibold">{{projectName}}</span>
+                        </Trans>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
               <button
                 onClick={() => setIsAlertDismissed(true)}
-                className="absolute top-4 right-4 text-amber-500 hover:text-amber-700 transition-colors"
+                className="absolute top-4 right-4 text-amber-500 hover:text-amber-700 transition-colors p-1 rounded-full hover:bg-amber-100 dark:hover:bg-amber-800/40"
                 title="Fermer"
               >
                 <FaTimes />
