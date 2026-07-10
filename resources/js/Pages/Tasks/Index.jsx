@@ -434,22 +434,22 @@ const Index = ({
               </div>
               <div className="ml-4 pr-8">
                 <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
-                  {t('attention')}
+                  Attention
                 </h3>
                 <div className="mt-2 text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
-                  {t('task_lock_alert_intro_before')}{' '}<span className="font-bold">{t('task_lock_alert_intro_locked_word')}</span>{' '}{t('task_lock_alert_intro_after')}
+                  Le délai alloué au(x) sprint(s)/objectif(s) suivant(s) est dépassé. Toutes les tâches non terminées y afférentes sont <span className="font-bold">bloquées</span> jusqu'à ce qu'un chef de projet le prolonge :
                   <ul className="mt-3 space-y-2 list-disc list-inside">
                     {lockedSprints.map(sprint => (
                       <li key={sprint.id} className="ml-1">
                         <span>
-                          {t('sprint')}{' '}
+                          Sprint{' '}
                           <Link
                             href={`/sprints/${sprint.id}`}
                             className="font-bold underline text-amber-600 hover:text-amber-800 dark:text-amber-400"
                           >
                             {sprint.name}
                           </Link>
-                          {' '}{t('task_lock_alert_of_project')}{' '}
+                          {' '}du projet{' '}
                           <span className="font-semibold">{sprint.project?.name}</span>
                         </span>
                       </li>
