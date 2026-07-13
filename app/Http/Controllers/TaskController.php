@@ -217,23 +217,33 @@ class TaskController extends Controller
         ]);
     }
 
-    public function create()
-    {
-        try {
-            $this->authorize('create', Task::class);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
-        }
-        $currentUser = auth()->user();
-        $projects = $currentUser->hasRole('admin')
-            ? Project::with(['users:id,name'])->get(['id', 'name'])
-            : $currentUser->projects()->with(['users:id,name'])->wherePivot('role', 'manager')->get(['projects.id', 'projects.name']);
-        $sprints = Sprint::whereIn('project_id', $projects->pluck('id'))->get();
-        return Inertia::render('Tasks/Create', [
-            'projects' => $projects,
-            'sprints' => $sprints,
-        ]);
+public function create(Request $request)
+{
+    try {
+        $this->authorize('create', Task::class);
+    } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
     }
+
+    $currentUser = auth()->user();
+    $projects = $currentUser->hasRole('admin')
+        ? Project::with(['users:id,name'])->get(['id', 'name'])
+        : $currentUser->projects()->with(['users:id,name'])->wherePivot('role', 'manager')->get(['projects.id', 'projects.name']);
+    $sprints = Sprint::whereIn('project_id', $projects->pluck('id'))->get();
+
+    // Présélection du projet si l'on arrive depuis la page show d'un projet
+    $selectedProjectId = $request->query('project_id');
+    if ($selectedProjectId && !$projects->contains('id', (int) $selectedProjectId)) {
+        // L'utilisateur n'est pas manager/admin de ce projet : on ignore la présélection
+        $selectedProjectId = null;
+    }
+
+    return Inertia::render('Tasks/Create', [
+        'projects' => $projects,
+        'sprints' => $sprints,
+        'selectedProjectId' => $selectedProjectId ? (int) $selectedProjectId : null,
+    ]);
+}
 
     public function store(Request $request)
     {
