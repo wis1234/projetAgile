@@ -352,11 +352,12 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
 
                         <footer className="py-16 text-center text-sm text-black dark:text-white/70">
                             <div className="mb-4 flex justify-center space-x-6">
-                                <Link href={route('about')} className="hover:text-black dark:hover:text-white">About</Link>
-                                <Link href={route('contact')} className="hover:text-black dark:hover:text-white">Contact</Link>
-                                <Link href={route('privacy.policy')} className="hover:text-black dark:hover:text-white">Privacy Policy</Link>
-                                <Link href={route('terms.of.service')} className="hover:text-black dark:hover:text-white">Terms of Service</Link>
+                                <Link href={route('about')} className="hover:text-blue-500 dark:hover:text-blue-400 transition">À propos</Link>
+                                <Link href={route('contact')} className="hover:text-blue-500 dark:hover:text-blue-400 transition">Contact</Link>
+                                <Link href={route('privacy.policy')} className="hover:text-blue-500 dark:hover:text-blue-400 transition">Politique de confidentialité</Link>
+                                <Link href={route('terms.of.service')} className="hover:text-blue-500 dark:hover:text-blue-400 transition">Conditions d'utilisation</Link>
                             </div>
+                            &copy; {new Date().getFullYear()} ProJA - Tous droits réservés.<br/>
                             Proja v{laravelVersion} (PHP v{phpVersion})
                         </footer>
                     </div>
