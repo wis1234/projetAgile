@@ -587,23 +587,6 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           </div>
         </motion.div>
 
-{/* Pied de page */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="text-center text-sm text-gray-500 dark:text-gray-400 pt-8 border-t border-gray-200 dark:border-gray-700 mt-8"
-        >
-          <div className="mb-3">
-            &copy; {new Date().getFullYear()} {t('app_name')} - {t('all_rights_reserved')}
-          </div>
-          <div className="flex flex-wrap justify-center gap-6 text-sm">
-            <Link href="/about" className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">À propos</Link>
-            <Link href="/contact" className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Contact</Link>
-            <Link href="/privacy-policy" className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Politique de confidentialité</Link>
-            <Link href="/terms-of-service" className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Conditions d'utilisation</Link>
-          </div>
-        </motion.div>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import Dropdown from '@/Components/Dropdown';
 import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link, usePage } from '@inertiajs/react';
+import GlobalFooter from '@/Components/GlobalFooter';
 import { useState } from 'react';
 
 export default function AuthenticatedLayout({ header, children }) {
@@ -238,20 +239,8 @@ export default function AuthenticatedLayout({ header, children }) {
             <main>{children}</main>
 
             {/* Footer */}
-            <footer className="mt-auto border-t border-gray-200 bg-white py-6 dark:border-gray-700 dark:bg-gray-800">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div className="flex flex-col items-center justify-center space-y-4 text-center">
-                        <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                            &copy; {new Date().getFullYear()} ProJA - Tous droits réservés.
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-6 text-sm">
-                            <Link href={route('about')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">À propos</Link>
-                            <Link href={route('contact')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Contact</Link>
-                            <Link href={route('privacy.policy')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Politique de confidentialité</Link>
-                            <Link href={route('terms.of.service')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Conditions d'utilisation</Link>
-                        </div>
-                    </div>
-                </div>
+            <footer className="mt-auto border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                <GlobalFooter />
             </footer>
         </div>
     );

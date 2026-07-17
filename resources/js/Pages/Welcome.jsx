@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import GlobalFooter from '@/Components/GlobalFooter';
 
 export default function Welcome({ auth, laravelVersion, phpVersion }) {
     const handleImageError = () => {
@@ -350,16 +351,10 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                             </div>
                         </main>
 
-                        <footer className="py-16 text-center text-sm text-black dark:text-white/70">
-                            <div className="mb-4 flex justify-center space-x-6">
-                                <Link href={route('about')} className="hover:text-blue-500 dark:hover:text-blue-400 transition">À propos</Link>
-                                <Link href={route('contact')} className="hover:text-blue-500 dark:hover:text-blue-400 transition">Contact</Link>
-                                <Link href={route('privacy.policy')} className="hover:text-blue-500 dark:hover:text-blue-400 transition">Politique de confidentialité</Link>
-                                <Link href={route('terms.of.service')} className="hover:text-blue-500 dark:hover:text-blue-400 transition">Conditions d'utilisation</Link>
-                            </div>
-                            &copy; {new Date().getFullYear()} ProJA - Tous droits réservés.<br/>
-                            Proja v{laravelVersion} (PHP v{phpVersion})
-                        </footer>
+                        {/* Footer Section */}
+                        <div className="bg-gray-50 border-t border-gray-200 dark:bg-gray-800 dark:border-gray-700 w-full mt-12 py-8">
+                            <GlobalFooter />
+                        </div>
                     </div>
                 </div>
             </div>

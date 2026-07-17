@@ -3,6 +3,7 @@ import { Link, usePage } from '@inertiajs/react';
 import Notification from '../Components/Notification';
 import { router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
+import GlobalFooter from '@/Components/GlobalFooter';
 
 const navLinks = [
   { href: '/dashboard', label: 'dashboard', icon: (
@@ -730,8 +731,13 @@ export default function AdminLayout({ children }) {
         <Notification message={flash.error} type="error" />
         <Notification message={flash.info} type="info" />
         {/* Page content */}
-        <main className="flex-1 w-full h-full transition-colors pt-16 bg-white dark:bg-gray-900">
-          {children}
+        <main className="flex-1 w-full h-full transition-colors pt-16 bg-white dark:bg-gray-900 flex flex-col">
+          <div className="flex-1">
+            {children}
+          </div>
+          <footer className="mt-auto border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <GlobalFooter />
+          </footer>
         </main>
       </div>
     </div>
