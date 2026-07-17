@@ -351,6 +351,12 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                         </main>
 
                         <footer className="py-16 text-center text-sm text-black dark:text-white/70">
+                            <div className="mb-4 flex justify-center space-x-6">
+                                <Link href={route('about')} className="hover:text-black dark:hover:text-white">About</Link>
+                                <Link href={route('contact')} className="hover:text-black dark:hover:text-white">Contact</Link>
+                                <Link href={route('privacy.policy')} className="hover:text-black dark:hover:text-white">Privacy Policy</Link>
+                                <Link href={route('terms.of.service')} className="hover:text-black dark:hover:text-white">Terms of Service</Link>
+                            </div>
                             Proja v{laravelVersion} (PHP v{phpVersion})
                         </footer>
                     </div>

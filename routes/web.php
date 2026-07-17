@@ -23,6 +23,11 @@ Route::get('/', function () {
     ]);
 });
 
+Route::get('/about', function () { return Inertia::render('About'); })->name('about');
+Route::get('/contact', function () { return Inertia::render('Contact'); })->name('contact');
+Route::get('/privacy-policy', function () { return Inertia::render('PrivacyPolicy'); })->name('privacy.policy');
+Route::get('/terms-of-service', function () { return Inertia::render('TermsOfService'); })->name('terms.of.service');
+
 Route::get('/api/users/search', [\App\Http\Controllers\UserSearchController::class, 'index'])
     ->name('api.users.search')
     ->middleware(['auth']);

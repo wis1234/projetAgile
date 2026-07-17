@@ -13,6 +13,14 @@ export default function GuestLayout({ children }) {
             <div className="mt-6 w-full overflow-hidden bg-white px-6 py-4 shadow-md sm:max-w-md sm:rounded-lg">
                 {children}
             </div>
+
+            {/* Footer */}
+            <div className="mt-8 text-center flex space-x-4">
+                <Link href={route('about')} className="text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition">About</Link>
+                <Link href={route('contact')} className="text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition">Contact</Link>
+                <Link href={route('privacy.policy')} className="text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition">Privacy Policy</Link>
+                <Link href={route('terms.of.service')} className="text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition">Terms</Link>
+            </div>
         </div>
     );
 }
