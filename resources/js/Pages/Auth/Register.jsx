@@ -160,8 +160,9 @@ export default function Register() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 font-sans p-4 sm:p-6 overflow-hidden">
-            <div className="flex flex-col md:flex-row w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 font-sans p-4 sm:p-6 overflow-hidden">
+            <div className="flex-1 flex flex-col justify-center w-full max-w-4xl mx-auto">
+                <div className="flex flex-col md:flex-row w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
                 {/* Left Panel: Branding - Visible uniquement sur desktop */}
                 <div className="hidden md:flex flex-col justify-center items-center w-full md:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-white text-center">
                     <h1 className="text-4xl font-bold mb-4">Bienvenue sur ProjA</h1>
@@ -328,6 +329,20 @@ export default function Register() {
                             </Link>
                         </p>
                     </div>
+                </div>
+            </div>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-8 mb-2 w-full text-center">
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                    &copy; {new Date().getFullYear()} ProJA - Tous droits réservés.
+                </div>
+                <div className="flex flex-wrap justify-center gap-4 text-sm">
+                    <Link href={route('about')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">À propos</Link>
+                    <Link href={route('contact')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Contact</Link>
+                    <Link href={route('privacy.policy')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Politique de confidentialité</Link>
+                    <Link href={route('terms.of.service')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Conditions d'utilisation</Link>
                 </div>
             </div>
         </div>
