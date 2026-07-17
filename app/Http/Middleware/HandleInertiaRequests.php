@@ -2,7 +2,7 @@
 namespace App\Http\Middleware;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
-use Closure;
+
 class HandleInertiaRequests extends Middleware
 {
     /**
@@ -11,27 +11,6 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
-    /**
-     * Determine the current asset version.
-     */
-    public function version(Request $request): ?string
-    {
-        return parent::version($request);
-    }
-    
-    public function handle($request, Closure $next)
-{
-    $response = parent::handle($request, $next);
-    // 🔥 Si ce n'est pas une requête Inertia, forcer HTML
-    if (!$request->header('X-Inertia')) {
-        if ($response instanceof \Inertia\Response) {
-            return response()->view('app', [
-                'page' => $response->toArray()
-            ]);
-        }
-    }
-    return $response;
-}
     /**
      * Define the props that are shared by default.
      *
