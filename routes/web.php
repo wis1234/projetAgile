@@ -58,7 +58,7 @@ Route::prefix('push')->group(function () {
 
 
     // Test d'envoi de notification (à supprimer ou protéger en production)
-    Route::post('/test', [
+    Route::get('/test', [
         \App\Http\Controllers\PushSubscriptionController::class,
         'test'
     ])->name('push.test');
