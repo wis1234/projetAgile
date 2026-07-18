@@ -16,6 +16,7 @@
         "laravel/tinker": "^2.10.1",
         "laravel/ui": "^4.6",
         "maatwebsite/excel": "^3.1",
+        "minishlink/web-push": "*",
         "phpoffice/phpword": "^1.4",
         "spatie/flysystem-dropbox": "^3.0",
         "spatie/laravel-activitylog": "^4.10",
