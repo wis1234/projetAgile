@@ -4,6 +4,7 @@ import Notification from '../Components/Notification';
 import { router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import GlobalFooter from '@/Components/GlobalFooter';
+import PushNotificationManager from '@/Components/PushNotificationManager';
 
 const navLinks = [
   { href: '/dashboard', label: 'dashboard', icon: (
@@ -55,6 +56,7 @@ const Loader = () => {
   
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
+      <PushNotificationManager />
       <div className="flex space-x-1 mb-8">
         {letters.map((letter, index) => (
           <span 
