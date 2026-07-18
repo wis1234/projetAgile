@@ -11,30 +11,40 @@ class PushSubscriptionController extends Controller
     /**
      * Enregistrer un nouvel abonnement push pour l'utilisateur connecté.
      */
-    public function store(Request $request): JsonResponse
-    {
-        $request->validate([
-            'endpoint'                       => 'required|url',
-            'keys.p256dh'                    => 'required|string',
-            'keys.auth'                      => 'required|string',
-            'expirationTime'                 => 'nullable',
-        ]);
+public function store(Request $request): JsonResponse
+{
+    $request->validate([
+        'endpoint' => 'required|url',
+        'keys.p256dh' => 'required|string',
+        'keys.auth' => 'required|string',
+    ]);
 
-        $user = $request->user();
+    $user = $request->user();
 
-        // Upsert : met à jour si l'endpoint existe déjà, sinon crée
-        PushSubscription::updateOrCreate(
-            ['endpoint' => $request->endpoint],
-            [
-                'user_id'          => $user?->id,
-                'public_key'       => $request->input('keys.p256dh'),
-                'auth_token'       => $request->input('keys.auth'),
-                'content_encoding' => 'aesgcm',
-            ]
-        );
-
-        return response()->json(['status' => 'subscribed'], 201);
+    if (!$user) {
+        return response()->json([
+            'error' => 'Non authentifié'
+        ], 401);
     }
+
+
+    PushSubscription::updateOrCreate(
+        [
+            'endpoint' => $request->endpoint
+        ],
+        [
+            'user_id' => $user->id,
+            'public_key' => $request->input('keys.p256dh'),
+            'auth_token' => $request->input('keys.auth'),
+            'content_encoding' => 'aes128gcm',
+        ]
+    );
+
+
+    return response()->json([
+        'status' => 'subscribed'
+    ], 201);
+}
 
     /**
      * Supprimer un abonnement (désabonnement).

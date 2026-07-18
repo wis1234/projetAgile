@@ -11,19 +11,22 @@ class WebPushService
 {
     private WebPush $webPush;
 
-    public function __construct()
-    {
-        $auth = [
-            'VAPID' => [
-                'subject'    => config('app.url'),
-                'publicKey'  => config('webpush.vapid.public_key'),
-                'privateKey' => config('webpush.vapid.private_key'),
-            ],
-        ];
+public function __construct()
+{
+    $auth = [
+        'VAPID' => [
+            'subject'    => config('webpush.vapid.subject'),
+            'publicKey'  => config('webpush.vapid.public_key'),
+            'privateKey' => config('webpush.vapid.private_key'),
+        ],
+    ];
 
-        $this->webPush = new WebPush($auth);
-        $this->webPush->setDefaultOptions(['TTL' => 86400]); // 24h
-    }
+    $this->webPush = new WebPush($auth);
+
+    $this->webPush->setDefaultOptions([
+        'TTL' => 86400,
+    ]);
+}
 
     /**
      * Envoyer une notification push à un utilisateur spécifique

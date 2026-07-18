@@ -5,6 +5,22 @@ import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link, usePage } from '@inertiajs/react';
 import GlobalFooter from '@/Components/GlobalFooter';
 import { useState } from 'react';
+import PushNotificationManager from '@/Components/PushNotificationManager';
+
+export default function AuthenticatedLayout({children}) {
+
+    return (
+
+        <>
+            <PushNotificationManager />
+
+            {children}
+
+        </>
+
+    );
+}
+
 
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props.auth.user;

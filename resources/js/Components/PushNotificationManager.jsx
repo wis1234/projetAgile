@@ -34,59 +34,85 @@ export default function PushNotificationManager() {
         }
     }, []);
 
-    async function registerAndSubscribe() {
-        try {
-            // 1. Enregistrer le Service Worker
-            const registration = await navigator.serviceWorker.register('/sw.js', {
+ async function registerAndSubscribe() {
+
+    try {
+
+        const registration =
+            await navigator.serviceWorker.register('/sw.js', {
                 scope: '/',
             });
 
-            await navigator.serviceWorker.ready;
-            console.log('[Push] Service Worker enregistré');
 
-            // 2. Vérifier si déjà abonné
-            const existingSubscription = await registration.pushManager.getSubscription();
-            if (existingSubscription) {
-                setStatus('subscribed');
-                return;
-            }
+        await navigator.serviceWorker.ready;
 
-            // 3. Obtenir la clé VAPID publique depuis la meta tag
-            const vapidMeta = document.querySelector('meta[name="vapid-public-key"]');
-            if (!vapidMeta) {
-                console.error('[Push] Clé VAPID non trouvée dans le HTML');
-                return;
-            }
-            const vapidPublicKey = vapidMeta.content;
 
-            // 4. S'abonner
-            const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-            });
+        console.log('[Push] Service Worker enregistré');
 
-            // 5. Envoyer l'abonnement au serveur Laravel
-            const response = await fetch('/push/subscribe', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify(subscription.toJSON()),
-            });
 
-            if (response.ok) {
-                setStatus('subscribed');
-                console.log('[Push] Abonné avec succès !');
-            } else {
-                console.error('[Push] Erreur serveur lors de l\'abonnement');
-            }
+        const existingSubscription =
+            await registration.pushManager.getSubscription();
 
-        } catch (error) {
-            console.error('[Push] Erreur lors de l\'abonnement:', error);
+
+        if (existingSubscription) {
+
+            await saveSubscription(existingSubscription);
+
+            setStatus('subscribed');
+
+            console.log('[Push] Abonnement existant synchronisé');
+
+            return;
         }
+
+
+        const vapidMeta =
+            document.querySelector('meta[name="vapid-public-key"]');
+
+
+        if (!vapidMeta) {
+
+            console.error(
+                '[Push] Clé VAPID absente'
+            );
+
+            return;
+        }
+
+
+        const subscription =
+            await registration.pushManager.subscribe({
+
+                userVisibleOnly: true,
+
+                applicationServerKey:
+                    urlBase64ToUint8Array(
+                        vapidMeta.content
+                    ),
+
+            });
+
+
+        await saveSubscription(subscription);
+
+
+        setStatus('subscribed');
+
+
+        console.log(
+            '[Push] Nouvel abonnement enregistré'
+        );
+
+
+    } catch(error) {
+
+        console.error(
+            '[Push] Erreur:',
+            error
+        );
+
     }
+}
 
     async function requestPermission() {
         setStatus('requesting');

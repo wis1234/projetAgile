@@ -35,6 +35,36 @@ Route::get('/api/users/search', [\App\Http\Controllers\UserSearchController::cla
 
 // Routes protégées par authentification
 Route::middleware(['auth', 'verified'])->group(function () {
+
+
+// ============================================================
+// Web Push Notifications
+// ============================================================
+
+Route::prefix('push')->group(function () {
+
+    // Enregistrer l'abonnement du navigateur
+    Route::post('/subscribe', [
+        \App\Http\Controllers\PushSubscriptionController::class,
+        'store'
+    ])->name('push.subscribe');
+
+
+    // Supprimer l'abonnement
+    Route::delete('/unsubscribe', [
+        \App\Http\Controllers\PushSubscriptionController::class,
+        'destroy'
+    ])->name('push.unsubscribe');
+
+
+    // Test d'envoi de notification (à supprimer ou protéger en production)
+    Route::post('/test', [
+        \App\Http\Controllers\PushSubscriptionController::class,
+        'test'
+    ])->name('push.test');
+
+});
+
     // Routes Zoom
     Route::prefix('projects/{project}')->group(function () {
         Route::get('/zoom/active', [\App\Http\Controllers\ZoomMeetingController::class, 'active'])->name('api.zoom.active');
