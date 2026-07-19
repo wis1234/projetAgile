@@ -1,6 +1,8 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { Transition } from '@headlessui/react';
 import PrimaryButton from '@/Components/PrimaryButton';
+import PushNotificationManager from '@/Components/PushNotificationManager';
+
 
 const preferenceOptions = [
     {
@@ -131,6 +133,7 @@ export default function NotificationPreferencesForm({ notificationPreferences = 
                         </div>
                     </div>
                 </form>
+                <PushNotificationManager variant="inline" />
             </div>
         </section>
     );
