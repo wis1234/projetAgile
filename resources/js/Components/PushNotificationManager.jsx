@@ -11,6 +11,54 @@ function urlBase64ToUint8Array(base64String) {
     return new Uint8Array([...rawData].map((char) => char.charCodeAt(0)));
 }
 
+/**
+ * Récupère un jeton CSRF frais juste avant l'envoi de la requête,
+ * plutôt que de réutiliser celui (potentiellement périmé) du <meta>
+ * chargé au démarrage de la page.
+ */
+async function getFreshCsrfToken() {
+    const res = await fetch('/csrf-token', { credentials: 'same-origin' });
+    if (!res.ok) {
+        throw new Error(`[Push] Impossible de récupérer un jeton CSRF frais (${res.status})`);
+    }
+    const data = await res.json();
+    return data.token;
+}
+
+/**
+ * Envoie l'abonnement push au backend pour qu'il puisse
+ * ensuite déclencher des notifications côté serveur.
+ */
+async function saveSubscription(subscription) {
+    const csrfToken = await getFreshCsrfToken();
+
+    const response = await fetch('/push/subscribe', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(subscription.toJSON()),
+    });
+
+    if (response.status === 419) {
+        // Session expirée entre-temps : on recharge pour repartir sur une session propre
+        console.warn('[Push] Session expirée (419), rechargement de la page...');
+        window.location.reload();
+        return null;
+    }
+
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`[Push] Échec de l'enregistrement de l'abonnement (${response.status}) ${text}`);
+    }
+
+    return response.json().catch(() => null);
+}
+
 export default function PushNotificationManager() {
     const [status, setStatus] = useState('idle'); // idle | requesting | subscribed | denied | unsupported
 
@@ -34,85 +82,46 @@ export default function PushNotificationManager() {
         }
     }, []);
 
- async function registerAndSubscribe() {
-
-    try {
-
-        const registration =
-            await navigator.serviceWorker.register('/sw.js', {
+    async function registerAndSubscribe() {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js', {
                 scope: '/',
             });
 
+            await navigator.serviceWorker.ready;
 
-        await navigator.serviceWorker.ready;
+            console.log('[Push] Service Worker enregistré');
 
+            const existingSubscription = await registration.pushManager.getSubscription();
 
-        console.log('[Push] Service Worker enregistré');
+            if (existingSubscription) {
+                await saveSubscription(existingSubscription);
+                setStatus('subscribed');
+                console.log('[Push] Abonnement existant synchronisé');
+                return;
+            }
 
+            const vapidMeta = document.querySelector('meta[name="vapid-public-key"]');
 
-        const existingSubscription =
-            await registration.pushManager.getSubscription();
+            if (!vapidMeta) {
+                console.error('[Push] Clé VAPID absente');
+                return;
+            }
 
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidMeta.content),
+            });
 
-        if (existingSubscription) {
-
-            await saveSubscription(existingSubscription);
+            await saveSubscription(subscription);
 
             setStatus('subscribed');
 
-            console.log('[Push] Abonnement existant synchronisé');
-
-            return;
+            console.log('[Push] Nouvel abonnement enregistré');
+        } catch (error) {
+            console.error('[Push] Erreur:', error);
         }
-
-
-        const vapidMeta =
-            document.querySelector('meta[name="vapid-public-key"]');
-
-
-        if (!vapidMeta) {
-
-            console.error(
-                '[Push] Clé VAPID absente'
-            );
-
-            return;
-        }
-
-
-        const subscription =
-            await registration.pushManager.subscribe({
-
-                userVisibleOnly: true,
-
-                applicationServerKey:
-                    urlBase64ToUint8Array(
-                        vapidMeta.content
-                    ),
-
-            });
-
-
-        await saveSubscription(subscription);
-
-
-        setStatus('subscribed');
-
-
-        console.log(
-            '[Push] Nouvel abonnement enregistré'
-        );
-
-
-    } catch(error) {
-
-        console.error(
-            '[Push] Erreur:',
-            error
-        );
-
     }
-}
 
     async function requestPermission() {
         setStatus('requesting');
@@ -139,11 +148,14 @@ export default function PushNotificationManager() {
         return (
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-sm mx-auto">
                 <div className="bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-2xl shadow-2xl p-4 flex items-start gap-3 animate-bounce-in">
-                    {/* Icône cloche */}
                     <div className="flex-shrink-0 w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                            />
                         </svg>
                     </div>
 

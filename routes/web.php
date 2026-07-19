@@ -28,6 +28,13 @@ Route::get('/contact', function () { return Inertia::render('Contact'); })->name
 Route::get('/privacy-policy', function () { return Inertia::render('PrivacyPolicy'); })->name('privacy.policy');
 Route::get('/terms-of-service', function () { return Inertia::render('TermsOfService'); })->name('terms.of.service');
 
+
+Route::get('/csrf-token', function () {
+    return response()->json(['token' => csrf_token()])
+        ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+})->middleware('web')->name('csrf.token');
+
+
 Route::get('/api/users/search', [\App\Http\Controllers\UserSearchController::class, 'index'])
     ->name('api.users.search')
     ->middleware(['auth']);
@@ -40,6 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // ============================================================
 // Web Push Notifications
 // ============================================================
+    
 
 Route::prefix('push')->group(function () {
 

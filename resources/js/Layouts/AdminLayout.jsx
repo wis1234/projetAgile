@@ -56,7 +56,6 @@ const Loader = () => {
   
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
-      <PushNotificationManager />
       <div className="flex space-x-1 mb-8">
         {letters.map((letter, index) => (
           <span 
@@ -298,6 +297,7 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className="flex min-h-screen bg-white dark:bg-gray-900">
+        <PushNotificationManager />
       {globalLoading && <Loader />}
       {/* Sidebar */}
       <aside className={`fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}>
