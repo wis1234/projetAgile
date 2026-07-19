@@ -239,6 +239,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'school_id', // Ajouté pour la relation avec l'école
         // Champs d'abonnement
         'current_subscription_id',
+        'share_discussions_by_email',
         'subscription_ends_at',
         'is_subscribed',
         'subscription_status',

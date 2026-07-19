@@ -2046,7 +2046,7 @@ const handleReplyComment = (commentId) => {
         <svg className="w-3.5 h-3.5 text-yellow-200 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.598c.75 1.336-.213 3.003-1.742 3.003H3.48c-1.53 0-2.492-1.667-1.742-3.003L8.257 3.1zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-2a.75.75 0 01-.75-.75v-3.5a.75.75 0 011.5 0v3.5c0 .414-.336.75-.75.75z" clipRule="evenodd" />
         </svg>
-        <span>{t('task_details.messages_sent_to_mailbox')}</span>
+      {/*  <span>{t('task_details.messages_sent_to_mailbox')}</span> */}
 
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-5">
 
@@ -2062,8 +2062,7 @@ const handleReplyComment = (commentId) => {
 
             <p className="text-sm text-gray-500 mt-1">
 
-                Lorsque cette option est activée, les nouveaux messages
-                seront également envoyés à votre adresse email.
+         
 
             </p>
 
