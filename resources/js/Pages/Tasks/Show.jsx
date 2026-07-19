@@ -2073,7 +2073,7 @@ const handleReplyComment = (commentId) => {
 
             <input
                 type="checkbox"
-                checked={discussionEmailEnabled}
+                checked={shareDiscussionEmail}
                 onChange={toggleDiscussionEmail}
                 className="sr-only peer"
             />
