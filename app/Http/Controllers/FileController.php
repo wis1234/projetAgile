@@ -311,14 +311,11 @@ foreach ($usersToNotify as $user) {
 
     $user->notify($notification);
 
-    // Web Push
+// Web Push
     $user->notify(new \App\Notifications\ProjaNotification(
         'Nouveau fichier ajouté',
         "Un fichier {$fileModel->name} a été ajouté dans la tâche {$task->title}",
-        [
-            'url' => route('files.show', $fileModel->id),
-            'type' => 'file_upload'
-        ]
+        route('files.show', $fileModel->id)
     ));
 }
                 }
@@ -537,15 +534,16 @@ foreach ($usersToNotify as $user) {
                     ]
                 ));
 
-                //web push
+//web push
 
                 $user->notify(new \App\Notifications\ProjaNotification(
-    'Nouveau fichier ajouté',
-    "{$currentUser->name} a ajouté le fichier {$fileModel->name} dans la tâche {$task->title}",
-    route('files.show', $fileModel->id),
-    '/logo-proja.png',
-    'file-upload'
-));
+                    'Statut de fichier mis à jour',
+                    $message,
+                    route('files.show', $file->id),
+                    '/logo-proja.png',
+                    'file-status'
+                ));
+                
 
             }
         }
