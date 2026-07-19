@@ -5,29 +5,100 @@ import {
   FaFileAlt, FaUpload, FaPlus, FaSave, FaTimes,
   FaInfoCircle, FaFileWord, FaFilePdf, FaFileExcel,
   FaFileImage, FaFileCode, FaArrowLeft, FaCheckCircle,
-  FaExclamationCircle, FaCloudUploadAlt, FaFile
+  FaExclamationCircle, FaCloudUploadAlt, FaFile, FaShieldAlt
 } from 'react-icons/fa';
 
-// ─── CSRF helper : relit le token depuis le DOM à chaque appel ───────────────
+// ─── CSRF helpers ─────────────────────────────────────────────────────────────
 function getCsrfToken() {
   return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 }
 
-// ─── Renouvelle le token CSRF via un HEAD discret ───────────────────────────
-async function refreshCsrfToken() {
-  try {
-    const res = await fetch(window.location.href, {
-      method: 'HEAD',
-      credentials: 'same-origin',
-    });
-    // Laravel renvoie le nouveau token dans le cookie XSRF-TOKEN
-    // L'interception Axios / Inertia le gère automatiquement,
-    // mais la balise meta doit aussi être mise à jour.
-    const freshToken = getCsrfToken();
-    return freshToken;
-  } catch {
-    return getCsrfToken();
+/**
+ * Récupère un jeton CSRF frais en rechargeant discrètement le HTML de la page
+ * courante en arrière-plan (aucune navigation visible), puis en extrayant la
+ * nouvelle balise meta. Nécessaire car Laravel ne rafraîchit pas le jeton
+ * exposé côté client tant que la page n'est pas rechargée.
+ */
+async function fetchFreshCsrfToken() {
+  const response = await fetch(window.location.pathname + window.location.search, {
+    method: 'GET',
+    credentials: 'same-origin',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    cache: 'no-store',
+  });
+
+  const html = await response.text();
+  const match = html.match(/<meta\s+name=["']csrf-token["']\s+content=["']([^"']+)["']/i);
+
+  if (!match || !match[1]) {
+    throw new Error('Impossible de renouveler le jeton de sécurité. Veuillez rafraîchir la page.');
   }
+
+  const metaTag = document.querySelector('meta[name="csrf-token"]');
+  if (metaTag) metaTag.setAttribute('content', match[1]);
+
+  return match[1];
+}
+
+// ─── Upload avec suivi de progression réel (XHR) ─────────────────────────────
+/**
+ * Envoie le FormData via XMLHttpRequest pour obtenir la progression réelle
+ * de l'upload (impossible avec fetch()). Gère automatiquement le
+ * renouvellement du jeton CSRF en cas de 419, de façon transparente :
+ * la même requête (mêmes données) est rejouée une seule fois, sans que
+ * l'utilisateur ait besoin de recommencer sa saisie.
+ */
+function uploadWithProgress(url, formData, { onProgress, onStatusChange } = {}) {
+  const attempt = (isRetry = false) => new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.setRequestHeader('X-CSRF-TOKEN', getCsrfToken());
+    xhr.timeout = 90_000;
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        // Les 10 derniers % sont réservés à la finalisation côté serveur
+        const pct = Math.min(90, Math.round((e.loaded / e.total) * 90));
+        onProgress(pct);
+      }
+    };
+
+    xhr.onload = async () => {
+      if (xhr.status === 419 && !isRetry) {
+        try {
+          onStatusChange?.('security');
+          await fetchFreshCsrfToken();
+          resolve(await attempt(true));
+        } catch (err) {
+          reject(err);
+        }
+        return;
+      }
+
+      let data;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        reject(new Error('Réponse serveur invalide.'));
+        return;
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+        resolve(data);
+      } else {
+        reject(new Error(data.message || `Erreur HTTP ${xhr.status}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Erreur réseau. Vérifiez votre connexion.'));
+    xhr.ontimeout = () => reject(new Error('La requête a expiré. Réessayez avec un fichier plus petit.'));
+
+    xhr.send(formData);
+  });
+
+  return attempt(false);
 }
 
 // ─── File icon helper ────────────────────────────────────────────────────────
@@ -62,6 +133,51 @@ function Banner({ type, message, onClose }) {
   );
 }
 
+// ─── Modal de progression d'import ────────────────────────────────────────────
+function UploadProgressModal({ visible, fileName, progress, stage }) {
+  if (!visible) return null;
+
+  const stageLabel = {
+    uploading: 'Envoi du fichier en cours…',
+    security: 'Renouvellement de la session de sécurité…',
+    finalizing: 'Finalisation de l\'import…',
+    done: 'Import terminé avec succès',
+  }[stage] || 'Préparation de l\'envoi…';
+
+  return (
+    <div className="cf-modal-backdrop" role="dialog" aria-modal="true" aria-busy={stage !== 'done'}>
+      <div className="cf-modal-card cf-fade-up">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="cf-modal-icon">
+            {stage === 'done'
+              ? <FaCheckCircle className="h-5 w-5 text-emerald-500" />
+              : <FaCloudUploadAlt className="h-5 w-5 text-indigo-500" />}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
+              {fileName || 'Votre fichier'}
+            </p>
+            <p className="text-xs text-slate-400">{stageLabel}</p>
+          </div>
+        </div>
+
+        <div className="cf-progress-track">
+          <div className="cf-progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+
+        <div className="flex justify-between items-center mt-2">
+          <span className="text-[11px] text-slate-400 cf-mono">{progress}%</span>
+          {stage === 'security' && (
+            <span className="text-[11px] text-amber-500 flex items-center gap-1">
+              <FaShieldAlt className="h-3 w-3" /> Nouvelle tentative automatique
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 function Create({ projects, users, tasks = [], kanbans = [] }) {
   const { errors = {}, flash = {}, auth } = usePage().props;
@@ -82,6 +198,11 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
   const [notificationType, setNotificationType] = useState(flash.success ? 'success' : 'error');
   const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  // ── État de la modal de progression ─────────────────────────────────────
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState('idle'); // idle | uploading | security | finalizing | done
+  const [uploadFileName, setUploadFileName] = useState('');
 
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
@@ -114,38 +235,13 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
     if (urlTaskId) setTaskId(urlTaskId);
   }, [urlProjectId, urlTaskId]);
 
-  // ── Submit with CSRF-refresh retry ─────────────────────────────────────────
-  const doRequest = useCallback(async (formData, isRetry = false) => {
-    const token = getCsrfToken();
-    const response = await fetch('/files', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-TOKEN': token,
-      },
-      body: formData,
-    });
-
-    // 419 = CSRF token mismatch → refresh & retry once
-    if (response.status === 419 && !isRetry) {
-      await refreshCsrfToken();
-      return doRequest(formData, true);
-    }
-
-    return response;
-  }, []);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setNotification('');
 
     if (!projectId) {
       setNotification('Veuillez sélectionner un projet.');
       setNotificationType('error');
-      setLoading(false);
       return;
     }
 
@@ -154,11 +250,14 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
       formData.append('name', name);
       formData.append('project_id', projectId);
 
+      let finalFileName = name;
       if (file) {
         formData.append('file', file);
+        finalFileName = file.name;
       } else if (content) {
+        finalFileName = name.endsWith('.txt') ? name : `${name}.txt`;
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        formData.append('file', blob, name.endsWith('.txt') ? name : `${name}.txt`);
+        formData.append('file', blob, finalFileName);
       } else {
         throw new Error('Aucun contenu fourni.');
       }
@@ -167,19 +266,21 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
       if (kanbanId)    formData.append('kanban_id', kanbanId);
       if (description) formData.append('description', description);
 
-      const controller = new AbortController();
-      const timeoutId  = setTimeout(() => controller.abort(), 60_000);
+      setLoading(true);
+      setUploadFileName(finalFileName);
+      setUploadStage('uploading');
+      setUploadProgress(2);
 
-      const response = await doRequest(formData);
-      clearTimeout(timeoutId);
+      const data = await uploadWithProgress('/files', formData, {
+        onProgress: (pct) => setUploadProgress(pct),
+        onStatusChange: (stage) => setUploadStage(stage),
+      });
 
-      const text = await response.text();
-      let data;
-      try { data = JSON.parse(text); }
-      catch { throw new Error('Réponse serveur invalide.'); }
-
-      if (!response.ok) throw new Error(data.message || `Erreur HTTP ${response.status}`);
-      if (!data.success) throw new Error(data.message || 'Échec de la création.');
+      setUploadStage('finalizing');
+      setUploadProgress(97);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      setUploadStage('done');
+      setUploadProgress(100);
 
       setNotification('Fichier créé avec succès — redirection…');
       setNotificationType('success');
@@ -187,16 +288,15 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
       setTimeout(() => {
         const target = taskId ? `/tasks/${taskId}` : data.data?.id ? `/files/${data.data.id}` : '/files';
         window.location.href = target;
-      }, 1200);
+      }, 600);
 
     } catch (err) {
-      const msg = err.name === 'AbortError'
-        ? 'La requête a expiré. Vérifiez votre connexion ou réessayez avec un fichier plus petit.'
-        : err.message || 'Une erreur est survenue.';
+      setLoading(false);
+      setUploadStage('idle');
+      setUploadProgress(0);
+      const msg = err.message || 'Une erreur est survenue.';
       setNotification(msg);
       setNotificationType('error');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -428,6 +528,46 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
         .cf-delay-1 { animation-delay: .05s; }
         .cf-delay-2 { animation-delay: .1s; }
         .cf-delay-3 { animation-delay: .15s; }
+
+        /* ── Modal de progression d'import ─────────────────────────────── */
+        .cf-modal-backdrop {
+          position: fixed; inset: 0; z-index: 100;
+          background: rgba(15,23,42,0.35);
+          backdrop-filter: blur(3px);
+          -webkit-backdrop-filter: blur(3px);
+          display: flex; align-items: center; justify-content: center;
+          padding: 1rem;
+        }
+        .cf-modal-card {
+          width: 100%; max-width: 380px;
+          background: #fff;
+          border-radius: 1rem;
+          padding: 1.5rem;
+          box-shadow: 0 20px 60px rgba(0,0,0,.25);
+          border: 1px solid #e8edf5;
+        }
+        .dark .cf-modal-card {
+          background: #0f172a;
+          border-color: rgba(255,255,255,.08);
+        }
+        .cf-modal-icon {
+          width: 2.5rem; height: 2.5rem; border-radius: .75rem;
+          background: #eef2ff;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+        }
+        .dark .cf-modal-icon { background: rgba(99,102,241,.15); }
+
+        .cf-progress-track {
+          width: 100%; height: 6px; border-radius: 999px;
+          background: #eef1f7; overflow: hidden;
+        }
+        .dark .cf-progress-track { background: rgba(255,255,255,.08); }
+        .cf-progress-fill {
+          height: 100%; border-radius: 999px;
+          background: linear-gradient(90deg, #6366f1, #3b82f6);
+          transition: width .25s ease;
+        }
       `}</style>
 
       <div className="cf-root min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 py-8">
@@ -689,6 +829,13 @@ function Create({ projects, users, tasks = [], kanbans = [] }) {
           </div>
         </div>
       </div>
+
+      <UploadProgressModal
+        visible={loading}
+        fileName={uploadFileName}
+        progress={uploadProgress}
+        stage={uploadStage}
+      />
     </>
   );
 }

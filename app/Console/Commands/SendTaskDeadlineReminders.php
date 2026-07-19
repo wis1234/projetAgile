@@ -6,6 +6,7 @@ use App\Models\Task;
 use Carbon\Carbon;
 use App\Notifications\TaskDeadlineReminder;
 use Illuminate\Console\Command;
+use App\Notifications\ProjaNotification;
 
 class SendTaskDeadlineReminders extends Command
 {
@@ -59,14 +60,25 @@ class SendTaskDeadlineReminders extends Command
 
         foreach ($tasks as $task) {
             if ($task->assignedUser) {
-// Vérifier si une notification a déjà été envoyée récemment
+                // Vérifier si une notification a déjà été envoyée récemment
                 $lastNotification = $task->notifications()
                     ->where('type', 'App\\Notifications\\TaskDeadlineReminder')
                     ->where('created_at', '>=', $now->copy()->subHours(24))
                     ->first();
 
                 if (!$lastNotification) {
+                    // Notification email existante
                     $task->assignedUser->notify(new TaskDeadlineReminder($task));
+
+                    // Notification Web Push + database
+                    $task->assignedUser->notify(
+                        new ProjaNotification(
+                            '⏰ Échéance imminente',
+                            'La tâche "'.$task->title.'" arrive à échéance bientôt.',
+                            '/tasks/'.$task->id
+                        )
+                    );
+
                     $task->update(['deadline_notification_sent_at' => $now]);
                 }
                 $this->info("Notification envoyée pour la tâche #{$task->id} - {$task->title} à {$task->assignedUser->email}");

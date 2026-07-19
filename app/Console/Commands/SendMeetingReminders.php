@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\MeetingStartedNotification;
+use App\Notifications\ProjaNotification;
 use Illuminate\Support\Facades\Notification;
 
 class SendMeetingReminders extends Command
@@ -75,6 +76,27 @@ class SendMeetingReminders extends Command
                                 \Log::error("Erreur d'envoi de notification à " . $user->email, [
                                     'error' => $mailException->getMessage(),
                                     'trace' => $mailException->getTraceAsString()
+                                ]);
+                            }
+
+                            // Notification Web Push + database (indépendante du mail)
+                            try {
+                                $user->notify(
+                                    new ProjaNotification(
+                                        '📹 Réunion en cours',
+                                        'La réunion "'.$meeting->topic.'" commence maintenant.',
+                                        route('projects.meetings.show', [
+                                            'project' => $project->id,
+                                            'meeting' => $meeting->id
+                                        ])
+                                    )
+                                );
+                                $this->info("Notification push envoyée à " . $user->email . " pour la réunion: " . $meeting->topic);
+                            } catch (\Exception $pushException) {
+                                $this->error("Erreur d'envoi push à " . $user->email . ": " . $pushException->getMessage());
+                                \Log::error("Erreur d'envoi de notification push à " . $user->email, [
+                                    'error' => $pushException->getMessage(),
+                                    'trace' => $pushException->getTraceAsString()
                                 ]);
                             }
                         }
