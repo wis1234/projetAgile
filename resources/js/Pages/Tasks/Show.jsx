@@ -1140,52 +1140,57 @@ const handleReplyComment = (commentId) => {
 
 
   return (
-  <div className="flex flex-col w-full bg-white dark:bg-gray-950 h-screen overflow-hidden">
-    <div className="flex-shrink-0 w-full pt-4 px-4 sm:px-6 lg:px-8">
+    <div className="flex flex-col w-full bg-white dark:bg-gray-950 p-0 m-0 min-h-screen">
+      <div className="flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
         
         {/* Section En-tête */}
-{/* Section En-tête (compacte) */}
-<div className="flex items-center justify-between gap-3 mb-3 flex-shrink-0">
-  <div className="flex items-center gap-2 min-w-0">
-    <Link 
-      href="/tasks" 
-      className="flex-shrink-0 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 p-2 rounded-lg transition duration-200"
-    >
-      <FaArrowLeft className="text-base" />
-    </Link>
-    <h1 className="text-base font-semibold text-gray-700 dark:text-gray-200 truncate">
-      {task.title}
-    </h1>
-    {process.env.NODE_ENV !== 'production' && (
-      <span className="text-[10px] text-gray-400 flex-shrink-0">
-        ({isAdmin ? 'Admin' : isProjectManager ? 'Manager' : 'Membre'})
-      </span>
-    )}
-  </div>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+          <div className="flex items-center gap-4">
+            {/* <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" /> */}
+            <Link 
+                href="/tasks" 
+                className="bg-white-600 hover:bg-blue-200 text-blue text-4xl text-blue-600 dark:text-blue-400 px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+              >
+                <FaArrowLeft className="text-lg sm:text-xl" />
+              </Link>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
+              {t('task_details.page_title')}
+              {process.env.NODE_ENV !== 'production' && (
+                <div className="text-xs text-gray-500 mt-1">
+                  Droits: {isAdmin ? 'Admin' : isProjectManager ? 'Manager' : 'Membre'}
+                </div>
+              )}
+            </h1>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-3">
+              {canEditTask && (
+                <>
+                  <Link 
+                    href={`/tasks/${task.id}/edit`} 
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+                  >
+                    <FaEdit /> 
+                    <span>{t('edit')}</span>
+                  </Link>
+                  <button
+                    onClick={handleDeleteTask}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+                  >
+                    <FaTrash /> 
+                    <span>{t('delete')}</span>
+                  </button>
+                </>
+              )}
+              
 
-  {canEditTask && (
-    <div className="flex items-center gap-1.5 flex-shrink-0">
-      <Link 
-        href={`/tasks/${task.id}/edit`} 
-        title={t('edit')}
-        className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800 dark:text-gray-400 dark:hover:text-blue-400 p-2 rounded-lg transition duration-200"
-      >
-        <FaEdit className="text-sm" />
-      </Link>
-      <button
-        onClick={handleDeleteTask}
-        title={t('delete')}
-        className="text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-gray-800 dark:text-gray-400 dark:hover:text-red-400 p-2 rounded-lg transition duration-200"
-      >
-        <FaTrash className="text-sm" />
-      </button>
-    </div>
-  )}
-</div>
-
+            </div>
+          </div>
+        </div>
 
         {/* Enhanced Tabs Navigation with Beautiful Buttons */}
-        <div className="mb-3">
+        <div className="mb-8">
 
   {/* Bande d'arrière-plan avec ombre douce */}
   <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-300 dark:border-gray-800 p-2">
@@ -1298,10 +1303,7 @@ const handleReplyComment = (commentId) => {
 
 
         {/* Tab Content */}
-          {/* Zone de contenu : scroll normal pour les autres tabs, scroll interne uniquement pour comments */}
-    <div className={`flex-1 min-h-0 px-4 sm:px-6 lg:px-8 pb-4 ${
-      activeTab === 'comments' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'
-    }`}>
+        <div>
           {activeTab === 'details' && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 mb-6">
@@ -2023,11 +2025,10 @@ const handleReplyComment = (commentId) => {
 
 
 {activeTab === 'comments' && (
-        <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+  <div className="flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8" style={{ height: '85vh', maxHeight: '800px' }}>
     
 {/* ─── HEADER STYLE WHATSAPP ─── */}
-    <div className="flex items-center justify-between px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white flex-shrink-0 shadow-md">
-
+<div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white flex-shrink-0 shadow-md">
   <div className="flex items-center gap-3">
     <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
       <FaCommentDots className="text-white text-lg" />
@@ -2071,7 +2072,7 @@ const handleReplyComment = (commentId) => {
     {/* ─── ZONE DES MESSAGES ─── */}
     <div
       id="chat-messages-container"
-      className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-2"
+      className="flex-1 overflow-y-auto px-4 py-4 space-y-2"
       style={{ background: 'var(--chat-bg, #ece5dd)', scrollBehavior: 'smooth' }}
     >
       <style>{`
