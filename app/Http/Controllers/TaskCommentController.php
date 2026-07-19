@@ -6,6 +6,9 @@ use App\Models\TaskComment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Notifications\ProjaNotification;
+use App\Events\TaskCommentPosted;
+use App\Events\TaskCommentDeleted;
+use App\Events\TaskCommentUpdated;
 
 class TaskCommentController extends Controller
 {
@@ -59,21 +62,7 @@ class TaskCommentController extends Controller
         $audioPath = null;
         if ($request->hasFile('audio')) {
             $audioPath = $request->file('audio')->store('task_comments/audio', 'public');
-       }
-       
-      // $audioPath = null;
-
-//if ($request->hasFile('audio')) {
-  //  try {
-    //    $path = $request->file('audio')->store('task_comments/audio', 'public');
-      //  $audioPath = 'public/' . $path; // on force le prefix public/
-    //} catch (\Exception $e) {
-      //  \Log::error('Erreur upload audio : ' . $e->getMessage());
-      //  return response()->json(['message' => 'Erreur lors du téléchargement de l’audio.'], 500);
-    //}
-//}
-        
-        
+        }
 
         $comment = TaskComment::create([
             'task_id' => $taskId,
@@ -86,6 +75,9 @@ class TaskCommentController extends Controller
         
         // Charger les relations nécessaires pour la réponse
         $comment->load('user', 'parent.user');
+
+        // ── Diffusion temps réel (WebSocket via Pusher) ──────────────────
+        event(new TaskCommentPosted($comment, (int) $taskId));
 
         // Envoyer la notification de commentaire
         $task = \App\Models\Task::with(['project.users', 'assignedUsers'])->findOrFail($taskId);
@@ -115,25 +107,24 @@ class TaskCommentController extends Controller
             });
         
         // Envoyer la notification à chaque utilisateur concerné
-foreach ($usersToNotify as $user) {
+        foreach ($usersToNotify as $user) {
 
-    // Notification existante (ne pas toucher)
-    $user->notify(
-        new \App\Notifications\TaskCommentNotification($task, $comment)
-    );
+            // Notification existante (ne pas toucher)
+            $user->notify(
+                new \App\Notifications\TaskCommentNotification($task, $comment)
+            );
 
-
-    // Nouvelle notification Web Push
-    $user->notify(
-        new ProjaNotification(
-            'Nouveau commentaire',
-            auth()->user()->name . ' a commenté la tâche "' . $task->title . '"',
-            '/tasks/' . $task->id,
-            null,
-            'task_comment'
-        )
-    );
-}
+            // Nouvelle notification Web Push
+            $user->notify(
+                new ProjaNotification(
+                    'Nouveau commentaire',
+                    auth()->user()->name . ' a commenté la tâche "' . $task->title . '"',
+                    '/tasks/' . $task->id,
+                    null,
+                    'task_comment'
+                )
+            );
+        }
         
         // Retourner la réponse avec le commentaire créé
         return response()->json([
@@ -150,6 +141,10 @@ foreach ($usersToNotify as $user) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
         $comment->delete();
+
+        // ── Diffusion temps réel (WebSocket via Pusher) ──────────────────
+        event(new TaskCommentDeleted((int) $commentId, (int) $taskId));
+
         return response()->json(['success' => true]);
     }
 
@@ -166,6 +161,10 @@ foreach ($usersToNotify as $user) {
         $comment->content = $request->content;
         $comment->save();
         $comment->load('user');
+
+        // ── Diffusion temps réel (WebSocket via Pusher) ──────────────────
+        event(new TaskCommentUpdated($comment, (int) $taskId));
+
         return response()->json($comment);
     }
-} 
+}
