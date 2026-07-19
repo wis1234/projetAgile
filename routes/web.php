@@ -34,6 +34,25 @@ Route::get('/csrf-token', function () {
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
 })->middleware('web')->name('csrf.token');
 
+use App\Models\User;
+use App\Notifications\ProjaNotification;
+
+Route::get('/test-push', function () {
+
+    $user = User::find(22); // ton utilisateur
+
+    $user->notify(
+
+        new ProjaNotification(
+            title: 'Test ProJA',
+            message: 'Votre système de notifications fonctionne.',
+            url: '/dashboard'
+        )
+
+    );
+
+    return 'Notification envoyée';
+});
 
 Route::get('/api/users/search', [\App\Http\Controllers\UserSearchController::class, 'index'])
     ->name('api.users.search')
