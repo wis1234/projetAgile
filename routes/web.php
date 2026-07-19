@@ -12,6 +12,10 @@ use App\Http\Controllers\FileVersionController;
 use App\Http\Controllers\FileAccessController;
 use Illuminate\Support\Facades\Artisan;
 
+use App\Models\User;
+use App\Notifications\ProjaNotification;
+
+
 
 
 Route::get('/', function () {
@@ -34,12 +38,22 @@ Route::get('/csrf-token', function () {
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
 })->middleware('web')->name('csrf.token');
 
-use App\Models\User;
-use App\Notifications\ProjaNotification;
 
-Route::get('/test-push', function () {
 
-    $user = User::find(1); // ton utilisateur
+
+Route::get('/api/users/search', [\App\Http\Controllers\UserSearchController::class, 'index'])
+    ->name('api.users.search')
+    ->middleware(['auth']);
+    
+
+// Routes protégées par authentification
+Route::middleware(['auth', 'verified'])->group(function () {
+    
+    
+    
+    Route::get('/test-push', function () {
+
+    $user = User::find(22); // ton utilisateur
 
     $user->notify(
 
@@ -53,14 +67,6 @@ Route::get('/test-push', function () {
 
     return 'Notification envoyée';
 });
-
-Route::get('/api/users/search', [\App\Http\Controllers\UserSearchController::class, 'index'])
-    ->name('api.users.search')
-    ->middleware(['auth']);
-    
-
-// Routes protégées par authentification
-Route::middleware(['auth', 'verified'])->group(function () {
 
 
 // ============================================================

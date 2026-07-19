@@ -2,12 +2,12 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Channels\ProjaWebPushChannel;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
-use NotificationChannels\WebPush\WebPushChannel;
-use NotificationChannels\WebPush\WebPushMessage;
 
-class ProjaNotification extends Notification
+class ProjaNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -38,7 +38,7 @@ class ProjaNotification extends Notification
     {
         return [
             'database',
-            WebPushChannel::class,
+            ProjaWebPushChannel::class,
         ];
     }
 
@@ -57,17 +57,16 @@ class ProjaNotification extends Notification
     }
 
     /**
-     * Notification Push navigateur.
+     * Payload envoyé au Service Worker (format attendu par WebPushService::sendToUser).
      */
     public function toWebPush($notifiable, $notification)
     {
-        return (new WebPushMessage)
-            ->title($this->title)
-            ->body($this->message)
-            ->icon($this->icon ?? '/logo.png')
-            ->tag($this->tag ?? 'proja')
-            ->data([
-                'url' => $this->url,
-            ]);
+        return [
+            'title' => $this->title,
+            'body'  => $this->message,
+            'url'   => $this->url ?? '/dashboard',
+            'icon'  => $this->icon ?? '/logo-proja.png',
+            'tag'   => $this->tag ?? 'proja',
+        ];
     }
 }
