@@ -21,16 +21,18 @@ class HandleInertiaRequests extends Middleware
         $auth = [
             'user' => null,
         ];
-        if ($request->user()) {
-            $auth['user'] = [
-                'id' => $request->user()->id,
-                'name' => $request->user()->name,
-                'email' => $request->user()->email,
-                'profile_photo_url' => $request->user()->profile_photo_url ?? null,
-                'notifications' => $request->user()->notifications()->latest()->take(20)->get(),
-                'unreadNotificationsCount' => $request->user()->unreadNotifications()->count(),
-            ];
-        }
+if ($request->user()) {
+    $auth['user'] = [
+        'id' => $request->user()->id,
+        'name' => $request->user()->name,
+        'email' => $request->user()->email,
+        'profile_photo_url' => $request->user()->profile_photo_url ?? null,
+        'notifications' => $request->user()->notifications()->latest()->take(20)->get(),
+        'unreadNotificationsCount' => $request->user()->unreadNotifications()->count(),
+        'share_discussions_by_email' => (bool) $request->user()->share_discussions_by_email,
+    ];
+}
+
         return [
             ...parent::share($request),
             'auth' => $auth,

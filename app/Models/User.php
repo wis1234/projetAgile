@@ -291,6 +291,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'is_subscribed' => 'boolean',
         'bank_details_verified_at' => 'datetime',
         'notification_preferences' => 'array',
+            'share_discussions_by_email' => 'boolean', // ajouté
+
     ];
 
     /**
