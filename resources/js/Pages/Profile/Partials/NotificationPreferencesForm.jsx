@@ -133,7 +133,8 @@ export default function NotificationPreferencesForm({ notificationPreferences = 
                         </div>
                     </div>
                 </form>
-                <PushNotificationManager variant="inline" />
+                <PushNotificationManager />
+                
             </div>
         </section>
     );
