@@ -608,6 +608,10 @@
   "cta": "Voir les offres"
 },
 
+"email_copy_enabled": "Copie par email activée — cliquez pour désactiver",
+"email_copy_disabled": "Recevoir une copie des messages par email",
+"share_discussions_by_email": "Partager les échanges par email",
+
 "attention": "Attention",
 "task_lock_alert_intro_before": "Le délai alloué au(x) sprint(s)/objectif(s) suivant(s) est dépassé. Toutes les tâches non terminées y afférentes sont",
 "task_lock_alert_intro_locked_word": "bloquées",

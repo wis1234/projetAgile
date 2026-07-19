@@ -2027,46 +2027,47 @@ const handleReplyComment = (commentId) => {
 {activeTab === 'comments' && (
   <div className="flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8" style={{ height: '85vh', maxHeight: '800px' }}>
     
-    {/* ─── HEADER STYLE WHATSAPP ─── */}
-<div className="flex items-center justify-between px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white flex-shrink-0">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-          <FaCommentDots className="text-white text-lg" />
-        </div>
-        <div>
-          <p className="font-semibold text-sm leading-tight">Discussions</p>
-          <p className="text-xs text-blue-100">
-            {loadingComments
-              ? t('task_details.loading_comments')
-              : `${comments.length} message${comments.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-      </div>
-<label
-  className="flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none"
-  title={shareDiscussionEmail
-    ? t('task_details.email_copy_enabled')
-    : t('task_details.email_copy_disabled')}
->
-  <FaEnvelope
-    className={`w-3.5 h-3.5 flex-shrink-0 transition-colors duration-200 ${
-      shareDiscussionEmail ? 'text-white' : 'text-blue-200'
-    }`}
-  />
-
-  <input
-    type="checkbox"
-    checked={shareDiscussionEmail}
-    onChange={toggleDiscussionEmail}
-    aria-label={t('task_details.share_discussions_by_email')}
-    className="sr-only peer"
-  />
-
-  <span className="relative w-8 h-4 rounded-full bg-white/25 peer-checked:bg-white transition-colors duration-200">
-    <span className="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white peer-checked:bg-blue-600 shadow-sm transition-transform duration-200 peer-checked:translate-x-4" />
-  </span>
-</label>
+{/* ─── HEADER STYLE WHATSAPP ─── */}
+<div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white flex-shrink-0 shadow-md">
+  <div className="flex items-center gap-3">
+    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+      <FaCommentDots className="text-white text-lg" />
     </div>
+    <div>
+      <p className="font-semibold text-sm leading-tight">Discussions</p>
+      <p className="text-xs text-blue-100">
+        {loadingComments
+          ? t('task_details.loading_comments')
+          : `${comments.length} message${comments.length !== 1 ? 's' : ''}`}
+      </p>
+    </div>
+  </div>
+
+  <label
+    className="flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none"
+    title={shareDiscussionEmail
+      ? t('task_details.email_copy_enabled')
+      : t('task_details.email_copy_disabled')}
+  >
+    <FaEnvelope
+      className={`w-3.5 h-3.5 flex-shrink-0 transition-colors duration-200 ${
+        shareDiscussionEmail ? 'text-white' : 'text-blue-200'
+      }`}
+    />
+
+    <input
+      type="checkbox"
+      checked={shareDiscussionEmail}
+      onChange={toggleDiscussionEmail}
+      aria-label={t('task_details.share_discussions_by_email')}
+      className="sr-only peer"
+    />
+
+    <span className="relative w-8 h-4 rounded-full bg-white/25 peer-checked:bg-white transition-colors duration-200">
+      <span className="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white peer-checked:bg-blue-600 shadow-sm transition-transform duration-200 peer-checked:translate-x-4" />
+    </span>
+  </label>
+</div>
 
     {/* ─── ZONE DES MESSAGES ─── */}
     <div
