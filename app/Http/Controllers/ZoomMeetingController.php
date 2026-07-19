@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use App\Notifications\MeetingReminder;
+use App\Notifications\ProjaNotification;
+
 
 class ZoomMeetingController extends Controller
 {
@@ -150,15 +152,51 @@ class ZoomMeetingController extends Controller
                         'is_reminder' => $isReminder
                     ]);
 
-                    foreach ($project->users as $user) {
-                        try {
-                            $notification = new MeetingReminder($meeting, $isReminder);
-                            $user->notify($notification);
-                            Log::info('Notification envoyée à l\'utilisateur', ['user_id' => $user->id]);
-                        } catch (\Exception $e) {
-                            Log::warning('Erreur lors de l\'envoi de notification à l\'utilisateur ' . $user->id . ': ' . $e->getMessage());
-                        }
-                    }
+foreach ($project->users as $user) {
+    try {
+
+        // 1) Notification email existante
+        $user->notify(
+            new MeetingReminder($meeting, $isReminder)
+        );
+
+
+        // 2) Notification Web Push + database Proja
+        $user->notify(
+            new \App\Notifications\ProjaNotification(
+                $isReminder
+                    ? "🔔 Rappel de réunion"
+                    : "📅 Nouvelle réunion",
+
+                $isReminder
+                    ? "La réunion '{$meeting->topic}' va commencer bientôt."
+                    : "Une nouvelle réunion '{$meeting->topic}' a été créée.",
+
+                route('projects.meetings.show', [
+                    'project' => $project->id,
+                    'meeting' => $meeting->id
+                ]),
+
+                '/logo-proja.png',
+
+                'meeting-'.$meeting->id
+            )
+        );
+
+
+        Log::info('Notifications envoyées à l\'utilisateur', [
+            'user_id' => $user->id
+        ]);
+
+
+    } catch (\Exception $e) {
+
+        Log::warning(
+            'Erreur notification utilisateur '.$user->id.': '.$e->getMessage()
+        );
+
+    }
+}
                 }
 
                 // Préparer la réponse

@@ -15,6 +15,8 @@ use ZipArchive;
 use Illuminate\Support\Facades\App;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Hash;
+use App\Notifications\ProjaNotification;
+
 
 // Charger le helper personnalisé
 require_once app_path('Helpers/file_helpers.php');
@@ -299,13 +301,26 @@ public function store(Request $request)
                         });
                     
                     // Envoyer la notification à chaque utilisateur concerné
-                    foreach ($usersToNotify as $user) {
-                        $user->notify(new \App\Notifications\TaskFileUploadNotification(
-                            $task, 
-                            $fileModel,
-                            $currentUser
-                        ));
-                    }
+foreach ($usersToNotify as $user) {
+
+    $notification = new \App\Notifications\TaskFileUploadNotification(
+        $task, 
+        $fileModel,
+        $currentUser
+    );
+
+    $user->notify($notification);
+
+    // Web Push
+    $user->notify(new \App\Notifications\WebPushNotification(
+        'Nouveau fichier ajouté',
+        "Un fichier {$fileModel->name} a été ajouté dans la tâche {$task->title}",
+        [
+            'url' => route('files.show', $fileModel->id),
+            'type' => 'file_upload'
+        ]
+    ));
+}
                 }
             }
             
@@ -336,6 +351,14 @@ public function store(Request $request)
                                 'preference_key' => 'file_updates',
                             ]
                         ));
+
+                        $member->notify(new \App\Notifications\ProjaNotification(
+    'Nouveau fichier ajouté',
+    "{$currentUser->name} a ajouté {$fileModel->name} dans le projet {$project->name}",
+    route('files.show', $fileModel->id),
+    '/logo-proja.png',
+    'file-upload'
+));
                     }
                 }
             }
@@ -513,6 +536,17 @@ public function store(Request $request)
                         'preference_key' => 'file_updates',
                     ]
                 ));
+
+                //web push
+
+                $user->notify(new \App\Notifications\ProjaNotification(
+    'Nouveau fichier ajouté',
+    "{$currentUser->name} a ajouté le fichier {$fileModel->name} dans la tâche {$task->title}",
+    route('files.show', $fileModel->id),
+    '/logo-proja.png',
+    'file-upload'
+));
+
             }
         }
         if ($request->header('X-Inertia')) {

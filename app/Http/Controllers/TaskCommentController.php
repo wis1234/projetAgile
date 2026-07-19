@@ -5,6 +5,7 @@ use App\Models\Task;
 use App\Models\TaskComment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Notifications\ProjaNotification;
 
 class TaskCommentController extends Controller
 {
@@ -114,9 +115,25 @@ class TaskCommentController extends Controller
             });
         
         // Envoyer la notification à chaque utilisateur concerné
-        foreach ($usersToNotify as $user) {
-            $user->notify(new \App\Notifications\TaskCommentNotification($task, $comment));
-        }
+foreach ($usersToNotify as $user) {
+
+    // Notification existante (ne pas toucher)
+    $user->notify(
+        new \App\Notifications\TaskCommentNotification($task, $comment)
+    );
+
+
+    // Nouvelle notification Web Push
+    $user->notify(
+        new ProjaNotification(
+            'Nouveau commentaire',
+            auth()->user()->name . ' a commenté la tâche "' . $task->title . '"',
+            '/tasks/' . $task->id,
+            null,
+            'task_comment'
+        )
+    );
+}
         
         // Retourner la réponse avec le commentaire créé
         return response()->json([

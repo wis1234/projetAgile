@@ -16,6 +16,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use App\Notifications\ProjaNotification;
 
 class TaskController extends Controller
 {
@@ -320,9 +321,22 @@ public function create(Request $request)
             // Si la tâche est assignée à quelqu'un, envoyer uniquement la notification personnalisée
             if ($task->assigned_to) {
                 $assignedUser = \App\Models\User::find($task->assigned_to);
-                if ($assignedUser) {
-                    $assignedUser->notify(new TaskAssignedNotification($task));
-                }
+if ($assignedUser) {
+
+    // Email existant
+    $assignedUser->notify(
+        new TaskAssignedNotification($task)
+    );
+
+    // Web Push + database
+    $assignedUser->notify(
+        new ProjaNotification(
+            'Nouvelle tâche assignée',
+            'La tâche "'.$task->title.'" vous a été assignée.',
+            '/tasks/'.$task->id
+        )
+    );
+}
             }
         }
 
@@ -563,6 +577,15 @@ public function create(Request $request)
             if ($assignedUser) {
                 // Envoyer une notification personnalisée au nouvel utilisateur assigné
                 $assignedUser->notify(new TaskAssignedNotification($task));
+
+                // Envoyer une notification push + database
+                $assignedUser->notify(
+                    new ProjaNotification(  
+                        'Nouvelle tâche assignée',
+                        'La tâche "'.$task->title.'" vous a été assignée.',
+                        '/tasks/'.$task->id
+                    )
+                );
             }
         }
 
