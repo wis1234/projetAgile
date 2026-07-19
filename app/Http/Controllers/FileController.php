@@ -312,7 +312,7 @@ foreach ($usersToNotify as $user) {
     $user->notify($notification);
 
     // Web Push
-    $user->notify(new \App\Notifications\WebPushNotification(
+    $user->notify(new \App\Notifications\ProjaNotification(
         'Nouveau fichier ajouté',
         "Un fichier {$fileModel->name} a été ajouté dans la tâche {$task->title}",
         [
