@@ -9,6 +9,7 @@ use App\Notifications\ProjaNotification;
 use App\Events\TaskCommentPosted;
 use App\Events\TaskCommentDeleted;
 use App\Events\TaskCommentUpdated;
+use App\Notifications\TaskCommentNotification;
 
 class TaskCommentController extends Controller
 {
