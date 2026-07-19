@@ -38,7 +38,10 @@ Route::get('/csrf-token', function () {
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
 })->middleware('web')->name('csrf.token');
 
-
+Route::patch(
+    '/user/discussion-email-sharing',
+    [UserController::class, 'toggleDiscussionEmailSharing']
+)->middleware('auth');
 
 
 Route::get('/api/users/search', [\App\Http\Controllers\UserSearchController::class, 'index'])

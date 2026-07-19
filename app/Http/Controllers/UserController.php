@@ -337,4 +337,20 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+ //message preference in task discussions
+    public function toggleDiscussionEmailSharing()
+    {
+        $user = auth()->user();
+
+        $user->share_discussions_by_email =
+            ! $user->share_discussions_by_email;
+
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => $user->share_discussions_by_email
+        ]);
+    }
 }

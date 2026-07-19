@@ -1110,6 +1110,35 @@ const handleReplyComment = (commentId) => {
     comment.id && !readComments.has(comment.id)
   ).length;
 
+
+
+  const [shareDiscussionEmail, setShareDiscussionEmail] =
+    useState(auth.user.share_discussions_by_email);
+
+    const toggleDiscussionEmail = async () => {
+
+    const response = await fetch(
+        "/user/discussion-email-sharing",
+        {
+            method: "PATCH",
+            headers:{
+                "X-CSRF-TOKEN":
+                    document.querySelector(
+                        'meta[name="csrf-token"]'
+                    ).content,
+                "X-Requested-With":"XMLHttpRequest"
+            }
+        }
+    );
+
+    const data = await response.json();
+
+    setShareDiscussionEmail(data.enabled);
+
+};
+
+
+
   return (
     <div className="flex flex-col w-full bg-white dark:bg-gray-950 p-0 m-0 min-h-screen">
       <div className="flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
@@ -2019,10 +2048,57 @@ const handleReplyComment = (commentId) => {
         </svg>
         <span>{t('task_details.messages_sent_to_mailbox')}</span>
 
-        <div className="flex items-center gap-2 text-xs bg-white/10 border border-white/20 px-3 py-1.5 rounded-full">
-  <span className={`w-1.5 h-1.5 rounded-full ${isRealtimeConnected ? 'bg-emerald-300 animate-pulse' : 'bg-gray-300'}`} />
-  <span className="text-white/90">{isRealtimeConnected ? 'En direct' : 'Connexion...'}</span>
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-5">
+
+    <div className="flex items-center justify-between">
+
+        <div>
+
+            <h3 className="font-semibold text-gray-800 dark:text-white">
+
+                Partager également les échanges par email
+
+            </h3>
+
+            <p className="text-sm text-gray-500 mt-1">
+
+                Lorsque cette option est activée, les nouveaux messages
+                seront également envoyés à votre adresse email.
+
+            </p>
+
+        </div>
+
+        <label className="relative inline-flex items-center cursor-pointer">
+
+            <input
+                type="checkbox"
+                checked={discussionEmailEnabled}
+                onChange={toggleDiscussionEmail}
+                className="sr-only peer"
+            />
+
+            <div
+                className="w-12 h-7 bg-gray-300 rounded-full
+                peer peer-checked:bg-blue-600
+                after:content-['']
+                after:absolute
+                after:top-1
+                after:left-1
+                after:bg-white
+                after:w-5
+                after:h-5
+                after:rounded-full
+                after:transition-all
+                peer-checked:after:translate-x-5">
+            </div>
+
+        </label>
+
+    </div>
+
 </div>
+
       </div>
     </div>
 

@@ -105,26 +105,43 @@ class TaskCommentController extends Controller
             ->filter(function ($user) use ($comment) {
                 return $user && $user->id !== $comment->user_id;
             });
+
+
+
+$author = auth()->user();
+
+
+
+
         
         // Envoyer la notification à chaque utilisateur concerné
-        foreach ($usersToNotify as $user) {
+foreach ($usersToNotify as $user) {
 
-            // Notification existante (ne pas toucher)
-            $user->notify(
-                new \App\Notifications\TaskCommentNotification($task, $comment)
-            );
+    // Notification interne
+    $user->notify(
+        new ProjaNotification(
+            'Nouveau commentaire',
+            $author->name.' a commenté la tâche "'.$task->title.'"',
+            '/tasks/'.$task->id,
+            null,
+            'task_comment'
+        )
+    );
 
-            // Nouvelle notification Web Push
-            $user->notify(
-                new ProjaNotification(
-                    'Nouveau commentaire',
-                    auth()->user()->name . ' a commenté la tâche "' . $task->title . '"',
-                    '/tasks/' . $task->id,
-                    null,
-                    'task_comment'
-                )
-            );
-        }
+    // Email uniquement si l'auteur l'autorise
+    if ($author->share_discussions_by_email) {
+
+        $user->notify(
+            new TaskCommentNotification(
+                $task,
+                $comment
+            )
+        );
+
+    }
+
+}
+
         
         // Retourner la réponse avec le commentaire créé
         return response()->json([
