@@ -887,81 +887,6 @@ const retryComment = async (failedComment) => {
     loadComments();
   }, [loadComments]);
 
-  // ─── Temps réel : écoute des commentaires via Pusher/Echo ───────────
-  useEffect(() => {
-    if (!window.Echo || !task?.id) return;
-
-    const channel = window.Echo.private(`task.${task.id}.comments`);
-
-    channel.listen('.comment.posted', (e) => {
-      const incoming = e.comment;
-
-      if (incoming.user.id === auth.user.id) return;
-
-      setComments(prev => {
-        const alreadyExists =
-          prev.some(c => c.id === incoming.id) ||
-          prev.some(c => (c.replies || []).some(r => r.id === incoming.id));
-        if (alreadyExists) return prev;
-
-        const withMeta = {
-          ...incoming,
-          formatted_date: formatDate(incoming.created_at),
-          replies: [],
-        };
-
-        if (incoming.parent_id) {
-          return prev.map(c =>
-            c.id === incoming.parent_id
-              ? { ...c, replies: [withMeta, ...(c.replies || [])] }
-              : c
-          );
-        }
-        return [withMeta, ...prev];
-      });
-
-      if (activeTab === 'comments') {
-        setTimeout(() => {
-          const container = document.getElementById('chat-messages-container');
-          if (container) container.scrollTop = container.scrollHeight;
-        }, 50);
-      }
-    });
-
-    channel.listen('.comment.deleted', (e) => {
-      setComments(prev => {
-        const removeComment = (list) => list.reduce((acc, c) => {
-          if (c.id === e.commentId) return acc;
-          if (c.replies?.length) return [...acc, { ...c, replies: removeComment(c.replies) }];
-          return [...acc, c];
-        }, []);
-        return removeComment(prev);
-      });
-    });
-
-    channel.listen('.comment.updated', (e) => {
-      setComments(prev => prev.map(c =>
-        c.id === e.comment.id
-          ? { ...c, content: e.comment.content, formatted_date: formatDate(e.comment.updated_at) }
-          : c
-      ));
-    });
-
-    return () => {
-      window.Echo.leave(`task.${task.id}.comments`);
-    };
-  }, [task?.id, activeTab]);
-
-  // Suivi de l'état de connexion websocket
-  useEffect(() => {
-    if (!window.Echo) return;
-    const pusher = window.Echo.connector.pusher;
-    const update = () => setIsRealtimeConnected(pusher.connection.state === 'connected');
-    update();
-    pusher.connection.bind('state_change', update);
-    return () => pusher.connection.unbind('state_change', update);
-  }, []);
-  
 
   const handleDeleteComment = (commentId) => {
     setCommentToDeleteId(commentId);
@@ -1114,6 +1039,82 @@ const handleReplyComment = (commentId) => {
       }
     }
   }, []);
+
+   // ─── Temps réel : écoute des commentaires via Pusher/Echo ───────────
+  useEffect(() => {
+    if (!window.Echo || !task?.id) return;
+
+    const channel = window.Echo.private(`task.${task.id}.comments`);
+
+    channel.listen('.comment.posted', (e) => {
+      const incoming = e.comment;
+
+      if (incoming.user.id === auth.user.id) return;
+
+      setComments(prev => {
+        const alreadyExists =
+          prev.some(c => c.id === incoming.id) ||
+          prev.some(c => (c.replies || []).some(r => r.id === incoming.id));
+        if (alreadyExists) return prev;
+
+        const withMeta = {
+          ...incoming,
+          formatted_date: formatDate(incoming.created_at),
+          replies: [],
+        };
+
+        if (incoming.parent_id) {
+          return prev.map(c =>
+            c.id === incoming.parent_id
+              ? { ...c, replies: [withMeta, ...(c.replies || [])] }
+              : c
+          );
+        }
+        return [withMeta, ...prev];
+      });
+
+      if (activeTab === 'comments') {
+        setTimeout(() => {
+          const container = document.getElementById('chat-messages-container');
+          if (container) container.scrollTop = container.scrollHeight;
+        }, 50);
+      }
+    });
+
+    channel.listen('.comment.deleted', (e) => {
+      setComments(prev => {
+        const removeComment = (list) => list.reduce((acc, c) => {
+          if (c.id === e.commentId) return acc;
+          if (c.replies?.length) return [...acc, { ...c, replies: removeComment(c.replies) }];
+          return [...acc, c];
+        }, []);
+        return removeComment(prev);
+      });
+    });
+
+    channel.listen('.comment.updated', (e) => {
+      setComments(prev => prev.map(c =>
+        c.id === e.comment.id
+          ? { ...c, content: e.comment.content, formatted_date: formatDate(e.comment.updated_at) }
+          : c
+      ));
+    });
+
+    return () => {
+      window.Echo.leave(`task.${task.id}.comments`);
+    };
+  }, [task?.id, activeTab]);
+
+  // Suivi de l'état de connexion websocket
+  useEffect(() => {
+    if (!window.Echo) return;
+    const pusher = window.Echo.connector.pusher;
+    const update = () => setIsRealtimeConnected(pusher.connection.state === 'connected');
+    update();
+    pusher.connection.bind('state_change', update);
+    return () => pusher.connection.unbind('state_change', update);
+  }, []);
+  
   
   // L'accès est autorisé pour l'admin ou le manager du projet
   const hasAccess = isAdmin || isProjectManager;
