@@ -39,7 +39,7 @@ use App\Notifications\ProjaNotification;
 
 Route::get('/test-push', function () {
 
-    $user = User::find(22); // ton utilisateur
+    $user = User::find(1); // ton utilisateur
 
     $user->notify(
 
