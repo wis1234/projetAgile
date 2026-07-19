@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaReply, FaStar, FaPaperPlane } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaReply, FaStar, FaPaperPlane, FaEnvelope } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
@@ -2042,63 +2042,30 @@ const handleReplyComment = (commentId) => {
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2 text-xs bg-yellow-400/20 border border-yellow-300/40 text-yellow-100 px-3 py-1.5 rounded-full">
-        <svg className="w-3.5 h-3.5 text-yellow-200 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.598c.75 1.336-.213 3.003-1.742 3.003H3.48c-1.53 0-2.492-1.667-1.742-3.003L8.257 3.1zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-2a.75.75 0 01-.75-.75v-3.5a.75.75 0 011.5 0v3.5c0 .414-.336.75-.75.75z" clipRule="evenodd" />
-        </svg>
-      {/*  <span>{t('task_details.messages_sent_to_mailbox')}</span> */}
+<label
+  className="flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none"
+  title={shareDiscussionEmail
+    ? t('task_details.email_copy_enabled')
+    : t('task_details.email_copy_disabled')}
+>
+  <FaEnvelope
+    className={`w-3.5 h-3.5 flex-shrink-0 transition-colors duration-200 ${
+      shareDiscussionEmail ? 'text-white' : 'text-blue-200'
+    }`}
+  />
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-5">
+  <input
+    type="checkbox"
+    checked={shareDiscussionEmail}
+    onChange={toggleDiscussionEmail}
+    aria-label={t('task_details.share_discussions_by_email')}
+    className="sr-only peer"
+  />
 
-    <div className="flex items-center justify-between">
-
-        <div>
-
-            <h3 className="font-semibold text-gray-800 dark:text-white">
-
-                Partager également les échanges par email
-
-            </h3>
-
-            <p className="text-sm text-gray-500 mt-1">
-
-         
-
-            </p>
-
-        </div>
-
-        <label className="relative inline-flex items-center cursor-pointer">
-
-            <input
-                type="checkbox"
-                checked={shareDiscussionEmail}
-                onChange={toggleDiscussionEmail}
-                className="sr-only peer"
-            />
-
-            <div
-                className="w-12 h-7 bg-gray-300 rounded-full
-                peer peer-checked:bg-blue-600
-                after:content-['']
-                after:absolute
-                after:top-1
-                after:left-1
-                after:bg-white
-                after:w-5
-                after:h-5
-                after:rounded-full
-                after:transition-all
-                peer-checked:after:translate-x-5">
-            </div>
-
-        </label>
-
-    </div>
-
-</div>
-
-      </div>
+  <span className="relative w-8 h-4 rounded-full bg-white/25 peer-checked:bg-white transition-colors duration-200">
+    <span className="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white peer-checked:bg-blue-600 shadow-sm transition-transform duration-200 peer-checked:translate-x-4" />
+  </span>
+</label>
     </div>
 
     {/* ─── ZONE DES MESSAGES ─── */}
