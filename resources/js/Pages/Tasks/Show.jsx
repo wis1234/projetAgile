@@ -970,6 +970,8 @@ const handleReplyComment = (commentId) => {
     const channel = window.Echo.private(`task.${task.id}.comments`);
 
     channel.listen('.comment.posted', (e) => {
+        console.log('📨 Event reçu:', e); // ← ajoute cette ligne
+
       const incoming = e.comment;
 
       if (incoming.user.id === auth.user.id) return;
@@ -2016,7 +2018,7 @@ const handleReplyComment = (commentId) => {
           <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.598c.75 1.336-.213 3.003-1.742 3.003H3.48c-1.53 0-2.492-1.667-1.742-3.003L8.257 3.1zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-2a.75.75 0 01-.75-.75v-3.5a.75.75 0 011.5 0v3.5c0 .414-.336.75-.75.75z" clipRule="evenodd" />
         </svg>
         <span>{t('task_details.messages_sent_to_mailbox')}</span>
-        
+
         <div className="flex items-center gap-2 text-xs bg-white/10 border border-white/20 px-3 py-1.5 rounded-full">
   <span className={`w-1.5 h-1.5 rounded-full ${isRealtimeConnected ? 'bg-emerald-300 animate-pulse' : 'bg-gray-300'}`} />
   <span className="text-white/90">{isRealtimeConnected ? 'En direct' : 'Connexion...'}</span>
