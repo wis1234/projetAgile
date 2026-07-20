@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
@@ -481,6 +481,19 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
   // ─── Temps réel : état de connexion Pusher ──────────────────────────
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+
+  // ─── Présence en ligne, "en train d'écrire" et accusés de lecture ───
+  const [onlineUsers, setOnlineUsers] = useState([]); // [{id, name, ...}]
+  const [typingUsers, setTypingUsers] = useState({}); // { userId: userName }
+  const [readReceipts, setReadReceipts] = useState({}); // { commentId: Set(userIds) }
+  const presenceChannelRef = useRef(null);
+  const typingTimeoutsRef = useRef({});
+  const lastTypingSentRef = useRef(0);
+
+  const isUserOnline = useCallback((userId) => {
+    if (!userId) return false;
+    return onlineUsers.some(u => String(u.id) === String(userId));
+  }, [onlineUsers]);
   // Charger les commentaires lus depuis le localStorage
   const [readComments, setReadComments] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -581,6 +594,7 @@ const handleCommentSubmit = async (e) => {
   setAudioUrl(null);
   setReplyingTo(null);
   setError('');
+  emitStopTyping();
 
   // Scroll vers le bas
   setTimeout(() => {
@@ -1039,6 +1053,116 @@ const handleReplyComment = (commentId) => {
     pusher.connection.bind('state_change', update);
     return () => pusher.connection.unbind('state_change', update);
   }, []);
+
+  // ─── Présence : qui est en ligne, qui écrit, qui a lu quoi ───────────
+  // Nécessite un canal de présence côté Laravel (routes/channels.php) :
+  //   Broadcast::channel('presence-task.{taskId}', function ($user, $taskId) {
+  //       // ... vérifier l'accès à la tâche ...
+  //       return ['id' => $user->id, 'name' => $user->name, 'profile_photo_url' => $user->profile_photo_url];
+  //   });
+  useEffect(() => {
+    if (!window.Echo || !task?.id) return;
+
+    const presenceChannel = window.Echo.join(`presence-task.${task.id}`)
+      .here((users) => setOnlineUsers(users))
+      .joining((user) => {
+        setOnlineUsers(prev => [...prev.filter(u => u.id !== user.id), user]);
+      })
+      .leaving((user) => {
+        setOnlineUsers(prev => prev.filter(u => u.id !== user.id));
+        setTypingUsers(prev => {
+          if (!prev[user.id]) return prev;
+          const copy = { ...prev };
+          delete copy[user.id];
+          return copy;
+        });
+      })
+      .listenForWhisper('typing', (e) => {
+        if (e.userId === auth.user.id) return;
+        setTypingUsers(prev => ({ ...prev, [e.userId]: e.userName }));
+        clearTimeout(typingTimeoutsRef.current[e.userId]);
+        typingTimeoutsRef.current[e.userId] = setTimeout(() => {
+          setTypingUsers(prev => {
+            const copy = { ...prev };
+            delete copy[e.userId];
+            return copy;
+          });
+        }, 3000);
+      })
+      .listenForWhisper('stop-typing', (e) => {
+        setTypingUsers(prev => {
+          if (!prev[e.userId]) return prev;
+          const copy = { ...prev };
+          delete copy[e.userId];
+          return copy;
+        });
+      })
+      .listenForWhisper('message-read', (e) => {
+        if (!e?.commentId) return;
+        setReadReceipts(prev => {
+          const current = new Set(prev[e.commentId] || []);
+          current.add(e.userId);
+          return { ...prev, [e.commentId]: current };
+        });
+      });
+
+    presenceChannelRef.current = presenceChannel;
+
+    return () => {
+      Object.values(typingTimeoutsRef.current).forEach(clearTimeout);
+      typingTimeoutsRef.current = {};
+      window.Echo.leave(`presence-task.${task.id}`);
+      presenceChannelRef.current = null;
+    };
+  }, [task?.id, auth.user.id]);
+
+  // Émet un signal "en train d'écrire" (limité à 1 envoi / 1,5s pour rester léger)
+  const emitTyping = useCallback(() => {
+    if (!presenceChannelRef.current) return;
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < 1500) return;
+    lastTypingSentRef.current = now;
+    presenceChannelRef.current.whisper('typing', {
+      userId: auth.user.id,
+      userName: auth.user.name,
+    });
+  }, [auth.user.id, auth.user.name]);
+
+  const emitStopTyping = useCallback(() => {
+    if (!presenceChannelRef.current) return;
+    lastTypingSentRef.current = 0;
+    presenceChannelRef.current.whisper('stop-typing', { userId: auth.user.id });
+  }, [auth.user.id]);
+
+  // ─── Marque les messages des autres comme lus dès qu'ils sont visibles ──
+  useEffect(() => {
+    if (activeTab !== 'comments') return;
+    const container = document.getElementById('chat-messages-container');
+    if (!container) return;
+
+    const seen = new Set();
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const el = entry.target;
+        const commentId = el.dataset.commentId;
+        const authorId = el.dataset.authorId;
+        if (!commentId || commentId === 'null' || seen.has(commentId)) return;
+        if (String(authorId) === String(auth.user.id)) return; // pas ses propres messages
+
+        seen.add(commentId);
+        presenceChannelRef.current?.whisper('message-read', {
+          commentId,
+          userId: auth.user.id,
+        });
+        observer.unobserve(el);
+      });
+    }, { root: container, threshold: 0.6 });
+
+    container.querySelectorAll('[data-comment-id]').forEach(node => observer.observe(node));
+
+    return () => observer.disconnect();
+  }, [comments, activeTab, auth.user.id]);
 
   
   // L'accès est autorisé pour l'admin ou le manager du projet
@@ -2035,10 +2159,18 @@ const handleReplyComment = (commentId) => {
     </div>
     <div>
       <p className="font-semibold text-sm leading-tight">Discussions</p>
-      <p className="text-xs text-blue-100">
-        {loadingComments
-          ? t('task_details.loading_comments')
-          : `${comments.length} message${comments.length !== 1 ? 's' : ''}`}
+      <p className="text-xs text-blue-100 flex items-center gap-2">
+        <span>
+          {loadingComments
+            ? t('task_details.loading_comments')
+            : `${comments.length} message${comments.length !== 1 ? 's' : ''}`}
+        </span>
+        {!loadingComments && onlineUsers.length > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+            {onlineUsers.length} {t('task_details.online', 'en ligne')}
+          </span>
+        )}
       </p>
     </div>
   </div>
@@ -2103,16 +2235,26 @@ const handleReplyComment = (commentId) => {
             const hasFailed = comment._failed === true;
 
             return (
-                <div key={comment.id || comment._tempId} className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'} gap-0.5`}>
+                <div
+                  key={comment.id || comment._tempId}
+                  data-comment-id={comment.id || ''}
+                  data-author-id={comment.user?.id || ''}
+                  className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'} gap-0.5`}
+                >
                 
                 {/* Nom de l'expéditeur (uniquement pour les autres) */}
                 {!isMe && (
                   <div className="flex items-center gap-2 ml-3 mb-0.5">
-                    <img
-                      src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}&background=1D9E75&color=fff`}
-                      alt={comment.user?.name}
-                      className="w-6 h-6 rounded-full"
-                    />
+                    <div className="relative">
+                      <img
+                        src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}&background=1D9E75&color=fff`}
+                        alt={comment.user?.name}
+                        className="w-6 h-6 rounded-full"
+                      />
+                      {isUserOnline(comment.user?.id) && (
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400 border border-white dark:border-gray-800"></span>
+                      )}
+                    </div>
                     <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
                       {comment.user?.name}
                       {comment.user?.role === 'manager' && (
@@ -2202,7 +2344,9 @@ const handleReplyComment = (commentId) => {
                               ? <span className="text-red-300 text-xs">✕</span>
                               : isPending
                               ? <span className="text-white/60">⏳</span>
-                              : <span>✓✓</span>
+                              : (comment.id && readReceipts[comment.id]?.size > 0)
+                              ? <span className="text-sky-300 font-bold" title={t('task_details.read', 'Lu')}>✓✓</span>
+                              : <span className="text-white/70" title={t('task_details.sent', 'Envoyé')}>✓✓</span>
                           )}
                         </div>
 
@@ -2282,6 +2426,23 @@ const handleReplyComment = (commentId) => {
       )}
     </div>
 
+    {/* ─── INDICATEUR "EN TRAIN D'ÉCRIRE..." ─── */}
+    {Object.keys(typingUsers).length > 0 && (
+      <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50/80 dark:bg-blue-900/20 border-t border-blue-100 dark:border-blue-900 flex-shrink-0">
+        <div className="flex gap-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.3s]"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.15s]"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce"></span>
+        </div>
+        <span className="text-xs text-blue-600 dark:text-blue-300 italic">
+          {Object.values(typingUsers).join(', ')}{' '}
+          {Object.keys(typingUsers).length > 1
+            ? t('task_details.are_typing', 'sont en train d\'écrire…')
+            : t('task_details.is_typing', 'est en train d\'écrire…')}
+        </span>
+      </div>
+    )}
+
     {/* ─── BARRE REPLY ─── */}
     {replyingTo && (
       <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-800 flex-shrink-0">
@@ -2359,7 +2520,15 @@ const handleReplyComment = (commentId) => {
         <div className="flex-1 relative">
           <textarea
             value={commentContent}
-            onChange={e => setCommentContent(e.target.value)}
+            onChange={e => {
+              setCommentContent(e.target.value);
+              if (e.target.value.trim()) {
+                emitTyping();
+              } else {
+                emitStopTyping();
+              }
+            }}
+            onBlur={emitStopTyping}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

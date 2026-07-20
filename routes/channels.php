@@ -3,6 +3,11 @@
 use App\Models\Task;
 use Illuminate\Support\Facades\Broadcast;
 
+Broadcast::channel('presence-task.{taskId}', function ($user, $taskId) {
+    // vérifie que $user a accès à la tâche $taskId
+    return ['id' => $user->id, 'name' => $user->name, 'profile_photo_url' => $user->profile_photo_url];
+});
+
 Broadcast::channel('task.{taskId}.comments', function ($user, $taskId) {
     $task = Task::with('project')->find($taskId);
 
