@@ -486,6 +486,8 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [onlineUsers, setOnlineUsers] = useState([]); // [{id, name, ...}]
   const [typingUsers, setTypingUsers] = useState({}); // { userId: userName }
   const [readReceipts, setReadReceipts] = useState({}); // { commentId: Set(userIds) }
+  const [lastSeenMap, setLastSeenMap] = useState({}); // { userId: timestamp }
+  const [profileUser, setProfileUser] = useState(null); // user shown in the mini-profile modal
   const presenceChannelRef = useRef(null);
   const typingTimeoutsRef = useRef({});
   const lastTypingSentRef = useRef(0);
