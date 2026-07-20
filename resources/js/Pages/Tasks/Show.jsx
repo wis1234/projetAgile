@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaReply, FaStar, FaPaperPlane, FaEnvelope } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaPlay, FaReply, FaStar, FaPaperPlane, FaEnvelope } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
@@ -195,7 +195,7 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, t }
     );
   }
 
-  return (
+return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center justify-end gap-1">
         {timeLeft.days > 0 && formatTimeUnit(timeLeft.days, 'J')}
@@ -207,6 +207,78 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, t }
     </div>
   );
 };
+
+// Lecteur vocal façon Messenger : gros bouton rond play/stop + barre de
+// progression, tout en conservant les contrôles natifs (menu ⋮ : vitesse,
+// téléchargement) rattachés au même élément <audio>.
+const VoiceMessagePlayer = ({ src, isMe }) => {
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const togglePlay = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      audio.play();
+    } else {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  };
+
+  const formatAudioTime = (s) => {
+    if (!isFinite(s) || s < 0) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  const progress = duration ? Math.min((currentTime / duration) * 100, 100) : 0;
+
+  return (
+    <div className="flex flex-col gap-1 min-w-0" style={{ minWidth: 180 }}>
+      <div className="flex items-center gap-2 min-w-0">
+        <button
+          type="button"
+          onClick={togglePlay}
+          className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+            isMe ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'
+          }`}
+          title={isPlaying ? 'Arrêter' : 'Écouter'}
+        >
+          {isPlaying ? <FaStop className="w-3 h-3" /> : <FaPlay className="w-3 h-3 ml-0.5" />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className={`h-1.5 rounded-full overflow-hidden ${isMe ? 'bg-white/25' : 'bg-gray-200 dark:bg-gray-500'}`}>
+            <div
+              className={`h-full ${isMe ? 'bg-white' : 'bg-blue-500'} transition-all`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <span className={`text-[10px] mt-0.5 block ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
+            {isPlaying ? formatAudioTime(currentTime) : formatAudioTime(duration)}
+          </span>
+        </div>
+      </div>
+      {/* Contrôles natifs conservés : le menu ⋮ (vitesse, téléchargement) reste accessible */}
+      <audio
+        ref={audioRef}
+        src={src}
+        controls
+        preload="metadata"
+        onLoadedMetadata={e => setDuration(e.target.duration || 0)}
+        onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
+        className="h-7 w-full max-w-[220px] opacity-80"
+      />
+    </div>
+  );
+};
+
 
 export default function Show({ task, payments, projectMembers, currentUserRole }) {
   const { t } = useTranslation();
@@ -2330,10 +2402,7 @@ const handleReplyComment = (commentId) => {
                         {/* Audio — contenu dans la bulle, ne déborde plus */}
                         {comment.audio_path && (
                           <div className="mt-1.5 max-w-full overflow-hidden">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <FaMicrophone className={`w-3.5 h-3.5 flex-shrink-0 ${isMe ? 'text-white/70' : 'text-blue-500'}`} />
-                              <audio controls src={`/storage/public/${comment.audio_path}`} className="h-8 w-full max-w-[220px] min-w-0" />
-                            </div>
+                            <VoiceMessagePlayer src={`/storage/public/${comment.audio_path}`} isMe={isMe} />
                           </div>
                         )}
 
@@ -2413,7 +2482,7 @@ const handleReplyComment = (commentId) => {
                             <p className="whitespace-pre-wrap break-words leading-relaxed">{reply.content}</p>
                             {reply.audio_path && (
                               <div className="mt-1 max-w-full overflow-hidden">
-                                <audio controls src={`/storage/public/${reply.audio_path}`} className="h-7 w-full max-w-[180px] min-w-0" />
+                                <VoiceMessagePlayer src={`/storage/public/${reply.audio_path}`} isMe={isReplyMe} />
                               </div>
                             )}
                             <div className={`flex items-center gap-1 mt-0.5 justify-end tick ${isReplyMe ? 'text-white/60' : 'text-gray-400'}`}>
