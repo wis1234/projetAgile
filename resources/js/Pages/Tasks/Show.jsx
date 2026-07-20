@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaReply, FaStar, FaPaperPlane, FaEnvelope } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaPlay, FaReply, FaStar, FaPaperPlane, FaEnvelope } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
@@ -204,6 +204,70 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, t }
         {formatTimeUnit(timeLeft.seconds, 'S')}
       </div>
       <span className="text-xs text-gray-500 dark:text-gray-400">{t('time_remaining')}</span>
+    </div>
+  );
+};
+
+// Lecteur audio custom pour les messages vocaux (bouton play/stop + progression)
+const VoiceMessagePlayer = ({ src, isMe }) => {
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const togglePlay = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+      audio.currentTime = 0;
+      setIsPlaying(false);
+      setCurrentTime(0);
+    } else {
+      audio.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const formatAudioTime = (s) => {
+    if (!isFinite(s) || s < 0) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex items-center gap-2 min-w-0" style={{ minWidth: 160 }}>
+      <button
+        type="button"
+        onClick={togglePlay}
+        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+          isMe ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'
+        }`}
+        title={isPlaying ? 'Arrêter' : 'Écouter'}
+      >
+        {isPlaying ? <FaStop className="w-3 h-3" /> : <FaPlay className="w-3 h-3 ml-0.5" />}
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className={`h-1.5 rounded-full overflow-hidden ${isMe ? 'bg-white/25' : 'bg-gray-200 dark:bg-gray-500'}`}>
+          <div
+            className={`h-full ${isMe ? 'bg-white' : 'bg-blue-500'} transition-all`}
+            style={{ width: duration ? `${Math.min((currentTime / duration) * 100, 100)}%` : '0%' }}
+          />
+        </div>
+        <span className={`text-[10px] mt-0.5 block ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
+          {isPlaying ? formatAudioTime(currentTime) : formatAudioTime(duration)}
+        </span>
+      </div>
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={e => setDuration(e.target.duration || 0)}
+        onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
+        onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
+        className="hidden"
+      />
     </div>
   );
 };
@@ -2166,8 +2230,11 @@ const handleReplyComment = (commentId) => {
   <div className="flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8" style={{ height: '85vh', maxHeight: '800px' }}>
     
 {/* ─── HEADER STYLE WHATSAPP ─── */}
-<div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white flex-shrink-0 shadow-md">
-  <div className="flex items-center gap-3">
+<div
+  className="sticky z-20 flex items-center justify-between px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white flex-shrink-0 shadow-md"
+  style={{ top: 'var(--app-header-height, 72px)' }}
+>
+    <div className="flex items-center gap-3">
     <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
       <FaCommentDots className="text-white text-lg" />
     </div>
@@ -2328,12 +2395,10 @@ const handleReplyComment = (commentId) => {
                         )}
 
                         {/* Audio — contenu dans la bulle, ne déborde plus */}
+                        {/* Audio */}
                         {comment.audio_path && (
                           <div className="mt-1.5 max-w-full overflow-hidden">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <FaMicrophone className={`w-3.5 h-3.5 flex-shrink-0 ${isMe ? 'text-white/70' : 'text-blue-500'}`} />
-                              <audio controls src={`/storage/public/${comment.audio_path}`} className="h-8 w-full max-w-[220px] min-w-0" />
-                            </div>
+                            <VoiceMessagePlayer src={`/storage/public/${comment.audio_path}`} isMe={isMe} />
                           </div>
                         )}
 
@@ -2412,9 +2477,9 @@ const handleReplyComment = (commentId) => {
                           }`}>
                             <p className="whitespace-pre-wrap break-words leading-relaxed">{reply.content}</p>
                             {reply.audio_path && (
-                              <div className="mt-1 max-w-full overflow-hidden">
-                                <audio controls src={`/storage/public/${reply.audio_path}`} className="h-7 w-full max-w-[180px] min-w-0" />
-                              </div>
+                            <div className="mt-1 max-w-full overflow-hidden">
+                              <VoiceMessagePlayer src={`/storage/public/${reply.audio_path}`} isMe={isReplyMe} />
+                            </div>
                             )}
                             <div className={`flex items-center gap-1 mt-0.5 justify-end tick ${isReplyMe ? 'text-white/60' : 'text-gray-400'}`}>
                               <span>{new Date(reply.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
