@@ -1056,6 +1056,18 @@ const handleReplyComment = (commentId) => {
     return () => pusher.connection.unbind('state_change', update);
   }, []);
 
+  // ─── Défilement automatique vers le dernier message ───
+  useEffect(() => {
+    if (activeTab !== 'comments' || loadingComments) return;
+    const container = document.getElementById('chat-messages-container');
+    if (container) {
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
+    }
+  }, [activeTab, loadingComments]);
+
+
   // ─── Présence : qui est en ligne, qui écrit, qui a lu quoi ───────────
   // Nécessite un canal de présence côté Laravel (routes/channels.php) :
   //   Broadcast::channel('presence-task.{taskId}', function ($user, $taskId) {
@@ -2206,7 +2218,7 @@ const handleReplyComment = (commentId) => {
     {/* ─── ZONE DES MESSAGES ─── */}
     <div
       id="chat-messages-container"
-      className="flex-1 overflow-y-auto px-4 py-4 space-y-2"
+      className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-2"
       style={{ background: 'var(--chat-bg, #ece5dd)', scrollBehavior: 'smooth' }}
     >
       <style>{`
@@ -2231,48 +2243,36 @@ const handleReplyComment = (commentId) => {
         </div>
       ) : (
         <>
-          {[...comments].reverse().map(comment => {
+{[...comments].reverse().map(comment => {
             const isMe = comment.user?.id === auth.user.id;
             const isPending = comment._pending === true;
             const hasFailed = comment._failed === true;
 
             return (
-                <div
-                  key={comment.id || comment._tempId}
-                  data-comment-id={comment.id || ''}
-                  data-author-id={comment.user?.id || ''}
-                  className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'} gap-0.5`}
-                >
-                
-                {/* Nom de l'expéditeur (uniquement pour les autres) */}
-                {!isMe && (
-                  <div className="flex items-center gap-2 ml-3 mb-0.5">
-                    <div className="relative">
+              <div
+                key={comment.id || comment._tempId}
+                data-comment-id={comment.id || ''}
+                data-author-id={comment.user?.id || ''}
+                className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'} gap-0.5`}
+              >
+                <div className={`flex items-end gap-2 max-w-[78%] min-w-0 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+
+                  {/* Avatar seul (nom en tooltip au survol) */}
+                  {!isMe && (
+                    <div className="relative flex-shrink-0 mb-0.5" title={comment.user?.name || ''}>
                       <img
                         src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}&background=1D9E75&color=fff`}
                         alt={comment.user?.name}
-                        className="w-6 h-6 rounded-full"
+                        className="w-7 h-7 rounded-full"
                       />
                       {isUserOnline(comment.user?.id) && (
                         <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400 border border-white dark:border-gray-800"></span>
                       )}
                     </div>
-                    <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
-                      {comment.user?.name}
-                      {comment.user?.role === 'manager' && (
-                        <span className="ml-1 text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded-full">Manager</span>
-                      )}
-                      {comment.user?.role === 'admin' && (
-                        <span className="ml-1 text-xs bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded-full">Admin</span>
-                      )}
-                    </span>
-                  </div>
-                )}
+                  )}
 
-                <div className={`flex items-end gap-1.5 max-w-[78%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                  
                   {/* Bulle */}
-                  <div className={`relative px-3 py-2 shadow-sm ${
+                  <div className={`relative px-3 py-2 shadow-sm min-w-0 ${
                     isPending ? 'bubble-pending' : ''
                   } ${
                     isMe
@@ -2287,7 +2287,6 @@ const handleReplyComment = (commentId) => {
                           ? 'border-white/60 bg-white/20 text-white/80'
                           : 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-gray-600 dark:text-gray-300'
                       }`}>
-                        <p className="font-medium">{comment.parent.user?.name}</p>
                         <p className="truncate opacity-80">{comment.parent.content}</p>
                       </div>
                     )}
@@ -2328,11 +2327,13 @@ const handleReplyComment = (commentId) => {
                           />
                         )}
 
-                        {/* Audio */}
+                        {/* Audio — contenu dans la bulle, ne déborde plus */}
                         {comment.audio_path && (
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <FaMicrophone className={`w-3.5 h-3.5 flex-shrink-0 ${isMe ? 'text-white/70' : 'text-blue-500'}`} />
-                            <audio controls src={`/storage/public/${comment.audio_path}`} className="h-7 max-w-[200px]" />
+                          <div className="mt-1.5 max-w-full overflow-hidden">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FaMicrophone className={`w-3.5 h-3.5 flex-shrink-0 ${isMe ? 'text-white/70' : 'text-blue-500'}`} />
+                              <audio controls src={`/storage/public/${comment.audio_path}`} className="h-8 w-full max-w-[220px] min-w-0" />
+                            </div>
                           </div>
                         )}
 
@@ -2367,7 +2368,7 @@ const handleReplyComment = (commentId) => {
 
                   {/* Actions flottantes */}
                   {!isPending && editingId !== comment.id && (
-                    <div className={`flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${isMe ? 'items-end' : 'items-start'}`}>
+                    <div className={`flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ${isMe ? 'items-end' : 'items-start'}`}>
                       <button
                         onClick={() => handleReplyComment(comment.id)}
                         className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded"
@@ -2391,30 +2392,39 @@ const handleReplyComment = (commentId) => {
 
                 {/* Réponses imbriquées */}
                 {comment.replies && comment.replies.length > 0 && (
-                  <div className={`flex flex-col gap-1 mt-1 ${isMe ? 'items-end pr-2' : 'items-start pl-8'}`}>
+                  <div className={`flex flex-col gap-1 mt-1 ${isMe ? 'items-end pr-2' : 'items-start pl-9'}`}>
                     {[...comment.replies].reverse().map(reply => {
                       const isReplyMe = reply.user?.id === auth.user.id;
                       return (
-                        <div key={reply.id} className={`max-w-[70%] px-3 py-1.5 shadow-sm text-sm ${
-                          isReplyMe
-                            ? 'bg-blue-400 dark:bg-blue-700 text-white bubble-right'
-                            : 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-500 bubble-left'
-                        }`}>
+                        <div key={reply.id} className={`flex items-end gap-1.5 max-w-[70%] min-w-0 ${isReplyMe ? 'flex-row-reverse' : 'flex-row'}`}>
                           {!isReplyMe && (
-                            <p className="text-xs font-medium text-blue-600 dark:text-blue-300 mb-0.5">{reply.user?.name}</p>
+                            <img
+                              src={reply.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user?.name || '')}&background=1D9E75&color=fff`}
+                              alt={reply.user?.name}
+                              title={reply.user?.name || ''}
+                              className="w-5 h-5 rounded-full flex-shrink-0 mb-0.5"
+                            />
                           )}
-                          <p className="whitespace-pre-wrap break-words leading-relaxed">{reply.content}</p>
-                          {reply.audio_path && (
-                            <audio controls src={`/storage/public/${reply.audio_path}`} className="h-7 mt-1 max-w-[180px]" />
-                          )}
-                          <div className={`flex items-center gap-1 mt-0.5 justify-end tick ${isReplyMe ? 'text-white/60' : 'text-gray-400'}`}>
-                            <span>{new Date(reply.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-                            {isReplyMe && <span>✓✓</span>}
-                            {isReplyMe && reply.user?.id === auth.user.id && (
-                              <button onClick={() => handleDeleteComment(reply.id)} className="ml-1 text-white/50 hover:text-white/80">
-                                <FaTrash className="w-2.5 h-2.5" />
-                              </button>
+                          <div className={`px-3 py-1.5 shadow-sm text-sm min-w-0 ${
+                            isReplyMe
+                              ? 'bg-blue-400 dark:bg-blue-700 text-white bubble-right'
+                              : 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-500 bubble-left'
+                          }`}>
+                            <p className="whitespace-pre-wrap break-words leading-relaxed">{reply.content}</p>
+                            {reply.audio_path && (
+                              <div className="mt-1 max-w-full overflow-hidden">
+                                <audio controls src={`/storage/public/${reply.audio_path}`} className="h-7 w-full max-w-[180px] min-w-0" />
+                              </div>
                             )}
+                            <div className={`flex items-center gap-1 mt-0.5 justify-end tick ${isReplyMe ? 'text-white/60' : 'text-gray-400'}`}>
+                              <span>{new Date(reply.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                              {isReplyMe && <span>✓✓</span>}
+                              {isReplyMe && (
+                                <button onClick={() => handleDeleteComment(reply.id)} className="ml-1 text-white/50 hover:text-white/80">
+                                  <FaTrash className="w-2.5 h-2.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
