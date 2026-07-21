@@ -246,103 +246,110 @@ public function create(Request $request)
     ]);
 }
 
-    public function store(Request $request)
-    {
-        try {
-            $this->authorize('create', Task::class);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
-        }
+public function store(Request $request)
+{
+    try {
+        $this->authorize('create', Task::class);
+    } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+    }
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'status' => 'required|string|in:todo,in_progress,done',
-            'priority' => 'required|string|in:low,medium,high',
-            'due_date' => ['nullable', 'date_format:Y-m-d H:i:s'],
-            'project_id' => 'required|exists:projects,id',
-            'sprint_id' => 'required|exists:sprints,id',
-            'assigned_to' => 'nullable|exists:users,id',
-            'is_paid' => 'boolean',
-            'payment_reason' => 'required_if:is_paid,false|nullable|string|in:' . implode(',', [
-                \App\Models\Task::REASON_VOLUNTEER,
-                \App\Models\Task::REASON_ACADEMIC,
-                \App\Models\Task::REASON_OTHER,
-            ]),
-            'amount' => 'required_if:is_paid,true|nullable|numeric|min:0',
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'description' => 'nullable|string',
+        'status' => 'required|string|in:todo,in_progress,done',
+        'priority' => 'required|string|in:low,medium,high',
+        'due_date' => ['nullable', 'date_format:Y-m-d H:i:s'],
+        'project_id' => 'required|exists:projects,id',
+        'sprint_id' => 'required|exists:sprints,id',
+        'assigned_to' => 'nullable|exists:users,id',
+        'is_paid' => 'boolean',
+        'payment_reason' => 'required_if:is_paid,false|nullable|string|in:' . implode(',', [
+            \App\Models\Task::REASON_VOLUNTEER,
+            \App\Models\Task::REASON_ACADEMIC,
+            \App\Models\Task::REASON_OTHER,
+        ]),
+        'amount' => 'required_if:is_paid,true|nullable|numeric|min:0',
+    ]);
+
+    $validated['created_by'] = auth()->id();
+    $validated['payment_status'] = $validated['is_paid'] ?
+        \App\Models\Task::PAYMENT_STATUS_UNPAID :
+        \App\Models\Task::PAYMENT_STATUS_UNPAID;
+
+    // Si c'est une tâche bénévole, marquer comme payée
+    if (isset($validated['payment_reason']) && $validated['payment_reason'] === \App\Models\Task::REASON_VOLUNTEER) {
+        $validated['is_paid'] = true;
+        $validated['payment_status'] = \App\Models\Task::PAYMENT_STATUS_PAID;
+        $validated['paid_at'] = now();
+    }
+
+    $task = Task::create($validated);
+
+    // Créer un fichier de suivi pour la tâche
+    $project = Project::find($validated['project_id']);
+
+    if ($project) {
+        // Créer le dossier du projet s'il n'existe pas
+        $projectPath = 'projects/' . Str::slug($project->name) . '/tasks';
+        Storage::disk('public')->makeDirectory($projectPath, 0755, true);
+
+        // Créer le fichier de suivi
+        $fileName = 'Suivi de la tâche ' . Str::slug($task->title) ;
+        $filePath = $projectPath . '/' . $fileName;
+
+        $content = "Ce fichier est destiné au suivi de la tâche " . $task->title . "\n\n";
+        $content .= "Vous pouvez utiliser ce fichier pour noter les mises à jour, les commentaires ou toute information utile concernant cette tâche.\n";
+        $content .= "Tous les membres de l'équipe peuvent collaborer sur ce document.\n";
+
+        Storage::disk('public')->put($filePath, $content);
+
+        // Enregistrer le fichier dans la base de données
+        \App\Models\File::create([
+            'name' => $fileName,
+            'file_path' => $filePath,
+            'type' => 'text/plain',
+            'size' => Storage::disk('public')->size($filePath),
+            'user_id' => auth()->id(),
+            'project_id' => $project->id,
+            'task_id' => $task->id,
+            'description' => 'Fichier de suivi pour la tâche : ' . $task->title,
+            'status' => 'active',
+            'uploaded_by' => auth()->id()
         ]);
 
-        $validated['created_by'] = auth()->id();
-        $validated['payment_status'] = $validated['is_paid'] ?
-            \App\Models\Task::PAYMENT_STATUS_UNPAID :
-            \App\Models\Task::PAYMENT_STATUS_UNPAID;
+        // Si la tâche est assignée à quelqu'un, envoyer uniquement la notification personnalisée
+        if ($task->assigned_to) {
+            $assignedUser = \App\Models\User::find($task->assigned_to);
+            if ($assignedUser) {
 
-        // Si c'est une tâche bénévole, marquer comme payée
-        if (isset($validated['payment_reason']) && $validated['payment_reason'] === \App\Models\Task::REASON_VOLUNTEER) {
-            $validated['is_paid'] = true;
-            $validated['payment_status'] = \App\Models\Task::PAYMENT_STATUS_PAID;
-            $validated['paid_at'] = now();
-        }
+                // Email existant
+                $assignedUser->notify(
+                    new TaskAssignedNotification($task)
+                );
 
-        $task = Task::create($validated);
-
-        // Créer un fichier de suivi pour la tâche
-        $project = Project::find($validated['project_id']);
-
-        if ($project) {
-            // Créer le dossier du projet s'il n'existe pas
-            $projectPath = 'projects/' . Str::slug($project->name) . '/tasks';
-            Storage::disk('public')->makeDirectory($projectPath, 0755, true);
-
-            // Créer le fichier de suivi
-            $fileName = 'Suivi de la tâche ' . Str::slug($task->title) ;
-            $filePath = $projectPath . '/' . $fileName;
-
-            $content = "Ce fichier est destiné au suivi de la tâche " . $task->title . "\n\n";
-            $content .= "Vous pouvez utiliser ce fichier pour noter les mises à jour, les commentaires ou toute information utile concernant cette tâche.\n";
-            $content .= "Tous les membres de l'équipe peuvent collaborer sur ce document.\n";
-
-            Storage::disk('public')->put($filePath, $content);
-
-            // Enregistrer le fichier dans la base de données
-            \App\Models\File::create([
-                'name' => $fileName,
-                'file_path' => $filePath,
-                'type' => 'text/plain',
-                'size' => Storage::disk('public')->size($filePath),
-                'user_id' => auth()->id(),
-                'project_id' => $project->id,
-                'task_id' => $task->id,
-                'description' => 'Fichier de suivi pour la tâche : ' . $task->title,
-                'status' => 'active',
-                'uploaded_by' => auth()->id()
-            ]);
-
-            // Si la tâche est assignée à quelqu'un, envoyer uniquement la notification personnalisée
-            if ($task->assigned_to) {
-                $assignedUser = \App\Models\User::find($task->assigned_to);
-if ($assignedUser) {
-
-    // Email existant
-    $assignedUser->notify(
-        new TaskAssignedNotification($task)
-    );
-
-    // Web Push + database
-    $assignedUser->notify(
-        new ProjaNotification(
-            'Nouvelle tâche assignée',
-            'La tâche "'.$task->title.'" vous a été assignée.',
-            '/tasks/'.$task->id
-        )
-    );
-}
+                // Web Push + database
+                $assignedUser->notify(
+                    new ProjaNotification(
+                        'Nouvelle tâche assignée',
+                        'La tâche "'.$task->title.'" vous a été assignée.',
+                        '/tasks/'.$task->id
+                    )
+                );
             }
         }
+    }
 
-        return redirect()->route('tasks.index')
+    // Redirection contextuelle : si on arrive depuis la page d'un projet
+    // (créée via /tasks/create?project_id=X), on y retourne. Sinon, retour à la liste des tâches.
+    if ($request->boolean('from_project')) {
+        return redirect()->route('projects.show', $validated['project_id'])
             ->with('success', 'Tâche créée avec succès.');
     }
+
+    return redirect()->route('tasks.index')
+        ->with('success', 'Tâche créée avec succès.');
+}
 
     /**
      * Télécharge un fichier attaché à une tâche

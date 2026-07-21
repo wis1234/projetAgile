@@ -45,6 +45,12 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Route de retour contextuelle : si on arrive depuis la page d'un projet
+  // (selectedProjectId présent et valide), on doit y retourner. Sinon, retour à la liste des tâches.
+  const backRoute = isProjectPreSelected
+    ? route('projects.show', selectedProjectId)
+    : '/tasks';
   
   // Formatage date/heure pour l'affichage
   const formatDateTime = (dateString) => {
@@ -122,6 +128,9 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
       is_paid: isPaid,
       payment_reason: paymentReason,
       amount: amount,
+      // Indique au backend qu'on vient de la page d'un projet, pour que
+      // la redirection serveur (fallback sans JS) reste cohérente avec le client
+      from_project: isProjectPreSelected,
     }, {
       onSuccess: () => {
         setNotification('Tâche créée avec succès');
@@ -138,7 +147,7 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
         setPaymentReason('');
         setAmount('');
         setLoading(false);
-        setTimeout(() => router.visit('/tasks'), 1200);
+        setTimeout(() => router.visit(backRoute), 1200);
       },
       onError: () => {
         setNotification('Erreur lors de la création');
@@ -153,7 +162,7 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
       <div className="flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
         {/* En-tête avec boutons */}
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/tasks" className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 p-3 rounded-lg transition duration-200 hover:shadow-sm">
+          <Link href={backRoute} className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 p-3 rounded-lg transition duration-200 hover:shadow-sm">
             <FaArrowLeft className="text-xl" />
           </Link>
           <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" />
@@ -393,7 +402,7 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
               </div>
               {!showPreview ? (
                 <>
-                  <textarea value={description} onChange={e => setDescription(e.target.value.slice(0, 2000))} rows="6" className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 font-mono text-sm" placeholder="Décrivez la tâche en détail (support Markdown)" disabled={!hasProjects} />
+                  <textarea id="description" value={description} onChange={e => setDescription(e.target.value.slice(0, 2000))} rows="6" className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 font-mono text-sm" placeholder="Décrivez la tâche en détail (support Markdown)" disabled={!hasProjects} />
                   <div className="mt-1 flex flex-wrap gap-2">
                     <button type="button" onClick={() => { const ta = document.getElementById('description'); const s = ta.selectionStart, e = ta.selectionEnd, t = description.substring(s, e); setDescription(description.substring(0,s) + `**${t||'texte en gras'}**` + description.substring(e)); setTimeout(()=>ta.setSelectionRange(s+2, s+6+(t.length)),0); }} className="text-xs px-2 py-1 bg-gray-100 rounded border hover:bg-gray-200" title="Gras"><strong>B</strong></button>
                     <button type="button" onClick={() => { const ta = document.getElementById('description'); const s = ta.selectionStart, e = ta.selectionEnd, t = description.substring(s, e); setDescription(description.substring(0,s) + `*${t||'texte en italique'}*` + description.substring(e)); setTimeout(()=>ta.setSelectionRange(s+1, s+1+t.length),0); }} className="text-xs px-2 py-1 bg-gray-100 rounded border hover:bg-gray-200" title="Italique"><em>I</em></button>
@@ -445,7 +454,7 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
               <button type="submit" className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading || !isFormValid || projectUsers.length === 0 || !hasProjects}>
                 {loading ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Création...</>) : (<><FaTasks /> Créer la tâche</>)}
               </button>
-              <Link href="/tasks" className="flex-1 md:flex-none bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2">
+              <Link href={backRoute} className="flex-1 md:flex-none bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2">
                 <FaArrowLeft /> Annuler
               </Link>
             </div>
