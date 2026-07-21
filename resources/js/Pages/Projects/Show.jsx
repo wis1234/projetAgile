@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
+import { parseISO, isBefore, isAfter, addMinutes } from 'date-fns';
 import AdminLayout from '@/Layouts/AdminLayout';
 import {
   FaProjectDiagram, FaUsers, FaTasks, FaEdit, FaEye, FaArrowLeft, FaCalendarAlt,
@@ -8,7 +9,7 @@ import {
   FaChevronDown, FaChevronUp, FaFileAlt, FaFilePdf, FaFileWord, FaTrash, FaChartLine, FaCommentDots,
   FaCheckCircle, FaClock, FaPlay, FaChartBar, FaCrown, FaUser, FaShieldAlt,
   FaPlus, FaGlobe, FaExternalLinkAlt, FaQuestionCircle, FaArrowUp, FaArrowDown,
-  FaEquals, FaExclamationTriangle, FaSpinner, FaListUl
+  FaEquals, FaExclamationTriangle, FaSpinner, FaListUl, FaVideo, FaDoorOpen, FaTimes
 } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
@@ -98,6 +99,96 @@ const DescriptionWithToggle = ({ description, t }) => {
   );
 };
 
+// Bandeau compact de statut Zoom : remplace l'ancien composant pleine largeur.
+// Affiche l'essentiel (réunion en cours ou non) et délègue le reste au modal.
+const ZoomStatusBar = ({ project, onOpen }) => {
+  const [liveMeeting, setLiveMeeting] = useState(null);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchLiveMeeting = async () => {
+      try {
+        const response = await fetch(route('api.zoom.active', { project: project.id }), {
+          headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+          },
+          credentials: 'include',
+        });
+        if (!response.ok) return;
+        const result = await response.json();
+        if (cancelled) return;
+
+        if (result.success && result.meeting) {
+          const start = parseISO(result.meeting.start_time);
+          const end = addMinutes(start, result.meeting.duration);
+          const isOngoing = isBefore(new Date(), end) && isAfter(new Date(), start);
+          setLiveMeeting(isOngoing ? result.meeting : null);
+        } else {
+          setLiveMeeting(null);
+        }
+      } catch (e) {
+        // Échec silencieux : le badge "En cours" reste simplement masqué,
+        // l'utilisateur peut toujours ouvrir le modal pour vérifier.
+      } finally {
+        if (!cancelled) setChecked(true);
+      }
+    };
+
+    fetchLiveMeeting();
+    const interval = setInterval(fetchLiveMeeting, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [project.id]);
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${liveMeeting ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+          <FaVideo className="text-white text-sm" />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-gray-900 dark:text-white text-sm">Réunions Zoom</h3>
+            {liveMeeting && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 flex-shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> En cours
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+            {liveMeeting
+              ? liveMeeting.topic
+              : checked
+              ? 'Aucune réunion en cours'
+              : 'Vérification en cours…'}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {liveMeeting && (
+          <button
+            onClick={onOpen}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition"
+          >
+            <FaDoorOpen className="text-xs" /> Rejoindre
+          </button>
+        )}
+        <button
+          onClick={onOpen}
+          className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg transition"
+        >
+          <FaVideo className="text-xs" /> {liveMeeting ? 'Détails' : 'Planifier / voir'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ── Composant principal ─────────────────────────────────────────────────────
 function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
   const { t, i18n } = useTranslation();
@@ -105,6 +196,7 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showAllTasks, setShowAllTasks] = useState(false);
+  const [showZoomModal, setShowZoomModal] = useState(false);
 
   const userRoles = Array.isArray(auth?.user?.roles) ? auth.user.roles : [];
   const isAdmin = userRoles.includes('admin');
@@ -209,6 +301,9 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
           </div>
         </div>
 
+        {/* Bandeau de statut Zoom : compact, pleine largeur, ouvre le modal au clic */}
+        <ZoomStatusBar project={project} onOpen={() => setShowZoomModal(true)} />
+
         {/* Grille 2 colonnes */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Colonne gauche */}
@@ -241,9 +336,6 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
               <StatCard icon={<FaFileAlt className="text-purple-500 text-2xl" />} label={t('files')} value={stats.filesCount ?? 0} color="purple" />
               <StatCard icon={<FaCommentDots className="text-amber-500 text-2xl" />} label={t('comments')} value={stats.commentsCount ?? 0} color="amber" />
             </div>
-
-            {/* ZoomMeeting */}
-            <ZoomMeeting project={project} />
 
             {/* Sprints */}
             {sprintsList.length > 0 && (
@@ -367,16 +459,15 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
                   <span className="font-medium text-sm">{t('add_sprint')}</span>
                 </Link>
 
-<Link
-    href={route('project-users.create', { project_id: project.id })}
-    className="flex items-center gap-3 w-full px-3 py-2.5 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 rounded-xl transition"
->
-    <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-        <FaUserPlus className="text-white text-sm" />
-    </div>
-    <span className="font-medium text-sm">{t('add_member')}</span>
-</Link>
-
+                <Link
+                    href={route('project-users.create', { project_id: project.id })}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 rounded-xl transition"
+                >
+                    <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+                        <FaUserPlus className="text-white text-sm" />
+                    </div>
+                    <span className="font-medium text-sm">{t('add_member')}</span>
+                </Link>
 
                 <Link
                   href={route('tasks.create', { project_id: project.id })}
@@ -385,6 +476,14 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
                   <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center"><FaTasks className="text-white text-sm" /></div>
                   <span className="font-medium text-sm">{t('add_task')}</span>
                 </Link>
+
+                <button
+                  onClick={() => setShowZoomModal(true)}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 bg-sky-50 dark:bg-sky-900/30 hover:bg-sky-100 dark:hover:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded-xl transition text-left"
+                >
+                  <div className="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center"><FaVideo className="text-white text-sm" /></div>
+                  <span className="font-medium text-sm">Planifier une réunion Zoom</span>
+                </button>
 
                 {/* Export dropdown */}
                 <div className="relative group/export">
@@ -523,6 +622,25 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
               {deleteLoading ? t('deleting') : t('delete_project_permanently')}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Modal Zoom : héberge le composant complet, inchangé fonctionnellement */}
+      <Modal show={showZoomModal} onClose={() => setShowZoomModal(false)} maxWidth="2xl">
+        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100 dark:border-gray-700">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <FaVideo className="text-blue-500" /> Réunions Zoom
+          </h3>
+          <button
+            onClick={() => setShowZoomModal(false)}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-lg"
+            aria-label="Fermer"
+          >
+            <FaTimes />
+          </button>
+        </div>
+        <div className="max-h-[75vh] overflow-y-auto">
+          <ZoomMeeting project={project} />
         </div>
       </Modal>
     </div>

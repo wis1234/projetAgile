@@ -386,7 +386,7 @@ if (field === null || field === 'start_time') {
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 relative">
+        <div className="p-6 relative">
             {/* Notifications */}
             <div className="fixed top-4 right-4 z-50 space-y-2">
                 {notifications.map(notification => (
@@ -664,7 +664,7 @@ if (field === null || field === 'start_time') {
                         <span className="sr-only">Chargement des réunions...</span>
                     </div>
                 ) : recentMeetings.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         {recentMeetings.map((meeting) => {
                             const isUpcoming = isMeetingUpcoming(meeting);
                             const isActive = isMeetingActive(meeting);
