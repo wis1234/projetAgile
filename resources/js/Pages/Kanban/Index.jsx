@@ -43,7 +43,7 @@ function Kanban({ tasks: initialTasks, auth }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  const canModifyTasks = auth?.user?.is_admin || auth?.user?.is_manager;
+  //const canModifyTasks = auth?.user?.is_admin || auth?.user?.is_manager;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -92,11 +92,13 @@ function Kanban({ tasks: initialTasks, auth }) {
   }, [tasks]);
 
   const handleDragStart = (event) => {
-    if (!canModifyTasks) {
-      toast.error("Seuls les administrateurs et les managers peuvent déplacer les tâches");
-      event.preventDefault();
-      return;
-    }
+const task = event.active.data.current?.task;
+
+if (!task?.can_update) {
+    toast.error("Vous n'êtes pas autorisé à déplacer cette tâche.");
+    event.preventDefault();
+    return;
+}
     
     if (event.active.data.current?.type === 'Task') {
       setActiveTask(event.active.data.current.task);
@@ -107,9 +109,15 @@ function Kanban({ tasks: initialTasks, auth }) {
     setActiveTask(null);
     const { active, over } = event;
 
-    if (!over || isLoading || !canModifyTasks) return;
-
+if (!over || isLoading) return;
     const activeId = active.id;
+
+    const draggedTask = tasks.find(t => t.id === activeId);
+
+if (!draggedTask?.can_update) {
+    return;
+}
+
     const overId = over.id;
 
     if (activeId === overId) return;
@@ -304,9 +312,9 @@ function Kanban({ tasks: initialTasks, auth }) {
                     color={column.color}
                     headerBg={column.headerBg}
                     accentColor={column.accentColor}
-                    onAddTask={canModifyTasks ? handleAddTask : null}
+                    onAddTask={handleAddTask}
                     isLoading={isLoading}
-                    canModify={canModifyTasks}
+                    canModify={true}
                   />
                 );
               })}
@@ -386,12 +394,12 @@ const Column = ({ id, title, tasks, color, headerBg, accentColor, onAddTask, isL
       <div className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent -mr-3 pr-1">
         <SortableContext items={canModify ? tasks.map(t => t.id) : []}>
           {tasks.map(task => (
-            <TaskCard 
-              key={task.id} 
-              task={task}
-              accentColor={accentColor}
-              canModify={canModify}
-            />
+<TaskCard
+    key={task.id}
+    task={task}
+    accentColor={accentColor}
+    canModify={task.can_update}
+/>
           ))}
         </SortableContext>
         

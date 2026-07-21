@@ -36,7 +36,11 @@ class KanbanController extends Controller
             $query->whereIn('project_id', $projectIds);
         }
 
-        $tasks = $query->get();
+       // $tasks = $query->get();
+       $tasks = $query->get()->map(function ($task) use ($user) {
+    $task->can_update = $user->can('update', $task);
+    return $task;
+});
 
         // Récupérer toutes les informations nécessaires pour l'utilisateur
         $userData = [
@@ -60,119 +64,148 @@ class KanbanController extends Controller
     /**
      * Met à jour l'ordre et le statut des tâches
      */
-    public function updateOrder(Request $request)
-    {
-        // Journalisation des données brutes reçues
-        $rawInput = $request->getContent();
-        \Log::info('Données brutes reçues pour la mise à jour du Kanban', [
-            'raw_input' => $rawInput,
-            'content_type' => $request->header('Content-Type'),
-            'accept' => $request->header('Accept'),
-            'x_csrf_token' => $request->header('X-CSRF-TOKEN'),
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
+/**
+ * Met à jour l'ordre et le statut des tâches
+ */
+public function updateOrder(Request $request)
+{
+    // Journalisation des données brutes reçues
+    $rawInput = $request->getContent();
+    \Log::info('Données brutes reçues pour la mise à jour du Kanban', [
+        'raw_input' => $rawInput,
+        'content_type' => $request->header('Content-Type'),
+        'accept' => $request->header('Accept'),
+        'x_csrf_token' => $request->header('X-CSRF-TOKEN'),
+        'ip' => $request->ip(),
+        'user_agent' => $request->userAgent(),
+        'user_id' => auth()->id(),
+        'authenticated' => auth()->check()
+    ]);
+
+    // Journalisation des données parsées
+    $jsonData = json_decode($rawInput, true);
+    \Log::info('Données JSON décodées', [
+        'json_data' => $jsonData,
+        'json_last_error' => json_last_error(),
+        'json_last_error_msg' => json_last_error_msg()
+    ]);
+
+    // Valider que nous avons des données JSON valides
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        \Log::error('Erreur de décodage JSON', [
+            'error' => json_last_error_msg(),
+            'input' => $rawInput
+        ]);
+        return response()->json([
+            'message' => 'Données JSON invalides',
+            'error' => json_last_error_msg()
+        ], 400);
+    }
+
+    // Valider la structure des données
+    $validator = \Validator::make($jsonData, [
+        'tasks' => 'required|array|min:1',
+        'tasks.*.id' => [
+            'required',
+            'integer',
+            Rule::exists('tasks', 'id')
+        ],
+        'tasks.*.status' => [
+            'required',
+            'string',
+            Rule::in(['todo', 'in_progress', 'done'])
+        ],
+        'tasks.*.position' => 'required|integer', // Retrait de la validation min:0 pour permettre les positions négatives
+    ]);
+
+    if ($validator->fails()) {
+        \Log::error('Erreur de validation pour la mise à jour du Kanban', [
+            'errors' => $validator->errors(),
             'user_id' => auth()->id(),
-            'authenticated' => auth()->check()
         ]);
+        return response()->json([
+            'success' => false,
+            'message' => 'Données invalides.',
+            'errors' => $validator->errors(),
+        ], 422);
+    }
 
-        // Journalisation des données parsées
-        $jsonData = json_decode($rawInput, true);
-        \Log::info('Données JSON décodées', [
-            'json_data' => $jsonData,
-            'json_last_error' => json_last_error(),
-            'json_last_error_msg' => json_last_error_msg()
-        ]);
+    $tasks = $request->input('tasks');
+    $user = Auth::user();
 
-        // Valider que nous avons des données JSON valides
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            \Log::error('Erreur de décodage JSON', [
-                'error' => json_last_error_msg(),
-                'input' => $rawInput
-            ]);
-            return response()->json([
-                'message' => 'Données JSON invalides',
-                'error' => json_last_error_msg()
-            ], 400);
-        }
+    $updated = [];
+    $skipped = [];
 
-        // Valider la structure des données
-        $validator = \Validator::make($jsonData, [
-            'tasks' => 'required|array|min:1',
-            'tasks.*.id' => [
-                'required',
-                'integer',
-                Rule::exists('tasks', 'id')
-            ],
-            'tasks.*.status' => [
-                'required',
-                'string',
-                Rule::in(['todo', 'in_progress', 'done'])
-            ],
-            'tasks.*.position' => 'required|integer', // Retrait de la validation min:0 pour permettre les positions négatives
-        ]);
+    try {
+        DB::beginTransaction();
 
-        $tasks = $request->input('tasks');
-        $user = Auth::user();
+        // Mettre à jour chaque tâche avec les nouvelles valeurs
+        foreach ($tasks as $taskData) {
+            $task = Task::with('project')->findOrFail($taskData['id']);
 
-        try {
-            DB::beginTransaction();
-
-            // Mettre à jour chaque tâche avec les nouvelles valeurs
-            foreach ($tasks as $taskData) {
-                $task = Task::with('project')->findOrFail($taskData['id']);
-                
-                // Vérifier les autorisations
-                if (!$user->can('update', $task)) {
-                    throw new \Exception("Action non autorisée pour la tâche #{$task->id}");
-                }
-
-                // Mettre à jour la tâche
-                $task->update([
-                    'status' => $taskData['status'],
-                    'position' => (int)$taskData['position'],
-                ]);
-
-                // Journalisation pour le débogage
-                Log::info('Tâche mise à jour', [
+            // Vérifier les autorisations : on ignore la tâche au lieu de tout annuler
+            if (!$user->can('update', $task)) {
+                $skipped[] = $task->id;
+                Log::warning('Tâche ignorée (non autorisée)', [
                     'task_id' => $task->id,
-                    'status' => $task->status,
-                    'position' => $task->position,
+                    'project_id' => $task->project_id,
                     'user_id' => $user->id,
                 ]);
+                continue; // passe à la tâche suivante au lieu de throw
             }
 
-            DB::commit();
-
-            // Recharger les tâches mises à jour depuis la base de données
-            $updatedTasks = Task::whereIn('id', array_column($tasks, 'id'))
-                ->with(['assignedUser', 'project'])
-                ->orderBy('status')
-                ->orderBy('position')
-                ->orderBy('updated_at', 'desc')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Le tableau Kanban a été mis à jour avec succès.',
-                'data' => $updatedTasks
+            // Mettre à jour la tâche
+            $task->update([
+                'status' => $taskData['status'],
+                'position' => (int) $taskData['position'],
             ]);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            Log::error('Erreur lors de la mise à jour du Kanban', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => $user->id ?? null,
-            ]);
+            $updated[] = $task->id;
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Une erreur est survenue lors de la mise à jour du tableau Kanban.',
-                'error' => config('app.debug') ? $e->getMessage() : null,
-            ], 500);
+            // Journalisation pour le débogage
+            Log::info('Tâche mise à jour', [
+                'task_id' => $task->id,
+                'status' => $task->status,
+                'position' => $task->position,
+                'user_id' => $user->id,
+            ]);
         }
+
+        DB::commit();
+
+        // Recharger uniquement les tâches réellement mises à jour
+        $updatedTasks = Task::whereIn('id', $updated)
+            ->with(['assignedUser', 'project'])
+            ->orderBy('status')
+            ->orderBy('position')
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => count($skipped) > 0
+                ? 'Mise à jour effectuée, certaines tâches ont été ignorées (accès non autorisé).'
+                : 'Le tableau Kanban a été mis à jour avec succès.',
+            'data' => $updatedTasks,
+            'skipped_task_ids' => $skipped,
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+
+        Log::error('Erreur lors de la mise à jour du Kanban', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'user_id' => $user->id ?? null,
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Une erreur est survenue lors de la mise à jour du tableau Kanban.',
+            'error' => config('app.debug') ? $e->getMessage() : null,
+        ], 500);
     }
+}
 
     /**
      * Récupère les tâches pour l'API
@@ -197,7 +230,11 @@ class KanbanController extends Controller
         }
 
         // Récupérer les tâches
-        $tasks = $query->get();
+        //$tasks = $query->get();
+        $tasks = $query->get()->map(function ($task) use ($user) {
+    $task->can_update = $user->can('update', $task);
+    return $task;
+});
 
         // Journalisation pour le débogage
         \Log::info('Tâches chargées pour le Kanban', [
