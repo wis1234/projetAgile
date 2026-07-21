@@ -35,19 +35,51 @@ class TaskPolicy
     /**
      * Check if the user is a manager of the project.
      */
-private function isProjectManager(User $user, Task $task): bool
-{
-    if (!$task->project) {
-        return false;
-    }
+ /**
+     * Vérifie si l'utilisateur est manager du projet de la tâche.
+     * 
+     * @param User $user
+     * @param Task $task
+     * @return bool
+     */
+    private function isProjectManager(User $user, Task $task): bool
+    {
+        // 1. Charger la relation 'project' si elle n'est pas déjà chargée
+        if (!$task->relationLoaded('project')) {
+            $task->load('project');
+        }
 
-    // Vérifie si l'utilisateur est manager dans la pivot
-    return $task->project->users()
-        ->where('user_id', $user->id)
-        ->wherePivotIn('role', ['manager', 'project_manager']) // Accepte les deux valeurs
-        ->wherePivot('is_muted', false)
-        ->exists();
-}
+        // 2. Si la tâche n'a pas de projet, aucun manager possible
+        if (!$task->project) {
+            Log::warning('isProjectManager: project null', [
+                'user_id'   => $user->id,
+                'task_id'   => $task->id,
+                'project_id'=> $task->project_id,
+            ]);
+            return false;
+        }
+
+        // 3. Vérifier dans la table pivot project_user
+        //    Conditions : user_id = $user->id, role = 'manager', is_muted = 0
+        $exists = $task->project->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'manager')
+            ->wherePivot('is_muted', false)
+            ->exists();
+
+        // 4. Log détaillé pour déboguer
+        Log::info('isProjectManager result', [
+            'user_id'    => $user->id,
+            'task_id'    => $task->id,
+            'project_id' => $task->project_id,
+            'project_name' => $task->project->name ?? 'N/A',
+            'role'       => 'manager',
+            'is_muted'   => 0,
+            'is_manager' => $exists,
+        ]);
+
+        return $exists;
+    }
 
     public function viewAny(User $user)
     {
