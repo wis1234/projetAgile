@@ -85,9 +85,9 @@ class ProjectNotification extends Notification implements ShouldQueue
 
                 return array_merge($base, [
                     'heading'    => "Bienvenue sur le projet <strong>" . e($projectName) . "</strong>",
-                    'intro'      => "Vous avez été ajouté(e) en tant que <strong>" . e(ucfirst($this->data['role'] ?? 'membre')) . "</strong> "
+                    'intro'      => "Vous avez été ajouté(e) en tant que <strong>" . e($this->getRoleText($this->data['role'] ?? 'member')) . "</strong> "
                                   . "par <strong>" . e($this->data['added_by'] ?? 'un administrateur') . "</strong> le {$date}. "
-                                  . "Vous avez désormais accès à toutes les fonctionnalités de ce projet.",
+                                  . "Ensemble, chaque contribution compte : à vous de jouer pour faire avancer ce projet vers la réussite.",
                     'actionText' => 'Accéder au projet',
                     'actionUrl'  => route('projects.show', $projectId),
                 ]);
@@ -99,7 +99,7 @@ class ProjectNotification extends Notification implements ShouldQueue
                     'heading'    => "Nouveau membre dans le projet <strong>" . e($projectName) . "</strong>",
                     'metaItems'  => [
                         ['icon' => '👤', 'label' => 'Membre',    'value' => trim(($this->data['user_name'] ?? 'Nouveau membre') . ' (' . ($this->data['user_email'] ?? '') . ')')],
-                        ['icon' => '🎯', 'label' => 'Rôle',      'value' => $this->data['role'] ?? "membre de l'équipe"],
+                        ['icon' => '🎯', 'label' => 'Rôle',      'value' => $this->getRoleText($this->data['role'] ?? 'member')],
                         ['icon' => '👥', 'label' => 'Ajouté par', 'value' => $this->data['added_by'] ?? 'un administrateur'],
                         ['icon' => '📅', 'label' => 'Date',      'value' => now()->format('d/m/Y à H:i')],
                     ],
@@ -259,5 +259,21 @@ class ProjectNotification extends Notification implements ShouldQueue
         ];
 
         return $priorities[$priority] ?? ucfirst($priority);
+    }
+
+    /**
+     * Traduit le rôle d'un membre du projet.
+     * Accepte la valeur brute ('member', 'manager', 'observer') insensible à la casse,
+     * et retombe sur une capitalisation simple si le rôle est inconnu.
+     */
+    protected function getRoleText($role)
+    {
+        $roles = [
+            'member'   => 'Membre',
+            'manager'  => 'Manager',
+            'observer' => 'Observateur',
+        ];
+
+        return $roles[strtolower((string) $role)] ?? ucfirst((string) $role);
     }
 }
