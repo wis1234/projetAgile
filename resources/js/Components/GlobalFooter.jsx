@@ -3,15 +3,31 @@ import { Link } from '@inertiajs/react';
 
 export default function GlobalFooter({ className = '' }) {
     return (
-        <div className={`w-full text-center py-6 ${className}`}>
-            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
-                &copy; {new Date().getFullYear()} ProJA - Tous droits réservés.
-            </div>
-            <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-sm">
-                <Link href={route('about')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">À propos</Link>
-                <Link href={route('contact')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Contact</Link>
-                <Link href={route('privacy.policy')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Politique de confidentialité</Link>
-                <Link href={route('terms.of.service')} className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">Conditions d'utilisation</Link>
+        <div className={`w-full border-t border-gray-100 dark:border-gray-800 py-3 ${className}`}>
+            <div className="flex flex-col items-center gap-1.5 sm:flex-row sm:justify-center sm:gap-3">
+                <span className="text-xs tracking-wide text-gray-400 dark:text-gray-500">
+                    &copy; {new Date().getFullYear()} ProJA
+                </span>
+
+                <span className="hidden sm:inline text-gray-300 dark:text-gray-700">•</span>
+
+                <nav className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                    <Link href={route('about')} className="text-xs font-medium tracking-wide text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
+                        À propos
+                    </Link>
+                    <span className="text-gray-300 dark:text-gray-700">•</span>
+                    <Link href={route('contact')} className="text-xs font-medium tracking-wide text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
+                        Contact
+                    </Link>
+                    <span className="text-gray-300 dark:text-gray-700">•</span>
+                    <Link href={route('privacy.policy')} className="text-xs font-medium tracking-wide text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
+                        Confidentialité
+                    </Link>
+                    <span className="text-gray-300 dark:text-gray-700">•</span>
+                    <Link href={route('terms.of.service')} className="text-xs font-medium tracking-wide text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
+                        Conditions
+                    </Link>
+                </nav>
             </div>
         </div>
     );
