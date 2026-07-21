@@ -208,77 +208,17 @@ return (
   );
 };
 
-// Lecteur vocal façon Messenger : gros bouton rond play/stop + barre de
-// progression, tout en conservant les contrôles natifs (menu ⋮ : vitesse,
-// téléchargement) rattachés au même élément <audio>.
+//  conservant les contrôles natifs (menu ⋮ : vitesse,
 const VoiceMessagePlayer = ({ src, isMe }) => {
-  const audioRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-
-  const togglePlay = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (audio.paused) {
-      audio.play();
-    } else {
-      audio.pause();
-      audio.currentTime = 0;
-    }
-  };
-
-  const formatAudioTime = (s) => {
-    if (!isFinite(s) || s < 0) return '0:00';
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
-
-  const progress = duration ? Math.min((currentTime / duration) * 100, 100) : 0;
-
   return (
-    <div className="flex flex-col gap-1 min-w-0" style={{ minWidth: 180 }}>
-      <div className="flex items-center gap-2 min-w-0">
-        <button
-          type="button"
-          onClick={togglePlay}
-          className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-            isMe ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'
-          }`}
-          title={isPlaying ? 'Arrêter' : 'Écouter'}
-        >
-          {isPlaying ? <FaStop className="w-3 h-3" /> : <FaPlay className="w-3 h-3 ml-0.5" />}
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className={`h-1.5 rounded-full overflow-hidden ${isMe ? 'bg-white/25' : 'bg-gray-200 dark:bg-gray-500'}`}>
-            <div
-              className={`h-full ${isMe ? 'bg-white' : 'bg-blue-500'} transition-all`}
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <span className={`text-[10px] mt-0.5 block ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
-            {isPlaying ? formatAudioTime(currentTime) : formatAudioTime(duration)}
-          </span>
-        </div>
-      </div>
-      {/* Contrôles natifs conservés : le menu ⋮ (vitesse, téléchargement) reste accessible */}
-      <audio
-        ref={audioRef}
-        src={src}
-        controls
-        preload="metadata"
-        onLoadedMetadata={e => setDuration(e.target.duration || 0)}
-        onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
-        className="h-7 w-full max-w-[220px] opacity-80"
-      />
-    </div>
+    <audio
+      controls
+      preload="metadata"
+      src={src}
+      className="h-9 w-full max-w-[220px]"
+    />
   );
 };
-
 
 export default function Show({ task, payments, projectMembers, currentUserRole }) {
   const { t } = useTranslation();
