@@ -573,7 +573,7 @@ const handleCommentSubmit = async (e) => {
     id: null,              // pas encore d'id serveur
     _pending: true,
     _failed: false,
-    content: commentContent.trim() || 'Message vocal',
+    content: commentContent.trim() || 'Message audio enregistré et sauvegardé', // placeholder si audio seulement
     audio_path: audioBlob ? audioUrl : null, // aperçu local
     created_at: now,
     updated_at: now,
@@ -619,7 +619,7 @@ const handleCommentSubmit = async (e) => {
   // ─── Envoi réel en arrière-plan ───
   try {
     const formData = new FormData();
-    formData.append('content', savedContent || 'Message vocal');
+    formData.append('content', savedContent || 'Message audio enregistré et sauvegardé');
     if (savedAudioBlob) formData.append('audio', savedAudioBlob, 'voice_message.webm');
     if (savedReplyingTo) formData.append('parent_id', savedReplyingTo);
 
@@ -686,7 +686,7 @@ const retryComment = async (failedComment) => {
   setComments(prev => removeOptimistic(prev));
 
   // Remettre le contenu dans le formulaire
-  setCommentContent(failedComment.content === 'Message vocal' ? '' : failedComment.content);
+  setCommentContent(failedComment.content === 'Message audio enregistré et sauvegardé' ? '' : failedComment.content);
   if (failedComment.parent_id) setReplyingTo(failedComment.parent_id);
 };
 
