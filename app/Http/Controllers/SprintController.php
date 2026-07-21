@@ -136,24 +136,31 @@ class SprintController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
-    {
-        try {
-            $this->authorize('create', Sprint::class);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
-        }
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'project_id' => 'required|exists:projects,id',
-        ]);
-        $sprint = Sprint::create($validated);
-        event(new SprintUpdated($sprint));
-        return redirect()->route('sprints.index');
+public function store(Request $request)
+{
+    try {
+        $this->authorize('create', Sprint::class);
+    } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
     }
+
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'description' => 'nullable|string',
+        'start_date' => 'required|date',
+        'end_date' => 'required|date|after_or_equal:start_date',
+        'project_id' => 'required|exists:projects,id',
+    ]);
+
+    $sprint = Sprint::create($validated);
+    event(new SprintUpdated($sprint));
+
+    if ($request->boolean('from_project')) {
+        return redirect()->route('projects.show', $validated['project_id']);
+    }
+
+    return redirect()->route('sprints.index');
+}
 
     /**
      * Display the specified resource.

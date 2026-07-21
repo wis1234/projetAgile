@@ -43,6 +43,12 @@ function Create({ projects, selectedProjectId }) {
     end_date: false
   });
 
+  // Route de retour contextuelle : si on arrive depuis la page d'un projet
+  // (selectedProjectId présent), on doit y retourner. Sinon, retour à la liste des sprints.
+  const backRoute = selectedProjectId
+    ? route('projects.show', selectedProjectId)
+    : route('sprints.index');
+
   const pageVariants = {
     initial: { opacity: 0, y: 20 },
     in: { 
@@ -100,13 +106,18 @@ function Create({ projects, selectedProjectId }) {
     
     setLoading(true);
     
-    router.post(route('sprints.store'), formData, {
+    router.post(route('sprints.store'), {
+      ...formData,
+      // Indique au backend qu'on vient de la page d'un projet, pour que
+      // la redirection serveur (fallback sans JS) reste cohérente avec le client
+      from_project: !!selectedProjectId,
+    }, {
       onSuccess: () => {
         setNotification({ 
           type: 'success', 
           message: t('sprint_created_success')
         });
-        setTimeout(() => router.visit(route('sprints.index')), 1500);
+        setTimeout(() => router.visit(backRoute), 1500);
       },
       onError: (errors) => {
         setNotification({ 
@@ -154,7 +165,7 @@ function Create({ projects, selectedProjectId }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Link 
-                href={route('sprints.index')}
+                href={backRoute}
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
               >
                 <FaArrowLeft className="mr-2 h-4 w-4" />
@@ -433,7 +444,7 @@ function Create({ projects, selectedProjectId }) {
               <div className="flex flex-col sm:flex-row justify-end gap-3">
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   <Link 
-                    href={route('sprints.index')}
+                    href={backRoute}
                     as="button"
                     className="inline-flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
                   >
