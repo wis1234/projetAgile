@@ -119,7 +119,7 @@ class KanbanController extends Controller
 
             // Mettre à jour chaque tâche avec les nouvelles valeurs
             foreach ($tasks as $taskData) {
-                $task = Task::findOrFail($taskData['id']);
+                $task = Task::with('project')->findOrFail($taskData['id']);
                 
                 // Vérifier les autorisations
                 if (!$user->can('update', $task)) {
