@@ -35,18 +35,19 @@ class TaskPolicy
     /**
      * Check if the user is a manager of the project.
      */
-    private function isProjectManager(User $user, Task $task): bool
-    {
-        if (!$task->project) {
-            return false;
-        }
-
-        return $task->project->users()
-            ->where('user_id', $user->id)
-            ->wherePivot('role', 'manager')
-            ->wherePivot('is_muted', false)
-            ->exists();
+private function isProjectManager(User $user, Task $task): bool
+{
+    if (!$task->project) {
+        return false;
     }
+
+    // Vérifie si l'utilisateur est manager dans la pivot
+    return $task->project->users()
+        ->where('user_id', $user->id)
+        ->wherePivotIn('role', ['manager', 'project_manager']) // Accepte les deux valeurs
+        ->wherePivot('is_muted', false)
+        ->exists();
+}
 
     public function viewAny(User $user)
     {
