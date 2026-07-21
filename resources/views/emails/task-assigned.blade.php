@@ -1,248 +1,227 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nouvelle tâche assignée – {{ config('app.name') }}</title>
-    <style>
-        /* Reset */
-        body, table, td, p, a, h1, h2 {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.5;
-        }
-        body {
-            background-color: #f4f5f7;
-            padding: 20px;
-        }
-        .container {
-            max-width: 560px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-        }
-        .header {
-            padding: 32px 40px 0;
-            text-align: left;
-        }
-        .header .logo {
-            font-size: 22px;
-            font-weight: 700;
-            color: #1a1a1a;
-            letter-spacing: -0.3px;
-        }
-        .header .tagline {
-            font-size: 15px;
-            color: #555;
-            margin-top: 4px;
-            font-weight: 400;
-        }
-        .content {
-            padding: 28px 40px 20px;
-        }
-        .greeting {
-            font-size: 15px;
-            color: #222;
-            margin-bottom: 20px;
-            font-weight: 500;
-        }
-        .intro {
-            font-size: 14px;
-            color: #333;
-            margin-bottom: 24px;
-        }
-        .intro strong {
-            font-weight: 600;
-            color: #000;
-        }
-        .task-title {
-            font-size: 19px;
-            font-weight: 700;
-            color: #000;
-            margin-bottom: 12px;
-            line-height: 1.3;
-        }
-        .tags {
-            margin-bottom: 24px;
-        }
-        .tag {
-            display: inline-block;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 4px 12px;
-            border-radius: 20px;
-            margin-right: 8px;
-            letter-spacing: 0.3px;
-        }
-        .tag-priority-high { background: #fee2e2; color: #b91c1c; }
-        .tag-priority-medium { background: #fef3c7; color: #b45309; }
-        .tag-priority-low { background: #d1fae5; color: #047857; }
-        .tag-priority-urgent { background: #fce7f3; color: #be123c; }
-        .tag-status { background: #e0e7ff; color: #3730a3; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nouvelle Tâche Assignée - {{ config('app.name') }}</title>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f5f7fa;
+      margin: 0;
+      padding: 0;
+      color: #1e293b;
+    }
 
-        .info-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 24px 0;
-        }
-        .info-table td {
-            padding: 10px 0;
-            vertical-align: top;
-            border-bottom: 1px solid #f0f0f0;
-            font-size: 14px;
-            color: #222;
-        }
-        .info-label {
-            font-weight: 500;
-            color: #666;
-            width: 110px;
-        }
-        .info-value {
-            font-weight: 500;
-        }
-        .description-box {
-            margin: 20px 0;
-            padding: 16px 18px;
-            background: #f9fafb;
-            border-radius: 8px;
-            font-size: 14px;
-            color: #333;
-            line-height: 1.6;
-        }
-        .description-box .desc-label {
-            font-weight: 700;
-            color: #1a1a1a;
-            margin-bottom: 6px;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .button-wrapper {
-            margin: 28px 0 10px;
-        }
-        .button {
-            display: inline-block;
-            background: #0064e0;
-            color: #ffffff !important;
-            text-decoration: none;
-            padding: 13px 34px;
-            border-radius: 24px;
-            font-weight: 600;
-            font-size: 15px;
-        }
-        .tip {
-            background: #fff5e6;
-            padding: 14px 18px;
-            border-radius: 8px;
-            font-size: 13px;
-            color: #7c5600;
-            margin: 24px 0 0;
-        }
-        .footer {
-            padding: 24px 40px;
-            font-size: 12px;
-            color: #888;
-            text-align: center;
-            border-top: 1px solid #f0f0f0;
-            line-height: 1.6;
-        }
-        @media (max-width: 600px) {
-            body { padding: 10px; }
-            .header, .content, .footer { padding-left: 20px; padding-right: 20px; }
-            .info-table td:first-child { width: auto; display: block; padding-bottom: 2px; }
-            .info-table td:last-child { display: block; padding-top: 0; padding-bottom: 12px; }
-        }
-    </style>
+    .email-wrapper {
+      background: #fff;
+      max-width: 600px;
+      margin: auto;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    /* HEADER */
+    .header {
+      background: #ffffff;
+      text-align: center;
+      padding: 30px 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .logo {
+      font-size: 28px;
+      font-weight: 700;
+      color: #4361ee;
+      margin-bottom: 8px;
+    }
+    .header-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    /* CONTENT */
+    .content {
+      padding: 25px 20px;
+    }
+    .greeting {
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    .intro-text {
+      font-size: 14px;
+      color: #475569;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    /* TASK CARD */
+    .task-card {
+      background: #f9fafb;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #e2e8f0;
+    }
+    .task-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .badges-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-priority-medium { background: #fef9c3; color: #92400e; }
+    .badge-status { background: #e0f2fe; color: #1d4ed8; }
+
+    /* META INFO */
+    .task-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .meta-item {
+      background: #fff;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    .meta-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .meta-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    /* DESCRIPTION */
+    .description-section {
+      background: #fff;
+      border-left: 4px solid #4361ee;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+    }
+    .description-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #4361ee;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .description-content {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+    }
+
+    /* BUTTON */
+    .btn-container {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #4361ee, #3a0ca3);
+      color: #fff;
+      text-decoration: none;
+      padding: 12px 28px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(67,97,238,0.3);
+    }
+
+    /* FOOTER */
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: #64748b;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 600px) {
+      .logo { font-size: 24px; }
+      .header-title { font-size: 18px; }
+      .content { padding: 20px 15px; }
+      .task-card { padding: 15px; }
+      .badges-container { flex-direction: column; align-items: flex-start; }
+      .btn { width: 100%; padding: 14px; }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">{{ config('app.name') }}</div>
-            <div class="tagline">Nouvelle tâche assignée</div>
-        </div>
-
-        <div class="content">
-            @php
-                $assignedUser = $task->assignedUser;
-                $prenom = $assignedUser ? explode(' ', $assignedUser->name)[0] : 'Utilisateur';
-
-                $priorities = [
-                    'low' => 'Basse',
-                    'medium' => 'Moyenne',
-                    'high' => 'Haute',
-                    'urgent' => 'Urgente'
-                ];
-                $statuses = [
-                    'todo' => 'À faire',
-                    'in_progress' => 'En cours',
-                    'in_review' => 'En révision',
-                    'done' => 'Terminé',
-                    'cancelled' => 'Annulé',
-                    'pending' => 'En attente',
-                    'completed' => 'Terminé',
-                    'closed' => 'Fermé'
-                ];
-                $priority = $priorities[strtolower($task->priority)] ?? ucfirst($task->priority);
-                $status = $statuses[strtolower($task->status)] ?? ucfirst(str_replace('_', ' ', $task->status));
-                $creator = \App\Models\User::find($task->created_by);
-            @endphp
-
-            <p class="greeting">Bonjour {{ $prenom }},</p>
-
-            <p class="intro">
-                Une nouvelle tâche vous a été confiée par <strong>{{ $creator ? $creator->name : 'le système' }}</strong>.
-            </p>
-
-            <div class="task-title">{{ $task->title }}</div>
-
-            <div class="tags">
-                <span class="tag tag-priority-{{ strtolower($task->priority) }}">{{ $priority }}</span>
-                <span class="tag tag-status">{{ $status }}</span>
-            </div>
-
-            <table class="info-table">
-                @if($task->project)
-                <tr>
-                    <td class="info-label">📁 Projet</td>
-                    <td class="info-value">{{ $task->project->name ?? '—' }}</td>
-                </tr>
-                @endif
-                <tr>
-                    <td class="info-label">👤 Assigné à</td>
-                    <td class="info-value">{{ $assignedUser ? $assignedUser->name : 'Non assigné' }}</td>
-                </tr>
-                <tr>
-                    <td class="info-label">📅 Échéance</td>
-                    <td class="info-value">{{ $task->due_date ? \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') : 'Non définie' }}</td>
-                </tr>
-                <tr>
-                    <td class="info-label">✨ Créée par</td>
-                    <td class="info-value">{{ $creator ? $creator->name : 'Système' }}</td>
-                </tr>
-            </table>
-
-            @if($task->description)
-            <div class="description-box">
-                <div class="desc-label">Description</div>
-                {!! nl2br(e($task->description)) !!}
-            </div>
-            @endif
-
-            <div class="button-wrapper">
-                <a href="{{ route('tasks.show', $task->id) }}" class="button">Voir la tâche</a>
-            </div>
-
-            <div class="tip">
-                💡 Cette tâche vous est personnellement attribuée. Consultez-la et commencez à travailler dès que possible.
-            </div>
-        </div>
-
-        <div class="footer">
-            © {{ date('Y') }} {{ config('app.name') }} · Cet email automatique ne nécessite pas de réponse.
-        </div>
+  <div class="email-wrapper">
+    <div class="header">
+      <div class="logo">ProJA</div>
+      <h1 class="header-title">Nouvelle Tâche Assignée</h1>
     </div>
+
+    <div class="content">
+      <div class="greeting">Salut <strong>Ronaldo</strong> 👋</div>
+      <p class="intro-text">Une nouvelle tâche vous a été assignée par <strong>system Obs</strong>. Voici les détails :</p>
+
+      <div class="task-card">
+        <div class="task-title">Titre de la tâche</div>
+        <div class="badges-container">
+          <span class="badge badge-priority-medium">Priorité : Moyenne</span>
+          <span class="badge badge-status">Statut : À faire</span>
+        </div>
+
+        <div class="task-meta">
+          <div class="meta-item">
+            <span class="meta-label">📁 Projet</span>
+            <span class="meta-value">Nom du projet</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">👤 Assigné à</span>
+            <span class="meta-value">Ronaldo AGBOHOU</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">📅 Échéance</span>
+            <span class="meta-value">22/07/2026</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">✨ Créée par</span>
+            <span class="meta-value">system Obs</span>
+          </div>
+        </div>
+
+        <div class="description-section">
+          <div class="description-title">Description</div>
+          <div class="description-content">
+            Détails de la tâche à réaliser...
+          </div>
+        </div>
+
+        <div class="btn-container">
+          <a href="#" class="btn">👁️ Voir la tâche</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      © 2026 ProJA. Tous droits réservés.<br>
+      Cet email a été envoyé automatiquement, merci de ne pas y répondre directement.
+    </div>
+  </div>
 </body>
 </html>
