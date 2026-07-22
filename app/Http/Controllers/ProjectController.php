@@ -463,10 +463,11 @@ class ProjectController extends Controller
 
         $currentUser = auth()->user();
 
-        // Un administrateur système passe par destroy() en suppression directe,
-        // pas par ce flux de consentement.
+        // Un administrateur système passe par la suppression directe : on exécute la même
+        // logique ici plutôt que de rediriger (une redirection transformerait le DELETE en GET
+        // et casserait la suppression).
         if ($currentUser->hasRole('admin')) {
-            return redirect()->route('projects.destroy', $project->id);
+            return $this->destroy($id);
         }
 
         $validated = $request->validate([
