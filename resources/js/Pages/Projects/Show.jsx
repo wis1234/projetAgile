@@ -9,7 +9,7 @@ import {
   FaChevronDown, FaChevronUp, FaFileAlt, FaFilePdf, FaFileWord, FaTrash, FaChartLine, FaCommentDots,
   FaCheckCircle, FaClock, FaPlay, FaChartBar, FaCrown, FaUser, FaShieldAlt,
   FaPlus, FaGlobe, FaExternalLinkAlt, FaQuestionCircle, FaArrowUp, FaArrowDown,
-  FaEquals, FaExclamationTriangle, FaSpinner, FaListUl, FaVideo, FaDoorOpen, FaTimes
+  FaEquals, FaExclamationTriangle, FaSpinner, FaListUl, FaVideo, FaDoorOpen, FaTimes, FaLock
 } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
@@ -189,12 +189,104 @@ const ZoomStatusBar = ({ project, onOpen }) => {
   );
 };
 
+// Modale de suppression avec consentement unanime des membres.
+// Chaque membre saisit SON PROPRE mot de passe de compte (masqué) pour valider son accord.
+// Le bouton de confirmation reste désactivé tant que tous les champs ne sont pas remplis ;
+// la validation réelle (Hash::check) se fait côté serveur.
+const ConsentDeleteModal = ({ show, onClose, project, onSubmit, loading, errors }) => {
+  const [passwords, setPasswords] = useState({});
+
+  const handleChange = (userId, value) => {
+    setPasswords(prev => ({ ...prev, [userId]: value }));
+  };
+
+  const members = project.users || [];
+  const allFilled = members.length > 0 && members.every(u => (passwords[u.id] || '').length > 0);
+
+  const handleClose = () => {
+    setPasswords({});
+    onClose();
+  };
+
+  return (
+    <Modal show={show} onClose={handleClose} maxWidth="lg">
+      <div className="p-6">
+        <div className="flex items-start gap-3 mb-2">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <FaExclamationTriangle className="w-6 h-6 text-red-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Suppression du projet — consentement de tous les membres requis
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              En tant que manager, vous ne pouvez pas supprimer ce projet seul. Chaque membre listé ci-dessous
+              doit saisir son propre mot de passe pour donner son accord. Le projet ne sera supprimé que si
+              <strong> tous</strong> les membres consentent.
+            </p>
+          </div>
+        </div>
+
+        {errors?.consent && (
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300">
+            {errors.consent}
+          </div>
+        )}
+
+        <div className="mt-5 space-y-3 max-h-80 overflow-y-auto pr-1">
+          {members.map(user => (
+            <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+              <MemberAvatar user={user} size="md" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.name}</p>
+                <div className="relative mt-1">
+                  <FaLock className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={passwords[user.id] || ''}
+                    onChange={(e) => handleChange(user.id, e.target.value)}
+                    placeholder="Mot de passe du compte"
+                    className={`w-full pl-8 pr-3 py-1.5 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                      errors?.[user.id] ? 'border-red-400' : 'border-gray-300 dark:border-gray-600'
+                    }`}
+                  />
+                </div>
+                {errors?.[user.id] && (
+                  <p className="text-xs text-red-600 mt-1">{errors[user.id]}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={handleClose} disabled={loading} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+            Annuler
+          </button>
+          <button
+            onClick={() => onSubmit(passwords)}
+            disabled={loading || !allFilled}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+          >
+            {loading ? <FaSpinner className="animate-spin" /> : <FaTrash />}
+            {loading ? 'Vérification…' : 'Confirmer la suppression'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // ── Composant principal ─────────────────────────────────────────────────────
 function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
   const { t, i18n } = useTranslation();
   const { flash = {} } = usePage().props;
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentLoading, setConsentLoading] = useState(false);
+  const [consentErrors, setConsentErrors] = useState({});
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showZoomModal, setShowZoomModal] = useState(false);
 
@@ -209,6 +301,17 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
 
   const sprintsList = sprints?.data || [];
 
+  // Clic sur "Supprimer le projet" : un admin système passe par la confirmation directe,
+  // un manager (non admin) passe par la modale de consentement de tous les membres.
+  const handleDeleteClick = () => {
+    if (isAdmin) {
+      setShowDeleteModal(true);
+    } else {
+      setConsentErrors({});
+      setShowConsentModal(true);
+    }
+  };
+
   const handleDelete = () => {
     setDeleteLoading(true);
     router.delete(route('projects.destroy', project.id), {
@@ -217,6 +320,25 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
         setShowDeleteModal(false);
       },
       onError: () => setDeleteLoading(false),
+    });
+  };
+
+  const handleConsentSubmit = (passwords) => {
+    setConsentLoading(true);
+    setConsentErrors({});
+    router.delete(route('projects.destroy.consent', project.id), {
+      data: { passwords },
+      preserveScroll: true,
+      onSuccess: () => {
+        setConsentLoading(false);
+        setShowConsentModal(false);
+      },
+      onError: (errors) => {
+        setConsentLoading(false);
+        // Le contrôleur renvoie un message général ('consent') + une entrée par membre
+        // en échec (clé = user id) dans le même sac d'erreurs Inertia.
+        setConsentErrors(errors);
+      },
     });
   };
 
@@ -512,11 +634,14 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
                       <span className="font-medium text-sm">{t('edit_project')}</span>
                     </Link>
                     <button
-                      onClick={() => setShowDeleteModal(true)}
+                      onClick={handleDeleteClick}
                       className="flex items-center gap-3 w-full px-3 py-2.5 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 rounded-xl transition"
                     >
                       <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center"><FaTrash className="text-white text-sm" /></div>
-                      <span className="font-medium text-sm">{t('delete_project')}</span>
+                      <span className="font-medium text-sm">
+                        {t('delete_project')}
+                        {!isAdmin && <span className="block text-xs font-normal opacity-75">Nécessite le consentement de tous les membres</span>}
+                      </span>
                     </button>
                   </>
                 )}
@@ -593,7 +718,7 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
         </div>
       </div>
 
-      {/* Modal suppression */}
+      {/* Modal suppression directe (admin système uniquement) */}
       <Modal show={showDeleteModal} onClose={() => setShowDeleteModal(false)} maxWidth="md">
         <div className="p-6">
           <div className="flex items-center justify-center mb-4">
@@ -605,6 +730,9 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">{t('delete_project_title')}</h3>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               {t('delete_project_confirm', { name: project.name })}
+            </p>
+            <p className="mt-2 text-xs text-gray-400">
+              Suppression directe en tant qu'administrateur système.
             </p>
           </div>
           <div className="mt-6 flex justify-end gap-3">
@@ -618,6 +746,16 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
           </div>
         </div>
       </Modal>
+
+      {/* Modal suppression avec consentement des membres (managers non-admin) */}
+      <ConsentDeleteModal
+        show={showConsentModal}
+        onClose={() => setShowConsentModal(false)}
+        project={project}
+        onSubmit={handleConsentSubmit}
+        loading={consentLoading}
+        errors={consentErrors}
+      />
 
       {/* Modal Zoom : héberge le composant complet, inchangé fonctionnellement */}
       <Modal show={showZoomModal} onClose={() => setShowZoomModal(false)} maxWidth="2xl">
