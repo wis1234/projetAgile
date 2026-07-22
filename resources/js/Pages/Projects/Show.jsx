@@ -477,14 +477,6 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
                   <span className="font-medium text-sm">{t('add_task')}</span>
                 </Link>
 
-                <button
-                  onClick={() => setShowZoomModal(true)}
-                  className="flex items-center gap-3 w-full px-3 py-2.5 bg-sky-50 dark:bg-sky-900/30 hover:bg-sky-100 dark:hover:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded-xl transition text-left"
-                >
-                  <div className="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center"><FaVideo className="text-white text-sm" /></div>
-                  <span className="font-medium text-sm">Planifier une réunion Zoom</span>
-                </button>
-
                 {/* Export dropdown */}
                 <div className="relative group/export">
                   <button className="flex items-center gap-3 w-full px-3 py-2.5 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded-xl transition text-left">
@@ -494,14 +486,16 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
                   </button>
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all z-50">
                     <a href={`/projects/${project.id}/suivi-global/txt`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <FaFileAlt className="text-blue-500" /> <span>{t('txt_format')}</span>
+                      <FaFileAlt className="text-blue-500" /> <span>Log Format TXT</span>
                     </a>
+                     {/* Export hidden 
                     <a href={`/projects/${project.id}/suivi-global/pdf`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-2.5 text-sm border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                       <FaFilePdf className="text-red-500" /> <span>PDF</span>
                     </a>
                     <a href={`/projects/${project.id}/suivi-global/docx`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-2.5 text-sm border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                       <FaFileWord className="text-blue-700" /> <span>Word</span>
                     </a>
+                    */}
                     <a href={`/projects/${project.id}/planning/pdf`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-2.5 text-sm border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                       <FaProjectDiagram className="text-indigo-600" /> <span>Planning PDF</span>
                     </a>
