@@ -43,6 +43,10 @@ Route::patch(
     [UserController::class, 'toggleDiscussionEmailSharing']
 )->middleware('auth');
 
+//Remove project consent
+Route::delete('/projects/{project}/destroy-with-consent', [ProjectController::class, 'destroyWithConsent'])
+    ->middleware(['auth', 'throttle:6,1'])
+    ->name('projects.destroy.consent');
 
 Route::get('/api/users/search', [\App\Http\Controllers\UserSearchController::class, 'index'])
     ->name('api.users.search')
