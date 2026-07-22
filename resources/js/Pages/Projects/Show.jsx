@@ -217,10 +217,10 @@ const ConsentDeleteModal = ({ show, onClose, project, onSubmit, loading, errors 
           </div>
           <div>
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-              Suppression du projet — consentement de tous les membres requis
+              Suppression du projet: consentement de tous les membres requis
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              En tant que manager, vous ne pouvez pas supprimer ce projet seul. Chaque membre listé ci-dessous
+            Vous ne pouvez pas supprimer ce projet seul. Chaque membre listé ci-dessous
               doit saisir son propre mot de passe pour donner son accord. Le projet ne sera supprimé que si
               <strong> tous</strong> les membres consentent.
             </p>
