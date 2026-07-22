@@ -13,6 +13,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class ProjectController extends Controller
@@ -416,22 +417,96 @@ class ProjectController extends Controller
 
     /**
      * Remove the specified resource from storage.
+     *
+     * Suppression directe : réservée à un administrateur système (rôle Spatie 'admin').
+     * Un manager de projet ne peut PAS supprimer directement ; il doit passer par
+     * destroyWithConsent() qui exige le mot de passe de chaque membre du projet.
      */
     public function destroy(string $id)
     {
         $project = Project::whereHas('users', function($query) {
-            $query->where('users.id', auth()->id())
-                  ->whereIn('project_user.role', ['manager', 'admin']);
+            $query->where('users.id', auth()->id());
         })->findOrFail($id);
+
+        $currentUser = auth()->user();
+
+        if (!$currentUser->hasRole('admin')) {
+            abort(403, "Seul un administrateur système peut supprimer un projet directement. "
+                . "En tant que manager, utilisez la procédure de consentement des membres.");
+        }
 
         $projectName = $project->name;
         $project->delete();
 
         event(new ProjectUpdated($project));
-        activity_log('delete', 'Suppression du projet', $project, "Projet '{$projectName}' supprimé par " . auth()->user()->name);
+        activity_log('delete', 'Suppression du projet', $project,
+            "Projet '{$projectName}' supprimé directement par l'administrateur système " . $currentUser->name);
 
         return redirect()->route('projects.index')
             ->with('success', 'Projet supprimé avec succès !');
+    }
+
+    /**
+     * Suppression d'un projet par un manager, soumise au consentement unanime des membres.
+     *
+     * Chaque membre du projet doit fournir son propre mot de passe de compte pour valider
+     * son accord. Le tableau `passwords` est indexé par user_id => mot de passe en clair
+     * (jamais loggé, jamais stocké : uniquement vérifié via Hash::check() puis jeté).
+     * La suppression n'a lieu que si TOUS les membres ont consenti avec un mot de passe valide.
+     */
+    public function destroyWithConsent(Request $request, string $id)
+    {
+        $project = Project::with('users')->whereHas('users', function($query) {
+            $query->where('users.id', auth()->id())
+                  ->whereIn('project_user.role', ['manager', 'admin']);
+        })->findOrFail($id);
+
+        $currentUser = auth()->user();
+
+        // Un administrateur système passe par destroy() en suppression directe,
+        // pas par ce flux de consentement.
+        if ($currentUser->hasRole('admin')) {
+            return redirect()->route('projects.destroy', $project->id);
+        }
+
+        $validated = $request->validate([
+            'passwords' => 'required|array',
+            'passwords.*' => 'nullable|string',
+        ]);
+
+        $providedPasswords = $validated['passwords'];
+        $errors = [];
+
+        foreach ($project->users as $member) {
+            $password = $providedPasswords[$member->id] ?? null;
+
+            if (empty($password)) {
+                $errors[(string) $member->id] = "{$member->name} n'a pas encore donné son consentement.";
+                continue;
+            }
+
+            if (!Hash::check($password, $member->password)) {
+                $errors[(string) $member->id] = "Mot de passe incorrect pour {$member->name}.";
+            }
+        }
+
+        if (!empty($errors)) {
+            // Toutes les erreurs (message général + une par membre en échec) partent dans
+            // le même sac d'erreurs Inertia ; le front les lit directement via `errors`.
+            $errors['consent'] = 'Consentement incomplet ou invalide : vérifiez les mots de passe ci-dessous.';
+
+            return back()->withErrors($errors);
+        }
+
+        $projectName = $project->name;
+        $project->delete();
+
+        event(new ProjectUpdated($project));
+        activity_log('delete', 'Suppression du projet (consentement unanime)', $project,
+            "Projet '{$projectName}' supprimé après consentement de tous les membres, initié par le manager " . $currentUser->name);
+
+        return redirect()->route('projects.index')
+            ->with('success', 'Projet supprimé avec succès après consentement de tous les membres.');
     }
 
     /**
