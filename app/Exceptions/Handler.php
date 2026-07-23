@@ -2,50 +2,76 @@
 
 namespace App\Exceptions;
 
+use Throwable;
 use Inertia\Inertia;
+use Illuminate\Http\Request;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Session\TokenMismatchException;
-use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler; // ← CORRECT
-use Throwable;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-class Handler extends ExceptionHandler // ← étend le bon parent
+class Handler extends ExceptionHandler
 {
+    /**
+     * Report or log an exception.
+     */
+    public function report(Throwable $exception): void
+    {
+        parent::report($exception);
+    }
+
+    /**
+     * Render an exception into an HTTP response.
+     */
     public function render($request, Throwable $exception)
     {
-        // ── 403 Accès refusé ─────────────────────────────────
-        if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpException 
-            && $exception->getStatusCode() === 403) {
-            if ($request->hasHeader('X-Inertia')) {
+        /*
+        |--------------------------------------------------------------------------
+        | 403 - Forbidden
+        |--------------------------------------------------------------------------
+        */
+        if ($exception instanceof HttpException && $exception->getStatusCode() === 403) {
+            if ($request->header('X-Inertia')) {
                 return Inertia::render('Error403')
                     ->toResponse($request)
                     ->setStatusCode(403);
             }
+
+            return parent::render($request, $exception);
         }
 
-        // ── 419 CSRF expiré ───────────────────────────────────
-        if ($exception instanceof TokenMismatchException) {
-            if ($request->hasHeader('X-Inertia')) {
-                // Header X-Inertia-Location → Inertia fait une vraie navigation
-                return response()->json(
-                    ['message' => 'Session expirée'],
-                    419
-                )->header('X-Inertia-Location', url('/login'));
-            }
-            return redirect()->route('login')
-                ->with('error', 'Session expirée. Veuillez vous reconnecter.');
-        }
-
-        // ── 401 Session expirée / non authentifié ────────────
+        /*
+        |--------------------------------------------------------------------------
+        | 401 - Authentication expired
+        |--------------------------------------------------------------------------
+        */
         if ($exception instanceof AuthenticationException) {
-            if ($request->hasHeader('X-Inertia')) {
-                // Même chose → navigation propre vers login
-                return response()->json(
-                    ['message' => 'Non authentifié'],
-                    401
-                )->header('X-Inertia-Location', url('/login'));
+
+            // Requête Inertia
+            if ($request->header('X-Inertia')) {
+                return Inertia::location(route('login'));
             }
-            return redirect()->route('login')
-                ->with('error', 'Veuillez vous connecter pour accéder à cette page.');
+
+            // Requête navigateur classique
+            return redirect()->guest(route('login'));
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 419 - CSRF Token expired
+        |--------------------------------------------------------------------------
+        */
+        if ($exception instanceof TokenMismatchException) {
+
+            // Requête Inertia
+            if ($request->header('X-Inertia')) {
+                return Inertia::location(route('login'));
+            }
+
+            // Requête navigateur classique
+            return redirect()
+                ->guest(route('login'))
+                ->with('error', 'Votre session a expiré. Veuillez vous reconnecter.');
         }
 
         return parent::render($request, $exception);
