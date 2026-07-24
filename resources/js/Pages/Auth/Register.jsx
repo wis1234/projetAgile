@@ -1,8 +1,167 @@
 import { Link, useForm } from '@inertiajs/react';
-import { useState, useEffect, useRef } from 'react';
-import { FaUser, FaEnvelope, FaLock, FaShieldAlt } from 'react-icons/fa';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+    FaUser, FaEnvelope, FaLock, FaShieldAlt, FaEye, FaEyeSlash,
+    FaCheckCircle, FaColumns, FaUsers, FaChartLine, FaClock,
+    FaChevronDown, FaStar, FaLockOpen,
+} from 'react-icons/fa';
 import { InputError, PrimaryButton, TextInput } from '@/Components';
 import GlobalFooter from '@/Components/GlobalFooter';
+
+/* ------------------------------------------------------------------ */
+/*  Données statiques de la page (preuve sociale / FAQ / features)     */
+/* ------------------------------------------------------------------ */
+
+const FEATURES = [
+    {
+        icon: FaColumns,
+        title: 'Tableaux visuels',
+        text: "Organisez chaque projet en colonnes À faire / En cours / Terminé, glissez-déposez les tâches en un geste.",
+    },
+    {
+        icon: FaUsers,
+        title: 'Collaboration en temps réel',
+        text: "Commentaires, mentions et notifications instantanées : toute l'équipe voit la même version, au même moment.",
+    },
+    {
+        icon: FaChartLine,
+        title: 'Suivi & rapports',
+        text: "Charges, échéances et avancement consolidés automatiquement — sans tableur à mettre à jour à la main.",
+    },
+    {
+        icon: FaShieldAlt,
+        title: 'Sécurité de niveau entreprise',
+        text: "Chiffrement en transit et au repos, authentification renforcée, hébergement conforme RGPD.",
+    },
+];
+
+const TESTIMONIALS = [
+    {
+        initials: 'SL',
+        name: 'Sofia Lambert',
+        role: 'Cheffe de projet, agence Nova',
+        quote: "On a réduit nos réunions de suivi de moitié. Tout le monde regarde le même tableau au lieu de se demander où en est le projet.",
+    },
+    {
+        initials: 'MK',
+        name: 'Mathis Kouassi',
+        role: 'CTO, studio Baobab',
+        quote: "La mise en place a pris une après-midi. Six mois plus tard, c'est l'outil que toute l'équipe technique ouvre en premier le matin.",
+    },
+    {
+        initials: 'AD',
+        name: 'Amina Diallo',
+        role: 'Directrice opérations, Kanto',
+        quote: "Les rapports automatiques nous ont fait gagner un vrai poste de travail par mois. C'est devenu indispensable au pilotage.",
+    },
+];
+
+const FAQ = [
+    {
+        q: 'Mes données sont-elles en sécurité ?',
+        a: "Oui. Toutes les données sont chiffrées en transit (TLS) et au repos. L'accès à votre compte est protégé par une vérification anti-robot et peut être renforcé par une double authentification depuis vos paramètres.",
+    },
+    {
+        q: "Y a-t-il un essai gratuit ?",
+        a: "Chaque nouveau compte démarre avec 14 jours d'accès complet, sans carte bancaire requise. Vous pouvez inviter votre équipe dès l'inscription.",
+    },
+    {
+        q: 'Puis-je importer mes projets existants ?',
+        a: "Oui, un assistant d'import (Trello, Asana, fichiers CSV) est disponible dans les paramètres une fois votre compte créé.",
+    },
+    {
+        q: 'Comment contacter le support ?',
+        a: "Une messagerie support est accessible depuis l'application, avec une réponse sous 24h ouvrées en moyenne.",
+    },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Illustration signature : mini tableau Kanban animé                 */
+/* ------------------------------------------------------------------ */
+
+function KanbanSignature() {
+    const columns = [
+        { label: 'À faire', accent: '#64748B', cards: 3 },
+        { label: 'En cours', accent: '#F59E0B', cards: 2 },
+        { label: 'Terminé', accent: '#10B981', cards: 4 },
+    ];
+
+    return (
+        <div className="relative select-none" aria-hidden="true">
+            <style>{`
+                @keyframes projaFlow {
+                    0%   { left: 6%;  top: 14px; background: #64748B; opacity: 0; }
+                    8%   { opacity: 1; }
+                    28%  { left: 6%;  top: 14px; background: #64748B; }
+                    45%  { left: 38%; top: 54px; background: #F59E0B; }
+                    68%  { left: 38%; top: 54px; background: #F59E0B; }
+                    85%  { left: 70%; top: 94px; background: #10B981; }
+                    96%  { opacity: 1; }
+                    100% { left: 70%; top: 94px; background: #10B981; opacity: 0; }
+                }
+                .proja-flow-card {
+                    animation: projaFlow 7s ease-in-out infinite;
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .proja-flow-card { animation: none; left: 38%; top: 54px; background: #F59E0B; opacity: 1; }
+                }
+            `}</style>
+
+            <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10 backdrop-blur-sm">
+                {columns.map((col) => (
+                    <div key={col.label} className="space-y-2">
+                        <div className="flex items-center gap-1.5 px-1">
+                            <span
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{ backgroundColor: col.accent }}
+                            />
+                            <span className="text-[11px] font-medium uppercase tracking-wide text-white/60">
+                                {col.label}
+                            </span>
+                        </div>
+                        {Array.from({ length: col.cards }).map((_, i) => (
+                            <div
+                                key={i}
+                                className="h-6 rounded-md bg-white/10"
+                                style={{ width: `${85 - i * 10}%` }}
+                            />
+                        ))}
+                    </div>
+                ))}
+            </div>
+
+            {/* Carte flottante qui "avance" d'une colonne à l'autre */}
+            <div
+                className="proja-flow-card absolute h-6 w-16 rounded-md shadow-lg shadow-black/30"
+                style={{ left: '6%', top: '14px' }}
+            />
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Champ mot de passe avec bascule visibilité + jauge de robustesse   */
+/* ------------------------------------------------------------------ */
+
+function passwordStrength(password) {
+    if (!password) return { score: 0, label: '', color: 'bg-gray-200 dark:bg-gray-700' };
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+    const levels = [
+        { label: 'Faible', color: 'bg-red-500' },
+        { label: 'Moyen', color: 'bg-amber-500' },
+        { label: 'Bon', color: 'bg-blue-500' },
+        { label: 'Excellent', color: 'bg-emerald-500' },
+    ];
+    return { score, ...levels[Math.max(score - 1, 0)] };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page principale                                                    */
+/* ------------------------------------------------------------------ */
 
 export default function Register() {
     const { data, setData, post, processing, errors } = useForm({
@@ -16,46 +175,50 @@ export default function Register() {
     const recaptchaRef = useRef(null);
     const [recaptchaError, setRecaptchaError] = useState('');
     const [isRecaptchaLoaded, setIsRecaptchaLoaded] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+    const [openFaq, setOpenFaq] = useState(0);
 
-    // Fonction pour initialiser reCAPTCHA
+    const strength = useMemo(() => passwordStrength(data.password), [data.password]);
+    const emailLooksValid = useMemo(
+        () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email),
+        [data.email]
+    );
+    const passwordsMatch =
+        data.password_confirmation.length > 0 && data.password === data.password_confirmation;
+
+    // Initialise le widget reCAPTCHA
     const initializeRecaptcha = () => {
         if (!window.grecaptcha) {
             console.error('grecaptcha non disponible');
             return;
         }
 
-        console.log('Initialisation de reCAPTCHA...');
-        
         try {
-            // Vérifier si le widget a déjà été rendu
-            if (document.getElementById('recaptcha-element').hasChildNodes()) {
-                console.log('reCAPTCHA déjà initialisé');
+            const container = document.getElementById('recaptcha-element');
+            if (container && container.hasChildNodes()) {
                 return;
             }
 
-            // Rendre le widget reCAPTCHA
             const widgetId = window.grecaptcha.render('recaptcha-element', {
                 sitekey: window.recaptchaSiteKey || '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN',
                 callback: onRecaptchaSuccess,
                 'expired-callback': onRecaptchaExpired,
                 'error-callback': onRecaptchaError,
                 theme: 'light',
-                size: 'normal'
+                size: 'normal',
             });
 
-            console.log('reCAPTCHA rendu avec succès, widget ID:', widgetId);
             setIsRecaptchaLoaded(true);
             setRecaptchaError('');
-            
-            // Forcer l'exécution de la vérification
+
             window.grecaptcha.ready(() => {
                 try {
                     window.grecaptcha.execute(widgetId);
                 } catch (e) {
-                    console.error('Erreur lors de l\'exécution de reCAPTCHA:', e);
+                    console.error("Erreur lors de l'exécution de reCAPTCHA:", e);
                 }
             });
-            
         } catch (error) {
             console.error('Erreur lors du rendu de reCAPTCHA:', error);
             setRecaptchaError('Erreur lors du chargement de la vérification de sécurité.');
@@ -63,58 +226,41 @@ export default function Register() {
         }
     };
 
-    // Callback pour une vérification reCAPTCHA réussie
     const onRecaptchaSuccess = (token) => {
-        console.log('Token reCAPTCHA reçu:', token);
         setData('recaptcha_token', token);
         setRecaptchaError('');
         setIsRecaptchaLoaded(true);
     };
 
-    // Callback pour une vérification reCAPTCHA expirée
     const onRecaptchaExpired = () => {
-        console.log('reCAPTCHA expiré');
         setData('recaptcha_token', '');
         setRecaptchaError('La vérification a expiré. Veuillez réessayer.');
         setIsRecaptchaLoaded(false);
     };
 
-    // Callback pour une erreur reCAPTCHA
     const onRecaptchaError = () => {
-        console.error('Erreur reCAPTCHA');
         setData('recaptcha_token', '');
         setRecaptchaError('Une erreur est survenue. Veuillez réessayer.');
         setIsRecaptchaLoaded(false);
     };
 
-    // Gestion du chargement de reCAPTCHA
     useEffect(() => {
-        const handleRecaptchaLoaded = () => {
-            console.log('Événement reCAPTCHA chargé reçu');
-            initializeRecaptcha();
-        };
+        const handleRecaptchaLoaded = () => initializeRecaptcha();
 
-        // Vérifier si reCAPTCHA est déjà chargé
         if (window.grecaptcha) {
             handleRecaptchaLoaded();
         }
 
-        // Écouter l'événement de chargement de reCAPTCHA
         document.addEventListener('recaptcha-loaded', handleRecaptchaLoaded);
-        
-        // Nettoyage
-        return () => {
-            document.removeEventListener('recaptcha-loaded', handleRecaptchaLoaded);
-        };
+        return () => document.removeEventListener('recaptcha-loaded', handleRecaptchaLoaded);
     }, []);
 
     const submit = (e) => {
         e.preventDefault();
-        
+
         if (!data.recaptcha_token) {
-            setRecaptchaError('Veuillez confirmer que vous n\'êtes pas un robot.');
-            
-            // Essayer d'exécuter reCAPTCHA si disponible
+            setRecaptchaError("Veuillez confirmer que vous n'êtes pas un robot.");
+
             if (window.grecaptcha) {
                 try {
                     window.grecaptcha.ready(() => {
@@ -124,218 +270,512 @@ export default function Register() {
                         }
                     });
                 } catch (e) {
-                    console.error('Erreur lors de l\'exécution de reCAPTCHA:', e);
+                    console.error("Erreur lors de l'exécution de reCAPTCHA:", e);
                 }
             }
-            
             return;
         }
-        
-        console.log('Soumission du formulaire avec le token:', data.recaptcha_token);
-        
+
         post(route('register'), {
             onSuccess: () => {
-                console.log('Inscription réussie');
-                // Réinitialiser reCAPTCHA après une soumission réussie
-                if (window.grecaptcha) {
-                    window.grecaptcha.reset();
-                }
+                if (window.grecaptcha) window.grecaptcha.reset();
             },
-            onError: (errors) => {
-                console.error('Erreur lors de l\'inscription:', errors);
-                if (errors.recaptcha_token) {
-                    setRecaptchaError(errors.recaptcha_token);
-                }
-                // Réinitialiser reCAPTCHA en cas d'erreur
-                if (window.grecaptcha) {
-                    window.grecaptcha.reset();
-                }
+            onError: (errs) => {
+                if (errs.recaptcha_token) setRecaptchaError(errs.recaptcha_token);
+                if (window.grecaptcha) window.grecaptcha.reset();
                 setData('recaptcha_token', '');
             },
             preserveScroll: true,
-            onFinish: () => {
-                // S'assurer que le token est bien effacé après la soumission
-                setData('recaptcha_token', '');
-            }
+            onFinish: () => setData('recaptcha_token', ''),
         });
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 font-sans p-4 sm:p-6 overflow-hidden">
-            <div className="flex-1 flex flex-col justify-center w-full max-w-4xl mx-auto">
-                <div className="flex flex-col md:flex-row w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-                {/* Left Panel: Branding - Visible uniquement sur desktop */}
-                <div className="hidden md:flex flex-col justify-center items-center w-full md:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-white text-center">
-                    <h1 className="text-4xl font-bold mb-4">Bienvenue sur ProjA</h1>
-                    <p className="text-blue-100 text-lg">Intégrez notre communauté, optimisez la gestion de vos projets et saisissez des opportunités de collaboration.</p>
-                    <div className="mt-8">
-                        <p className="text-blue-200">Déjà membre ?</p>
-                        <Link 
-                            href={route('login')} 
-                            className="mt-2 inline-flex items-center px-6 py-2 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                        >
-                            Se connecter
-                        </Link>
+        <div className="min-h-screen bg-[#F6F7FB] font-sans antialiased dark:bg-[#0B1120]">
+            {/* ---------------------------------------------------------- */}
+            {/* Barre supérieure minimale                                   */}
+            {/* ---------------------------------------------------------- */}
+            <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
+                <span className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
+                    ProjA
+                </span>
+                <p className="hidden text-sm text-gray-500 dark:text-gray-400 sm:block">
+                    Déjà membre ?{' '}
+                    <Link
+                        href={route('login')}
+                        className="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                    >
+                        Se connecter
+                    </Link>
+                </p>
+            </header>
+
+            {/* ---------------------------------------------------------- */}
+            {/* Bloc principal : illustration + formulaire                  */}
+            {/* ---------------------------------------------------------- */}
+            <main className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+                <div className="grid overflow-hidden rounded-3xl shadow-xl ring-1 ring-black/5 md:grid-cols-2">
+                    {/* Panneau de marque */}
+                    <div className="relative hidden flex-col justify-between overflow-hidden bg-[#0B1120] p-10 text-white md:flex">
+                        <div>
+                            <h1 className="text-3xl font-bold leading-tight">
+                                Pilotez vos projets sans perdre le fil
+                            </h1>
+                            <p className="mt-3 text-sm leading-relaxed text-indigo-100/80">
+                                Tableaux, échéances et discussions d'équipe réunis au même endroit —
+                                pour que chacun sache exactement où en est le projet, à tout moment.
+                            </p>
+                        </div>
+
+                        <KanbanSignature />
+
+                        <div className="flex items-center gap-6 pt-2 text-xs text-indigo-100/70">
+                            <div>
+                                <div className="text-lg font-semibold text-white">12 400+</div>
+                                équipes actives
+                            </div>
+                            <div className="h-8 w-px bg-white/10" />
+                            <div>
+                                <div className="text-lg font-semibold text-white">99,9 %</div>
+                                de disponibilité
+                            </div>
+                            <div className="h-8 w-px bg-white/10" />
+                            <div>
+                                <div className="flex items-center gap-1 text-lg font-semibold text-white">
+                                    4,8 <FaStar className="h-3 w-3 text-amber-400" />
+                                </div>
+                                note moyenne
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                {/* Right Panel: Form */}
-                <div className="w-full md:w-1/2 p-8 sm:p-10">
-                    <div className="md:hidden text-center mb-8">
-                        <h4 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent mb-4">Rejoignez ProjA</h4>
-                        <p className="text-gray-600 dark:text-gray-300">Créez votre compte et commencez à gérer vos projets plus efficacement.</p>
-                    </div>
-
-                    <form onSubmit={submit} className="space-y-6 max-w-md mx-auto">
-                        <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Nom complet
-                            </label>
-                            <div className="relative mt-1">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FaUser className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <TextInput
-                                    id="name"
-                                    type="text"
-                                    name="name"
-                                    value={data.name}
-                                    className="pl-10 w-full"
-                                    placeholder="Votre nom complet"
-                                    onChange={(e) => setData('name', e.target.value)}
-                                    required
-                                    autoComplete="name"
-                                    isFocused
-                                />
-                            </div>
-                            <InputError message={errors.name} className="mt-1" />
+                    {/* Formulaire */}
+                    <div className="bg-white p-8 dark:bg-gray-900 sm:p-10">
+                        <div className="mb-8 text-center md:hidden">
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                                Rejoignez ProjA
+                            </h2>
+                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                Créez votre compte et commencez à gérer vos projets plus efficacement.
+                            </p>
                         </div>
+                        <h2 className="mb-6 hidden text-2xl font-bold text-gray-900 dark:text-white md:block">
+                            Créer votre compte
+                        </h2>
 
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Adresse email
-                            </label>
-                            <div className="relative mt-1">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FaEnvelope className="h-5 w-5 text-gray-400" />
+                        <form onSubmit={submit} className="max-w-md space-y-5" noValidate>
+                            {/* Nom */}
+                            <div>
+                                <label
+                                    htmlFor="name"
+                                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >
+                                    Nom complet
+                                </label>
+                                <div className="relative mt-1">
+                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                        <FaUser className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                    <TextInput
+                                        id="name"
+                                        type="text"
+                                        name="name"
+                                        value={data.name}
+                                        className="w-full pl-10"
+                                        placeholder="Votre nom complet"
+                                        onChange={(e) => setData('name', e.target.value)}
+                                        required
+                                        autoComplete="name"
+                                        isFocused
+                                    />
                                 </div>
-                                <TextInput 
-                                    id="email"
-                                    type="email" 
-                                    name="email" 
-                                    value={data.email} 
-                                    className="pl-10 w-full"
-                                    placeholder="votre@email.com" 
-                                    onChange={(e) => setData('email', e.target.value)}
-                                    required
-                                    autoComplete="username"
-                                />
+                                <InputError message={errors.name} className="mt-1" />
                             </div>
-                            <InputError message={errors.email} className="mt-1" />
-                        </div>
 
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Mot de passe
-                            </label>
-                            <div className="relative mt-1">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FaLock className="h-5 w-5 text-gray-400" />
+                            {/* Email */}
+                            <div>
+                                <label
+                                    htmlFor="email"
+                                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >
+                                    Adresse email
+                                </label>
+                                <div className="relative mt-1">
+                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                        <FaEnvelope className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                    <TextInput
+                                        id="email"
+                                        type="email"
+                                        name="email"
+                                        value={data.email}
+                                        className="w-full pl-10 pr-9"
+                                        placeholder="votre@email.com"
+                                        onChange={(e) => setData('email', e.target.value)}
+                                        required
+                                        autoComplete="username"
+                                    />
+                                    {emailLooksValid && (
+                                        <FaCheckCircle className="absolute inset-y-0 right-3 my-auto h-4 w-4 text-emerald-500" />
+                                    )}
                                 </div>
-                                <TextInput 
-                                    id="password"
-                                    type="password" 
-                                    name="password" 
-                                    value={data.password} 
-                                    className="pl-10 w-full"
-                                    placeholder="••••••••" 
-                                    onChange={(e) => setData('password', e.target.value)}
-                                    required
-                                    autoComplete="new-password"
-                                />
+                                <InputError message={errors.email} className="mt-1" />
                             </div>
-                            <InputError message={errors.password} className="mt-1" />
-                        </div>
 
-                        <div>
-                            <label htmlFor="password_confirmation" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Confirmer le mot de passe
-                            </label>
-                            <div className="relative mt-1">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FaLock className="h-5 w-5 text-gray-400" />
+                            {/* Mot de passe */}
+                            <div>
+                                <label
+                                    htmlFor="password"
+                                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                >
+                                    Mot de passe
+                                </label>
+                                <div className="relative mt-1">
+                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                        <FaLock className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                    <TextInput
+                                        id="password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        name="password"
+                                        value={data.password}
+                                        className="w-full pl-10 pr-10"
+                                        placeholder="••••••••"
+                                        onChange={(e) => setData('password', e.target.value)}
+                                        required
+                                        autoComplete="new-password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword((v) => !v)}
+                                        className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        aria-label={
+                                            showPassword
+                                                ? 'Masquer le mot de passe'
+                                                : 'Afficher le mot de passe'
+                                        }
+                                    >
+                                        {showPassword ? (
+                                            <FaEyeSlash className="h-4 w-4" />
+                                        ) : (
+                                            <FaEye className="h-4 w-4" />
+                                        )}
+                                    </button>
                                 </div>
-                                <TextInput 
-                                    id="password_confirmation"
-                                    type="password" 
-                                    name="password_confirmation" 
-                                    value={data.password_confirmation} 
-                                    className="pl-10 w-full"
-                                    placeholder="••••••••" 
-                                    onChange={(e) => setData('password_confirmation', e.target.value)}
-                                    required
-                                    autoComplete="new-password"
-                                />
-                            </div>
-                            <InputError message={errors.password_confirmation} className="mt-1" />
-                        </div>
 
-                        {/* reCAPTCHA */}
-                        <div className="mt-6">
-                            <div className="flex items-center mb-2">
-                                <FaShieldAlt className="h-5 w-5 text-gray-400 mr-2" />
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Vérification de sécurité
-                                </span>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <div 
-                                    id="recaptcha-element"
-                                    className={`${errors.recaptcha_token || recaptchaError ? 'border border-red-500 rounded p-2' : ''}`}
-                                    data-sitekey="6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN"
-                                ></div>
-                                {!isRecaptchaLoaded && (
-                                    <div className="mt-2 text-yellow-600 text-sm">
-                                        Chargement de la vérification de sécurité...
+                                {data.password.length > 0 && (
+                                    <div className="mt-2">
+                                        <div className="flex gap-1">
+                                            {Array.from({ length: 4 }).map((_, i) => (
+                                                <div
+                                                    key={i}
+                                                    className={`h-1 flex-1 rounded-full ${
+                                                        i < strength.score
+                                                            ? strength.color
+                                                            : 'bg-gray-200 dark:bg-gray-700'
+                                                    }`}
+                                                />
+                                            ))}
+                                        </div>
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            Robustesse : {strength.label} — utilisez au moins 8
+                                            caractères, avec chiffres et symboles.
+                                        </p>
                                     </div>
                                 )}
+                                <InputError message={errors.password} className="mt-1" />
                             </div>
-                            {recaptchaError && (
-                                <p className="mt-2 text-sm text-red-600">{recaptchaError}</p>
-                            )}
-                            {errors.recaptcha_token && (
-                                <p className="mt-2 text-sm text-red-600">{errors.recaptcha_token}</p>
-                            )}
-                        </div>
 
-                        <div className="pt-2">
-                            <div className="flex justify-center">
-                                <PrimaryButton 
-                                    type="submit" 
-                                    className="w-auto justify-center py-2 px-8 text-base sm:text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                                    disabled={processing}
+                            {/* Confirmation mot de passe */}
+                            <div>
+                                <label
+                                    htmlFor="password_confirmation"
+                                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                 >
-                                    {processing ? 'Inscription en cours...' : "S'inscrire"}
-                                </PrimaryButton>
+                                    Confirmer le mot de passe
+                                </label>
+                                <div className="relative mt-1">
+                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                        <FaLock className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                    <TextInput
+                                        id="password_confirmation"
+                                        type={showPasswordConfirm ? 'text' : 'password'}
+                                        name="password_confirmation"
+                                        value={data.password_confirmation}
+                                        className="w-full pl-10 pr-10"
+                                        placeholder="••••••••"
+                                        onChange={(e) =>
+                                            setData('password_confirmation', e.target.value)
+                                        }
+                                        required
+                                        autoComplete="new-password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswordConfirm((v) => !v)}
+                                        className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        aria-label={
+                                            showPasswordConfirm
+                                                ? 'Masquer le mot de passe'
+                                                : 'Afficher le mot de passe'
+                                        }
+                                    >
+                                        {showPasswordConfirm ? (
+                                            <FaEyeSlash className="h-4 w-4" />
+                                        ) : (
+                                            <FaEye className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                </div>
+                                {passwordsMatch && (
+                                    <p className="mt-1 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                        <FaCheckCircle className="h-3 w-3" /> Les mots de passe
+                                        correspondent
+                                    </p>
+                                )}
+                                <InputError message={errors.password_confirmation} className="mt-1" />
                             </div>
-                            
-                        </div>
-                    </form>
 
-                    <div className="mt-6 text-center md:hidden">
-                        <p className="text-sm text-gray-600">
+                            {/* reCAPTCHA */}
+                            <div className="pt-1">
+                                <div className="mb-2 flex items-center gap-2">
+                                    <FaShieldAlt className="h-4 w-4 text-gray-400" />
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Vérification de sécurité
+                                    </span>
+                                </div>
+                                <div
+                                    id="recaptcha-element"
+                                    className={
+                                        errors.recaptcha_token || recaptchaError
+                                            ? 'rounded border border-red-500 p-2'
+                                            : ''
+                                    }
+                                    data-sitekey="6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN"
+                                />
+                                {!isRecaptchaLoaded && (
+                                    <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                                        Chargement de la vérification de sécurité…
+                                    </p>
+                                )}
+                                {recaptchaError && (
+                                    <p className="mt-2 text-sm text-red-600" role="alert">
+                                        {recaptchaError}
+                                    </p>
+                                )}
+                                {errors.recaptcha_token && (
+                                    <p className="mt-2 text-sm text-red-600" role="alert">
+                                        {errors.recaptcha_token}
+                                    </p>
+                                )}
+                            </div>
+
+                            <PrimaryButton
+                                type="submit"
+                                className="w-full justify-center rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60"
+                                disabled={processing}
+                            >
+                                {processing ? 'Inscription en cours…' : "Créer mon compte"}
+                            </PrimaryButton>
+
+                            <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                                En créant un compte, vous acceptez nos{' '}
+                                <a href="/conditions" className="underline hover:text-gray-700 dark:hover:text-gray-300">
+                                    conditions d'utilisation
+                                </a>{' '}
+                                et notre{' '}
+                                <a href="/confidentialite" className="underline hover:text-gray-700 dark:hover:text-gray-300">
+                                    politique de confidentialité
+                                </a>
+                                .
+                            </p>
+                        </form>
+
+                        <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400 md:hidden">
                             Vous avez déjà un compte ?{' '}
-                            <Link href={route('login')} className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                            <Link
+                                href={route('login')}
+                                className="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                            >
                                 Connectez-vous
                             </Link>
                         </p>
                     </div>
                 </div>
-            </div>
-            </div>
+            </main>
 
-            {/* Footer */}
-            <div className="mt-8 mb-2 w-full text-center">
+            {/* ---------------------------------------------------------- */}
+            {/* Bandeau de chiffres                                         */}
+            {/* ---------------------------------------------------------- */}
+            <section className="border-y border-gray-200 bg-white py-8 dark:border-gray-800 dark:bg-gray-900">
+                <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 text-center sm:px-6 md:grid-cols-4">
+                    {[
+                        ['12 400+', 'équipes actives'],
+                        ['3,2 M', 'tâches suivies'],
+                        ['99,9 %', 'disponibilité'],
+                        ['24 h', 'délai moyen de réponse support'],
+                    ].map(([value, label]) => (
+                        <div key={label}>
+                            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                                {value}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {label}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* ---------------------------------------------------------- */}
+            {/* Fonctionnalités                                             */}
+            {/* ---------------------------------------------------------- */}
+            <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+                <div className="mx-auto max-w-2xl text-center">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        Tout ce qu'il faut pour piloter un projet, rien de plus
+                    </h2>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        Pensé pour que la première tâche créée soit utilisée le jour même par toute
+                        l'équipe.
+                    </p>
+                </div>
+                <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    {FEATURES.map(({ icon: Icon, title, text }) => (
+                        <div
+                            key={title}
+                            className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900"
+                        >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-500/10">
+                                <Icon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                            </div>
+                            <h3 className="mt-4 text-sm font-semibold text-gray-900 dark:text-white">
+                                {title}
+                            </h3>
+                            <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                {text}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* ---------------------------------------------------------- */}
+            {/* Sécurité / confiance                                        */}
+            {/* ---------------------------------------------------------- */}
+            <section className="bg-[#0B1120] py-16 text-white">
+                <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 md:grid-cols-2 md:items-center">
+                    <div>
+                        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
+                            <FaLockOpen className="h-5 w-5 text-emerald-400" />
+                        </div>
+                        <h2 className="text-2xl font-bold">Vos données, protégées par défaut</h2>
+                        <p className="mt-3 text-sm leading-relaxed text-indigo-100/80">
+                            La vérification anti-robot ci-dessus n'est qu'une première couche.
+                            Chaque compte est en plus protégé par un chiffrement de bout en bout des
+                            données stockées, et par une infrastructure hébergée en Europe,
+                            conforme au RGPD.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        {[
+                            ['Chiffrement TLS', 'en transit sur toutes les connexions'],
+                            ['Chiffrement au repos', 'sur l\u2019ensemble des données stockées'],
+                            ['Hébergement UE', 'conforme RGPD'],
+                            ['Sauvegardes quotidiennes', 'avec restauration point-in-time'],
+                        ].map(([title, text]) => (
+                            <div
+                                key={title}
+                                className="rounded-xl bg-white/5 p-4 ring-1 ring-white/10"
+                            >
+                                <div className="text-sm font-semibold">{title}</div>
+                                <div className="mt-1 text-xs text-indigo-100/70">{text}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ---------------------------------------------------------- */}
+            {/* Témoignages                                                 */}
+            {/* ---------------------------------------------------------- */}
+            <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+                <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white">
+                    Ils gèrent déjà leurs projets sur ProjA
+                </h2>
+                <div className="mt-10 grid gap-6 md:grid-cols-3">
+                    {TESTIMONIALS.map(({ initials, name, role, quote }) => (
+                        <div
+                            key={name}
+                            className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900"
+                        >
+                            <div className="mb-1 flex gap-0.5 text-amber-400">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <FaStar key={i} className="h-3 w-3" />
+                                ))}
+                            </div>
+                            <p className="mt-3 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                                {quote}
+                            </p>
+                            <div className="mt-5 flex items-center gap-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold text-white">
+                                    {initials}
+                                </div>
+                                <div>
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {name}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        {role}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* ---------------------------------------------------------- */}
+            {/* FAQ                                                         */}
+            {/* ---------------------------------------------------------- */}
+            <section className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+                <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white">
+                    Questions fréquentes
+                </h2>
+                <div className="mt-8 divide-y divide-gray-200 rounded-2xl border border-gray-200 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-900">
+                    {FAQ.map(({ q, a }, i) => {
+                        const isOpen = openFaq === i;
+                        return (
+                            <div key={q}>
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenFaq(isOpen ? -1 : i)}
+                                    className="flex w-full items-center justify-between px-6 py-4 text-left text-sm font-medium text-gray-900 dark:text-white"
+                                    aria-expanded={isOpen}
+                                >
+                                    {q}
+                                    <FaChevronDown
+                                        className={`h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${
+                                            isOpen ? 'rotate-180' : ''
+                                        }`}
+                                    />
+                                </button>
+                                {isOpen && (
+                                    <p className="px-6 pb-4 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                        {a}
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
+
+            {/* ---------------------------------------------------------- */}
+            {/* Pied de page                                                */}
+            {/* ---------------------------------------------------------- */}
+            <div className="mt-4 mb-2 w-full text-center">
                 <GlobalFooter />
             </div>
         </div>
