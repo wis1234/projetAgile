@@ -2,14 +2,14 @@ import { Link, useForm } from '@inertiajs/react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
     FaUser, FaEnvelope, FaLock, FaShieldAlt, FaEye, FaEyeSlash,
-    FaCheckCircle, FaColumns, FaUsers, FaChartLine, FaClock,
-    FaChevronDown, FaStar, FaLockOpen,
+    FaCheckCircle, FaColumns, FaUsers, FaChartLine, FaChevronDown,
+    FaLockOpen, FaGift,
 } from 'react-icons/fa';
 import { InputError, PrimaryButton, TextInput } from '@/Components';
 import GlobalFooter from '@/Components/GlobalFooter';
 
 /* ------------------------------------------------------------------ */
-/*  Données statiques de la page (preuve sociale / FAQ / features)     */
+/*  Contenu statique de la page                                        */
 /* ------------------------------------------------------------------ */
 
 const FEATURES = [
@@ -35,25 +35,11 @@ const FEATURES = [
     },
 ];
 
-const TESTIMONIALS = [
-    {
-        initials: 'SL',
-        name: 'Sofia Lambert',
-        role: 'Cheffe de projet, agence Nova',
-        quote: "On a réduit nos réunions de suivi de moitié. Tout le monde regarde le même tableau au lieu de se demander où en est le projet.",
-    },
-    {
-        initials: 'MK',
-        name: 'Mathis Kouassi',
-        role: 'CTO, studio Baobab',
-        quote: "La mise en place a pris une après-midi. Six mois plus tard, c'est l'outil que toute l'équipe technique ouvre en premier le matin.",
-    },
-    {
-        initials: 'AD',
-        name: 'Amina Diallo',
-        role: 'Directrice opérations, Kanto',
-        quote: "Les rapports automatiques nous ont fait gagner un vrai poste de travail par mois. C'est devenu indispensable au pilotage.",
-    },
+const SECURITY_POINTS = [
+    ['Chiffrement TLS', 'en transit sur toutes les connexions'],
+    ['Chiffrement au repos', "sur l'ensemble des données stockées"],
+    ['Hébergement UE', 'conforme RGPD'],
+    ['Sauvegardes quotidiennes', 'avec restauration point-in-time'],
 ];
 
 const FAQ = [
@@ -62,12 +48,8 @@ const FAQ = [
         a: "Oui. Toutes les données sont chiffrées en transit (TLS) et au repos. L'accès à votre compte est protégé par une vérification anti-robot et peut être renforcé par une double authentification depuis vos paramètres.",
     },
     {
-        q: "Y a-t-il un essai gratuit ?",
-        a: "Chaque nouveau compte démarre avec 14 jours d'accès complet, sans carte bancaire requise. Vous pouvez inviter votre équipe dès l'inscription.",
-    },
-    {
-        q: 'Puis-je importer mes projets existants ?',
-        a: "Oui, un assistant d'import (Trello, Asana, fichiers CSV) est disponible dans les paramètres une fois votre compte créé.",
+        q: 'Y a-t-il un essai gratuit ?',
+        a: "Chaque nouveau compte démarre avec 3 mois d'accès complet, sans carte bancaire requise. Vous pouvez inviter votre équipe dès l'inscription.",
     },
     {
         q: 'Comment contacter le support ?',
@@ -76,54 +58,51 @@ const FAQ = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Illustration signature : mini tableau Kanban animé                 */
+/*  Illustration signature : mini tableau Kanban animé (version claire) */
 /* ------------------------------------------------------------------ */
 
 function KanbanSignature() {
     const columns = [
-        { label: 'À faire', accent: '#64748B', cards: 3 },
-        { label: 'En cours', accent: '#F59E0B', cards: 2 },
-        { label: 'Terminé', accent: '#10B981', cards: 4 },
+        { label: 'À faire', dot: 'bg-slate-300', cards: 3 },
+        { label: 'En cours', dot: 'bg-amber-400', cards: 2 },
+        { label: 'Terminé', dot: 'bg-emerald-400', cards: 4 },
     ];
 
     return (
         <div className="relative select-none" aria-hidden="true">
             <style>{`
                 @keyframes projaFlow {
-                    0%   { left: 6%;  top: 14px; background: #64748B; opacity: 0; }
+                    0%   { left: 6%;  top: 16px; border-color: #94A3B8; opacity: 0; }
                     8%   { opacity: 1; }
-                    28%  { left: 6%;  top: 14px; background: #64748B; }
-                    45%  { left: 38%; top: 54px; background: #F59E0B; }
-                    68%  { left: 38%; top: 54px; background: #F59E0B; }
-                    85%  { left: 70%; top: 94px; background: #10B981; }
+                    28%  { left: 6%;  top: 16px; border-color: #94A3B8; }
+                    45%  { left: 38%; top: 58px; border-color: #F59E0B; }
+                    68%  { left: 38%; top: 58px; border-color: #F59E0B; }
+                    85%  { left: 70%; top: 100px; border-color: #10B981; }
                     96%  { opacity: 1; }
-                    100% { left: 70%; top: 94px; background: #10B981; opacity: 0; }
+                    100% { left: 70%; top: 100px; border-color: #10B981; opacity: 0; }
                 }
                 .proja-flow-card {
                     animation: projaFlow 7s ease-in-out infinite;
                 }
                 @media (prefers-reduced-motion: reduce) {
-                    .proja-flow-card { animation: none; left: 38%; top: 54px; background: #F59E0B; opacity: 1; }
+                    .proja-flow-card { animation: none; left: 38%; top: 58px; border-color: #F59E0B; opacity: 1; }
                 }
             `}</style>
 
-            <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10 backdrop-blur-sm">
+            <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/95 p-4 shadow-lg shadow-blue-900/20">
                 {columns.map((col) => (
                     <div key={col.label} className="space-y-2">
-                        <div className="flex items-center gap-1.5 px-1">
-                            <span
-                                className="h-1.5 w-1.5 rounded-full"
-                                style={{ backgroundColor: col.accent }}
-                            />
-                            <span className="text-[11px] font-medium uppercase tracking-wide text-white/60">
+                        <div className="flex items-center gap-1.5 px-0.5">
+                            <span className={`h-1.5 w-1.5 rounded-full ${col.dot}`} />
+                            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
                                 {col.label}
                             </span>
                         </div>
                         {Array.from({ length: col.cards }).map((_, i) => (
                             <div
                                 key={i}
-                                className="h-6 rounded-md bg-white/10"
-                                style={{ width: `${85 - i * 10}%` }}
+                                className="h-6 rounded-md bg-slate-100"
+                                style={{ width: `${88 - i * 10}%` }}
                             />
                         ))}
                     </div>
@@ -132,15 +111,15 @@ function KanbanSignature() {
 
             {/* Carte flottante qui "avance" d'une colonne à l'autre */}
             <div
-                className="proja-flow-card absolute h-6 w-16 rounded-md shadow-lg shadow-black/30"
-                style={{ left: '6%', top: '14px' }}
+                className="proja-flow-card absolute h-6 w-16 rounded-md border-2 bg-white shadow-md"
+                style={{ left: '6%', top: '16px' }}
             />
         </div>
     );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Champ mot de passe avec bascule visibilité + jauge de robustesse   */
+/*  Jauge de robustesse du mot de passe                                 */
 /* ------------------------------------------------------------------ */
 
 function passwordStrength(password) {
@@ -160,7 +139,7 @@ function passwordStrength(password) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Page principale                                                    */
+/*  Page principale                                                     */
 /* ------------------------------------------------------------------ */
 
 export default function Register() {
@@ -291,19 +270,19 @@ export default function Register() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F6F7FB] font-sans antialiased dark:bg-[#0B1120]">
+        <div className="min-h-screen bg-[#F8FAFC] font-sans antialiased dark:bg-gray-950">
             {/* ---------------------------------------------------------- */}
             {/* Barre supérieure minimale                                   */}
             {/* ---------------------------------------------------------- */}
             <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
-                <span className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
-                    ProjA
+                <span className="text-lg font-extrabold uppercase tracking-wide text-blue-700 dark:text-blue-400">
+                    PROJA
                 </span>
                 <p className="hidden text-sm text-gray-500 dark:text-gray-400 sm:block">
                     Déjà membre ?{' '}
                     <Link
                         href={route('login')}
-                        className="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                        className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
                     >
                         Se connecter
                     </Link>
@@ -315,13 +294,13 @@ export default function Register() {
             {/* ---------------------------------------------------------- */}
             <main className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
                 <div className="grid overflow-hidden rounded-3xl shadow-xl ring-1 ring-black/5 md:grid-cols-2">
-                    {/* Panneau de marque */}
-                    <div className="relative hidden flex-col justify-between overflow-hidden bg-[#0B1120] p-10 text-white md:flex">
+                    {/* Panneau de marque — couleur d'origine conservée */}
+                    <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-blue-600 to-blue-800 p-10 text-white md:flex">
                         <div>
                             <h1 className="text-3xl font-bold leading-tight">
-                                Pilotez vos projets sans perdre le fil
+                                Bienvenue sur PROJA
                             </h1>
-                            <p className="mt-3 text-sm leading-relaxed text-indigo-100/80">
+                            <p className="mt-3 text-sm leading-relaxed text-blue-100/90">
                                 Tableaux, échéances et discussions d'équipe réunis au même endroit —
                                 pour que chacun sache exactement où en est le projet, à tout moment.
                             </p>
@@ -329,39 +308,40 @@ export default function Register() {
 
                         <KanbanSignature />
 
-                        <div className="flex items-center gap-6 pt-2 text-xs text-indigo-100/70">
+                        <div className="flex items-center gap-6 pt-2 text-xs text-blue-100/80">
                             <div>
-                                <div className="text-lg font-semibold text-white">12 400+</div>
+                                <div className="text-lg font-semibold text-white">20+</div>
                                 équipes actives
                             </div>
-                            <div className="h-8 w-px bg-white/10" />
+                            <div className="h-8 w-px bg-white/20" />
+                            <div>
+                                <div className="text-lg font-semibold text-white">2 000+</div>
+                                tâches suivies
+                            </div>
+                            <div className="h-8 w-px bg-white/20" />
                             <div>
                                 <div className="text-lg font-semibold text-white">99,9 %</div>
                                 de disponibilité
                             </div>
-                            <div className="h-8 w-px bg-white/10" />
-                            <div>
-                                <div className="flex items-center gap-1 text-lg font-semibold text-white">
-                                    4,8 <FaStar className="h-3 w-3 text-amber-400" />
-                                </div>
-                                note moyenne
-                            </div>
                         </div>
                     </div>
 
-                    {/* Formulaire */}
+                    {/* Formulaire — entièrement repensé */}
                     <div className="bg-white p-8 dark:bg-gray-900 sm:p-10">
                         <div className="mb-8 text-center md:hidden">
                             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                Rejoignez ProjA
+                                Rejoignez PROJA
                             </h2>
                             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
                                 Créez votre compte et commencez à gérer vos projets plus efficacement.
                             </p>
                         </div>
-                        <h2 className="mb-6 hidden text-2xl font-bold text-gray-900 dark:text-white md:block">
+                        <h2 className="mb-1 hidden text-2xl font-bold text-gray-900 dark:text-white md:block">
                             Créer votre compte
                         </h2>
+                        <p className="mb-6 hidden text-sm text-gray-500 dark:text-gray-400 md:block">
+                            Moins de 2 minutes pour démarrer, aucune carte bancaire requise.
+                        </p>
 
                         <form onSubmit={submit} className="max-w-md space-y-5" noValidate>
                             {/* Nom */}
@@ -381,7 +361,7 @@ export default function Register() {
                                         type="text"
                                         name="name"
                                         value={data.name}
-                                        className="w-full pl-10"
+                                        className="w-full rounded-lg pl-10 focus:border-blue-500 focus:ring-blue-500"
                                         placeholder="Votre nom complet"
                                         onChange={(e) => setData('name', e.target.value)}
                                         required
@@ -409,7 +389,7 @@ export default function Register() {
                                         type="email"
                                         name="email"
                                         value={data.email}
-                                        className="w-full pl-10 pr-9"
+                                        className="w-full rounded-lg pl-10 pr-9 focus:border-blue-500 focus:ring-blue-500"
                                         placeholder="votre@email.com"
                                         onChange={(e) => setData('email', e.target.value)}
                                         required
@@ -439,7 +419,7 @@ export default function Register() {
                                         type={showPassword ? 'text' : 'password'}
                                         name="password"
                                         value={data.password}
-                                        className="w-full pl-10 pr-10"
+                                        className="w-full rounded-lg pl-10 pr-10 focus:border-blue-500 focus:ring-blue-500"
                                         placeholder="••••••••"
                                         onChange={(e) => setData('password', e.target.value)}
                                         required
@@ -503,7 +483,7 @@ export default function Register() {
                                         type={showPasswordConfirm ? 'text' : 'password'}
                                         name="password_confirmation"
                                         value={data.password_confirmation}
-                                        className="w-full pl-10 pr-10"
+                                        className="w-full rounded-lg pl-10 pr-10 focus:border-blue-500 focus:ring-blue-500"
                                         placeholder="••••••••"
                                         onChange={(e) =>
                                             setData('password_confirmation', e.target.value)
@@ -573,11 +553,21 @@ export default function Register() {
 
                             <PrimaryButton
                                 type="submit"
-                                className="w-full justify-center rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60"
+                                className="w-full justify-center rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60"
                                 disabled={processing}
                             >
-                                {processing ? 'Inscription en cours…' : "Créer mon compte"}
+                                {processing ? 'Inscription en cours…' : 'Créer mon compte'}
                             </PrimaryButton>
+
+                            {/* Badges de confiance sous le CTA, façon SaaS */}
+                            <div className="flex flex-wrap items-center justify-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+                                    <FaGift className="h-3 w-3" /> Essai gratuit de 3 mois
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+                                    <FaCheckCircle className="h-3 w-3" /> Sans carte bancaire
+                                </span>
+                            </div>
 
                             <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                                 En créant un compte, vous acceptez nos{' '}
@@ -596,7 +586,7 @@ export default function Register() {
                             Vous avez déjà un compte ?{' '}
                             <Link
                                 href={route('login')}
-                                className="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                                className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
                             >
                                 Connectez-vous
                             </Link>
@@ -609,15 +599,14 @@ export default function Register() {
             {/* Bandeau de chiffres                                         */}
             {/* ---------------------------------------------------------- */}
             <section className="border-y border-gray-200 bg-white py-8 dark:border-gray-800 dark:bg-gray-900">
-                <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 text-center sm:px-6 md:grid-cols-4">
+                <div className="mx-auto grid max-w-6xl grid-cols-3 gap-6 px-4 text-center sm:px-6">
                     {[
-                        ['12 400+', 'équipes actives'],
-                        ['3,2 M', 'tâches suivies'],
+                        ['20+', 'équipes actives'],
+                        ['2 000+', 'tâches suivies'],
                         ['99,9 %', 'disponibilité'],
-                        ['24 h', 'délai moyen de réponse support'],
                     ].map(([value, label]) => (
                         <div key={label}>
-                            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
                                 {value}
                             </div>
                             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -647,8 +636,8 @@ export default function Register() {
                             key={title}
                             className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900"
                         >
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-500/10">
-                                <Icon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10">
+                                <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                             </div>
                             <h3 className="mt-4 text-sm font-semibold text-gray-900 dark:text-white">
                                 {title}
@@ -662,16 +651,18 @@ export default function Register() {
             </section>
 
             {/* ---------------------------------------------------------- */}
-            {/* Sécurité / confiance                                        */}
+            {/* Sécurité / confiance — version claire                       */}
             {/* ---------------------------------------------------------- */}
-            <section className="bg-[#0B1120] py-16 text-white">
+            <section className="bg-blue-50/60 py-16 dark:bg-blue-500/5">
                 <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 md:grid-cols-2 md:items-center">
                     <div>
-                        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
-                            <FaLockOpen className="h-5 w-5 text-emerald-400" />
+                        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm">
+                            <FaLockOpen className="h-5 w-5 text-blue-600" />
                         </div>
-                        <h2 className="text-2xl font-bold">Vos données, protégées par défaut</h2>
-                        <p className="mt-3 text-sm leading-relaxed text-indigo-100/80">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                            Vos données, protégées par défaut
+                        </h2>
+                        <p className="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
                             La vérification anti-robot ci-dessus n'est qu'une première couche.
                             Chaque compte est en plus protégé par un chiffrement de bout en bout des
                             données stockées, et par une infrastructure hébergée en Europe,
@@ -679,60 +670,20 @@ export default function Register() {
                         </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        {[
-                            ['Chiffrement TLS', 'en transit sur toutes les connexions'],
-                            ['Chiffrement au repos', 'sur l\u2019ensemble des données stockées'],
-                            ['Hébergement UE', 'conforme RGPD'],
-                            ['Sauvegardes quotidiennes', 'avec restauration point-in-time'],
-                        ].map(([title, text]) => (
+                        {SECURITY_POINTS.map(([title, text]) => (
                             <div
                                 key={title}
-                                className="rounded-xl bg-white/5 p-4 ring-1 ring-white/10"
+                                className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-900"
                             >
-                                <div className="text-sm font-semibold">{title}</div>
-                                <div className="mt-1 text-xs text-indigo-100/70">{text}</div>
+                                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                    {title}
+                                </div>
+                                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {text}
+                                </div>
                             </div>
                         ))}
                     </div>
-                </div>
-            </section>
-
-            {/* ---------------------------------------------------------- */}
-            {/* Témoignages                                                 */}
-            {/* ---------------------------------------------------------- */}
-            <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-                <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white">
-                    Ils gèrent déjà leurs projets sur ProjA
-                </h2>
-                <div className="mt-10 grid gap-6 md:grid-cols-3">
-                    {TESTIMONIALS.map(({ initials, name, role, quote }) => (
-                        <div
-                            key={name}
-                            className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900"
-                        >
-                            <div className="mb-1 flex gap-0.5 text-amber-400">
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                    <FaStar key={i} className="h-3 w-3" />
-                                ))}
-                            </div>
-                            <p className="mt-3 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                                {quote}
-                            </p>
-                            <div className="mt-5 flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold text-white">
-                                    {initials}
-                                </div>
-                                <div>
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {name}
-                                    </div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        {role}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
                 </div>
             </section>
 
