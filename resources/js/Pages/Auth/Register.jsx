@@ -426,7 +426,7 @@ export default function Register() {
                                         name="name"
                                         value={data.name}
                                         className={fieldClasses}
-                                        placeholder="Awa Traoré"
+                                        placeholder="Ronaldo Agbohou"
                                         onChange={(e) => setData('name', e.target.value)}
                                         required
                                         autoComplete="name"
