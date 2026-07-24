@@ -1,9 +1,8 @@
 import { Link, useForm } from '@inertiajs/react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
-    FaUser, FaEnvelope, FaLock, FaShieldAlt, FaEye, FaEyeSlash,
-    FaCheckCircle, FaColumns, FaUsers, FaChartLine, FaChevronDown,
-    FaLockOpen, FaGift,
+    FaEye, FaEyeSlash, FaCheckCircle, FaColumns, FaUsers, FaChartLine,
+    FaChevronDown, FaLockOpen, FaShieldAlt, FaCloud, FaVideo,
 } from 'react-icons/fa';
 import { InputError, PrimaryButton, TextInput } from '@/Components';
 import GlobalFooter from '@/Components/GlobalFooter';
@@ -16,7 +15,7 @@ const FEATURES = [
     {
         icon: FaColumns,
         title: 'Tableaux visuels',
-        text: "Organisez chaque projet en colonnes À faire / En cours / Terminé, glissez-déposez les tâches en un geste.",
+        text: "Organisez chaque projet en colonnes À faire, En cours et Terminé, glissez déposez les tâches en un geste.",
     },
     {
         icon: FaUsers,
@@ -26,12 +25,22 @@ const FEATURES = [
     {
         icon: FaChartLine,
         title: 'Suivi & rapports',
-        text: "Charges, échéances et avancement consolidés automatiquement — sans tableur à mettre à jour à la main.",
+        text: "Charges, échéances et avancement consolidés automatiquement, sans tableur à mettre à jour à la main.",
     },
     {
         icon: FaShieldAlt,
         title: 'Sécurité de niveau entreprise',
         text: "Chiffrement en transit et au repos, authentification renforcée, hébergement conforme RGPD.",
+    },
+    {
+        icon: FaCloud,
+        title: 'Stockage des livrables',
+        text: "Centralisez vos fichiers de projet et synchronisez automatiquement vos dossiers Dropbox.",
+    },
+    {
+        icon: FaVideo,
+        title: 'Réunions intégrées',
+        text: "Lancez un appel Zoom directement depuis une tâche ou un projet, sans changer d'outil.",
     },
 ];
 
@@ -58,12 +67,12 @@ const FAQ = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Illustration signature : mini tableau Kanban animé (version claire) */
+/*  Illustration signature : capture d'écran stylisée du tableau       */
 /* ------------------------------------------------------------------ */
 
 function KanbanSignature() {
     const columns = [
-        { label: 'À faire', dot: 'bg-slate-300', cards: 3 },
+        { label: 'À faire', dot: 'bg-slate-400', cards: 3 },
         { label: 'En cours', dot: 'bg-amber-400', cards: 2 },
         { label: 'Terminé', dot: 'bg-emerald-400', cards: 4 },
     ];
@@ -72,47 +81,59 @@ function KanbanSignature() {
         <div className="relative select-none" aria-hidden="true">
             <style>{`
                 @keyframes projaFlow {
-                    0%   { left: 6%;  top: 16px; border-color: #94A3B8; opacity: 0; }
+                    0%   { left: 6%;  top: 46px; border-color: #94A3B8; opacity: 0; }
                     8%   { opacity: 1; }
-                    28%  { left: 6%;  top: 16px; border-color: #94A3B8; }
-                    45%  { left: 38%; top: 58px; border-color: #F59E0B; }
-                    68%  { left: 38%; top: 58px; border-color: #F59E0B; }
-                    85%  { left: 70%; top: 100px; border-color: #10B981; }
+                    28%  { left: 6%;  top: 46px; border-color: #94A3B8; }
+                    45%  { left: 38%; top: 88px; border-color: #F59E0B; }
+                    68%  { left: 38%; top: 88px; border-color: #F59E0B; }
+                    85%  { left: 70%; top: 130px; border-color: #10B981; }
                     96%  { opacity: 1; }
-                    100% { left: 70%; top: 100px; border-color: #10B981; opacity: 0; }
+                    100% { left: 70%; top: 130px; border-color: #10B981; opacity: 0; }
                 }
                 .proja-flow-card {
                     animation: projaFlow 7s ease-in-out infinite;
                 }
                 @media (prefers-reduced-motion: reduce) {
-                    .proja-flow-card { animation: none; left: 38%; top: 58px; border-color: #F59E0B; opacity: 1; }
+                    .proja-flow-card { animation: none; left: 38%; top: 88px; border-color: #F59E0B; opacity: 1; }
                 }
             `}</style>
 
-            <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/95 p-4 shadow-lg shadow-blue-900/20">
-                {columns.map((col) => (
-                    <div key={col.label} className="space-y-2">
-                        <div className="flex items-center gap-1.5 px-0.5">
-                            <span className={`h-1.5 w-1.5 rounded-full ${col.dot}`} />
-                            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                                {col.label}
-                            </span>
+            <div className="rounded-2xl border border-white/10 bg-gray-950 p-4 shadow-2xl shadow-black/50">
+                {/* Barre de fenêtre, façon capture d'écran d'application */}
+                <div className="mb-4 flex items-center gap-1.5 px-0.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
+                    <span className="ml-2 text-[11px] font-medium text-white/40">
+                        Projet Refonte site web
+                    </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                    {columns.map((col) => (
+                        <div key={col.label} className="space-y-2">
+                            <div className="flex items-center gap-1.5 px-0.5">
+                                <span className={`h-1.5 w-1.5 rounded-full ${col.dot}`} />
+                                <span className="text-[11px] font-medium uppercase tracking-wide text-white/50">
+                                    {col.label}
+                                </span>
+                            </div>
+                            {Array.from({ length: col.cards }).map((_, i) => (
+                                <div
+                                    key={i}
+                                    className="h-6 rounded-md bg-white/10"
+                                    style={{ width: `${88 - i * 10}%` }}
+                                />
+                            ))}
                         </div>
-                        {Array.from({ length: col.cards }).map((_, i) => (
-                            <div
-                                key={i}
-                                className="h-6 rounded-md bg-slate-100"
-                                style={{ width: `${88 - i * 10}%` }}
-                            />
-                        ))}
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
 
-            {/* Carte flottante qui "avance" d'une colonne à l'autre */}
+            {/* Carte flottante qui avance d'une colonne à l'autre */}
             <div
-                className="proja-flow-card absolute h-6 w-16 rounded-md border-2 bg-white shadow-md"
-                style={{ left: '6%', top: '16px' }}
+                className="proja-flow-card absolute h-6 w-16 rounded-md border-2 bg-gray-900 shadow-lg"
+                style={{ left: '6%', top: '46px' }}
             />
         </div>
     );
@@ -137,6 +158,19 @@ function passwordStrength(password) {
     ];
     return { score, ...levels[Math.max(score - 1, 0)] };
 }
+
+/* ------------------------------------------------------------------ */
+/*  Champ de formulaire "plein", style moderne                         */
+/* ------------------------------------------------------------------ */
+
+const fieldClasses =
+    'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 shadow-sm ' +
+    'transition placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:outline-none ' +
+    'focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-800/60 dark:text-white ' +
+    'dark:focus:bg-gray-800 dark:focus:ring-blue-500/20';
+
+const fieldLabelClasses =
+    'mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400';
 
 /* ------------------------------------------------------------------ */
 /*  Page principale                                                     */
@@ -272,37 +306,48 @@ export default function Register() {
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-sans antialiased dark:bg-gray-950">
             {/* ---------------------------------------------------------- */}
-            {/* Barre supérieure minimale                                   */}
+            {/* En-tête produit                                             */}
             {/* ---------------------------------------------------------- */}
-            <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
-                <span className="text-lg font-extrabold uppercase tracking-wide text-blue-700 dark:text-blue-400">
-                    PROJA
-                </span>
-                <p className="hidden text-sm text-gray-500 dark:text-gray-400 sm:block">
-                    Déjà membre ?{' '}
-                    <Link
-                        href={route('login')}
-                        className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                    >
-                        Se connecter
-                    </Link>
-                </p>
+            <header className="sticky top-0 z-10 border-b border-gray-200/70 bg-white/80 backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
+                <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+                    <div className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
+                            P
+                        </span>
+                        <span className="text-lg font-extrabold uppercase tracking-wide text-gray-900 dark:text-white">
+                            PROJA
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="hidden text-sm text-gray-500 dark:text-gray-400 sm:inline">
+                            Déjà membre ?
+                        </span>
+                        <Link
+                            href={route('login')}
+                            className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 transition hover:border-blue-600 hover:text-blue-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-400 dark:hover:text-blue-400"
+                        >
+                            Se connecter
+                        </Link>
+                    </div>
+                </div>
             </header>
 
             {/* ---------------------------------------------------------- */}
             {/* Bloc principal : illustration + formulaire                  */}
             {/* ---------------------------------------------------------- */}
-            <main className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+            <main className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
                 <div className="grid overflow-hidden rounded-3xl shadow-xl ring-1 ring-black/5 md:grid-cols-2">
-                    {/* Panneau de marque — couleur d'origine conservée */}
+                    {/* Panneau de marque, couleur d'origine conservée */}
                     <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-blue-600 to-blue-800 p-10 text-white md:flex">
                         <div>
                             <h1 className="text-3xl font-bold leading-tight">
                                 Bienvenue sur PROJA
                             </h1>
                             <p className="mt-3 text-sm leading-relaxed text-blue-100/90">
-                                Tableaux, échéances et discussions d'équipe réunis au même endroit —
-                                pour que chacun sache exactement où en est le projet, à tout moment.
+                                Centralisez la gestion de vos projets : tableaux de suivi,
+                                échéances, discussions d'équipe et stockage des livrables réunis
+                                au même endroit. Lancez vos réunions sur Zoom et sauvegardez vos
+                                fichiers sur Dropbox sans jamais quitter PROJA.
                             </p>
                         </div>
 
@@ -326,14 +371,15 @@ export default function Register() {
                         </div>
                     </div>
 
-                    {/* Formulaire — entièrement repensé */}
+                    {/* Formulaire, design repensé */}
                     <div className="bg-white p-8 dark:bg-gray-900 sm:p-10">
                         <div className="mb-8 text-center md:hidden">
                             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                                 Rejoignez PROJA
                             </h2>
                             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                                Créez votre compte et commencez à gérer vos projets plus efficacement.
+                                Créez votre compte et commencez à gérer vos projets plus
+                                efficacement.
                             </p>
                         </div>
                         <h2 className="mb-1 hidden text-2xl font-bold text-gray-900 dark:text-white md:block">
@@ -344,83 +390,64 @@ export default function Register() {
                         </p>
 
                         <form onSubmit={submit} className="max-w-md space-y-5" noValidate>
-                            {/* Nom */}
-                            <div>
-                                <label
-                                    htmlFor="name"
-                                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >
-                                    Nom complet
-                                </label>
-                                <div className="relative mt-1">
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                        <FaUser className="h-4 w-4 text-gray-400" />
-                                    </div>
+                            {/* Nom et email, côte à côte sur grand écran */}
+                            <div className="grid gap-5 sm:grid-cols-2">
+                                <div>
+                                    <label htmlFor="name" className={fieldLabelClasses}>
+                                        Nom complet
+                                    </label>
                                     <TextInput
                                         id="name"
                                         type="text"
                                         name="name"
                                         value={data.name}
-                                        className="w-full rounded-lg pl-10 focus:border-blue-500 focus:ring-blue-500"
-                                        placeholder="Votre nom complet"
+                                        className={fieldClasses}
+                                        placeholder="Awa Traoré"
                                         onChange={(e) => setData('name', e.target.value)}
                                         required
                                         autoComplete="name"
                                         isFocused
                                     />
+                                    <InputError message={errors.name} className="mt-1" />
                                 </div>
-                                <InputError message={errors.name} className="mt-1" />
-                            </div>
 
-                            {/* Email */}
-                            <div>
-                                <label
-                                    htmlFor="email"
-                                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >
-                                    Adresse email
-                                </label>
-                                <div className="relative mt-1">
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                        <FaEnvelope className="h-4 w-4 text-gray-400" />
+                                <div>
+                                    <label htmlFor="email" className={fieldLabelClasses}>
+                                        Adresse email
+                                    </label>
+                                    <div className="relative">
+                                        <TextInput
+                                            id="email"
+                                            type="email"
+                                            name="email"
+                                            value={data.email}
+                                            className={`${fieldClasses} pr-9`}
+                                            placeholder="vous@entreprise.com"
+                                            onChange={(e) => setData('email', e.target.value)}
+                                            required
+                                            autoComplete="username"
+                                        />
+                                        {emailLooksValid && (
+                                            <FaCheckCircle className="absolute inset-y-0 right-3 my-auto h-4 w-4 text-emerald-500" />
+                                        )}
                                     </div>
-                                    <TextInput
-                                        id="email"
-                                        type="email"
-                                        name="email"
-                                        value={data.email}
-                                        className="w-full rounded-lg pl-10 pr-9 focus:border-blue-500 focus:ring-blue-500"
-                                        placeholder="votre@email.com"
-                                        onChange={(e) => setData('email', e.target.value)}
-                                        required
-                                        autoComplete="username"
-                                    />
-                                    {emailLooksValid && (
-                                        <FaCheckCircle className="absolute inset-y-0 right-3 my-auto h-4 w-4 text-emerald-500" />
-                                    )}
+                                    <InputError message={errors.email} className="mt-1" />
                                 </div>
-                                <InputError message={errors.email} className="mt-1" />
                             </div>
 
                             {/* Mot de passe */}
                             <div>
-                                <label
-                                    htmlFor="password"
-                                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >
+                                <label htmlFor="password" className={fieldLabelClasses}>
                                     Mot de passe
                                 </label>
-                                <div className="relative mt-1">
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                        <FaLock className="h-4 w-4 text-gray-400" />
-                                    </div>
+                                <div className="relative">
                                     <TextInput
                                         id="password"
                                         type={showPassword ? 'text' : 'password'}
                                         name="password"
                                         value={data.password}
-                                        className="w-full rounded-lg pl-10 pr-10 focus:border-blue-500 focus:ring-blue-500"
-                                        placeholder="••••••••"
+                                        className={`${fieldClasses} pr-10`}
+                                        placeholder="8 caractères minimum"
                                         onChange={(e) => setData('password', e.target.value)}
                                         required
                                         autoComplete="new-password"
@@ -458,7 +485,7 @@ export default function Register() {
                                             ))}
                                         </div>
                                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                            Robustesse : {strength.label} — utilisez au moins 8
+                                            Robustesse : {strength.label}. Utilisez au moins 8
                                             caractères, avec chiffres et symboles.
                                         </p>
                                     </div>
@@ -468,23 +495,17 @@ export default function Register() {
 
                             {/* Confirmation mot de passe */}
                             <div>
-                                <label
-                                    htmlFor="password_confirmation"
-                                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >
+                                <label htmlFor="password_confirmation" className={fieldLabelClasses}>
                                     Confirmer le mot de passe
                                 </label>
-                                <div className="relative mt-1">
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                        <FaLock className="h-4 w-4 text-gray-400" />
-                                    </div>
+                                <div className="relative">
                                     <TextInput
                                         id="password_confirmation"
                                         type={showPasswordConfirm ? 'text' : 'password'}
                                         name="password_confirmation"
                                         value={data.password_confirmation}
-                                        className="w-full rounded-lg pl-10 pr-10 focus:border-blue-500 focus:ring-blue-500"
-                                        placeholder="••••••••"
+                                        className={`${fieldClasses} pr-10`}
+                                        placeholder="Ressaisissez le mot de passe"
                                         onChange={(e) =>
                                             setData('password_confirmation', e.target.value)
                                         }
@@ -518,7 +539,7 @@ export default function Register() {
                             </div>
 
                             {/* reCAPTCHA */}
-                            <div className="pt-1">
+                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
                                 <div className="mb-2 flex items-center gap-2">
                                     <FaShieldAlt className="h-4 w-4 text-gray-400" />
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -553,21 +574,11 @@ export default function Register() {
 
                             <PrimaryButton
                                 type="submit"
-                                className="w-full justify-center rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60"
+                                className="w-full justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60"
                                 disabled={processing}
                             >
                                 {processing ? 'Inscription en cours…' : 'Créer mon compte'}
                             </PrimaryButton>
-
-                            {/* Badges de confiance sous le CTA, façon SaaS */}
-                            <div className="flex flex-wrap items-center justify-center gap-2">
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
-                                    <FaGift className="h-3 w-3" /> Essai gratuit de 3 mois
-                                </span>
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
-                                    <FaCheckCircle className="h-3 w-3" /> Sans carte bancaire
-                                </span>
-                            </div>
 
                             <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                                 En créant un compte, vous acceptez nos{' '}
@@ -626,11 +637,11 @@ export default function Register() {
                         Tout ce qu'il faut pour piloter un projet, rien de plus
                     </h2>
                     <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        Pensé pour que la première tâche créée soit utilisée le jour même par toute
-                        l'équipe.
+                        Pensé pour que la première tâche créée soit utilisée le jour même par
+                        toute l'équipe.
                     </p>
                 </div>
-                <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {FEATURES.map(({ icon: Icon, title, text }) => (
                         <div
                             key={title}
@@ -651,7 +662,7 @@ export default function Register() {
             </section>
 
             {/* ---------------------------------------------------------- */}
-            {/* Sécurité / confiance — version claire                       */}
+            {/* Sécurité / confiance, version claire                        */}
             {/* ---------------------------------------------------------- */}
             <section className="bg-blue-50/60 py-16 dark:bg-blue-500/5">
                 <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 md:grid-cols-2 md:items-center">
@@ -664,8 +675,8 @@ export default function Register() {
                         </h2>
                         <p className="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
                             La vérification anti-robot ci-dessus n'est qu'une première couche.
-                            Chaque compte est en plus protégé par un chiffrement de bout en bout des
-                            données stockées, et par une infrastructure hébergée en Europe,
+                            Chaque compte est en plus protégé par un chiffrement de bout en bout
+                            des données stockées, et par une infrastructure hébergée en Europe,
                             conforme au RGPD.
                         </p>
                     </div>
