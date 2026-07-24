@@ -187,6 +187,7 @@ export default function Register() {
 
     const recaptchaRef = useRef(null);
     const [recaptchaError, setRecaptchaError] = useState('');
+    const [formError, setFormError] = useState('');
     const [isRecaptchaLoaded, setIsRecaptchaLoaded] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
@@ -201,42 +202,47 @@ export default function Register() {
         data.password_confirmation.length > 0 && data.password === data.password_confirmation;
 
     // Initialise le widget reCAPTCHA
+    // Important : grecaptcha.render() doit être appelé une fois l'API prête
+    // (grecaptcha.ready), sinon "render is not a function" apparaît car le
+    // script vient tout juste de se charger. Comme il s'agit d'un widget
+    // visible (size: 'normal'), on ne doit PAS appeler grecaptcha.execute()
+    // dessus : execute() n'existe que pour le reCAPTCHA invisible, l'utilisateur
+    // doit cocher la case lui-même.
     const initializeRecaptcha = () => {
         if (!window.grecaptcha) {
             console.error('grecaptcha non disponible');
             return;
         }
 
-        try {
-            const container = document.getElementById('recaptcha-element');
-            if (container && container.hasChildNodes()) {
-                return;
-            }
-
-            const widgetId = window.grecaptcha.render('recaptcha-element', {
-                sitekey: window.recaptchaSiteKey || '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN',
-                callback: onRecaptchaSuccess,
-                'expired-callback': onRecaptchaExpired,
-                'error-callback': onRecaptchaError,
-                theme: 'light',
-                size: 'normal',
-            });
-
+        const container = document.getElementById('recaptcha-element');
+        if (container && container.hasChildNodes()) {
+            // Déjà rendu, rien à faire
             setIsRecaptchaLoaded(true);
-            setRecaptchaError('');
-
-            window.grecaptcha.ready(() => {
-                try {
-                    window.grecaptcha.execute(widgetId);
-                } catch (e) {
-                    console.error("Erreur lors de l'exécution de reCAPTCHA:", e);
-                }
-            });
-        } catch (error) {
-            console.error('Erreur lors du rendu de reCAPTCHA:', error);
-            setRecaptchaError('Erreur lors du chargement de la vérification de sécurité.');
-            setIsRecaptchaLoaded(false);
+            return;
         }
+
+        window.grecaptcha.ready(() => {
+            try {
+                const widgetId = window.grecaptcha.render('recaptcha-element', {
+                    sitekey: window.recaptchaSiteKey || '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN',
+                    callback: onRecaptchaSuccess,
+                    'expired-callback': onRecaptchaExpired,
+                    'error-callback': onRecaptchaError,
+                    theme: 'light',
+                    size: 'normal',
+                });
+
+                recaptchaRef.current = widgetId;
+                setIsRecaptchaLoaded(true);
+                setRecaptchaError('');
+            } catch (error) {
+                console.error('Erreur lors du rendu de reCAPTCHA:', error);
+                setRecaptchaError(
+                    "La vérification de sécurité n'a pas pu se charger. Rechargez la page ou réessayez."
+                );
+                setIsRecaptchaLoaded(false);
+            }
+        });
     };
 
     const onRecaptchaSuccess = (token) => {
@@ -272,30 +278,39 @@ export default function Register() {
         e.preventDefault();
 
         if (!data.recaptcha_token) {
-            setRecaptchaError("Veuillez confirmer que vous n'êtes pas un robot.");
-
-            if (window.grecaptcha) {
-                try {
-                    window.grecaptcha.ready(() => {
-                        const widgetId = window.grecaptcha.render('recaptcha-element');
-                        if (widgetId) {
-                            window.grecaptcha.execute(widgetId);
-                        }
-                    });
-                } catch (e) {
-                    console.error("Erreur lors de l'exécution de reCAPTCHA:", e);
-                }
+            if (!isRecaptchaLoaded) {
+                // Le widget n'a jamais pu se charger : on retente plutôt que
+                // d'appeler une API invalide sur un widget qui n'existe pas.
+                setRecaptchaError(
+                    "La vérification de sécurité n'a pas pu se charger. Nouvelle tentative en cours…"
+                );
+                initializeRecaptcha();
+            } else {
+                setRecaptchaError("Veuillez cocher la case « Je ne suis pas un robot » avant de continuer.");
             }
             return;
         }
 
+        setFormError('');
+
         post(route('register'), {
             onSuccess: () => {
-                if (window.grecaptcha) window.grecaptcha.reset();
+                if (window.grecaptcha) {
+                    window.grecaptcha.reset(recaptchaRef.current ?? undefined);
+                }
             },
             onError: (errs) => {
-                if (errs.recaptcha_token) setRecaptchaError(errs.recaptcha_token);
-                if (window.grecaptcha) window.grecaptcha.reset();
+                if (errs.recaptcha_token) {
+                    setRecaptchaError(errs.recaptcha_token);
+                } else if (Object.keys(errs).length === 0) {
+                    // Erreur serveur non associée à un champ précis (ex : session expirée)
+                    setFormError(
+                        "Une erreur est survenue lors de l'inscription. Veuillez réessayer."
+                    );
+                }
+                if (window.grecaptcha) {
+                    window.grecaptcha.reset(recaptchaRef.current ?? undefined);
+                }
                 setData('recaptcha_token', '');
             },
             preserveScroll: true,
@@ -388,6 +403,15 @@ export default function Register() {
                         <p className="mb-6 hidden text-sm text-gray-500 dark:text-gray-400 md:block">
                             Moins de 2 minutes pour démarrer, aucune carte bancaire requise.
                         </p>
+
+                        {formError && (
+                            <div
+                                className="mb-5 max-w-md rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400"
+                                role="alert"
+                            >
+                                {formError}
+                            </div>
+                        )}
 
                         <form onSubmit={submit} className="max-w-md space-y-5" noValidate>
                             {/* Nom et email, côte à côte sur grand écran */}
@@ -553,17 +577,27 @@ export default function Register() {
                                             ? 'rounded border border-red-500 p-2'
                                             : ''
                                     }
-                                    data-sitekey="6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN"
                                 />
-                                {!isRecaptchaLoaded && (
+                                {!isRecaptchaLoaded && !recaptchaError && (
                                     <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
                                         Chargement de la vérification de sécurité…
                                     </p>
                                 )}
                                 {recaptchaError && (
-                                    <p className="mt-2 text-sm text-red-600" role="alert">
-                                        {recaptchaError}
-                                    </p>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                        <p className="text-sm text-red-600" role="alert">
+                                            {recaptchaError}
+                                        </p>
+                                        {!isRecaptchaLoaded && (
+                                            <button
+                                                type="button"
+                                                onClick={initializeRecaptcha}
+                                                className="text-sm font-medium text-blue-600 underline hover:text-blue-700 dark:text-blue-400"
+                                            >
+                                                Réessayer
+                                            </button>
+                                        )}
+                                    </div>
                                 )}
                                 {errors.recaptcha_token && (
                                     <p className="mt-2 text-sm text-red-600" role="alert">
