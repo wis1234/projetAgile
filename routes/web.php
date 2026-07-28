@@ -12,12 +12,10 @@ use App\Http\Controllers\FileVersionController;
 use App\Http\Controllers\FileAccessController;
 use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\ProjectController;
-
+use App\Http\TaskCommentReactionController;
 
 use App\Models\User;
 use App\Notifications\ProjaNotification;
-
-use App\Http\Controllers\TaskCommentReactionController;
 
 
 
@@ -192,8 +190,6 @@ Route::prefix('push')->group(function () {
     // Ressources principales
     Route::resource('tasks', App\Http\Controllers\TaskController::class);
 
-    Route::post('/tasks/{task}/comments/{comment}/reactions', [TaskCommentReactionController::class, 'toggle']);
-Route::get('/tasks/{task}/comments/{comment}/reactions', [TaskCommentReactionController::class, 'index']);
   
     
     // Gestion des plans d'abonnement
@@ -295,6 +291,10 @@ Route::delete('/files/{file}/access/{user}',        [FileAccessController::class
         Route::post('/tasks/{task}/comments', [\App\Http\Controllers\TaskCommentController::class, 'store']);
         Route::put('/tasks/{task}/comments/{comment}', [\App\Http\Controllers\TaskCommentController::class, 'update']);
         Route::delete('/tasks/{task}/comments/{comment}', [\App\Http\Controllers\TaskCommentController::class, 'destroy']);
+
+
+        Route::post('/tasks/{task}/comments/{comment}/reactions', [TaskCommentReactionController::class, 'toggle']);
+        Route::get('/tasks/{task}/comments/{comment}/reactions', [TaskCommentReactionController::class, 'index']);
         
         // Commentaires des fichiers
         Route::get('/files/{file}/comments', [\App\Http\Controllers\FileCommentController::class, 'index']);
