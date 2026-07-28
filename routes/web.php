@@ -17,6 +17,8 @@ use App\Http\Controllers\ProjectController;
 use App\Models\User;
 use App\Notifications\ProjaNotification;
 
+use App\Http\Controllers\TaskCommentReactionController;
+
 
 
 
@@ -189,6 +191,9 @@ Route::prefix('push')->group(function () {
     
     // Ressources principales
     Route::resource('tasks', App\Http\Controllers\TaskController::class);
+
+    Route::post('/tasks/{task}/comments/{comment}/reactions', [TaskCommentReactionController::class, 'toggle']);
+Route::get('/tasks/{task}/comments/{comment}/reactions', [TaskCommentReactionController::class, 'index']);
   
     
     // Gestion des plans d'abonnement
