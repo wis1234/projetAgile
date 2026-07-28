@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaPlay, FaReply, FaStar, FaPaperPlane, FaEnvelope } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaPlay, FaReply, FaStar, FaPaperPlane, FaEnvelope, FaPaperclip, FaSmile, FaSmileBeam } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
@@ -208,7 +208,7 @@ return (
   );
 };
 
-//  conservant les contrôles natifs (menu ⋮ : vitesse,
+// ─── VoiceMessagePlayer ───────────────────────────────────────────────────────
 const VoiceMessagePlayer = ({ src, isMe }) => {
   return (
     <audio
@@ -217,6 +217,91 @@ const VoiceMessagePlayer = ({ src, isMe }) => {
       src={src}
       className="h-9 w-full max-w-[220px]"
     />
+  );
+};
+
+// ─── Constantes pour Réactions & Stickers ────────────────────────────────────
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉'];
+
+const COMMON_EMOJIS = [
+  '😀','😁','😂','🤣','😍','🥰','😎','🤔','😅','🙏','😊','😭',
+  '😏','🤝','💪','👏','👍','❤️','🔥','🎉','💯','✅','⚡','🚀',
+  '🌟','💎','🎯','✨','😴','🤗','😇','🥳','🤩','😜','👋','🙌',
+  '💬','📌','⏰','🛠️','💡','🔑','📱','💻','🎁','🏆'
+];
+
+const STICKERS = [
+  { id: '1', emoji: '🚀', title: 'En cours', bg: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-blue-200' },
+  { id: '2', emoji: '✅', title: 'Validé', bg: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-200' },
+  { id: '3', emoji: '🔥', title: 'Urgent', bg: 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200' },
+  { id: '4', emoji: '💡', title: 'Idée', bg: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-200' },
+  { id: '5', emoji: '👏', title: 'Bravo !', bg: 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border-purple-200' },
+  { id: '6', emoji: '🙏', title: 'Merci', bg: 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-200' },
+  { id: '7', emoji: '❓', title: 'Question', bg: 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 border-orange-200' },
+  { id: '8', emoji: '🎯', title: 'Objectif', bg: 'bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200' },
+];
+
+// ─── Composant OnlineAvatarStack ──────────────────────────────────────────────
+const OnlineAvatarStack = ({ users }) => {
+  if (!users || users.length === 0) return null;
+  const visible = users.slice(0, 4);
+  const overflow = users.length - 4;
+  return (
+    <div className="flex items-center gap-2 bg-white/15 dark:bg-black/25 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 shadow-inner">
+      <div className="flex -space-x-2.5">
+        {visible.map((u) => (
+          <div key={u.id} className="relative group" title={`${u.name} (En ligne)`}>
+            <img
+              src={u.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || '')}&background=ffffff&color=2563eb&size=32`}
+              alt={u.name}
+              className="w-7.5 h-7.5 rounded-full border-2 border-blue-600 dark:border-blue-700 object-cover shadow-md transition-transform group-hover:scale-115 group-hover:z-10"
+            />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-blue-600 dark:border-blue-700 animate-pulse" />
+          </div>
+        ))}
+        {overflow > 0 && (
+          <div className="w-7.5 h-7.5 rounded-full border-2 border-blue-600 bg-blue-800 flex items-center justify-center text-[10px] text-white font-bold">
+            +{overflow}
+          </div>
+        )}
+      </div>
+      <span className="text-xs text-blue-100 font-medium hidden sm:inline-block">
+        {users.length} en ligne
+      </span>
+    </div>
+  );
+};
+
+// ─── Composant ReactionPicker ──────────────────────────────────────────────────
+const ReactionPicker = ({ commentId, isMe, onReact, onClose }) => {
+  const pickerRef = useRef(null);
+  useEffect(() => {
+    const handler = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={pickerRef}
+      className={`absolute ${isMe ? 'right-0 -top-11' : 'left-0 -top-11'} z-30 flex items-center gap-1 bg-white dark:bg-gray-800 rounded-full shadow-xl border border-gray-200 dark:border-gray-700 px-2 py-1 animate-in fade-in zoom-in duration-150`}
+    >
+      {REACTION_EMOJIS.map(emoji => (
+        <button
+          key={emoji}
+          type="button"
+          onClick={() => { onReact(commentId, emoji); onClose(); }}
+          className="text-lg w-8 h-8 flex items-center justify-center hover:scale-125 transition-transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+          title={emoji}
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
   );
 };
 
@@ -503,6 +588,42 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const presenceChannelRef = useRef(null);
   const typingTimeoutsRef = useRef({});
   const lastTypingSentRef = useRef(0);
+
+  // ─── State Réactions, Stickers & Picker WhatsApp ───────────────────────────
+  const [reactions, setReactions] = useState({}); // { commentId: { emoji: [userIds] } }
+  const [activeReactionPicker, setActiveReactionPicker] = useState(null); // commentId | null
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activePickerTab, setActivePickerTab] = useState('emojis'); // 'emojis' | 'stickers'
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const handleReaction = useCallback((commentId, emoji) => {
+    if (!commentId) return;
+    setReactions(prev => {
+      const commentReactions = { ...(prev[commentId] || {}) };
+      const userIds = [...(commentReactions[emoji] || [])];
+      const idx = userIds.indexOf(auth.user.id);
+      if (idx >= 0) {
+        userIds.splice(idx, 1);
+      } else {
+        userIds.push(auth.user.id);
+      }
+      if (userIds.length === 0) {
+        delete commentReactions[emoji];
+      } else {
+        commentReactions[emoji] = userIds;
+      }
+      return { ...prev, [commentId]: commentReactions };
+    });
+    // Whisper to connected peers via presence channel
+    if (presenceChannelRef.current) {
+      presenceChannelRef.current.whisper('reaction', {
+        commentId,
+        emoji,
+        userId: auth.user.id,
+      });
+    }
+  }, [auth.user.id]);
 
   const isUserOnline = useCallback((userId) => {
     if (!userId) return false;
@@ -1129,6 +1250,19 @@ const handleReplyComment = (commentId) => {
           const current = new Set(prev[e.commentId] || []);
           current.add(e.userId);
           return { ...prev, [e.commentId]: current };
+        });
+      })
+      .listenForWhisper('reaction', (e) => {
+        if (!e?.commentId || !e?.emoji || e.userId === auth.user.id) return;
+        setReactions(prev => {
+          const commentReactions = { ...(prev[e.commentId] || {}) };
+          const userIds = [...(commentReactions[e.emoji] || [])];
+          const idx = userIds.indexOf(e.userId);
+          if (idx >= 0) userIds.splice(idx, 1);
+          else userIds.push(e.userId);
+          if (userIds.length === 0) delete commentReactions[e.emoji];
+          else commentReactions[e.emoji] = userIds;
+          return { ...prev, [e.commentId]: commentReactions };
         });
       });
 
@@ -2175,129 +2309,150 @@ const handleReplyComment = (commentId) => {
 
 
 {activeTab === 'comments' && (
-  <div className="flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8" style={{ height: '85vh', maxHeight: '800px' }}>
+  <div className="flex flex-col bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8 shadow-xl" style={{ height: '85vh', maxHeight: '800px' }}>
     
-{/* ─── HEADER STYLE WHATSAPP ─── */}
-<div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white flex-shrink-0 shadow-md">
-  <div className="flex items-center gap-3">
-    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-      <FaCommentDots className="text-white text-lg" />
-    </div>
-    <div>
-      <p className="font-semibold text-sm leading-tight">Discussions</p>
-      <p className="text-xs text-blue-100 flex items-center gap-2">
-        <span>
-          {loadingComments
-            ? t('task_details.loading_comments')
-            : `${comments.length} message${comments.length !== 1 ? 's' : ''}`}
-        </span>
-        {!loadingComments && onlineUsers.length > 0 && (
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-            {onlineUsers.length} {t('task_details.online', 'en ligne')}
+    {/* ─── HEADER STYLE WHATSAPP AVEC MEMBRES CONNECTÉS ─── */}
+    <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-800 text-white flex-shrink-0 shadow-md">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-inner">
+          <FaCommentDots className="text-white text-lg" />
+        </div>
+        <div>
+          <h3 className="font-bold text-base leading-tight flex items-center gap-2">
+            <span>Discussions</span>
+            {isRealtimeConnected && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Temps réel connecté"></span>
+            )}
+          </h3>
+          <p className="text-xs text-blue-100 flex items-center gap-2 mt-0.5">
+            <span>
+              {loadingComments
+                ? t('task_details.loading_comments')
+                : `${comments.length} message${comments.length !== 1 ? 's' : ''}`}
+            </span>
+          </p>
+        </div>
+      </div>
+
+      {/* MILIEU & DROITE : PHOTOS DES MEMBRES CONNECTÉS & COPIE EMAIL */}
+      <div className="flex items-center gap-3">
+        <OnlineAvatarStack users={onlineUsers} />
+
+        <label
+          className="flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none border border-white/15"
+          title={shareDiscussionEmail
+            ? t('task_details.email_copy_enabled')
+            : t('task_details.email_copy_disabled')}
+        >
+          <FaEnvelope
+            className={`w-3.5 h-3.5 flex-shrink-0 transition-colors duration-200 ${
+              shareDiscussionEmail ? 'text-white' : 'text-blue-200'
+            }`}
+          />
+          <input
+            type="checkbox"
+            checked={shareDiscussionEmail}
+            onChange={toggleDiscussionEmail}
+            aria-label={t('task_details.share_discussions_by_email')}
+            className="sr-only peer"
+          />
+          <span className="relative w-8 h-4 rounded-full bg-white/25 peer-checked:bg-white transition-colors duration-200">
+            <span className="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white peer-checked:bg-blue-600 shadow-sm transition-transform duration-200 peer-checked:translate-x-4" />
           </span>
-        )}
-      </p>
+        </label>
+      </div>
     </div>
-  </div>
-
-  <label
-    className="flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none"
-    title={shareDiscussionEmail
-      ? t('task_details.email_copy_enabled')
-      : t('task_details.email_copy_disabled')}
-  >
-    <FaEnvelope
-      className={`w-3.5 h-3.5 flex-shrink-0 transition-colors duration-200 ${
-        shareDiscussionEmail ? 'text-white' : 'text-blue-200'
-      }`}
-    />
-
-    <input
-      type="checkbox"
-      checked={shareDiscussionEmail}
-      onChange={toggleDiscussionEmail}
-      aria-label={t('task_details.share_discussions_by_email')}
-      className="sr-only peer"
-    />
-
-    <span className="relative w-8 h-4 rounded-full bg-white/25 peer-checked:bg-white transition-colors duration-200">
-      <span className="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white peer-checked:bg-blue-600 shadow-sm transition-transform duration-200 peer-checked:translate-x-4" />
-    </span>
-  </label>
-</div>
 
     {/* ─── ZONE DES MESSAGES ─── */}
     <div
       id="chat-messages-container"
-      className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-2"
+      className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 space-y-3 relative"
       style={{ background: 'var(--chat-bg, #ece5dd)', scrollBehavior: 'smooth' }}
     >
       <style>{`
-        .dark #chat-messages-container { --chat-bg: #1a1a2e; }
-        .bubble-left { border-radius: 0 16px 16px 16px; }
-        .bubble-right { border-radius: 16px 0 16px 16px; }
-        .bubble-pending { opacity: 0.65; }
+        .dark #chat-messages-container { --chat-bg: #0f172a; }
+        .bubble-left { border-radius: 4px 18px 18px 18px; }
+        .bubble-right { border-radius: 18px 4px 18px 18px; }
+        .bubble-pending { opacity: 0.7; }
         .tick { font-size: 11px; }
       `}</style>
 
       {loadingComments ? (
         <div className="flex flex-col items-center justify-center h-full gap-3">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">{t('task_details.loading_comments')}</p>
+          <div className="w-10 h-10 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t('task_details.loading_comments')}</p>
         </div>
       ) : comments.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
-          <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shadow-inner">
             <FaCommentDots className="text-3xl text-blue-500 dark:text-blue-400" />
           </div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">{t('task_details.no_discussion_yet')}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">{t('task_details.no_discussion_yet')}</p>
         </div>
       ) : (
         <>
-{[...comments].reverse().map(comment => {
+          {[...comments].reverse().map(comment => {
             const isMe = comment.user?.id === auth.user.id;
             const isPending = comment._pending === true;
             const hasFailed = comment._failed === true;
+            const commentReactions = reactions[comment.id] || {};
+            const reactionEntries = Object.entries(commentReactions).filter(([_, userIds]) => userIds && userIds.length > 0);
 
             return (
               <div
                 key={comment.id || comment._tempId}
                 data-comment-id={comment.id || ''}
                 data-author-id={comment.user?.id || ''}
-                className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'} gap-0.5`}
+                className={`group relative flex flex-col ${isMe ? 'items-end' : 'items-start'} gap-1`}
               >
-                <div className={`flex items-end gap-2 max-w-[78%] min-w-0 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                <div className={`flex items-end gap-2 max-w-[85%] sm:max-w-[78%] min-w-0 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
 
-                  {/* Avatar seul (nom en tooltip au survol) */}
+                  {/* Avatar utilisateur */}
                   {!isMe && (
                     <div className="relative flex-shrink-0 mb-0.5" title={comment.user?.name || ''}>
                       <img
                         src={comment.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || '')}&background=1D9E75&color=fff`}
                         alt={comment.user?.name}
-                        className="w-7 h-7 rounded-full"
+                        className="w-7 h-7 rounded-full object-cover shadow-sm border border-gray-200 dark:border-gray-700"
                       />
                       {isUserOnline(comment.user?.id) && (
-                        <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400 border border-white dark:border-gray-800"></span>
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-white dark:border-gray-800"></span>
                       )}
                     </div>
                   )}
 
-                  {/* Bulle */}
-                  <div className={`relative px-3 py-2 shadow-sm min-w-0 ${
+                  {/* Bulle de Message */}
+                  <div className={`relative px-3.5 py-2.5 shadow-sm min-w-[120px] ${
                     isPending ? 'bubble-pending' : ''
                   } ${
                     isMe
-                      ? `bubble-right ${hasFailed ? 'bg-red-100 dark:bg-red-900/40' : 'bg-blue-500 dark:bg-blue-600'}`
-                      : 'bubble-left bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600'
+                      ? `bubble-right ${hasFailed ? 'bg-red-100 dark:bg-red-900/40 text-red-900' : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'}`
+                      : 'bubble-left bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-100'
                   }`}>
+
+                    {/* Popover Réactions flottantes sur cette bulle */}
+                    {activeReactionPicker === comment.id && (
+                      <ReactionPicker
+                        commentId={comment.id}
+                        isMe={isMe}
+                        onReact={handleReaction}
+                        onClose={() => setActiveReactionPicker(null)}
+                      />
+                    )}
+
+                    {/* Nom d'auteur si message tiers */}
+                    {!isMe && comment.user?.name && (
+                      <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 mb-0.5">
+                        {comment.user.name}
+                      </p>
+                    )}
 
                     {/* Réponse à un parent */}
                     {comment.parent && (
-                      <div className={`mb-2 px-2 py-1 rounded text-xs border-l-2 ${
+                      <div className={`mb-2 px-2.5 py-1.5 rounded-lg text-xs border-l-3 ${
                         isMe
-                          ? 'border-white/60 bg-white/20 text-white/80'
-                          : 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-gray-600 dark:text-gray-300'
+                          ? 'border-white/80 bg-white/15 text-white/90'
+                          : 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-gray-600 dark:text-gray-300'
                       }`}>
                         <p className="truncate opacity-80">{comment.parent.content}</p>
                       </div>
@@ -2309,7 +2464,7 @@ const handleReplyComment = (commentId) => {
                         <textarea
                           value={editContent}
                           onChange={e => setEditContent(e.target.value)}
-                          className="w-full p-2 text-sm rounded border border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-white focus:ring-1 focus:ring-blue-500 resize-none"
+                          className="w-full p-2 text-sm rounded-lg border border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white focus:ring-1 focus:ring-blue-500 resize-none"
                           rows={3}
                           autoFocus
                           maxLength={2000}
@@ -2318,7 +2473,7 @@ const handleReplyComment = (commentId) => {
                           <button type="button" onClick={() => setEditingId(null)} className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300">
                             {t('task_details.cancel')}
                           </button>
-                          <button type="submit" className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1">
+                          <button type="submit" className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1 font-medium">
                             <FaSave className="w-3 h-3" /> {t('task_details.save')}
                           </button>
                         </div>
@@ -2339,15 +2494,15 @@ const handleReplyComment = (commentId) => {
                           />
                         )}
 
-                        {/* Audio — contenu dans la bulle, ne déborde plus */}
+                        {/* Audio */}
                         {comment.audio_path && (
                           <div className="mt-1.5 max-w-full overflow-hidden">
                             <VoiceMessagePlayer src={`/storage/public/${comment.audio_path}`} isMe={isMe} />
                           </div>
                         )}
 
-                        {/* Timestamp + statut */}
-                        <div className={`flex items-center gap-1 mt-1 justify-end tick ${isMe ? 'text-white/60' : 'text-gray-400 dark:text-gray-500'}`}>
+                        {/* Timestamp + statut d'envoi */}
+                        <div className={`flex items-center gap-1 mt-1 justify-end tick ${isMe ? 'text-white/70' : 'text-gray-400 dark:text-gray-500'}`}>
                           <span>
                             {new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                           </span>
@@ -2358,16 +2513,16 @@ const handleReplyComment = (commentId) => {
                               ? <span className="text-white/60">⏳</span>
                               : (comment.id && readReceipts[comment.id]?.size > 0)
                               ? <span className="text-sky-300 font-bold" title={t('task_details.read', 'Lu')}>✓✓</span>
-                              : <span className="text-white/70" title={t('task_details.sent', 'Envoyé')}>✓✓</span>
+                              : <span className="text-white/80" title={t('task_details.sent', 'Envoyé')}>✓✓</span>
                           )}
                         </div>
 
                         {/* Erreur envoi */}
                         {hasFailed && (
-                          <p className="text-xs text-red-500 mt-1">{t('task_details.send_failed')}
+                          <p className="text-xs text-red-500 mt-1 font-medium">{t('task_details.send_failed')}
                             <button
                               onClick={() => retryComment(comment)}
-                              className="ml-1 underline hover:no-underline"
+                              className="ml-1 underline hover:no-underline font-semibold"
                             >{t('task_details.retry')}</button>
                           </p>
                         )}
@@ -2375,23 +2530,30 @@ const handleReplyComment = (commentId) => {
                     )}
                   </div>
 
-                  {/* Actions flottantes */}
+                  {/* Actions au survol de la bulle */}
                   {!isPending && editingId !== comment.id && (
-                    <div className={`flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ${isMe ? 'items-end' : 'items-start'}`}>
+                    <div className={`flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-1 rounded-full shadow border border-gray-200 dark:border-gray-700 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <button
+                        onClick={() => setActiveReactionPicker(prev => prev === comment.id ? null : comment.id)}
+                        className="text-gray-500 hover:text-amber-500 p-1 rounded-full transition-colors"
+                        title="Ajouter une réaction"
+                      >
+                        <FaSmileBeam className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => handleReplyComment(comment.id)}
-                        className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded"
+                        className="text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded-full transition-colors"
                         title={t('task_details.response')}
                       >
-                        <FaReply className="w-3 h-3" />
+                        <FaReply className="w-3.5 h-3.5" />
                       </button>
                       {isMe && (
                         <>
-                          <button onClick={() => handleEditComment(comment)} className="text-gray-400 hover:text-blue-500 p-1 rounded" title={t('edit')}>
-                            <FaEdit className="w-3 h-3" />
+                          <button onClick={() => handleEditComment(comment)} className="text-gray-500 hover:text-blue-500 p-1 rounded-full transition-colors" title={t('edit')}>
+                            <FaEdit className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => handleDeleteComment(comment.id)} className="text-gray-400 hover:text-red-500 p-1 rounded" title={t('delete')}>
-                            <FaTrash className="w-3 h-3" />
+                          <button onClick={() => handleDeleteComment(comment.id)} className="text-gray-500 hover:text-red-500 p-1 rounded-full transition-colors" title={t('delete')}>
+                            <FaTrash className="w-3.5 h-3.5" />
                           </button>
                         </>
                       )}
@@ -2399,25 +2561,49 @@ const handleReplyComment = (commentId) => {
                   )}
                 </div>
 
+                {/* Badge des réactions sous la bulle */}
+                {reactionEntries.length > 0 && (
+                  <div className={`flex flex-wrap gap-1 ${isMe ? 'pr-2 justify-end' : 'pl-9 justify-start'}`}>
+                    {reactionEntries.map(([emoji, userIds]) => {
+                      const hasReacted = userIds.includes(auth.user.id);
+                      return (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleReaction(comment.id, emoji)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-all ${
+                            hasReacted
+                              ? 'bg-blue-100 dark:bg-blue-900/60 border-blue-400 text-blue-700 dark:text-blue-300 font-semibold shadow-xs'
+                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>{emoji}</span>
+                          <span className="text-[10px] font-bold">{userIds.length}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Réponses imbriquées */}
                 {comment.replies && comment.replies.length > 0 && (
                   <div className={`flex flex-col gap-1 mt-1 ${isMe ? 'items-end pr-2' : 'items-start pl-9'}`}>
                     {[...comment.replies].reverse().map(reply => {
                       const isReplyMe = reply.user?.id === auth.user.id;
                       return (
-                        <div key={reply.id} className={`flex items-end gap-1.5 max-w-[70%] min-w-0 ${isReplyMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div key={reply.id} className={`flex items-end gap-1.5 max-w-[75%] min-w-0 ${isReplyMe ? 'flex-row-reverse' : 'flex-row'}`}>
                           {!isReplyMe && (
                             <img
                               src={reply.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user?.name || '')}&background=1D9E75&color=fff`}
                               alt={reply.user?.name}
                               title={reply.user?.name || ''}
-                              className="w-5 h-5 rounded-full flex-shrink-0 mb-0.5"
+                              className="w-5 h-5 rounded-full flex-shrink-0 mb-0.5 object-cover"
                             />
                           )}
-                          <div className={`px-3 py-1.5 shadow-sm text-sm min-w-0 ${
+                          <div className={`px-3 py-1.5 shadow-xs text-sm min-w-0 ${
                             isReplyMe
-                              ? 'bg-blue-400 dark:bg-blue-700 text-white bubble-right'
-                              : 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-500 bubble-left'
+                              ? 'bg-blue-500 dark:bg-blue-700 text-white bubble-right'
+                              : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-600 bubble-left'
                           }`}>
                             <p className="whitespace-pre-wrap break-words leading-relaxed">{reply.content}</p>
                             {reply.audio_path && (
@@ -2425,7 +2611,7 @@ const handleReplyComment = (commentId) => {
                                 <VoiceMessagePlayer src={`/storage/public/${reply.audio_path}`} isMe={isReplyMe} />
                               </div>
                             )}
-                            <div className={`flex items-center gap-1 mt-0.5 justify-end tick ${isReplyMe ? 'text-white/60' : 'text-gray-400'}`}>
+                            <div className={`flex items-center gap-1 mt-0.5 justify-end tick ${isReplyMe ? 'text-white/70' : 'text-gray-400'}`}>
                               <span>{new Date(reply.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                               {isReplyMe && <span>✓✓</span>}
                               {isReplyMe && (
@@ -2449,13 +2635,13 @@ const handleReplyComment = (commentId) => {
 
     {/* ─── INDICATEUR "EN TRAIN D'ÉCRIRE..." ─── */}
     {Object.keys(typingUsers).length > 0 && (
-      <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50/80 dark:bg-blue-900/20 border-t border-blue-100 dark:border-blue-900 flex-shrink-0">
-        <div className="flex gap-0.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.3s]"></span>
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.15s]"></span>
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce"></span>
+      <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50/90 dark:bg-blue-900/30 border-t border-blue-100 dark:border-blue-900 flex-shrink-0">
+        <div className="flex gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.3s]"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.15s]"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-bounce"></span>
         </div>
-        <span className="text-xs text-blue-600 dark:text-blue-300 italic">
+        <span className="text-xs text-blue-700 dark:text-blue-300 font-medium italic">
           {Object.values(typingUsers).join(', ')}{' '}
           {Object.keys(typingUsers).length > 1
             ? t('task_details.are_typing', 'sont en train d\'écrire…')
@@ -2466,36 +2652,129 @@ const handleReplyComment = (commentId) => {
 
     {/* ─── BARRE REPLY ─── */}
     {replyingTo && (
-      <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-800 flex-shrink-0">
-        <div className="flex-1 border-l-4 border-blue-500 pl-3">
+      <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 border-t border-blue-200 dark:border-blue-800 flex-shrink-0">
+        <div className="flex-1 border-l-3 border-blue-500 pl-3">
           <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-1">
             <FaReply className="w-3 h-3" /> {t('task_details.reply_to_comment')}
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-{(() => {
-  const parent = comments.find(c => c.id === replyingTo) 
-    || comments.flatMap(c => c.replies || []).find(r => r.id === replyingTo);
-  return parent?.content?.substring(0, 60) || '...';
-})()}
-</p>
+          <p className="text-xs text-gray-600 dark:text-gray-300 truncate font-medium">
+            {(() => {
+              const parent = comments.find(c => c.id === replyingTo) 
+                || comments.flatMap(c => c.replies || []).find(r => r.id === replyingTo);
+              return parent?.content?.substring(0, 60) || '...';
+            })()}
+          </p>
         </div>
-        <button onClick={cancelReply} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1">
+        <button onClick={cancelReply} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full">
           <FaTimes className="w-4 h-4" />
         </button>
       </div>
     )}
 
-    {/* ─── INPUT STYLE WHATSAPP ─── */}
-    <div className="flex-shrink-0 px-3 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+    {/* ─── DRAWER STICKERS & EMOJIS (WHATSAPP STYLE) ─── */}
+    {showEmojiPicker && (
+      <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3 shadow-lg max-h-56 overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2 mb-2">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setActivePickerTab('emojis')}
+              className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+                activePickerTab === 'emojis'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+              }`}
+            >
+              Émojis
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePickerTab('stickers')}
+              className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+                activePickerTab === 'stickers'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+              }`}
+            >
+              Stickers
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker(false)}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            <FaTimes className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {activePickerTab === 'emojis' ? (
+          <div className="grid grid-cols-10 gap-1.5">
+            {COMMON_EMOJIS.map((emoji, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setCommentContent(prev => prev + emoji)}
+                className="text-xl hover:scale-125 transition-transform p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {STICKERS.map(sticker => (
+              <button
+                key={sticker.id}
+                type="button"
+                onClick={() => {
+                  setCommentContent(prev => (prev ? prev + ' ' : '') + `${sticker.emoji} ${sticker.title}`);
+                  setShowEmojiPicker(false);
+                }}
+                className={`flex items-center gap-2 p-2 rounded-xl border text-xs font-bold transition-all hover:scale-102 hover:shadow-md ${sticker.bg}`}
+              >
+                <span className="text-xl">{sticker.emoji}</span>
+                <span>{sticker.title}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* ─── APERÇU FICHER JOINT ─── */}
+    {selectedFile && (
+      <div className="flex-shrink-0 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 border-t border-blue-200 dark:border-blue-800 flex items-center justify-between text-xs text-blue-700 dark:text-blue-300">
+        <div className="flex items-center gap-2 truncate">
+          <FaPaperclip className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="font-semibold truncate">{selectedFile.name}</span>
+          <span className="text-gray-500 dark:text-gray-400">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+        </div>
+        <button type="button" onClick={() => setSelectedFile(null)} className="text-gray-400 hover:text-red-500 p-1">
+          <FaTimes className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    )}
+
+    {/* ─── ZONE DE SAISIE WHATSAPP COMPLÈTE ─── */}
+    <div className="flex-shrink-0 px-3 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-inner">
       {error && (
-        <div className="mb-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-600 dark:text-red-300 flex items-center gap-2">
+        <div className="mb-2 px-3 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-600 dark:text-red-300 flex items-center gap-2">
           <FaInfoCircle className="flex-shrink-0" />
           <span>{error}</span>
           <button onClick={() => setError('')} className="ml-auto"><FaTimes className="w-3 h-3" /></button>
         </div>
       )}
 
-      {/* Aperçu audio */}
+      {/* Input de fichier caché */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={e => e.target.files?.[0] && setSelectedFile(e.target.files[0])}
+        className="hidden"
+      />
+
+      {/* Aperçu audio enregistré */}
       {audioUrl && (
         <div className="mb-2 flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700">
           <FaMicrophone className="text-blue-600 w-4 h-4 flex-shrink-0" />
@@ -2506,95 +2785,112 @@ const handleReplyComment = (commentId) => {
         </div>
       )}
 
-      {/* Indicateur d'enregistrement */}
-      {isRecording && (
-        <div className="mb-2 flex items-center gap-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-xl">
+      {/* Mode enregistrement vocal en cours */}
+      {isRecording ? (
+        <div className="flex items-center gap-3 px-3 py-2 bg-red-50 dark:bg-red-900/30 rounded-2xl border border-red-200 dark:border-red-800">
           <span className="relative flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
           </span>
-          <span className="text-sm text-red-700 dark:text-red-300 font-medium flex-1">{t('task_details.recording_in_progress')}</span>
-          <span className="font-mono text-sm bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-red-600 dark:text-red-300">{formatTime(recordingTime)}</span>
-          <button onClick={stopRecording} className="text-red-600 hover:text-red-800 p-1">
+          <span className="text-xs sm:text-sm text-red-700 dark:text-red-300 font-semibold flex-1">Enregistrement vocal en cours...</span>
+          <span className="font-mono text-xs sm:text-sm bg-white dark:bg-gray-700 px-2 py-0.5 rounded-md text-red-600 dark:text-red-300 shadow-xs">{formatTime(recordingTime)}</span>
+          <button onClick={stopRecording} type="button" className="w-9 h-9 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-md transition-transform active:scale-95" title="Arrêter l'enregistrement">
             <FaStop className="w-4 h-4" />
           </button>
         </div>
-      )}
+      ) : (
+        <div className="flex items-end gap-2">
+          {/* Bouton Émoji / Sticker */}
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker(prev => !prev)}
+            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+              showEmojiPicker
+                ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-300'
+                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+            title="Émojis & Stickers"
+          >
+            <FaSmile className="w-5 h-5" />
+          </button>
 
-      <div className="flex items-end gap-2">
-        {/* Bouton micro */}
-        <button
-          type="button"
-          onClick={isRecording ? stopRecording : startRecording}
-          disabled={posting}
-          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-            isRecording
-              ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-          }`}
-          title={isRecording ? t('task_details.stop_recording') : t('task_details.record_voice_message')}
-        >
-          {isRecording ? <FaStop className="w-4 h-4" /> : <FaMicrophone className="w-4 h-4" />}
-        </button>
+          {/* Bouton Fichier joint */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+              selectedFile
+                ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300'
+                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+            title="Joindre un fichier"
+          >
+            <FaPaperclip className="w-4.5 h-4.5" />
+          </button>
 
-        {/* Zone de saisie */}
-        <div className="flex-1 relative">
-          <textarea
-            value={commentContent}
-            onChange={e => {
-              setCommentContent(e.target.value);
-              if (e.target.value.trim()) {
-                emitTyping();
-              } else {
-                emitStopTyping();
-              }
-            }}
-            onBlur={emitStopTyping}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (commentContent.trim() || audioBlob) handleCommentSubmit(e);
-              }
-            }}
-            placeholder={replyingTo ? t('task_details.write_your_message_here') : t('task_details.write_your_message_here')}
-            rows={1}
-            disabled={posting || isRecording}
-            maxLength={2000}
-            className="w-full px-4 py-2.5 pr-10 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-2xl border-none focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none leading-relaxed"
-            style={{ minHeight: '42px', maxHeight: '120px', overflowY: 'auto' }}
-            onInput={e => {
-              e.target.style.height = 'auto';
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-            }}
-          />
-          {commentContent.length > 0 && (
-            <span className="absolute right-3 bottom-2 text-xs text-gray-400">{commentContent.length}/2000</span>
+          {/* Zone de texte principale */}
+          <div className="flex-1 relative">
+            <textarea
+              value={commentContent}
+              onChange={e => {
+                setCommentContent(e.target.value);
+                if (e.target.value.trim()) {
+                  emitTyping();
+                } else {
+                  emitStopTyping();
+                }
+              }}
+              onBlur={emitStopTyping}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (commentContent.trim() || audioBlob || selectedFile) handleCommentSubmit(e);
+                }
+              }}
+              placeholder={replyingTo ? "Écrire une réponse..." : "Tapez un message..."}
+              rows={1}
+              disabled={posting || isRecording}
+              maxLength={2000}
+              className="w-full px-4 py-2.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-2xl border-none focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none leading-relaxed transition-all"
+              style={{ minHeight: '42px', maxHeight: '120px', overflowY: 'auto' }}
+              onInput={e => {
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+            />
+          </div>
+
+          {/* Bouton Dynamique : Micro ou Envoyer */}
+          {commentContent.trim() || audioBlob || selectedFile ? (
+            <button
+              type="button"
+              onClick={handleCommentSubmit}
+              disabled={posting}
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
+              title="Envoyer"
+            >
+              {posting ? (
+                <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              ) : (
+                <FaPaperPlane className="w-4 h-4 ml-0.5" />
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={startRecording}
+              disabled={posting}
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-blue-600 flex items-center justify-center transition-all"
+              title="Enregistrer un message vocal"
+            >
+              <FaMicrophone className="w-4.5 h-4.5" />
+            </button>
           )}
         </div>
-
-        {/* Bouton envoyer */}
-        <button
-          type="button"
-          onClick={handleCommentSubmit}
-          disabled={posting || (!commentContent.trim() && !audioBlob) || isRecording}
-          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-            (!commentContent.trim() && !audioBlob) || isRecording
-              ? 'bg-gray-200 dark:bg-gray-600 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg active:scale-95'
-          }`}
-        >
-          {posting ? (
-            <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-            </svg>
-          )}
-        </button>
-      </div>
+      )}
     </div>
   </div>
 )}
