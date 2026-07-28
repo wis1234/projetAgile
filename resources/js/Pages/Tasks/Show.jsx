@@ -231,14 +231,22 @@ const COMMON_EMOJIS = [
 ];
 
 const STICKERS = [
-  { id: '1', emoji: '🚀', title: 'En cours', bg: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-blue-200' },
-  { id: '2', emoji: '✅', title: 'Validé', bg: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-200' },
-  { id: '3', emoji: '🔥', title: 'Urgent', bg: 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200' },
-  { id: '4', emoji: '💡', title: 'Idée', bg: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-200' },
-  { id: '5', emoji: '👏', title: 'Bravo !', bg: 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border-purple-200' },
-  { id: '6', emoji: '🙏', title: 'Merci', bg: 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-200' },
-  { id: '7', emoji: '❓', title: 'Question', bg: 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 border-orange-200' },
-  { id: '8', emoji: '🎯', title: 'Objectif', bg: 'bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200' },
+  { id: 'st_1', emoji: '🚀', title: 'En cours', bg: 'bg-blue-500 text-white shadow-blue-500/30' },
+  { id: 'st_2', emoji: '✅', title: 'Validé', bg: 'bg-emerald-500 text-white shadow-emerald-500/30' },
+  { id: 'st_3', emoji: '🔥', title: 'Urgent', bg: 'bg-rose-500 text-white shadow-rose-500/30' },
+  { id: 'st_4', emoji: '💡', title: 'Idée', bg: 'bg-amber-500 text-white shadow-amber-500/30' },
+  { id: 'st_5', emoji: '👏', title: 'Bravo !', bg: 'bg-purple-500 text-white shadow-purple-500/30' },
+  { id: 'st_6', emoji: '🙏', title: 'Merci', bg: 'bg-indigo-500 text-white shadow-indigo-500/30' },
+  { id: 'st_7', emoji: '❓', title: 'Question', bg: 'bg-orange-500 text-white shadow-orange-500/30' },
+  { id: 'st_8', emoji: '🎯', title: 'Objectif', bg: 'bg-teal-500 text-white shadow-teal-500/30' },
+  { id: 'st_9', emoji: '⭐', title: 'Favori', bg: 'bg-yellow-500 text-white shadow-yellow-500/30' },
+  { id: 'st_10', emoji: '📌', title: 'Important', bg: 'bg-red-600 text-white shadow-red-600/30' },
+  { id: 'st_11', emoji: '⚡', title: 'Express', bg: 'bg-cyan-500 text-white shadow-cyan-500/30' },
+  { id: 'st_12', emoji: '🎉', title: 'Félicitations', bg: 'bg-pink-500 text-white shadow-pink-500/30' },
+  { id: 'st_13', emoji: '🏆', title: 'Succès', bg: 'bg-yellow-600 text-white shadow-yellow-600/30' },
+  { id: 'st_14', emoji: '🛠️', title: 'En révision', bg: 'bg-slate-600 text-white shadow-slate-600/30' },
+  { id: 'st_15', emoji: '💻', title: 'Dev / Code', bg: 'bg-violet-600 text-white shadow-violet-600/30' },
+  { id: 'st_16', emoji: '🎁', title: 'Bonus', bg: 'bg-fuchsia-500 text-white shadow-fuchsia-500/30' },
 ];
 
 // ─── Composant OnlineAvatarStack ──────────────────────────────────────────────
@@ -594,12 +602,19 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const lastTypingSentRef = useRef(0);
 
   // ─── State Réactions, Stickers & Picker WhatsApp ───────────────────────────
-  const [reactions, setReactions] = useState({}); // { commentId: { emoji: [userIds] } }
+  const [reactions, setReactions] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(`task_reactions_${task.id}`);
+        return saved ? JSON.parse(saved) : {};
+      } catch { return {}; }
+    }
+    return {};
+  });
+
   const [activeReactionPicker, setActiveReactionPicker] = useState(null); // commentId | null
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activePickerTab, setActivePickerTab] = useState('emojis'); // 'emojis' | 'stickers'
-  const [selectedFile, setSelectedFile] = useState(null);
-  const fileInputRef = useRef(null);
 
   const handleReaction = useCallback((commentId, emoji) => {
     if (!commentId) return;
@@ -617,9 +632,25 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       } else {
         commentReactions[emoji] = userIds;
       }
-      return { ...prev, [commentId]: commentReactions };
+      const updated = { ...prev, [commentId]: commentReactions };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`task_reactions_${task.id}`, JSON.stringify(updated));
+      }
+      return updated;
     });
-    // Whisper to connected peers via presence channel
+
+    // Envoi de la réaction au serveur
+    fetch(`/api/tasks/${task.id}/comments/${commentId}/reactions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+      },
+      body: JSON.stringify({ emoji }),
+    }).catch(() => {});
+
+    // Whisper aux pairs connectés
     if (presenceChannelRef.current) {
       presenceChannelRef.current.whisper('reaction', {
         commentId,
@@ -627,7 +658,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         userId: auth.user.id,
       });
     }
-  }, [auth.user.id]);
+  }, [auth.user.id, task.id]);
 
   const isUserOnline = useCallback((userId) => {
     if (!userId) return false;
@@ -681,10 +712,11 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
 // ─── ENVOI OPTIMISTE ───
-const handleCommentSubmit = async (e) => {
+const handleCommentSubmit = async (e, textOverride = null) => {
   if (e && e.preventDefault) { e.preventDefault(); e.stopPropagation(); }
 
-  if (!commentContent.trim() && !audioBlob) {
+  const textToSend = (textOverride !== null ? textOverride : commentContent).trim();
+  if (!textToSend && !audioBlob) {
     setError('Veuillez écrire un message ou enregistrer un message vocal.');
     return false;
   }
@@ -698,7 +730,7 @@ const handleCommentSubmit = async (e) => {
     id: null,              // pas encore d'id serveur
     _pending: true,
     _failed: false,
-    content: commentContent.trim() || 'Message audio enregistré et sauvegardé', // placeholder si audio seulement
+    content: textToSend || 'Message audio enregistré et sauvegardé',
     audio_path: audioBlob ? audioUrl : null, // aperçu local
     created_at: now,
     updated_at: now,
@@ -712,20 +744,25 @@ const handleCommentSubmit = async (e) => {
     replies: [],
   };
 
+  // ─── Insertion optimiste récursive (pour gérer réponses et commentaires) ───
+  const insertCommentRecursively = (commentsList, incoming) => {
+    const parentId = incoming.parent_id ? String(incoming.parent_id) : null;
+    if (!parentId) return [incoming, ...commentsList];
+    return commentsList.map(c => {
+      if (String(c.id || c._tempId) === parentId) {
+        return { ...c, replies: [incoming, ...(c.replies || [])] };
+      }
+      if (c.replies && c.replies.length > 0) {
+        return { ...c, replies: insertCommentRecursively(c.replies, incoming) };
+      }
+      return c;
+    });
+  };
 
-  // ─── Affichage immédiat ───
-  if (replyingTo) {
-    setComments(prev => prev.map(c =>
-      c.id === replyingTo
-        ? { ...c, replies: [optimisticComment, ...(c.replies || [])] }
-        : c
-    ));
-  } else {
-    setComments(prev => [optimisticComment, ...prev]);
-  }
+  setComments(prev => insertCommentRecursively(prev, optimisticComment));
 
   // Vider le formulaire immédiatement
-  const savedContent = commentContent.trim();
+  const savedContent = textToSend;
   const savedAudioBlob = audioBlob;
   const savedReplyingTo = replyingTo;
   setCommentContent('');
@@ -752,7 +789,7 @@ const handleCommentSubmit = async (e) => {
       method: 'POST',
       headers: {
         'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
       },
       body: formData,
     });
@@ -1123,33 +1160,38 @@ const handleReplyComment = (commentId) => {
     const channel = window.Echo.private(`task.${task.id}.comments`);
 
     channel.listen('.comment.posted', (e) => {
-        console.log('📨 Event reçu:', e); // ← ajoute cette ligne
-
       const incoming = e.comment;
+      if (!incoming || incoming.user.id === auth.user.id) return;
 
-      if (incoming.user.id === auth.user.id) return;
+      const withMeta = {
+        ...incoming,
+        formatted_date: formatDate(incoming.created_at),
+        replies: incoming.replies || [],
+      };
 
-      setComments(prev => {
-        const alreadyExists =
-          prev.some(c => c.id === incoming.id) ||
-          prev.some(c => (c.replies || []).some(r => r.id === incoming.id));
-        if (alreadyExists) return prev;
+      const insertRealtimeComment = (commentsList, inc) => {
+        const incId = String(inc.id);
+        const parentId = inc.parent_id ? String(inc.parent_id) : null;
 
-        const withMeta = {
-          ...incoming,
-          formatted_date: formatDate(incoming.created_at),
-          replies: [],
-        };
+        const exists = commentsList.some(c =>
+          String(c.id) === incId || (c.replies && c.replies.some(r => String(r.id) === incId))
+        );
+        if (exists) return commentsList;
 
-        if (incoming.parent_id) {
-          return prev.map(c =>
-            c.id === incoming.parent_id
-              ? { ...c, replies: [withMeta, ...(c.replies || [])] }
-              : c
-          );
-        }
-        return [withMeta, ...prev];
-      });
+        if (!parentId) return [inc, ...commentsList];
+
+        return commentsList.map(c => {
+          if (String(c.id) === parentId) {
+            return { ...c, replies: [inc, ...(c.replies || [])] };
+          }
+          if (c.replies && c.replies.length > 0) {
+            return { ...c, replies: insertRealtimeComment(c.replies, inc) };
+          }
+          return c;
+        });
+      };
+
+      setComments(prev => insertRealtimeComment(prev, withMeta));
 
       if (activeTab === 'comments') {
         setTimeout(() => {
