@@ -640,7 +640,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     });
 
     // Envoi de la réaction au serveur
-    fetch(`/api/tasks/${task.id}/comments/${commentId}/reactions`, {
+ fetch(`/api/tasks/${task.id}/comments/${commentId}/reactions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -648,7 +648,17 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
       },
       body: JSON.stringify({ emoji }),
-    }).catch(() => {});
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text();
+          console.error('Erreur réaction:', res.status, text);
+        } else {
+          console.log('Réaction envoyée avec succès:', await res.json());
+        }
+      })
+      .catch((err) => console.error('Erreur réseau réaction:', err));
+      
 
     // Whisper aux pairs connectés
     if (presenceChannelRef.current) {

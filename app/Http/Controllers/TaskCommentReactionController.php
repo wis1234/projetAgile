@@ -52,6 +52,7 @@ class TaskCommentReactionController extends Controller
             $action = 'added';
         }
 
+
         $summary = $this->getReactionsSummary($commentId);
 
         broadcast(new CommentReactionUpdated((int) $taskId, (int) $commentId, $summary))
