@@ -2788,20 +2788,6 @@ const handleReplyComment = (commentId) => {
       </div>
     )}
 
-    {/* ─── APERÇU FICHER JOINT ─── */}
-    {selectedFile && (
-      <div className="flex-shrink-0 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 border-t border-blue-200 dark:border-blue-800 flex items-center justify-between text-xs text-blue-700 dark:text-blue-300">
-        <div className="flex items-center gap-2 truncate">
-          <FaPaperclip className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="font-semibold truncate">{selectedFile.name}</span>
-          <span className="text-gray-500 dark:text-gray-400">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
-        </div>
-        <button type="button" onClick={() => setSelectedFile(null)} className="text-gray-400 hover:text-red-500 p-1">
-          <FaTimes className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    )}
-
     {/* ─── ZONE DE SAISIE WHATSAPP COMPLÈTE ─── */}
     <div className="flex-shrink-0 px-3 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-inner">
       {error && (
@@ -2811,14 +2797,6 @@ const handleReplyComment = (commentId) => {
           <button onClick={() => setError('')} className="ml-auto"><FaTimes className="w-3 h-3" /></button>
         </div>
       )}
-
-      {/* Input de fichier caché */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={e => e.target.files?.[0] && setSelectedFile(e.target.files[0])}
-        className="hidden"
-      />
 
       {/* Aperçu audio enregistré */}
       {audioUrl && (
@@ -2860,20 +2838,6 @@ const handleReplyComment = (commentId) => {
             <FaSmile className="w-5 h-5" />
           </button>
 
-          {/* Bouton Fichier joint */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              selectedFile
-                ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-            title="Joindre un fichier"
-          >
-            <FaPaperclip className="w-4.5 h-4.5" />
-          </button>
-
           {/* Zone de texte principale */}
           <div className="flex-1 relative">
             <textarea
@@ -2890,7 +2854,7 @@ const handleReplyComment = (commentId) => {
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  if (commentContent.trim() || audioBlob || selectedFile) handleCommentSubmit(e);
+                  if (commentContent.trim() || audioBlob) handleCommentSubmit(e);
                 }
               }}
               placeholder={replyingTo ? "Écrire une réponse..." : "Tapez un message..."}
@@ -2907,10 +2871,10 @@ const handleReplyComment = (commentId) => {
           </div>
 
           {/* Bouton Dynamique : Micro ou Envoyer */}
-          {commentContent.trim() || audioBlob || selectedFile ? (
+          {commentContent.trim() || audioBlob ? (
             <button
               type="button"
-              onClick={handleCommentSubmit}
+              onClick={e => handleCommentSubmit(e)}
               disabled={posting}
               className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all active:scale-95"
               title="Envoyer"
