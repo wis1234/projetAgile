@@ -29,6 +29,11 @@ class TaskComment extends Model
         return $this->hasMany(TaskComment::class, 'parent_id')->orderBy('created_at', 'asc');
     }
 
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(TaskCommentReaction::class, 'task_comment_id');
+    }
+
     public function allRepliesWithUser()
     {
         return $this->replies()->with(['user', 'replies' => function($q) {

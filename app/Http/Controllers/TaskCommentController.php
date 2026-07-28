@@ -13,26 +13,42 @@ use App\Notifications\TaskCommentNotification;
 
 class TaskCommentController extends Controller
 {
-    // Liste les commentaires d'une tâche avec leurs réponses
+    // Liste les commentaires d'une tâche avec leurs réponses et réactions
     public function index($taskId)
     {
-        $comments = TaskComment::with(['user', 'replies.user'])
+        $formatReactions = function ($comment) {
+            $comment->reactions_summary = $comment->reactions
+                ->groupBy('emoji')
+                ->map(fn($group) => [
+                    'count'    => $group->count(),
+                    'user_ids' => $group->pluck('user_id')->toArray(),
+                ])
+                ->toArray();
+            return $comment;
+        };
+
+        $comments = TaskComment::with([
+                'user',
+                'reactions',
+                'replies' => function ($query) {
+                    $query->with(['user', 'reactions', 'replies' => function ($q) {
+                        $q->with(['user', 'reactions']);
+                    }])->orderBy('created_at', 'asc');
+                },
+            ])
             ->where('task_id', $taskId)
-            ->whereNull('parent_id') // Ne récupérer que les commentaires de premier niveau
+            ->whereNull('parent_id')
             ->orderBy('created_at', 'asc')
             ->get()
-            ->map(function($comment) {
-                // Charger les réponses imbriquées de manière récursive
-                $comment->load(['replies' => function($query) {
-                    $query->with(['user', 'replies' => function($q) {
-                        $q->with('user');
-                    }]);
-                }]);
+            ->map(function ($comment) use ($formatReactions) {
+                $formatReactions($comment);
+                $comment->replies->each(fn($reply) => $formatReactions($reply));
                 return $comment;
             });
-            
+
         return response()->json($comments);
     }
+
 
     // Ajoute un commentaire ou une réponse à une tâche
     public function store(Request $request, $taskId)
