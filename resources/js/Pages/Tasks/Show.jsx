@@ -247,25 +247,29 @@ const OnlineAvatarStack = ({ users }) => {
   const visible = users.slice(0, 4);
   const overflow = users.length - 4;
   return (
-    <div className="flex items-center gap-2 bg-white/15 dark:bg-black/25 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 shadow-inner">
-      <div className="flex -space-x-2.5">
+    <div className="flex items-center gap-1.5 bg-white/15 dark:bg-black/25 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20 shadow-inner flex-shrink-0">
+      <div className="flex -space-x-2 flex-shrink-0 items-center">
         {visible.map((u) => (
-          <div key={u.id} className="relative group" title={`${u.name} (En ligne)`}>
+          <div key={u.id} className="relative group flex-shrink-0 w-7 h-7" title={`${u.name} (En ligne)`}>
             <img
               src={u.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || '')}&background=ffffff&color=2563eb&size=32`}
               alt={u.name}
-              className="w-7.5 h-7.5 rounded-full border-2 border-blue-600 dark:border-blue-700 object-cover shadow-md transition-transform group-hover:scale-115 group-hover:z-10"
+              className="w-7 h-7 min-w-[28px] min-h-[28px] max-w-[28px] max-h-[28px] rounded-full border-2 border-blue-600 dark:border-blue-700 object-cover shadow-md transition-transform group-hover:scale-110 group-hover:z-10"
+              style={{ width: '28px', height: '28px', minWidth: '28px', minHeight: '28px' }}
             />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-blue-600 dark:border-blue-700 animate-pulse" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-blue-600 dark:border-blue-700 animate-pulse" />
           </div>
         ))}
         {overflow > 0 && (
-          <div className="w-7.5 h-7.5 rounded-full border-2 border-blue-600 bg-blue-800 flex items-center justify-center text-[10px] text-white font-bold">
+          <div
+            className="w-7 h-7 min-w-[28px] min-h-[28px] max-w-[28px] max-h-[28px] rounded-full border-2 border-blue-600 bg-blue-800 flex items-center justify-center text-[10px] text-white font-bold flex-shrink-0"
+            style={{ width: '28px', height: '28px', minWidth: '28px', minHeight: '28px' }}
+          >
             +{overflow}
           </div>
         )}
       </div>
-      <span className="text-xs text-blue-100 font-medium hidden sm:inline-block">
+      <span className="text-xs text-blue-100 font-medium hidden sm:inline-block whitespace-nowrap">
         {users.length} en ligne
       </span>
     </div>
