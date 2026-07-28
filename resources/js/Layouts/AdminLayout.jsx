@@ -354,36 +354,48 @@ export default function AdminLayout({ children }) {
       {sidebarOpen && <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
-        {/* Header */}
-        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white dark:bg-gray-800 bg-opacity-100 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 sm:px-6 z-40 transition-all duration-300">
-          <button 
-            className="md:hidden text-2xl mr-2 text-gray-600 dark:text-gray-200" 
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Ouvrir le menu"
-          >
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <div className="flex items-center">
-            <span className="text-xl md:text-2xl font-light tracking-wider text-gray-700 dark:text-white">
-              ProJA
-            </span>
-            <span className="ml-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-medium rounded-full border border-blue-100 dark:border-blue-800">
-              v1.0
-            </span>
+        {/* ═══════════════════════════════════════════════════════════
+            HEADER — Entièrement responsive (mobile / tablet / desktop)
+        ═══════════════════════════════════════════════════════════ */}
+        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300">
+
+          {/* ── Gauche : burger + logo ── */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Ouvrir le menu"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            {/* Logo — visible uniquement sur mobile (caché sur md+ car la sidebar prend le relais) */}
+            <div className="flex items-center gap-2 md:hidden">
+              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <span className="text-lg font-bold text-gray-800 dark:text-white tracking-wide">ProJA</span>
+            </div>
+
+            {/* Titre page (desktop uniquement) */}
+            <div className="hidden md:flex items-center gap-2">
+              <span className="text-xl font-light tracking-wider text-gray-700 dark:text-white">ProJA</span>
+              <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-semibold rounded-full border border-blue-100 dark:border-blue-800">
+                v1.0
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-4 dark:text-gray-200">
-            {/* Language Switcher */}
-            <div className="relative z-[60] group" ref={useRef(null)}>
-              <button 
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isChangingLanguage ? 'opacity-70 cursor-not-allowed' : ''}`}
+
+          {/* ── Droite : actions ── */}
+          <div className="flex items-center gap-1 sm:gap-2">
+
+            {/* ─── Sélecteur de langue ─── */}
+            <div className="relative" ref={useRef(null)}>
+              <button
+                className={`flex items-center justify-center gap-1.5 h-10 px-2 sm:px-3 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isChangingLanguage ? 'opacity-60 cursor-not-allowed' : ''}`}
                 onClick={() => !isChangingLanguage && setLanguageOpen(prev => !prev)}
-                onBlur={() => setTimeout(() => setLanguageOpen(false), 200)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') setLanguageOpen(false);
-                  if (e.key === 'ArrowDown' && !languageOpen) setLanguageOpen(true);
-                }}
                 aria-haspopup="true"
                 aria-expanded={languageOpen}
                 aria-label={t('change_language')}
@@ -391,104 +403,63 @@ export default function AdminLayout({ children }) {
                 title={t('change_language')}
               >
                 {isChangingLanguage ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span className="sr-only">{t('changing_language')}</span>
-                  </>
+                  <svg className="animate-spin h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
                 ) : (
                   <>
-                    <span className="fi" style={{ 
-                      backgroundImage: `url(https://flagcdn.com/24x18/${languages.find(lang => lang.code === currentLanguage)?.flag || 'gb'}.png)`,
-                      width: '20px',
-                      height: '15px',
-                      backgroundSize: 'cover',
-                      display: 'inline-block',
-                      borderRadius: '2px',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                    }} aria-hidden="true"></span>
-                    <span className="hidden sm:inline">
-                      {languages.find(lang => lang.code === currentLanguage)?.name || 'English'}
+                    <span
+                      style={{
+                        backgroundImage: `url(https://flagcdn.com/24x18/${languages.find(l => l.code === currentLanguage)?.flag || 'gb'}.png)`,
+                        width: '20px', height: '15px',
+                        backgroundSize: 'cover', display: 'inline-block',
+                        borderRadius: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                        flexShrink: 0,
+                      }}
+                      aria-hidden="true"
+                    />
+                    <span className="hidden sm:inline text-xs font-semibold">
+                      {languages.find(l => l.code === currentLanguage)?.code?.toUpperCase() || 'FR'}
                     </span>
-                    <span className="sr-only">{t('current_language')}: {languages.find(lang => lang.code === currentLanguage)?.name || 'English'}</span>
+                    <svg className={`w-3 h-3 transition-transform hidden sm:block ${languageOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
                   </>
                 )}
-                {!isChangingLanguage && (
-                  <svg 
-                    className={`w-4 h-4 transition-transform ${languageOpen ? 'transform rotate-180' : ''}`} 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                )}
               </button>
+
+              {/* Dropdown langue */}
               {languageOpen && (
-                <div 
-                  className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-[9999] border border-gray-200 dark:border-gray-700"
+                <div
+                  className="absolute right-0 mt-2 w-44 bg-white dark:bg-gray-800 rounded-xl shadow-xl py-1 z-[9999] border border-gray-100 dark:border-gray-700 ring-1 ring-black/5"
                   role="menu"
-                  aria-orientation="vertical"
-                  aria-labelledby="language-menu"
-                  onMouseEnter={() => setLanguageOpen(true)}
                   onMouseLeave={() => setLanguageOpen(false)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') setLanguageOpen(false);
-                  }}
                 >
-                  {languages.map((language) => (
-                    <button 
-                      key={language.code}
-                      onClick={() => changeLanguage(language.code)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          changeLanguage(language.code);
-                        }
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 ${
-                        currentLanguage === language.code 
-                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
-                          : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  {languages.map(lang => (
+                    <button
+                      key={lang.code}
+                      onClick={() => changeLanguage(lang.code)}
+                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${
+                        currentLanguage === lang.code
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
+                          : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                       role="menuitemradio"
-                      aria-checked={currentLanguage === language.code}
+                      aria-checked={currentLanguage === lang.code}
                       disabled={isChangingLanguage}
-                      tabIndex={0}
                     >
-                      <span 
-                        className="fi" 
-                        style={{ 
-                          backgroundImage: `url(https://flagcdn.com/24x18/${language.flag}.png)`,
-                          width: '20px',
-                          height: '15px',
-                          backgroundSize: 'cover',
-                          display: 'inline-block',
-                          borderRadius: '2px',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                        }}
-                        aria-hidden="true"
-                      ></span>
-                      <span>{language.name}</span>
-                      {currentLanguage === language.code && (
-                        <span className="ml-auto">
-                          <svg 
-                            className="w-4 h-4 text-blue-500" 
-                            fill="currentColor" 
-                            viewBox="0 0 20 20"
-                            aria-hidden="true"
-                          >
-                            <path 
-                              fillRule="evenodd" 
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" 
-                              clipRule="evenodd" 
-                            />
-                          </svg>
-                          <span className="sr-only">{t('selected')}</span>
-                        </span>
+                      <span style={{
+                        backgroundImage: `url(https://flagcdn.com/24x18/${lang.flag}.png)`,
+                        width: '20px', height: '15px', backgroundSize: 'cover',
+                        display: 'inline-block', borderRadius: '2px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)', flexShrink: 0,
+                      }} aria-hidden="true" />
+                      <span className="flex-1">{lang.name}</span>
+                      {currentLanguage === lang.code && (
+                        <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
                       )}
                     </button>
                   ))}
@@ -496,233 +467,215 @@ export default function AdminLayout({ children }) {
               )}
             </div>
 
-            {/* Notifications internes */}
+            {/* ─── Cloche notifications ─── */}
             <div className="relative">
-              <button className="relative" title="Notifications internes" onClick={() => setNotifDropdown(d => !d)}>
-                <svg className="w-7 h-7 text-gray-600 dark:text-gray-200" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-                {notifCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 animate-pulse">{notifCount}</span>}
+              <button
+                className="relative flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Notifications"
+                onClick={() => { setNotifDropdown(d => !d); setProfileDropdown(false); setLanguageOpen(false); }}
+                aria-label="Notifications"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {notifCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 shadow animate-pulse">
+                    {notifCount > 99 ? '99+' : notifCount}
+                  </span>
+                )}
               </button>
+
+              {/* Dropdown notifications */}
               {notifDropdown && (
-                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded shadow-lg z-50 max-h-96 overflow-y-auto">
-                  <div className="p-4 border-b font-bold text-blue-700 dark:text-blue-200">Notifications</div>
-                  <ul>
-                    {notifications.length === 0 && <li className="p-4 text-gray-500 dark:text-gray-300">Aucune notification</li>}
-                    {notifications.slice(0, 5).map(n => {
-                      // Extraire l'ID utilisateur du message si présent
-                      const userIdMatch = n.message.match(/User #(\d+)/);
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                      </svg>
+                      <span className="font-bold text-blue-700 dark:text-blue-200 text-sm">Notifications</span>
+                    </div>
+                    {notifCount > 0 && (
+                      <span className="px-2 py-0.5 bg-blue-600 text-white text-xs font-bold rounded-full">{notifCount}</span>
+                    )}
+                  </div>
+                  <ul className="max-h-80 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700">
+                    {notifications.length === 0 && (
+                      <li className="flex flex-col items-center justify-center py-10 text-gray-400 dark:text-gray-500">
+                        <svg className="w-10 h-10 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z" />
+                        </svg>
+                        <span className="text-sm">Aucune notification</span>
+                      </li>
+                    )}
+                    {notifications.slice(0, 6).map(n => {
                       let message = n.message;
-                      
-                      // Remplacer l'ID utilisateur par le nom si disponible
-                      if (userIdMatch && userIdMatch[1] && n.data?.user) {
-                        message = message.replace(`User #${userIdMatch[1]}`, n.data.user.name || `Utilisateur #${userIdMatch[1]}`);
+                      const match = n.message.match(/User #(\d+)/);
+                      if (match && n.data?.user) {
+                        message = message.replace(`User #${match[1]}`, n.data.user.name || `#${match[1]}`);
                       }
-                      
                       return (
                         <li
                           key={n.id}
-                          className={`p-4 border-b last:border-b-0 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 ${!n.read_at ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
-                          onClick={() => {
-                            setSelectedNotif(n);
-                            setNotifDropdown(false);
-                            if (n.url) {
-                              window.location.href = n.url;
-                            }
-                          }}
+                          className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors ${!n.read_at ? 'bg-blue-50/60 dark:bg-blue-900/10' : ''}`}
+                          onClick={() => { setSelectedNotif(n); setNotifDropdown(false); if (n.url) window.location.href = n.url; }}
                         >
-                          <div className="flex items-start">
-                            <div className="flex-shrink-0 pt-0.5">
-                              <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </div>
-                            <div className="ml-3 flex-1">
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                {message}
-                              </p>
-                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                {new Date(n.created_at).toLocaleString('fr-FR', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </p>
-                            </div>
+                          <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${!n.read_at ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-800 dark:text-gray-100 line-clamp-2">{message}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                              {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </p>
                           </div>
                         </li>
                       );
                     })}
                   </ul>
-                  <div className="p-2 text-center border-t">
-                    <Link href="/activities" className="text-blue-700 hover:underline font-semibold">Voir tout le journal d'activité</Link>
+                  <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <Link href="/activities" className="flex items-center justify-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+                      Voir toutes les activités
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                    </Link>
                   </div>
                 </div>
               )}
-              {/* Détail notification */}
+
+              {/* Modal détail notification */}
               {selectedNotif && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                  <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg w-full max-w-md p-6 relative animate-fade-in">
-                    <button onClick={() => setSelectedNotif(null)} className="absolute top-2 right-3 text-2xl text-gray-400 hover:text-gray-700">&times;</button>
-                    <h2 className="text-xl font-bold mb-2 text-blue-700 dark:text-blue-200">Détail de la notification</h2>
-                    <div className="mb-4">
-                      <div className="flex items-center mb-2">
-                        <div className="flex-shrink-0">
-                          <svg className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </div>
-                        <h3 className="ml-2 text-lg font-semibold text-gray-900 dark:text-white">
-                          {(() => {
-                            let message = selectedNotif.message;
-                            if (selectedNotif.data?.user) {
-                              message = message.replace(/User #(\d+)/, selectedNotif.data.user.name || 'Utilisateur');
-                            }
-                            return message;
-                          })()}
-                        </h3>
-                      </div>
-                      <div className="ml-8">
-                        <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                          {new Date(selectedNotif.created_at).toLocaleString('fr-FR', {
-                            weekday: 'long',
-                            day: '2-digit',
-                            month: 'long',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                        
-                        {selectedNotif.data && (
-                          <div className="mt-4">
-                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Détails :</h4>
-                            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-sm">
-                              {selectedNotif.data.user && (
-                                <p className="mb-1">
-                                  <span className="font-medium text-gray-700 dark:text-gray-300">Utilisateur :</span>{' '}
-                                  <span className="text-gray-900 dark:text-white">
-                                    {selectedNotif.data.user.name || 'Inconnu'}
-                                    {selectedNotif.data.user.email ? ` (${selectedNotif.data.user.email})` : ''}
-                                  </span>
-                                </p>
-                              )}
-                              {selectedNotif.data.subject && (
-                                <p className="mb-1">
-                                  <span className="font-medium text-gray-700 dark:text-gray-300">Sujet :</span>{' '}
-                                  <span className="text-gray-900 dark:text-white">{selectedNotif.data.subject}</span>
-                                </p>
-                              )}
-                              {selectedNotif.data.changes && (
-                                <div className="mt-2">
-                                  <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Modifications :</p>
-                                  <ul className="space-y-1">
-                                    {Object.entries(selectedNotif.data.changes).map(([key, value]) => (
-                                      <li key={key} className="flex">
-                                        <span className="font-medium text-gray-700 dark:text-gray-300 w-1/3">{key} :</span>
-                                        <span className="text-gray-900 dark:text-white flex-1">
-                                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                        </span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedNotif(null)}>
+                  <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 relative" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setSelectedNotif(null)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                    <h2 className="text-lg font-bold mb-4 text-blue-700 dark:text-blue-300 pr-8">Détail de la notification</h2>
+                    <p className="text-sm text-gray-800 dark:text-gray-100 mb-2">
+                      {(() => {
+                        let msg = selectedNotif.message;
+                        if (selectedNotif.data?.user) msg = msg.replace(/User #(\d+)/, selectedNotif.data.user.name || 'Utilisateur');
+                        return msg;
+                      })()}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+                      {new Date(selectedNotif.created_at).toLocaleString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    {selectedNotif.data && (
+                      <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-sm space-y-1">
+                        {selectedNotif.data.user && (
+                          <p><span className="font-medium text-gray-600 dark:text-gray-300">Utilisateur : </span><span className="text-gray-900 dark:text-white">{selectedNotif.data.user.name}</span></p>
+                        )}
+                        {selectedNotif.data.subject && (
+                          <p><span className="font-medium text-gray-600 dark:text-gray-300">Sujet : </span><span className="text-gray-900 dark:text-white">{selectedNotif.data.subject}</span></p>
                         )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
-            {/* Dark mode toggle */}
-            <button 
-              className="ml-2 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
-              onClick={() => setDarkMode(dm => !dm)} 
-              aria-label={darkMode ? "Désactiver le mode sombre" : "Activer le mode sombre"}
-              title={darkMode ? "Désactiver le mode sombre" : "Activer le mode sombre"}
+
+            {/* ─── Toggle Dark / Light ─── */}
+            <button
+              className="flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => setDarkMode(dm => !dm)}
+              aria-label={darkMode ? 'Désactiver le mode sombre' : 'Activer le mode sombre'}
+              title={darkMode ? 'Désactiver le mode sombre' : 'Activer le mode sombre'}
             >
               {darkMode ? (
-                <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m8.66-13.66l-.71.71M4.05 19.95l-.71.71M21 12h-1M4 12H3m16.66 5.66l-.71-.71M4.05 4.05l-.71-.71M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5 text-gray-600 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-gray-500 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
               )}
             </button>
-            {/* Profil & menu */}
+
+            {/* ─── Profil utilisateur ─── */}
             <div className="relative" ref={profileRef}>
-              <button className="flex items-center gap-2 focus:outline-none" onClick={() => setProfileDropdown(d => !d)}>
-                <img src={avatarUrl} alt="avatar" className="w-9 h-9 rounded-full border-2 border-blue-400 shadow" />
-                <span className="text-gray-600 dark:text-gray-200 font-medium">{userName}</span>
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+              <button
+                className="flex items-center gap-2 h-10 pl-1 pr-2 sm:pr-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                onClick={() => { setProfileDropdown(d => !d); setNotifDropdown(false); setLanguageOpen(false); }}
+                aria-label="Menu profil"
+              >
+                <div className="relative flex-shrink-0">
+                  <img
+                    src={avatarUrl}
+                    alt={userName}
+                    className="w-8 h-8 rounded-full border-2 border-blue-400 object-cover shadow-sm"
+                  />
+                  {/* Point "en ligne" */}
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 border-2 border-white dark:border-gray-800 rounded-full"></span>
+                </div>
+                {/* Nom uniquement sur sm+ */}
+                <div className="hidden sm:flex flex-col items-start leading-tight max-w-[120px]">
+                  <span className="text-xs font-semibold text-gray-800 dark:text-gray-100 truncate w-full">{userName}</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500 capitalize">{isAdmin ? 'Admin' : 'Membre'}</span>
+                </div>
+                <svg className="w-3.5 h-3.5 text-gray-400 hidden sm:block flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
+
+              {/* Dropdown profil */}
               {profileDropdown && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded shadow-lg z-50">
-                  <Link href="/profile" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  {/* Header du menu */}
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{userName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{isAdmin ? '👑 Administrateur' : '👤 Membre'}</p>
+                  </div>
+
+                  <div className="py-1">
+                    <Link href="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                       Mon profil
-                    </div>
-                  </Link>
-                  <Link href="/profile" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    </Link>
+                    <Link href="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                       Paramètres
-                    </div>
-                  </Link>
-                  {isAdmin && (
-                    <Link 
-                      href="/admin/subscription-plans" 
-                      className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200"
-                    >
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    </Link>
+                    {isAdmin && (
+                      <Link href="/admin/subscription-plans" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
-                        Gestion des abonnements
-                      </div>
-                    </Link>
-                  )}
-                  <Link href="/subscription/plans" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 3v2m3-2v2m3-2v2m3-2v2m3-2v2m-18 8h18M7 17v-2m3 2v-2m3 2v-2m3 2v-2m3 2v-2" />
+                        Gestion abonnements
+                        <span className="ml-auto text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full font-bold">Admin</span>
+                      </Link>
+                    )}
+                    <Link href="/subscription/plans" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                       </svg>
                       Mon abonnement
-                    </div>
-                  </Link>
-                  <Link href="/remunerations/dashboard" className="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200">
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    </Link>
+                    <Link href="/remunerations/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Mes rémunérations
-                    </div>
-                  </Link>
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-                  <Link 
-                    href="/logout" 
-                    method="post" 
-                    as="button" 
-                    className="block w-full text-left px-4 py-3 text-red-700 dark:text-red-200 hover:bg-red-50 dark:hover:bg-red-900"
-                  >
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    </Link>
+                  </div>
+
+                  <div className="border-t border-gray-100 dark:border-gray-700">
+                    <Link
+                      href="/logout"
+                      method="post"
+                      as="button"
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                       </svg>
                       Déconnexion
-                    </div>
-                  </Link>
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
