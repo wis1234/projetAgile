@@ -5,6 +5,7 @@ use App\Models\TaskComment;
 use App\Models\TaskCommentReaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Events\CommentReactionUpdated;
 
 class TaskCommentReactionController extends Controller
 {
@@ -51,9 +52,14 @@ class TaskCommentReactionController extends Controller
             $action = 'added';
         }
 
+        $summary = $this->getReactionsSummary($commentId);
+
+        broadcast(new CommentReactionUpdated((int) $taskId, (int) $commentId, $summary))
+            ->toOthers();
+
         return response()->json([
             'action'    => $action,
-            'reactions' => $this->getReactionsSummary($commentId),
+            'reactions' => $summary,
         ]);
     }
 

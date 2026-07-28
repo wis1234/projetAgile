@@ -707,6 +707,23 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     }
   };
 
+// ─── Construit la map des réactions à partir de reactions_summary renvoyé par le serveur ───
+const buildReactionsMap = (commentsList) => {
+  const map = {};
+  const walk = (list) => {
+    list.forEach(c => {
+      if (c.reactions_summary && Object.keys(c.reactions_summary).length > 0) {
+        map[c.id] = {};
+        Object.entries(c.reactions_summary).forEach(([emoji, data]) => {
+          map[c.id][emoji] = data.user_ids;
+        });
+      }
+      if (c.replies?.length) walk(c.replies);
+    });
+  };
+  walk(commentsList);
+  return map;
+};
 
 // ─── Génère un ID temporaire unique ───
 const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -987,6 +1004,7 @@ const retryComment = async (failedComment) => {
       }));
       
       setComments(processedComments);
+      setReactions(prev => ({ ...buildReactionsMap(processedComments), ...prev }));
     } catch (error) {
       console.error('Erreur:', error);
       setError('Impossible de charger les commentaires');
@@ -1310,6 +1328,14 @@ const handleReplyComment = (commentId) => {
           else commentReactions[e.emoji] = userIds;
           return { ...prev, [e.commentId]: commentReactions };
         });
+      })
+      .listen('.comment.reaction.updated', (e) => {
+        if (!e?.commentId || !e?.reactions) return;
+        const converted = {};
+        Object.entries(e.reactions).forEach(([emoji, data]) => {
+          converted[emoji] = data.user_ids;
+        });
+        setReactions(prev => ({ ...prev, [e.commentId]: converted }));
       });
 
     presenceChannelRef.current = presenceChannel;
