@@ -108,6 +108,8 @@ Route::prefix('push')->group(function () {
 
     //LiveKit Routes
     Route::middleware(['auth'])->post('/tasks/{task}/livekit-token', [LiveKitController::class, 'livekitToken']);
+    Route::middleware(['auth'])->post('/projects/{project}/livekit-token', [LiveKitController::class, 'livekitTokenForProject']);
+    
 
 
     // Routes Zoom

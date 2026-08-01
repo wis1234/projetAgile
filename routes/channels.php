@@ -30,3 +30,11 @@ Broadcast::channel('task.{taskId}.comments', function ($user, $taskId) {
 
     return false;
 });
+
+Broadcast::channel('presence-project.{projectId}', function ($user, $projectId) {
+    $project = \App\Models\Project::find($projectId);
+    if (!$project) return false;
+    $isMember = $project->users()->where('users.id', $user->id)->exists();
+    if (!$isMember) return false;
+    return ['id' => $user->id, 'name' => $user->name, 'profile_photo_url' => $user->profile_photo_url];
+});

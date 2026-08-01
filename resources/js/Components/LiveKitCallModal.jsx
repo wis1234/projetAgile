@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import { FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash } from 'react-icons/fa';
 
-export default function LiveKitCallModal({ task, onClose }) {
+export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [micEnabled, setMicEnabled] = useState(true);
@@ -17,7 +17,7 @@ export default function LiveKitCallModal({ task, onClose }) {
 
     const connect = async () => {
       try {
-        const res = await fetch(`/tasks/${task.id}/livekit-token`, {
+        const res = await fetch(tokenEndpoint, {
           method: 'POST',
           headers: {
             'X-Requested-With': 'XMLHttpRequest',
@@ -60,7 +60,7 @@ export default function LiveKitCallModal({ task, onClose }) {
     return () => {
       activeRoom?.disconnect();
     };
-  }, [task.id]);
+}, [tokenEndpoint]);
 
   useEffect(() => {
     participants.forEach(p => {
@@ -102,7 +102,7 @@ export default function LiveKitCallModal({ task, onClose }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 bg-slate-900 text-white">
-        <span className="font-semibold">Appel LiveKit — {task.title}</span>
+        <span className="font-semibold">Appel LiveKit — {title}</span> 
         <button onClick={handleLeave} className="text-white/80 hover:text-white">
           <FaTimes className="w-5 h-5" />
         </button>

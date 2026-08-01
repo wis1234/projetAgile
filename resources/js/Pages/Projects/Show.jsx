@@ -15,6 +15,7 @@ import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
 import Modal from '../../Components/Modal';
 import ZoomMeeting from '../../Components/ZoomMeeting';
+import LiveKitCallModal from '@/Components/LiveKitCallModal';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const getStatusInfo = (status, t) => {
@@ -289,6 +290,32 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
   const [consentErrors, setConsentErrors] = useState({});
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showZoomModal, setShowZoomModal] = useState(false);
+  const [showLiveKitCall, setShowLiveKitCall] = useState(false);
+  const [liveKitInvite, setLiveKitInvite] = useState(null);
+  const presenceChannelRef = React.useRef(null);
+
+
+
+  useEffect(() => {
+  if (!window.Echo || !project?.id || !auth?.user) return;
+
+  const presenceChannel = window.Echo.join(`presence-project.${project.id}`)
+    .listenForWhisper('livekit-call-started', (e) => {
+      if (e.initiatorId === auth.user.id) return;
+      setLiveKitInvite({ initiatorName: e.initiatorName, initiatorId: e.initiatorId });
+    })
+    .listenForWhisper('livekit-call-ended', () => {
+      setLiveKitInvite(null);
+    });
+
+  presenceChannelRef.current = presenceChannel;
+
+  return () => {
+    window.Echo.leave(`presence-project.${project.id}`);
+    presenceChannelRef.current = null;
+  };
+}, [project?.id, auth?.user?.id]);
+
 
   const userRoles = Array.isArray(auth?.user?.roles) ? auth.user.roles : [];
   const isAdmin = userRoles.includes('admin');
@@ -424,7 +451,34 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
         </div>
 
         {/* Bandeau de statut Zoom : compact, pleine largeur, ouvre le modal au clic */}
+{/* Bandeau de statut Zoom : compact, pleine largeur, ouvre le modal au clic */}
         <ZoomStatusBar project={project} onOpen={() => setShowZoomModal(true)} />
+
+        {/* Bandeau appel LiveKit (jusqu'à ~100 participants) */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 shadow-sm flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-600">
+              <FaVideo className="text-white text-sm" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-gray-900 dark:text-white text-sm">Appel vidéo LiveKit</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Jusqu'à 100 participants simultanés</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setShowLiveKitCall(true);
+              presenceChannelRef.current?.whisper('livekit-call-started', {
+                initiatorId: auth.user.id,
+                initiatorName: auth.user.name,
+              });
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition flex-shrink-0"
+          >
+            <FaVideo className="text-xs" /> Démarrer / Rejoindre
+          </button>
+        </div>
+
 
         {/* Grille 2 colonnes */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -775,6 +829,30 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
           <ZoomMeeting project={project} />
         </div>
       </Modal>
+      {showLiveKitCall && (
+        <LiveKitCallModal
+          tokenEndpoint={`/projects/${project.id}/livekit-token`}
+          title={project.name}
+          onClose={() => {
+            setShowLiveKitCall(false);
+            presenceChannelRef.current?.whisper('livekit-call-ended', { initiatorId: auth.user.id });
+          }}
+        />
+      )}
+      {liveKitInvite && !showLiveKitCall && (
+        <div className="fixed bottom-6 right-6 z-40 bg-emerald-600 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-sm font-medium">{liveKitInvite.initiatorName} a démarré un appel LiveKit</span>
+          <button
+            onClick={() => { setShowLiveKitCall(true); setLiveKitInvite(null); }}
+            className="bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-emerald-50"
+          >
+            Rejoindre
+          </button>
+          <button onClick={() => setLiveKitInvite(null)} className="text-white/70 hover:text-white text-xs">
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }

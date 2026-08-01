@@ -3376,8 +3376,10 @@ return () => {
         </Modal>
        {showLiveKitCall && (
   <LiveKitCallModal
-    task={task}
+    tokenEndpoint={`/tasks/${task.id}/livekit-token`}
+    title={task.title}
     onClose={() => {
+      
       setShowLiveKitCall(false);
       presenceChannelRef.current?.whisper('livekit-call-ended', { initiatorId: auth.user.id });
     }}
