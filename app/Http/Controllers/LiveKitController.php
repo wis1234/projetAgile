@@ -7,6 +7,8 @@ use App\Models\Task;
 use Agence104\LiveKit\AccessToken;
 use Agence104\LiveKit\AccessTokenOptions;
 use Agence104\LiveKit\VideoGrant;
+use Agence104\LiveKit\RoomServiceClient;
+
 
 class LiveKitController extends Controller
 {
@@ -95,5 +97,50 @@ public function notifyCallAnswered(Request $request, \App\Models\Project $projec
     event(new \App\Events\LiveKitCallAnswered($project->id, $memberIds));
     return response()->json(['status' => 'ok']);
 }
+
+
+private function getRoomService()
+{
+    return new RoomServiceClient(
+        config('services.livekit.url'),
+        config('services.livekit.key'),
+        config('services.livekit.secret')
+    );
+}
+
+public function callStatus(Request $request, \App\Models\Project $project)
+{
+    $roomName = 'project-' . $project->id;
+    try {
+        $participants = $this->getRoomService()->listParticipants($roomName);
+        $active = count($participants) > 0;
+    } catch (\Exception $e) {
+        $active = false;
+    }
+    return response()->json(['active' => $active]);
+}
+
+public function joinOrStartCall(Request $request, \App\Models\Project $project)
+{
+    $user = $request->user();
+    $roomName = 'project-' . $project->id;
+
+    try {
+        $participants = $this->getRoomService()->listParticipants($roomName);
+        $alreadyActive = count($participants) > 0;
+    } catch (\Exception $e) {
+        $alreadyActive = false;
+    }
+
+    if (!$alreadyActive) {
+        $memberIds = $project->users()->pluck('users.id')->toArray();
+        event(new \App\Events\LiveKitCallStarted(
+            $project->id, $project->name, $user->id, $user->name, $memberIds
+        ));
+    }
+
+    return response()->json(['alreadyActive' => $alreadyActive]);
+}
+
 
 }

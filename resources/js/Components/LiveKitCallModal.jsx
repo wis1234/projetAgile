@@ -11,7 +11,7 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [micEnabled, setMicEnabled] = useState(true);
-  const [camEnabled, setCamEnabled] = useState(true);
+  const [camEnabled, setCamEnabled] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState('');
@@ -114,15 +114,9 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
           } catch (e) { /* ignore */ }
         });
 
-        await activeRoom.connect(url, token);
+       await activeRoom.connect(url, token);
         await activeRoom.localParticipant.setMicrophoneEnabled(true);
-        await activeRoom.localParticipant.setCameraEnabled(true);
-
-        const camPub = [...activeRoom.localParticipant.videoTrackPublications.values()]
-          .find(pub => pub.source === Track.Source.Camera);
-        if (camPub?.track && localVideoRef.current) {
-          camPub.track.attach(localVideoRef.current);
-        }
+        // Caméra désactivée par défaut — l'utilisateur l'active manuellement s'il le souhaite
 
         const initialParticipants = [...activeRoom.remoteParticipants.values()];
         setParticipants(initialParticipants);
@@ -150,11 +144,11 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
   }, [tokenEndpoint]);
 
   // ─── Gère le passage "en attente" → "appel démarré" ─────────────────
-  useEffect(() => {
+useEffect(() => {
     if (connecting) return;
 
     if (participants.length === 0) {
-      startRingback();
+      if (!callStarted) startRingback(); // ne sonne que si l'appel n'a jamais vraiment démarré
       return;
     }
 
@@ -339,7 +333,7 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
             /* ─── EN ATTENTE : personne d'autre encore présent ─── */
             <div className="h-full flex flex-col items-center justify-center gap-4 text-white">
               <div className="w-40 h-40 rounded-2xl overflow-hidden bg-black border border-slate-700 relative">
-                <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
+                <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
               </div>
               <div className="flex items-center gap-2 text-slate-300">
                 <span className="relative flex h-2.5 w-2.5">
@@ -360,7 +354,7 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
               </div>
               <div className="flex gap-2 overflow-x-auto flex-shrink-0 pb-1">
                 <div className="w-32 h-20 rounded-xl overflow-hidden bg-black border border-slate-700 flex-shrink-0 relative">
-                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
+                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
                   <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded">Vous</span>
                 </div>
                 {participants.map(p => (
@@ -378,8 +372,12 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
             </div>
           ) : (
             <div className="h-full p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto content-start">
-              <div className="rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video relative">
-                <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
+              <div className="rounded-2xl overflow-hidden bg-slate-800 border border-slate-800 aspect-video relative flex items-center justify-center">
+                {camEnabled ? (
+                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
+                ) : (
+                  <FaVideoSlash className="text-slate-500 text-3xl" />
+                )}
                 <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs font-semibold rounded flex items-center gap-1.5">
                   Vous {!micEnabled && <FaMicrophoneSlash className="w-3 h-3 text-red-400" />}
                 </div>

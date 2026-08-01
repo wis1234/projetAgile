@@ -291,6 +291,15 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
+  const [callActive, setCallActive] = useState(false);
+
+  useEffect(() => {
+    fetch(`/projects/${project.id}/livekit-call/status`)
+      .then(res => res.json())
+      .then(data => setCallActive(!!data.active))
+      .catch(() => {});
+  }, [project.id]);
+
 
   const userRoles = Array.isArray(auth?.user?.roles) ? auth.user.roles : [];
   const isAdmin = userRoles.includes('admin');
@@ -440,21 +449,24 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Jusqu'à 100 participants simultanés</p>
             </div>
           </div>
-          <button
-onClick={() => {
-  setShowLiveKitCall(true);
-  fetch(`/projects/${project.id}/livekit-call/notify`, {
-    method: 'POST',
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-    },
-  }).catch(err => console.error('Erreur notification appel:', err));
-}}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition flex-shrink-0"
-          >
-            <FaVideo className="text-xs" /> Démarrer / Rejoindre
-          </button>
+         <button
+  onClick={() => {
+    setShowLiveKitCall(true);
+    fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+      },
+    })
+      .then(res => res.json())
+      .then(data => setCallActive(true))
+      .catch(err => console.error('Erreur appel:', err));
+  }}
+  className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition flex-shrink-0"
+>
+  <FaVideo className="text-xs" /> {callActive ? 'Rejoindre l’appel en cours' : 'Démarrer / Rejoindre'}
+</button>
         </div>
 
 
@@ -820,9 +832,12 @@ onClick={() => {
         },
       }).catch(() => {});
     }}
-    onClose={() => {
-      
+onClose={() => {
   setShowLiveKitCall(false);
+  fetch(`/projects/${project.id}/livekit-call/status`)
+    .then(res => res.json())
+    .then(data => setCallActive(!!data.active))
+    .catch(() => {});
   fetch(`/projects/${project.id}/livekit-call/end`, {
     method: 'POST',
     headers: {
