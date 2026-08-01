@@ -8,6 +8,7 @@ import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
 // Ajout de FaSave à la liste des icônes importées
 import { FaSave, FaTimes } from 'react-icons/fa';
+import LiveKitCallModal from '@/Components/LiveKitCallModal';
 
 // Composant de compte à rebours réutilisable
 const formatTimeUnit = (value, label) => (
@@ -1105,6 +1106,7 @@ const retryComment = async (failedComment) => {
 
   const [activeTab, setActiveTab] = useState('details');
   const activeTabRef = useRef(activeTab);
+  const [showLiveKitCall, setShowLiveKitCall] = useState(false);
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
@@ -2698,9 +2700,19 @@ return () => {
               >
                 <FaVideo /> {callState === 'in-call' ? 'Terminer l’appel' : 'Démarrer appel natif'}
               </button>
+              
             )}
           </div>
         )}
+
+    <button
+  type="button"
+  onClick={() => setShowLiveKitCall(true)}
+  className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-300/30 text-white text-xs font-semibold px-3 py-2 transition"
+>
+  <FaVideo /> Appel LiveKit
+</button>
+
 
         <label
           className="flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none border border-white/15"
@@ -3345,6 +3357,9 @@ return () => {
             </div>
           </div>
         </Modal>
+        {showLiveKitCall && (
+          <LiveKitCallModal task={task} onClose={() => setShowLiveKitCall(false)} />
+        )}
       </div>
     </div>
   );

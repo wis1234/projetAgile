@@ -15,6 +15,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskCommentReactionController;
 use App\Models\User;
 use App\Notifications\ProjaNotification;
+use app\Http\Controllers\LiveKitController;
 
 
 
@@ -105,6 +106,10 @@ Route::prefix('push')->group(function () {
     ])->name('push.test');
 
 });
+
+    //LiveKit Routes
+    Route::middleware(['auth'])->post('/tasks/{task}/livekit-token', [LiveKitController::class, 'livekitToken']);
+
 
     // Routes Zoom
     Route::prefix('projects/{project}')->group(function () {

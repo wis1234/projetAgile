@@ -55,4 +55,11 @@ return [
         'default_user_email' => env('ZOOM_DEFAULT_USER_EMAIL'),
     ],
 
+    'livekit' => [
+    'key' => env('LIVEKIT_API_KEY'),
+    'secret' => env('LIVEKIT_API_SECRET'),
+    'url' => env('LIVEKIT_URL'),
+],
+
+
 ];
