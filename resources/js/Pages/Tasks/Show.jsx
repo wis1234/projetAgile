@@ -1105,10 +1105,9 @@ const retryComment = async (failedComment) => {
 
 const [activeTab, setActiveTab] = useState('details');
 
-  useEffect(() => {
-    if (activeTab !== 'comments') return;
-    initializeNativeCall();
-  }, [activeTab, initializeNativeCall]);
+useEffect(() => {
+  initializeNativeCall();
+}, [initializeNativeCall]);
 
   const startNativeCall = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -1127,7 +1126,8 @@ const [activeTab, setActiveTab] = useState('details');
       setLocalStream(stream);
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
-      const callId = `task-${task.id}-call-${Date.now()}`;
+const callId = `task-${task.id}-call-${Date.now()}`;
+      currentCallIdRef.current = callId;
       setCurrentCallId(callId);
       setIsCallActive(true);
       setCallState('ringing');
