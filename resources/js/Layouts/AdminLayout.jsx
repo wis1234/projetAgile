@@ -6,6 +6,18 @@ import { useTranslation } from 'react-i18next';
 import GlobalFooter from '@/Components/GlobalFooter';
 import PushNotificationManager from '@/Components/PushNotificationManager';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
+const getFreshCsrfToken = async () => {
+  try {
+    const res = await fetch('/csrf-token', { credentials: 'include' });
+    const data = await res.json();
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    if (metaTag) metaTag.setAttribute('content', data.token);
+    return data.token;
+  } catch {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  }
+};
+
 
 const navLinks = [
   { href: '/dashboard', label: 'dashboard', icon: (
@@ -800,23 +812,25 @@ channel.listen('.livekit.call.ended', () => {
         <LiveKitCallModal
           tokenEndpoint={`/projects/${liveKitInvite.projectId}/livekit-token`}
           title={liveKitInvite.projectName}
-          onAnswered={() => {
+          onAnswered={async () => {
+            const csrfToken = await getFreshCsrfToken();
             fetch(`/projects/${liveKitInvite.projectId}/livekit-call/answered`, {
               method: 'POST',
               headers: {
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN': csrfToken,
               },
             }).catch(() => {});
           }}
-          onClose={() => {
+          onClose={async () => {
             setShowLiveKitCall(false);
             setLiveKitInvite(null);
+            const csrfToken = await getFreshCsrfToken();
             fetch(`/projects/${liveKitInvite.projectId}/livekit-call/end`, {
               method: 'POST',
               headers: {
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN': csrfToken,
               },
             }).catch(() => {});
           }}
