@@ -1237,7 +1237,10 @@ const callId = `task-${task.id}-call-${Date.now()}`;
   };
 
   const createOfferForAllParticipants = async (stream, callId) => {
-    const participants = [...onlineUsers.filter(u => u.id !== auth.user.id)];
+
+  const projectUsers = task?.project?.users || [];
+  const participants = projectUsers.filter(u => u.id !== auth.user.id);
+
     if (participants.length === 0) {
       setCallState('in-call');
       return;
