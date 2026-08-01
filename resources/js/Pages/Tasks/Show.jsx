@@ -1101,6 +1101,10 @@ const retryComment = async (failedComment) => {
     };
   }, [task?.id, auth.user.id]);
 
+  
+
+const [activeTab, setActiveTab] = useState('details');
+
   useEffect(() => {
     if (activeTab !== 'comments') return;
     initializeNativeCall();
@@ -1403,8 +1407,6 @@ const handleReplyComment = (commentId) => {
     return descriptionMap[reason] || 'Cette tâche est effectuée sans rémunération.';
   };
 
-  // Récupérer l'onglet actif depuis le stockage local ou utiliser 'details' par défaut
-  const [activeTab, setActiveTab] = useState('details');
 
   // Charger l'onglet sauvegardé après le montage du composant
   useEffect(() => {
