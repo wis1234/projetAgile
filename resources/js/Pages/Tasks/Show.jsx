@@ -1107,6 +1107,7 @@ const retryComment = async (failedComment) => {
   const [activeTab, setActiveTab] = useState('details');
   const activeTabRef = useRef(activeTab);
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
+  const [liveKitInvite, setLiveKitInvite] = useState(null); // { initiatorName, initiatorId }
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
@@ -1584,6 +1585,15 @@ return () => {
           return { ...prev, [e.commentId]: commentReactions };
         });
       })
+
+      .listenForWhisper('livekit-call-started', (e) => {
+        if (e.initiatorId === auth.user.id) return;
+        setLiveKitInvite({ initiatorName: e.initiatorName, initiatorId: e.initiatorId });
+      })
+      .listenForWhisper('livekit-call-ended', () => {
+        setLiveKitInvite(null);
+      })
+
       .listen('.comment.reaction.updated', (e) => {
         if (!e?.commentId || !e?.reactions) return;
         const converted = {};
@@ -2705,9 +2715,16 @@ return () => {
           </div>
         )}
 
-    <button
+<button
   type="button"
-  onClick={() => setShowLiveKitCall(true)}
+  onClick={() => {
+    setShowLiveKitCall(true);
+    presenceChannelRef.current?.whisper('livekit-call-started', {
+      initiatorId: auth.user.id,
+      initiatorName: auth.user.name,
+    });
+  }}
+
   className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-300/30 text-white text-xs font-semibold px-3 py-2 transition"
 >
   <FaVideo /> Appel LiveKit
@@ -3357,9 +3374,30 @@ return () => {
             </div>
           </div>
         </Modal>
-        {showLiveKitCall && (
-          <LiveKitCallModal task={task} onClose={() => setShowLiveKitCall(false)} />
-        )}
+       {showLiveKitCall && (
+  <LiveKitCallModal
+    task={task}
+    onClose={() => {
+      setShowLiveKitCall(false);
+      presenceChannelRef.current?.whisper('livekit-call-ended', { initiatorId: auth.user.id });
+    }}
+  />
+)}
+{liveKitInvite && !showLiveKitCall && (
+  <div className="fixed bottom-6 right-6 z-40 bg-emerald-600 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3">
+    <span className="text-sm font-medium">{liveKitInvite.initiatorName} a démarré un appel LiveKit</span>
+    <button
+      onClick={() => { setShowLiveKitCall(true); setLiveKitInvite(null); }}
+      className="bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-emerald-50"
+    >
+      Rejoindre
+    </button>
+    <button onClick={() => setLiveKitInvite(null)} className="text-white/70 hover:text-white text-xs">
+      ✕
+    </button>
+  </div>
+)}
+
       </div>
     </div>
   );
