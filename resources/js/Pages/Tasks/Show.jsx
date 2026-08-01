@@ -2727,7 +2727,7 @@ return () => {
 
   className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-300/30 text-white text-xs font-semibold px-3 py-2 transition"
 >
-  <FaVideo /> Appel LiveKit
+<FaVideo /> Appel ProJA
 </button>
 
 
@@ -3379,7 +3379,7 @@ return () => {
     tokenEndpoint={`/tasks/${task.id}/livekit-token`}
     title={task.title}
     onClose={() => {
-      
+
       setShowLiveKitCall(false);
       presenceChannelRef.current?.whisper('livekit-call-ended', { initiatorId: auth.user.id });
     }}
@@ -3387,7 +3387,7 @@ return () => {
 )}
 {liveKitInvite && !showLiveKitCall && (
   <div className="fixed bottom-6 right-6 z-40 bg-emerald-600 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3">
-    <span className="text-sm font-medium">{liveKitInvite.initiatorName} a démarré un appel LiveKit</span>
+<span className="text-sm font-medium">{liveKitInvite.initiatorName} a démarré un appel ProJA</span>
     <button
       onClick={() => { setShowLiveKitCall(true); setLiveKitInvite(null); }}
       className="bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-emerald-50"

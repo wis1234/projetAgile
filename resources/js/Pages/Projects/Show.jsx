@@ -461,7 +461,7 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
               <FaVideo className="text-white text-sm" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-bold text-gray-900 dark:text-white text-sm">Appel vidéo LiveKit</h3>
+              <h3 className="font-bold text-gray-900 dark:text-white text-sm">Appel vidéo ProJA</h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Jusqu'à 100 participants simultanés</p>
             </div>
           </div>
