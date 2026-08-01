@@ -142,5 +142,34 @@ public function joinOrStartCall(Request $request, \App\Models\Project $project)
     return response()->json(['alreadyActive' => $alreadyActive]);
 }
 
+public function muteParticipant(Request $request, \App\Models\Project $project)
+{
+    $user = $request->user();
+    $userRoles = $user->roles ?? [];
+    $isAdmin = ($user->role === 'admin' || $user->is_admin) ||
+        (is_array($userRoles) && collect($userRoles)->contains(fn($r) => ($r->name ?? $r) === 'admin'));
+    $isManager = $project->managers()->where('users.id', $user->id)->exists();
+
+    if (!$isAdmin && !$isManager) {
+        abort(403, 'Seul l’hôte peut couper le micro/caméra des participants.');
+    }
+
+    $validated = $request->validate([
+        'identity' => 'required|string',
+        'trackSid' => 'required|string',
+    ]);
+
+    $roomName = 'project-' . $project->id;
+
+    try {
+        $this->getRoomService()->mutePublishedTrack(
+            $roomName, $validated['identity'], $validated['trackSid'], true
+        );
+    } catch (\Exception $e) {
+        return response()->json(['message' => 'Impossible de couper ce flux.'], 500);
+    }
+
+    return response()->json(['status' => 'ok']);
+}
 
 }

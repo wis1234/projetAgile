@@ -116,6 +116,9 @@ Route::prefix('push')->group(function () {
    
    Route::middleware(['auth'])->get('/projects/{project}/livekit-call/status', [LiveKitController::class, 'callStatus']);
    Route::middleware(['auth'])->post('/projects/{project}/livekit-call/join-or-start', [LiveKitController::class, 'joinOrStartCall']);
+   Route::middleware(['auth'])->post('/projects/{project}/livekit-call/mute-participant', [LiveKitController::class, 'muteParticipant']);
+    
+
     // Routes Zoom
     Route::prefix('projects/{project}')->group(function () {
         Route::get('/zoom/active', [\App\Http\Controllers\ZoomMeetingController::class, 'active'])->name('api.zoom.active');

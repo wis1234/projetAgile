@@ -17,6 +17,18 @@ import Modal from '../../Components/Modal';
 import ZoomMeeting from '../../Components/ZoomMeeting';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 
+const getFreshCsrfToken = async () => {
+  try {
+    const res = await fetch('/csrf-token', { credentials: 'include' });
+    const data = await res.json();
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    if (metaTag) metaTag.setAttribute('content', data.token);
+    return data.token;
+  } catch {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  }
+};
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 const getStatusInfo = (status, t) => {
   const statusMap = {
@@ -450,13 +462,14 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
             </div>
           </div>
          <button
-  onClick={() => {
+  onClick={async () => {
     setShowLiveKitCall(true);
+    const csrfToken = await getFreshCsrfToken();
     fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
       method: 'POST',
       headers: {
         'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        'X-CSRF-TOKEN': csrfToken,
       },
     })
       .then(res => res.json())
@@ -820,29 +833,34 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
         </div>
       </Modal>
 {showLiveKitCall && (
-  <LiveKitCallModal
-    tokenEndpoint={`/projects/${project.id}/livekit-token`}
-    title={project.name}
-    onAnswered={() => {
+<LiveKitCallModal
+  tokenEndpoint={`/projects/${project.id}/livekit-token`}
+  muteEndpoint={`/projects/${project.id}/livekit-call/mute-participant`}
+  isHost={isAdmin || isManager}
+  title={project.name}
+
+    onAnswered={async () => {
+      const csrfToken = await getFreshCsrfToken();
       fetch(`/projects/${project.id}/livekit-call/answered`, {
         method: 'POST',
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+          'X-CSRF-TOKEN': csrfToken,
         },
       }).catch(() => {});
     }}
-onClose={() => {
+onClose={async () => {
   setShowLiveKitCall(false);
   fetch(`/projects/${project.id}/livekit-call/status`)
     .then(res => res.json())
     .then(data => setCallActive(!!data.active))
     .catch(() => {});
+  const csrfToken = await getFreshCsrfToken();
   fetch(`/projects/${project.id}/livekit-call/end`, {
     method: 'POST',
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
-      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+      'X-CSRF-TOKEN': csrfToken,
     },
   }).catch(() => {});
 }}

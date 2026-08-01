@@ -2,12 +2,24 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
-  FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle,
+  FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
 } from 'react-icons/fa';
+
+const getFreshCsrfToken = async () => {
+  try {
+    const res = await fetch('/csrf-token', { credentials: 'include' });
+    const data = await res.json();
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    if (metaTag) metaTag.setAttribute('content', data.token);
+    return data.token;
+  } catch {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  }
+};
 
 const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '🔥'];
 
-export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnswered }) {
+export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, onClose, onAnswered }) {
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [micEnabled, setMicEnabled] = useState(true);
@@ -21,7 +33,9 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [connectionState, setConnectionState] = useState('connecting');
-  const [callStarted, setCallStarted] = useState(false); // true dès qu'un autre participant est présent
+  const [callStarted, setCallStarted] = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
+  const [raisedHands, setRaisedHands] = useState({}); // { identity: name }
 
   const localVideoRef = useRef(null);
   const screenVideoRef = useRef(null);
@@ -31,7 +45,7 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
   const timerIntervalRef = useRef(null);
   const answeredNotifiedRef = useRef(false);
 
-  // ─── Tonalité d'appel sortant (tant qu'on est seul dans la room) ────
+  // ─── Tonalité d'appel sortant ────────────────────────────────────
   const startRingback = () => {
     if (ringbackRef.current) return;
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -75,11 +89,12 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
 
     const connect = async () => {
       try {
+        const csrfToken = await getFreshCsrfToken();
         const res = await fetch(tokenEndpoint, {
           method: 'POST',
           headers: {
             'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            'X-CSRF-TOKEN': csrfToken,
           },
         });
         if (!res.ok) throw new Error('Impossible de récupérer le token ProJA');
@@ -94,35 +109,50 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
         activeRoom.on(RoomEvent.ParticipantConnected, () => {
           setParticipants([...activeRoom.remoteParticipants.values()]);
         });
-        activeRoom.on(RoomEvent.ParticipantDisconnected, () => {
+        activeRoom.on(RoomEvent.ParticipantDisconnected, (p) => {
           setParticipants([...activeRoom.remoteParticipants.values()]);
+          setRaisedHands(prev => {
+            const copy = { ...prev };
+            delete copy[p.identity];
+            return copy;
+          });
         });
         activeRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
           setConnectionState(state);
         });
-        activeRoom.on(RoomEvent.DataReceived, (payload) => {
+        activeRoom.on(RoomEvent.DataReceived, (payload, participant) => {
           try {
             const text = new TextDecoder().decode(payload);
             const data = JSON.parse(text);
+
             if (data.type === 'reaction') {
               const id = `${Date.now()}_${Math.random()}`;
-              setFloatingReactions(prev => [...prev, { id, emoji: data.emoji, from: data.name }]);
+              const leftPercent = 10 + Math.random() * 70;
+              setFloatingReactions(prev => [...prev, { id, emoji: data.emoji, left: leftPercent }]);
               setTimeout(() => {
                 setFloatingReactions(prev => prev.filter(r => r.id !== id));
-              }, 2500);
+              }, 3000);
             }
-          } catch (e) { /* ignore */ }
+
+            if (data.type === 'hand' && participant) {
+              setRaisedHands(prev => {
+                const copy = { ...prev };
+                if (data.raised) copy[participant.identity] = data.name || participant.name || 'Participant';
+                else delete copy[participant.identity];
+                return copy;
+              });
+            }
+          } catch (e) { /* ignore malformed payload */ }
         });
 
-       await activeRoom.connect(url, token);
+        await activeRoom.connect(url, token);
         await activeRoom.localParticipant.setMicrophoneEnabled(true);
-        // Caméra désactivée par défaut — l'utilisateur l'active manuellement s'il le souhaite
+        // Caméra désactivée par défaut
 
         const initialParticipants = [...activeRoom.remoteParticipants.values()];
         setParticipants(initialParticipants);
         setConnecting(false);
 
-        // Si des participants sont déjà là, c'est que quelqu'un "décroche" en nous rejoignant
         if (initialParticipants.length > 0 && !answeredNotifiedRef.current) {
           answeredNotifiedRef.current = true;
           onAnswered?.();
@@ -143,12 +173,12 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose, onAnsw
     };
   }, [tokenEndpoint]);
 
-  // ─── Gère le passage "en attente" → "appel démarré" ─────────────────
-useEffect(() => {
+  // ─── Passage "en attente" → "appel démarré" ─────────────────────────
+  useEffect(() => {
     if (connecting) return;
 
     if (participants.length === 0) {
-      if (!callStarted) startRingback(); // ne sonne que si l'appel n'a jamais vraiment démarré
+      if (!callStarted) startRingback();
       return;
     }
 
@@ -159,12 +189,26 @@ useEffect(() => {
     }
     if (!callStarted) {
       setCallStarted(true);
-      setElapsedSeconds(0);
-      timerIntervalRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
-    }
-  }, [participants.length, connecting]);
 
-  // ─── Attacher les flux distants (caméra + partage d'écran) ─────────
+      // Synchronise la minuterie sur l'heure réelle de création de la room
+      // (partagée par tous les participants), pas sur l'heure locale d'arrivée.
+      // Si room.roomInfo n'existe pas dans votre version du SDK, vérifiez
+      // dans la console `console.log(room)` où se trouve le vrai timestamp
+      // (parfois room.metadata, room.info, ou une autre propriété selon la version).
+      let startedAt = Date.now();
+      if (room?.roomInfo?.creationTime) {
+        startedAt = Number(room.roomInfo.creationTime) * 1000;
+      }
+
+      const updateElapsed = () => {
+        setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+      };
+      updateElapsed();
+      timerIntervalRef.current = setInterval(updateElapsed, 1000);
+    }
+  }, [participants.length, connecting, room]);
+
+  // ─── Attacher les flux distants ─────────────────────────────────────
   useEffect(() => {
     participants.forEach(p => {
       const camPub = [...p.videoTrackPublications.values()].find(pub => pub.source === Track.Source.Camera && pub.track);
@@ -186,7 +230,7 @@ useEffect(() => {
     }
   }, [remoteScreenShare]);
 
-  // ─── Contrôles ───────────────────────────────────────────────────
+  // ─── Contrôles locaux ────────────────────────────────────────────
   const toggleMic = async () => {
     if (!room) return;
     const next = !micEnabled;
@@ -227,17 +271,24 @@ useEffect(() => {
 
   const sendReaction = (emoji) => {
     if (!room) return;
-    const payload = new TextEncoder().encode(JSON.stringify({
-      type: 'reaction',
-      emoji,
-      name: room.localParticipant.name || 'Vous',
-    }));
+    const payload = new TextEncoder().encode(JSON.stringify({ type: 'reaction', emoji }));
     room.localParticipant.publishData(payload, { reliable: true });
 
     const id = `${Date.now()}_local`;
-    setFloatingReactions(prev => [...prev, { id, emoji, from: 'Vous' }]);
-    setTimeout(() => setFloatingReactions(prev => prev.filter(r => r.id !== id)), 2500);
+    const leftPercent = 10 + Math.random() * 70;
+    setFloatingReactions(prev => [...prev, { id, emoji, left: leftPercent }]);
+    setTimeout(() => setFloatingReactions(prev => prev.filter(r => r.id !== id)), 3000);
     setShowReactions(false);
+  };
+
+  const toggleRaiseHand = () => {
+    if (!room) return;
+    const next = !handRaised;
+    setHandRaised(next);
+    const payload = new TextEncoder().encode(JSON.stringify({
+      type: 'hand', raised: next, name: room.localParticipant.name || 'Vous',
+    }));
+    room.localParticipant.publishData(payload, { reliable: true });
   };
 
   const toggleFullscreen = () => {
@@ -247,6 +298,30 @@ useEffect(() => {
     } else {
       document.exitFullscreen?.();
       setIsFullscreen(false);
+    }
+  };
+
+  // ─── Contrôle de l'hôte sur un participant distant ──────────────────
+  const muteRemote = async (participant, kind) => {
+    if (!isHost || !muteEndpoint) return;
+    const pub = kind === 'audio'
+      ? [...participant.audioTrackPublications.values()][0]
+      : [...participant.videoTrackPublications.values()].find(p => p.source === Track.Source.Camera);
+    if (!pub) return;
+
+    try {
+      const csrfToken = await getFreshCsrfToken();
+      await fetch(muteEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({ identity: participant.identity, trackSid: pub.trackSid }),
+      });
+    } catch (err) {
+      console.error('Erreur mute participant:', err);
     }
   };
 
@@ -268,18 +343,33 @@ useEffect(() => {
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
-      {/* ─── HEADER ─── */}
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-900 text-white flex-shrink-0">
+      <style>{`
+        @keyframes floatUpMeet {
+          0% { transform: translateY(0) scale(0.5); opacity: 0; }
+          15% { opacity: 1; transform: translateY(-10vh) scale(1.1); }
+          85% { opacity: 1; }
+          100% { transform: translateY(-70vh) scale(1); opacity: 0; }
+        }
+        .float-reaction { animation: floatUpMeet 3s ease-out forwards; }
+      `}</style>
+
+      {/* ─── HEADER — bleu ProJA ─── */}
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex-shrink-0 shadow-md">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="font-semibold truncate">ProJA — {title}</span>
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-300 bg-white/5 px-2 py-1 rounded-full">
-            <FaCircle className={`w-1.5 h-1.5 ${connectionState === 'connected' && callStarted ? 'text-emerald-400' : 'text-amber-400 animate-pulse'}`} />
+          <span className="font-semibold truncate">ProJA Meet — {title}</span>
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-blue-100 bg-white/10 px-2 py-1 rounded-full">
+            <FaCircle className={`w-1.5 h-1.5 ${connectionState === 'connected' && callStarted ? 'text-emerald-400' : 'text-amber-300 animate-pulse'}`} />
             {connecting
               ? 'Connexion…'
               : callStarted
               ? formatElapsed(elapsedSeconds)
               : 'En attente de participants…'}
           </span>
+          {isHost && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-bold bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
+              <FaCrown className="w-3 h-3" /> Hôte
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -288,10 +378,10 @@ useEffect(() => {
           >
             <FaUsers className="w-3.5 h-3.5" /> {totalCount}
           </button>
-          <button onClick={toggleFullscreen} className="text-white/80 hover:text-white p-1.5">
+          <button onClick={toggleFullscreen} className="text-white/90 hover:text-white p-1.5">
             {isFullscreen ? <FaCompress className="w-4 h-4" /> : <FaExpand className="w-4 h-4" />}
           </button>
-          <button onClick={handleLeave} className="text-white/80 hover:text-white p-1.5">
+          <button onClick={handleLeave} className="text-white/90 hover:text-white p-1.5">
             <FaTimes className="w-5 h-5" />
           </button>
         </div>
@@ -311,15 +401,39 @@ useEffect(() => {
             <div className="space-y-2">
               <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5">
                 <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">Moi</div>
-                <span className="text-sm text-white truncate">Vous</span>
-                {!micEnabled && <FaMicrophoneSlash className="w-3 h-3 text-red-400 ml-auto" />}
+                <span className="text-sm text-white truncate flex items-center gap-1">
+                  Vous {isHost && <FaCrown className="w-3 h-3 text-amber-400" />}
+                </span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  {handRaised && <FaHandPaper className="w-3 h-3 text-amber-400" />}
+                  {!micEnabled && <FaMicrophoneSlash className="w-3 h-3 text-red-400" />}
+                </div>
               </div>
               {participants.map(p => (
-                <div key={p.identity} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5">
-                  <div className="w-7 h-7 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold">
+                <div key={p.identity} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 group">
+                  <div className="w-7 h-7 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                     {(p.name || p.identity).slice(0, 2).toUpperCase()}
                   </div>
-                  <span className="text-sm text-slate-200 truncate">{p.name || p.identity}</span>
+                  <span className="text-sm text-slate-200 truncate flex-1">{p.name || p.identity}</span>
+                  {raisedHands[p.identity] && <FaHandPaper className="w-3 h-3 text-amber-400 flex-shrink-0" />}
+                  {isHost && (
+                    <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => muteRemote(p, 'audio')}
+                        title="Couper le micro"
+                        className="w-6 h-6 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center"
+                      >
+                        <FaMicrophoneSlash className="w-3 h-3 text-white" />
+                      </button>
+                      <button
+                        onClick={() => muteRemote(p, 'video')}
+                        title="Couper la caméra"
+                        className="w-6 h-6 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center"
+                      >
+                        <FaVideoSlash className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -330,10 +444,13 @@ useEffect(() => {
           {connecting ? (
             <div className="h-full flex items-center justify-center text-white">Connexion en cours…</div>
           ) : !callStarted ? (
-            /* ─── EN ATTENTE : personne d'autre encore présent ─── */
             <div className="h-full flex flex-col items-center justify-center gap-4 text-white">
-              <div className="w-40 h-40 rounded-2xl overflow-hidden bg-black border border-slate-700 relative">
-                <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
+              <div className="w-40 h-40 rounded-2xl overflow-hidden bg-slate-800 border border-slate-700 relative flex items-center justify-center">
+                {camEnabled ? (
+                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
+                ) : (
+                  <FaVideoSlash className="text-slate-500 text-3xl" />
+                )}
               </div>
               <div className="flex items-center gap-2 text-slate-300">
                 <span className="relative flex h-2.5 w-2.5">
@@ -353,8 +470,12 @@ useEffect(() => {
                 </div>
               </div>
               <div className="flex gap-2 overflow-x-auto flex-shrink-0 pb-1">
-                <div className="w-32 h-20 rounded-xl overflow-hidden bg-black border border-slate-700 flex-shrink-0 relative">
-                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
+                <div className="w-32 h-20 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex-shrink-0 relative flex items-center justify-center">
+                  {camEnabled ? (
+                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
+                  ) : (
+                    <FaVideoSlash className="text-slate-500 text-lg" />
+                  )}
                   <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded">Vous</span>
                 </div>
                 {participants.map(p => (
@@ -378,27 +499,62 @@ useEffect(() => {
                 ) : (
                   <FaVideoSlash className="text-slate-500 text-3xl" />
                 )}
+                {handRaised && (
+                  <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
+                    <FaHandPaper className="w-3.5 h-3.5 text-amber-900" />
+                  </div>
+                )}
                 <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs font-semibold rounded flex items-center gap-1.5">
-                  Vous {!micEnabled && <FaMicrophoneSlash className="w-3 h-3 text-red-400" />}
+                  Vous {isHost && <FaCrown className="w-3 h-3 text-amber-400" />} {!micEnabled && <FaMicrophoneSlash className="w-3 h-3 text-red-400" />}
                 </div>
               </div>
               {participants.map(p => (
-                <div key={p.identity} className="rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video relative">
+                <div key={p.identity} className="rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video relative group">
                   <video
                     ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
                     autoPlay playsInline className="w-full h-full object-cover bg-black"
                   />
-                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs font-semibold rounded truncate max-w-[85%]">
+                  {raisedHands[p.identity] && (
+                    <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
+                      <FaHandPaper className="w-3.5 h-3.5 text-amber-900" />
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs font-semibold rounded truncate max-w-[70%]">
                     {p.name || p.identity}
                   </div>
+                  {isHost && (
+                    <div className="absolute bottom-2 right-2 hidden group-hover:flex items-center gap-1">
+                      <button
+                        onClick={() => muteRemote(p, 'audio')}
+                        title="Couper le micro"
+                        className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center"
+                      >
+                        <FaMicrophoneSlash className="w-3.5 h-3.5 text-white" />
+                      </button>
+                      <button
+                        onClick={() => muteRemote(p, 'video')}
+                        title="Couper la caméra"
+                        className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center"
+                      >
+                        <FaVideoSlash className="w-3.5 h-3.5 text-white" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
-          <div className="pointer-events-none absolute bottom-4 right-4 flex flex-col items-end gap-1">
+          {/* ─── Réactions façon Google Meet : flottent vers le haut ─── */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-full overflow-hidden">
             {floatingReactions.map(r => (
-              <div key={r.id} className="animate-bounce text-3xl drop-shadow-lg">{r.emoji}</div>
+              <div
+                key={r.id}
+                className="float-reaction absolute bottom-16 text-4xl drop-shadow-lg"
+                style={{ left: `${r.left}%` }}
+              >
+                {r.emoji}
+              </div>
             ))}
           </div>
         </div>
@@ -418,7 +574,7 @@ useEffect(() => {
         </div>
       )}
 
-      <div className="flex items-center justify-center gap-3 py-4 bg-slate-900 flex-shrink-0">
+      <div className="flex items-center justify-center gap-3 py-4 bg-slate-900 flex-shrink-0 flex-wrap px-4">
         <button onClick={toggleMic} title={micEnabled ? 'Couper le micro' : 'Activer le micro'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${micEnabled ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}>
           {micEnabled ? <FaMicrophone /> : <FaMicrophoneSlash />}
         </button>
@@ -427,6 +583,9 @@ useEffect(() => {
         </button>
         <button onClick={toggleScreenShare} title={screenSharing ? 'Arrêter le partage' : 'Partager l’écran'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
           <FaDesktop />
+        </button>
+        <button onClick={toggleRaiseHand} title={handRaised ? 'Baisser la main' : 'Lever la main'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handRaised ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+          <FaHandPaper />
         </button>
         <button onClick={() => setShowReactions(v => !v)} title="Réactions" className={`w-11 h-11 rounded-full flex items-center justify-center transition ${showReactions ? 'bg-amber-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
           <FaSmile />
