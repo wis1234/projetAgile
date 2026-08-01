@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import { parseISO, isBefore, isAfter, addMinutes } from 'date-fns';
@@ -292,20 +292,66 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
   const [liveKitInvite, setLiveKitInvite] = useState(null);
-  const presenceChannelRef = React.useRef(null);
+const presenceChannelRef = useRef(null);
+  const ringtoneRef = useRef(null);
 
+  const playRingtone = useCallback(() => {
+    if (ringtoneRef.current) return; // déjà en train de sonner
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    const audioCtx = new AudioCtx();
+    audioCtx.resume?.().catch(() => {});
+
+    const playTone = () => {
+      const now = audioCtx.currentTime;
+      [880, 1108].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + i * 0.15);
+        gain.gain.linearRampToValueAtTime(0.18, now + 0.05 + i * 0.15);
+        gain.gain.linearRampToValueAtTime(0, now + 0.35 + i * 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + i * 0.15);
+        osc.stop(now + 0.5 + i * 0.15);
+      });
+    };
+
+    playTone();
+    const interval = setInterval(playTone, 1800);
+    ringtoneRef.current = { audioCtx, interval };
+
+    if (navigator.vibrate) {
+      navigator.vibrate([400, 200, 400, 200, 400]);
+    }
+  }, []);
+
+  const stopRingtone = useCallback(() => {
+    if (!ringtoneRef.current) return;
+    clearInterval(ringtoneRef.current.interval);
+    ringtoneRef.current.audioCtx.close().catch(() => {});
+    ringtoneRef.current = null;
+    if (navigator.vibrate) navigator.vibrate(0);
+  }, []);
+
+  useEffect(() => stopRingtone, [stopRingtone]);
 
 
   useEffect(() => {
   if (!window.Echo || !project?.id || !auth?.user) return;
 
-  const presenceChannel = window.Echo.join(`presence-project.${project.id}`)
+const presenceChannel = window.Echo.join(`presence-project.${project.id}`)
     .listenForWhisper('livekit-call-started', (e) => {
       if (e.initiatorId === auth.user.id) return;
       setLiveKitInvite({ initiatorName: e.initiatorName, initiatorId: e.initiatorId });
+      playRingtone();
     })
     .listenForWhisper('livekit-call-ended', () => {
       setLiveKitInvite(null);
+      stopRingtone();
     });
 
   presenceChannelRef.current = presenceChannel;
@@ -314,7 +360,7 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
     window.Echo.leave(`presence-project.${project.id}`);
     presenceChannelRef.current = null;
   };
-}, [project?.id, auth?.user?.id]);
+}, [project?.id, auth?.user?.id, playRingtone, stopRingtone]);
 
 
   const userRoles = Array.isArray(auth?.user?.roles) ? auth.user.roles : [];
@@ -839,20 +885,20 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
           }}
         />
       )}
-      {liveKitInvite && !showLiveKitCall && (
-        <div className="fixed bottom-6 right-6 z-40 bg-emerald-600 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3">
-          <span className="text-sm font-medium">{liveKitInvite.initiatorName} a démarré un appel LiveKit</span>
-          <button
-            onClick={() => { setShowLiveKitCall(true); setLiveKitInvite(null); }}
-            className="bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-emerald-50"
-          >
-            Rejoindre
-          </button>
-          <button onClick={() => setLiveKitInvite(null)} className="text-white/70 hover:text-white text-xs">
-            ✕
-          </button>
-        </div>
-      )}
+{liveKitInvite && !showLiveKitCall && (
+  <div className="fixed bottom-6 right-6 z-40 bg-emerald-600 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3 animate-pulse">
+    <span className="text-sm font-medium">{liveKitInvite.initiatorName} démarre un appel ProJA</span>
+    <button
+      onClick={() => { setShowLiveKitCall(true); setLiveKitInvite(null); stopRingtone(); }}
+      className="bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-emerald-50"
+    >
+      Rejoindre
+    </button>
+    <button onClick={() => { setLiveKitInvite(null); stopRingtone(); }} className="text-white/70 hover:text-white text-xs">
+      ✕
+    </button>
+  </div>
+)}
     </div>
   );
 }
