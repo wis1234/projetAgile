@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Room, RoomEvent, Track } from 'livekit-client';
+import { Room, RoomEvent, Track, ConnectionState } from 'livekit-client';
 import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
-  FaDesktop, FaExpand, FaCompress, FaSmile, FaUsers, FaSignal
+  FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle,
 } from 'react-icons/fa';
 
 const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '🔥'];
@@ -15,22 +15,23 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
   const [screenSharing, setScreenSharing] = useState(false);
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState('');
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [showReactions, setShowReactions] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState([]);
-  const [activeSpeakerIds, setActiveSpeakerIds] = useState([]);
-  const [, forceTick] = useState(0); // force re-render on mute/unmute events
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pinnedId, setPinnedId] = useState(null); // null = grille, sinon identity épinglée
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [connectionState, setConnectionState] = useState('connecting');
 
   const localVideoRef = useRef(null);
-  const screenShareRef = useRef(null);
+  const screenVideoRef = useRef(null);
   const remoteVideoRefs = useRef({});
   const containerRef = useRef(null);
-  const roomRef = useRef(null);
 
-  const rerender = useCallback(() => forceTick(t => t + 1), []);
-
+  // ─── Connexion à la room ───────────────────────────────────────────
   useEffect(() => {
     let activeRoom;
+    let timerInterval;
 
     const connect = async () => {
       try {
@@ -44,26 +45,20 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
         if (!res.ok) throw new Error('Impossible de récupérer le token ProJA');
         const { token, url } = await res.json();
 
-        activeRoom = new Room();
-        roomRef.current = activeRoom;
+        activeRoom = new Room({ adaptiveStream: true, dynacast: true });
         setRoom(activeRoom);
 
         activeRoom.on(RoomEvent.TrackSubscribed, () => {
           setParticipants([...activeRoom.remoteParticipants.values()]);
         });
-        activeRoom.on(RoomEvent.TrackUnsubscribed, () => {
+        activeRoom.on(RoomEvent.ParticipantConnected, () => {
           setParticipants([...activeRoom.remoteParticipants.values()]);
         });
         activeRoom.on(RoomEvent.ParticipantDisconnected, () => {
           setParticipants([...activeRoom.remoteParticipants.values()]);
         });
-        activeRoom.on(RoomEvent.ParticipantConnected, () => {
-          setParticipants([...activeRoom.remoteParticipants.values()]);
-        });
-        activeRoom.on(RoomEvent.TrackMuted, rerender);
-        activeRoom.on(RoomEvent.TrackUnmuted, rerender);
-        activeRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-          setActiveSpeakerIds(speakers.map(s => s.sid));
+        activeRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
+          setConnectionState(state);
         });
         activeRoom.on(RoomEvent.DataReceived, (payload) => {
           try {
@@ -71,12 +66,12 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
             const data = JSON.parse(text);
             if (data.type === 'reaction') {
               const id = `${Date.now()}_${Math.random()}`;
-              setFloatingReactions(prev => [...prev, { id, emoji: data.emoji, x: Math.random() * 70 + 15 }]);
+              setFloatingReactions(prev => [...prev, { id, emoji: data.emoji, from: data.name }]);
               setTimeout(() => {
                 setFloatingReactions(prev => prev.filter(r => r.id !== id));
               }, 2500);
             }
-          } catch (e) { /* ignore malformed data */ }
+          } catch (e) { /* ignore malformed payload */ }
         });
 
         await activeRoom.connect(url, token);
@@ -84,16 +79,18 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
         await activeRoom.localParticipant.setCameraEnabled(true);
 
         const camPub = [...activeRoom.localParticipant.videoTrackPublications.values()]
-          .find(p => p.source === Track.Source.Camera);
+          .find(pub => pub.source === Track.Source.Camera);
         if (camPub?.track && localVideoRef.current) {
           camPub.track.attach(localVideoRef.current);
         }
 
         setParticipants([...activeRoom.remoteParticipants.values()]);
         setConnecting(false);
+
+        timerInterval = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
       } catch (err) {
-        console.error('Erreur connexion ProJA Call:', err);
-        setError(err.message || 'Impossible de rejoindre l’appel ProJA');
+        console.error('Erreur connexion ProJA:', err);
+        setError(err.message || 'Impossible de rejoindre l’appel');
         setConnecting(false);
       }
     };
@@ -101,29 +98,35 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
     connect();
 
     return () => {
+      clearInterval(timerInterval);
       activeRoom?.disconnect();
     };
-  }, [tokenEndpoint, rerender]);
+  }, [tokenEndpoint]);
 
+  // ─── Attacher les flux distants (caméra + partage d'écran) ─────────
   useEffect(() => {
     participants.forEach(p => {
-      const videoPub = [...p.videoTrackPublications.values()].find(pub => pub.track && pub.source === Track.Source.Camera);
+      const camPub = [...p.videoTrackPublications.values()].find(pub => pub.source === Track.Source.Camera && pub.track);
       const el = remoteVideoRefs.current[p.identity];
-      if (videoPub?.track && el) {
-        videoPub.track.attach(el);
-      }
-      const screenPub = [...p.videoTrackPublications.values()].find(pub => pub.track && pub.source === Track.Source.ScreenShare);
-      const screenEl = remoteVideoRefs.current[`${p.identity}_screen`];
-      if (screenPub?.track && screenEl) {
-        screenPub.track.attach(screenEl);
-      }
+      if (camPub?.track && el) camPub.track.attach(el);
+
       const audioPub = [...p.audioTrackPublications.values()].find(pub => pub.track);
-      if (audioPub?.track) {
-        audioPub.track.attach();
-      }
+      if (audioPub?.track) audioPub.track.attach();
     });
   }, [participants]);
 
+  // Détecte si quelqu'un (local ou distant) partage son écran, pour l'afficher en grand
+  const remoteScreenShare = participants
+    .map(p => ({ p, pub: [...p.videoTrackPublications.values()].find(pub => pub.source === Track.Source.ScreenShare && pub.track) }))
+    .find(x => x.pub);
+
+  useEffect(() => {
+    if (remoteScreenShare?.pub?.track && screenVideoRef.current) {
+      remoteScreenShare.pub.track.attach(screenVideoRef.current);
+    }
+  }, [remoteScreenShare]);
+
+  // ─── Contrôles ───────────────────────────────────────────────────
   const toggleMic = async () => {
     if (!room) return;
     const next = !micEnabled;
@@ -138,7 +141,7 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
     setCamEnabled(next);
     if (next) {
       const camPub = [...room.localParticipant.videoTrackPublications.values()]
-        .find(p => p.source === Track.Source.Camera);
+        .find(pub => pub.source === Track.Source.Camera);
       if (camPub?.track && localVideoRef.current) camPub.track.attach(localVideoRef.current);
     }
   };
@@ -147,39 +150,39 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
     if (!room) return;
     try {
       const next = !screenSharing;
-      await room.localParticipant.setScreenShareEnabled(next);
+      await room.localParticipant.setScreenShareEnabled(next, { audio: true });
       setScreenSharing(next);
       if (next) {
         setTimeout(() => {
-          const screenPub = [...room.localParticipant.videoTrackPublications.values()]
+          const pub = [...room.localParticipant.videoTrackPublications.values()]
             .find(p => p.source === Track.Source.ScreenShare);
-          if (screenPub?.track && screenShareRef.current) {
-            screenPub.track.attach(screenShareRef.current);
-          }
-        }, 200);
+          if (pub?.track && screenVideoRef.current) pub.track.attach(screenVideoRef.current);
+        }, 300);
       }
     } catch (err) {
-      // L'utilisateur a probablement annulé la sélection de fenêtre/écran
-      console.warn('Partage d’écran annulé ou refusé:', err);
+      console.error('Erreur partage d’écran:', err);
+      setError('Impossible de démarrer le partage d’écran.');
     }
   };
 
   const sendReaction = (emoji) => {
     if (!room) return;
-    const payload = new TextEncoder().encode(JSON.stringify({ type: 'reaction', emoji }));
+    const payload = new TextEncoder().encode(JSON.stringify({
+      type: 'reaction',
+      emoji,
+      name: room.localParticipant.name || 'Vous',
+    }));
     room.localParticipant.publishData(payload, { reliable: true });
-    const id = `local_${Date.now()}`;
-    setFloatingReactions(prev => [...prev, { id, emoji, x: Math.random() * 70 + 15 }]);
-    setTimeout(() => {
-      setFloatingReactions(prev => prev.filter(r => r.id !== id));
-    }, 2500);
-    setShowReactionPicker(false);
+
+    const id = `${Date.now()}_local`;
+    setFloatingReactions(prev => [...prev, { id, emoji, from: 'Vous' }]);
+    setTimeout(() => setFloatingReactions(prev => prev.filter(r => r.id !== id)), 2500);
+    setShowReactions(false);
   };
 
   const toggleFullscreen = () => {
-    if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.();
+      containerRef.current?.requestFullscreen?.();
       setIsFullscreen(true);
     } else {
       document.exitFullscreen?.();
@@ -192,36 +195,37 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
     onClose();
   };
 
-  const isMicMuted = (p) => {
-    const pub = [...p.audioTrackPublications.values()][0];
-    return !pub || pub.isMuted;
+  const formatElapsed = (s) => {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const sec = (s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
   };
-  const isCamOff = (p) => {
-    const pub = [...p.videoTrackPublications.values()].find(v => v.source === Track.Source.Camera);
-    return !pub || pub.isMuted;
-  };
-  const remoteScreenShares = participants.filter(p =>
-    [...p.videoTrackPublications.values()].some(v => v.source === Track.Source.ScreenShare && v.track)
-  );
+
+  const totalCount = 1 + participants.length;
+  const isScreenSharingAnyone = screenSharing || !!remoteScreenShare;
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex-shrink-0">
+      {/* ─── HEADER ─── */}
+      <div className="flex items-center justify-between px-4 py-3 bg-slate-900 text-white flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="font-semibold truncate">Appel ProJA — {title}</span>
-          <span className="hidden sm:inline-flex items-center gap-1 text-xs bg-white/10 px-2 py-1 rounded-full">
-            <FaUsers className="text-[10px]" /> {participants.length + 1}
-          </span>
-          <span className="hidden sm:inline-flex items-center gap-1 text-xs bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded-full">
-            <FaSignal className="text-[10px]" /> {connecting ? 'Connexion…' : 'En direct'}
+          <span className="font-semibold truncate">ProJA — {title}</span>
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-300 bg-white/5 px-2 py-1 rounded-full">
+            <FaCircle className={`w-1.5 h-1.5 ${connectionState === 'connected' ? 'text-emerald-400' : 'text-amber-400 animate-pulse'}`} />
+            {connectionState === 'connected' ? formatElapsed(elapsedSeconds) : 'Connexion…'}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={toggleFullscreen} className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10" title="Plein écran">
+          <button
+            onClick={() => setShowParticipants(v => !v)}
+            className="flex items-center gap-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition"
+          >
+            <FaUsers className="w-3.5 h-3.5" /> {totalCount}
+          </button>
+          <button onClick={toggleFullscreen} className="text-white/80 hover:text-white p-1.5">
             {isFullscreen ? <FaCompress className="w-4 h-4" /> : <FaExpand className="w-4 h-4" />}
           </button>
-          <button onClick={handleLeave} className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10">
+          <button onClick={handleLeave} className="text-white/80 hover:text-white p-1.5">
             <FaTimes className="w-5 h-5" />
           </button>
         </div>
@@ -233,130 +237,146 @@ export default function LiveKitCallModal({ tokenEndpoint, title, onClose }) {
         </div>
       )}
 
-      {/* ── Zone vidéo ── */}
-      <div className="flex-1 relative overflow-hidden">
-        {connecting ? (
-          <div className="h-full flex items-center justify-center text-white">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-3 border-blue-400 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-white/70">Connexion à l’appel ProJA…</span>
-            </div>
-          </div>
-        ) : (
-          <div className="h-full overflow-y-auto p-4">
-            {/* Partage d'écran : mis en avant en grand si actif */}
-            {(screenSharing || remoteScreenShares.length > 0) && (
-              <div className="mb-4 rounded-2xl overflow-hidden bg-black border border-slate-700 shadow-lg">
-                {screenSharing ? (
-                  <video ref={screenShareRef} autoPlay playsInline className="w-full max-h-[60vh] object-contain bg-black" />
-                ) : (
-                  remoteScreenShares.slice(0, 1).map(p => (
-                    <video
-                      key={`${p.identity}_screen`}
-                      ref={(el) => { if (el) remoteVideoRefs.current[`${p.identity}_screen`] = el; }}
-                      autoPlay
-                      playsInline
-                      className="w-full max-h-[60vh] object-contain bg-black"
-                    />
-                  ))
-                )}
-                <div className="px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold flex items-center gap-1.5">
-                  <FaDesktop className="text-[10px]" /> {screenSharing ? 'Votre écran' : `Écran partagé par ${remoteScreenShares[0]?.name || remoteScreenShares[0]?.identity}`}
+      {/* ─── ZONE VIDÉO ─── */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Panneau participants, optionnel */}
+        {showParticipants && (
+          <div className="w-64 bg-slate-900 border-r border-slate-800 p-3 overflow-y-auto flex-shrink-0 hidden sm:block">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Participants ({totalCount})</h4>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5">
+                <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                  Moi
                 </div>
+                <span className="text-sm text-white truncate">Vous</span>
+                {!micEnabled && <FaMicrophoneSlash className="w-3 h-3 text-red-400 ml-auto" />}
               </div>
-            )}
-
-            {/* Grille des participants */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              <div className={`relative rounded-2xl overflow-hidden bg-black border-2 ${activeSpeakerIds.length && room?.localParticipant && activeSpeakerIds.includes(room.localParticipant.sid) ? 'border-emerald-400' : 'border-slate-700'}`}>
-                <video ref={localVideoRef} autoPlay muted playsInline className={`w-full h-40 object-cover bg-black ${!camEnabled ? 'opacity-0' : ''}`} />
-                {!camEnabled && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-800 text-white text-3xl font-bold">
-                    Vous
-                  </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 px-3 py-1.5 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between">
-                  <span className="text-white text-xs font-semibold">Vous</span>
-                  {!micEnabled && <FaMicrophoneSlash className="text-red-400 text-xs" />}
-                </div>
-              </div>
-
               {participants.map(p => (
-                <div
-                  key={p.identity}
-                  className={`relative rounded-2xl overflow-hidden bg-black border-2 ${activeSpeakerIds.includes(p.sid) ? 'border-emerald-400' : 'border-slate-700'}`}
-                >
-                  <video
-                    ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                    autoPlay
-                    playsInline
-                    className={`w-full h-40 object-cover bg-black ${isCamOff(p) ? 'opacity-0' : ''}`}
-                  />
-                  {isCamOff(p) && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-800 text-white text-xl font-bold">
-                      {(p.name || p.identity || '?').charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="absolute bottom-0 left-0 right-0 px-3 py-1.5 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between">
-                    <span className="text-white text-xs font-semibold truncate">{p.name || p.identity}</span>
-                    {isMicMuted(p) && <FaMicrophoneSlash className="text-red-400 text-xs flex-shrink-0" />}
+                <div key={p.identity} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5">
+                  <div className="w-7 h-7 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold">
+                    {(p.name || p.identity).slice(0, 2).toUpperCase()}
                   </div>
+                  <span className="text-sm text-slate-200 truncate">{p.name || p.identity}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Réactions flottantes */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          {floatingReactions.map(r => (
-            <span
-              key={r.id}
-              className="absolute bottom-24 text-3xl animate-[float-up_2.5s_ease-out_forwards]"
-              style={{ left: `${r.x}%` }}
-            >
-              {r.emoji}
-            </span>
-          ))}
-        </div>
-        <style>{`
-          @keyframes float-up {
-            0% { transform: translateY(0) scale(0.8); opacity: 0; }
-            15% { opacity: 1; transform: translateY(-20px) scale(1.1); }
-            100% { transform: translateY(-220px) scale(1); opacity: 0; }
-          }
-        `}</style>
-      </div>
+        <div className="flex-1 relative overflow-hidden">
+          {connecting ? (
+            <div className="h-full flex items-center justify-center text-white">Connexion en cours…</div>
+          ) : isScreenSharingAnyone ? (
+            /* ─── MODE PARTAGE D'ÉCRAN : grand écran + bandeau caméras ─── */
+            <div className="h-full flex flex-col p-3 gap-3">
+              <div className="flex-1 rounded-2xl overflow-hidden bg-black border border-slate-800 relative">
+                <video ref={screenVideoRef} autoPlay playsInline className="w-full h-full object-contain bg-black" />
+                <div className="absolute top-2 left-2 px-2.5 py-1 bg-black/60 text-white text-xs rounded-full flex items-center gap-1.5">
+                  <FaDesktop className="w-3 h-3" />
+                  {screenSharing ? 'Vous partagez votre écran' : `${remoteScreenShare?.p?.name || 'Un participant'} partage son écran`}
+                </div>
+              </div>
+              <div className="flex gap-2 overflow-x-auto flex-shrink-0 pb-1">
+                <div className="w-32 h-20 rounded-xl overflow-hidden bg-black border border-slate-700 flex-shrink-0 relative">
+                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
+                  <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded">Vous</span>
+                </div>
+                {participants.map(p => (
+                  <div key={p.identity} className="w-32 h-20 rounded-xl overflow-hidden bg-black border border-slate-700 flex-shrink-0 relative">
+                    <video
+                      ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
+                      autoPlay playsInline className="w-full h-full object-cover bg-black"
+                    />
+                    <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
+                      {p.name || p.identity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* ─── MODE GRILLE STANDARD ─── */
+            <div className="h-full p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto content-start">
+              <div className="rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video relative">
+                <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
+                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs font-semibold rounded flex items-center gap-1.5">
+                  Vous {!micEnabled && <FaMicrophoneSlash className="w-3 h-3 text-red-400" />}
+                </div>
+              </div>
+              {participants.map(p => (
+                <div key={p.identity} className="rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video relative">
+                  <video
+                    ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
+                    autoPlay playsInline className="w-full h-full object-cover bg-black"
+                  />
+                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs font-semibold rounded truncate max-w-[85%]">
+                    {p.name || p.identity}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-      {/* ── Barre de contrôle ── */}
-      <div className="relative flex items-center justify-center gap-3 py-4 bg-slate-900 flex-shrink-0">
-        {showReactionPicker && (
-          <div className="absolute bottom-full mb-2 flex items-center gap-1 bg-white dark:bg-gray-800 rounded-full shadow-xl border border-gray-200 dark:border-gray-700 px-2 py-1.5">
-            {REACTIONS.map(emoji => (
-              <button
-                key={emoji}
-                onClick={() => sendReaction(emoji)}
-                className="text-xl w-9 h-9 flex items-center justify-center hover:scale-125 transition-transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-              >
-                {emoji}
-              </button>
+          {/* ─── RÉACTIONS FLOTTANTES ─── */}
+          <div className="pointer-events-none absolute bottom-4 right-4 flex flex-col items-end gap-1">
+            {floatingReactions.map(r => (
+              <div key={r.id} className="animate-bounce text-3xl drop-shadow-lg">
+                {r.emoji}
+              </div>
             ))}
           </div>
-        )}
+        </div>
+      </div>
 
-        <button onClick={toggleMic} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${micEnabled ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-red-600 text-white'}`} title={micEnabled ? 'Couper le micro' : 'Activer le micro'}>
+      {/* ─── DRAWER RÉACTIONS ─── */}
+      {showReactions && (
+        <div className="flex items-center justify-center gap-2 py-2 bg-slate-900 border-t border-slate-800 flex-shrink-0">
+          {REACTIONS.map(emoji => (
+            <button
+              key={emoji}
+              onClick={() => sendReaction(emoji)}
+              className="text-2xl w-10 h-10 flex items-center justify-center hover:scale-125 hover:bg-white/10 rounded-full transition-transform"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ─── BARRE DE CONTRÔLES ─── */}
+      <div className="flex items-center justify-center gap-3 py-4 bg-slate-900 flex-shrink-0">
+        <button
+          onClick={toggleMic}
+          title={micEnabled ? 'Couper le micro' : 'Activer le micro'}
+          className={`w-11 h-11 rounded-full flex items-center justify-center transition ${micEnabled ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+        >
           {micEnabled ? <FaMicrophone /> : <FaMicrophoneSlash />}
         </button>
-        <button onClick={toggleCam} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${camEnabled ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-red-600 text-white'}`} title={camEnabled ? 'Couper la caméra' : 'Activer la caméra'}>
+        <button
+          onClick={toggleCam}
+          title={camEnabled ? 'Couper la caméra' : 'Activer la caméra'}
+          className={`w-11 h-11 rounded-full flex items-center justify-center transition ${camEnabled ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+        >
           {camEnabled ? <FaVideoIcon /> : <FaVideoSlash />}
         </button>
-        <button onClick={toggleScreenShare} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-blue-600 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`} title="Partager l’écran">
+        <button
+          onClick={toggleScreenShare}
+          title={screenSharing ? 'Arrêter le partage' : 'Partager l’écran'}
+          className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+        >
           <FaDesktop />
         </button>
-        <button onClick={() => setShowReactionPicker(prev => !prev)} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${showReactionPicker ? 'bg-amber-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`} title="Réactions">
+        <button
+          onClick={() => setShowReactions(v => !v)}
+          title="Réactions"
+          className={`w-11 h-11 rounded-full flex items-center justify-center transition ${showReactions ? 'bg-amber-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+        >
           <FaSmile />
         </button>
-        <button onClick={handleLeave} className="px-5 h-11 rounded-full bg-red-600 hover:bg-red-700 text-white font-semibold transition">
+        <button
+          onClick={handleLeave}
+          className="px-5 h-11 rounded-full bg-red-600 hover:bg-red-700 text-white font-semibold transition"
+        >
           Quitter
         </button>
       </div>
