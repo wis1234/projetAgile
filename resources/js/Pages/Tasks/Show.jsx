@@ -395,6 +395,7 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioChunks, setAudioChunks] = useState([]);
+  
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -615,6 +616,31 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [activeReactionPicker, setActiveReactionPicker] = useState(null); // commentId | null
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activePickerTab, setActivePickerTab] = useState('emojis'); // 'emojis' | 'stickers'
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [isCallInitiator, setIsCallInitiator] = useState(false);
+  const [callState, setCallState] = useState('idle'); // idle|ringing|connecting|in-call
+  const [currentCallId, setCurrentCallId] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStreams, setRemoteStreams] = useState({});
+  const [callError, setCallError] = useState('');
+  const localVideoRef = useRef(null);
+  const peerConnectionsRef = useRef({});
+  const localStreamRef = useRef(null);
+  const remoteVideoRefs = useRef({});
+  const currentCallIdRef = useRef(null);
+  const callStateRef = useRef('idle');
+  const isCallInitiatorRef = useRef(false);
+  useEffect(() => { callStateRef.current = callState; }, [callState]);
+
+  useEffect(() => {
+    Object.entries(remoteStreams).forEach(([userId, stream]) => {
+      const video = remoteVideoRefs.current[userId];
+      if (video && video.srcObject !== stream) {
+        try { video.srcObject = stream; } catch (e) { console.error(e); }
+      }
+    });
+  }, [remoteStreams]);
 
   const handleReaction = useCallback((commentId, emoji) => {
     if (!commentId) return;
@@ -1028,6 +1054,215 @@ const retryComment = async (failedComment) => {
     loadComments();
   }, [loadComments]);
 
+  const initializeNativeCall = useCallback(async () => {
+    setCallError('');
+    if (!task?.id || !window.Echo) {
+      setCallState('idle');
+      return;
+    }
+
+    const channel = window.Echo.private(`task.${task.id}.comments`);
+
+    channel.listenForWhisper('call.offer', async (event) => {
+      if (event.targetId !== auth.user.id) return;
+      if (event.initiator.id === auth.user.id) return;
+      if (callState !== 'idle') return;
+      currentCallIdRef.current = event.callId;
+      setCurrentCallId(event.callId);
+      setIncomingCall(event);
+      setCallState('ringing');
+    });
+
+    channel.listenForWhisper('call.answer', async (event) => {
+      if (event.targetId !== auth.user.id) return;
+      if (!isCallInitiatorRef.current) return;
+      await handleRemoteAnswer(event.answer, event.responderId);
+    });
+
+    channel.listenForWhisper('call.ice', async (event) => {
+      if (event.targetId !== auth.user.id) return;
+      if (event.senderId === auth.user.id) return;
+      const pc = peerConnectionsRef.current[event.senderId];
+      if (!pc) return;
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(event.candidate));
+      } catch (err) {
+        console.error('Erreur ICE candidate:', err);
+      }
+    });
+
+    channel.listenForWhisper('call.hangup', (event) => {
+      if (event.callId !== currentCallIdRef.current) return;
+      endNativeCall();
+    });
+
+    return () => {
+      window.Echo.leave(`task.${task.id}.comments`);
+    };
+  }, [task?.id, auth.user.id]);
+
+  useEffect(() => {
+    if (activeTab !== 'comments') return;
+    initializeNativeCall();
+  }, [activeTab, initializeNativeCall]);
+
+  const startNativeCall = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCallError('Votre navigateur ne prend pas en charge WebRTC.');
+      return;
+    }
+
+    try {
+      setCallError('');
+      setCallState('connecting');
+      setIsCallInitiator(true);
+      isCallInitiatorRef.current = true;
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+      const callId = `task-${task.id}-call-${Date.now()}`;
+      setCurrentCallId(callId);
+      setIsCallActive(true);
+      setCallState('ringing');
+
+      await createOfferForAllParticipants(stream, callId);
+    } catch (error) {
+      console.error('Erreur démarrage appel natif:', error);
+      setCallError(error?.message || 'Impossible de démarrer l’appel audio/vidéo');
+      setCallState('idle');
+    }
+  };
+
+  const acceptNativeCall = async () => {
+    if (!incomingCall) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCallError('Votre navigateur ne prend pas en charge WebRTC.');
+      return;
+    }
+
+    try {
+      setCallError('');
+      setCallState('connecting');
+      setIsCallInitiator(false);
+      isCallInitiatorRef.current = false;
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+      const pc = createPeerConnection(incomingCall.initiator.id);
+      peerConnectionsRef.current[incomingCall.initiator.id] = pc;
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+      await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      window.Echo.private(`task.${task.id}.comments`).whisper('call.answer', {
+        callId: incomingCall.callId,
+        answer,
+        responderId: auth.user.id,
+        targetId: incomingCall.initiator.id,
+      });
+
+      setCallState('in-call');
+      setIncomingCall(null);
+      setIsCallActive(true);
+    } catch (error) {
+      console.error('Erreur acceptation appel natif:', error);
+      setCallError(error?.message || 'Impossible de rejoindre l’appel audio/vidéo');
+      setCallState('idle');
+    }
+  };
+
+  const hangupNativeCall = async () => {
+    if (currentCallIdRef.current) {
+      window.Echo.private(`task.${task.id}.comments`).whisper('call.hangup', {
+        callId: currentCallIdRef.current,
+        senderId: auth.user.id,
+      });
+    }
+    endNativeCall();
+  };
+
+  const endNativeCall = () => {
+    setIsCallActive(false);
+    setCallState('idle');
+    setIncomingCall(null);
+    setCurrentCallId(null);
+    setIsCallInitiator(false);
+    isCallInitiatorRef.current = false;
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    setLocalStream(null);
+    setRemoteStreams({});
+
+    Object.values(peerConnectionsRef.current).forEach(pc => pc.close());
+    peerConnectionsRef.current = {};
+    remoteVideoRefs.current = {};
+  };
+
+  const createPeerConnection = (remoteUserId) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+    });
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        window.Echo.private(`task.${task.id}.comments`).whisper('call.ice', {
+          callId: currentCallIdRef.current,
+          senderId: auth.user.id,
+          targetId: remoteUserId,
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      setRemoteStreams(prev => ({ ...prev, [remoteUserId]: event.streams[0] }));
+    };
+
+    return pc;
+  };
+
+  const createOfferForAllParticipants = async (stream, callId) => {
+    const participants = [...onlineUsers.filter(u => u.id !== auth.user.id)];
+    if (participants.length === 0) {
+      setCallState('in-call');
+      return;
+    }
+
+    for (const participant of participants) {
+      const pc = createPeerConnection(participant.id);
+      peerConnectionsRef.current[participant.id] = pc;
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      window.Echo.private(`task.${task.id}.comments`).whisper('call.offer', {
+        callId,
+        initiator: { id: auth.user.id, name: auth.user.name },
+        targetId: participant.id,
+        offer,
+        participants: participants.map(u => u.id),
+      });
+    }
+  };
+
+  const handleRemoteAnswer = async (answer, responderId) => {
+    const pc = peerConnectionsRef.current[responderId || incomingCall?.initiator?.id];
+    if (!pc) return;
+    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    setCallState('in-call');
+  };
 
   const handleDeleteComment = (commentId) => {
     setCommentToDeleteId(commentId);
@@ -2420,6 +2655,45 @@ const handleReplyComment = (commentId) => {
       <div className="flex items-center gap-3">
         <OnlineAvatarStack users={onlineUsers} />
 
+        {task?.project_id && (
+          <div className="flex items-center gap-2">
+            <div className="rounded-full bg-white/10 px-3 py-2 text-xs text-white border border-white/15">
+              {callState === 'idle' && 'Aucun appel actif'}
+              {callState === 'ringing' && incomingCall && `${incomingCall.initiator.name} vous appelle…`}
+              {callState === 'connecting' && 'Connexion à l’appel…'}
+              {callState === 'in-call' && 'Appel natif en cours'}
+            </div>
+
+            {incomingCall && callState === 'ringing' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={acceptNativeCall}
+                  className="inline-flex items-center gap-2 rounded-full bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-3 py-2 transition"
+                >
+                  <FaPlay /> Rejoindre
+                </button>
+                <button
+                  type="button"
+                  onClick={hangupNativeCall}
+                  className="inline-flex items-center gap-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs font-semibold px-3 py-2 transition"
+                >
+                  <FaStop /> Refuser
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={callState === 'in-call' ? hangupNativeCall : startNativeCall}
+                disabled={callState === 'connecting'}
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold px-3 py-2 transition disabled:opacity-50"
+              >
+                <FaVideo /> {callState === 'in-call' ? 'Terminer l’appel' : 'Démarrer appel natif'}
+              </button>
+            )}
+          </div>
+        )}
+
         <label
           className="flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none border border-white/15"
           title={shareDiscussionEmail
@@ -2444,6 +2718,63 @@ const handleReplyComment = (commentId) => {
         </label>
       </div>
     </div>
+
+    {/* ─── UI D’APPEL AUDIO/VIDÉO NATIF ─── */}
+    {(callState !== 'idle' || isCallActive) && (
+      <div className="px-4 py-3 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-slate-700 dark:text-slate-200">
+              {callState === 'ringing' && incomingCall && <span>{incomingCall.initiator.name} vous appelle.</span>}
+              {callState === 'connecting' && <span>Préparation du flux audio/vidéo…</span>}
+              {callState === 'in-call' && <span>Vous êtes en appel natif.</span>}
+            </div>
+            {callState === 'in-call' && (
+              <button
+                type="button"
+                onClick={hangupNativeCall}
+                className="inline-flex items-center gap-2 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-2 transition"
+              >
+                <FaStop /> Quitter
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-2xl overflow-hidden bg-black border border-slate-200 dark:border-slate-700">
+              <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-44 object-cover bg-black" />
+              <div className="px-3 py-2 bg-slate-900 text-white text-xs font-semibold">Votre vidéo</div>
+            </div>
+            {Object.entries(remoteStreams).length > 0 ? (
+              Object.entries(remoteStreams).map(([userId]) => {
+                const user = onlineUsers.find(u => String(u.id) === String(userId));
+                return (
+                  <div key={userId} className="rounded-2xl overflow-hidden bg-black border border-slate-200 dark:border-slate-700">
+                    <video
+                      ref={(el) => { if (el) remoteVideoRefs.current[userId] = el; }}
+                      autoPlay
+                      playsInline
+                      className="w-full h-44 object-cover bg-black"
+                    />
+                    <div className="px-3 py-2 bg-slate-900 text-white text-xs font-semibold">
+                      {user?.name || `Participant ${userId}`}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4 text-sm text-slate-600 dark:text-slate-300">
+                {callState === 'in-call' ? 'En attente de la vidéo distante…' : 'Aucun flux distant reçu pour le moment.'}
+              </div>
+            )}
+          </div>
+          {callError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">
+              {callError}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
 
     {/* ─── ZONE DES MESSAGES ─── */}
     <div
@@ -2945,7 +3276,9 @@ const handleReplyComment = (commentId) => {
         
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Zoom embed removed for native WebRTC call support */}
+
+    {/* Confirmation Modal */}
       <Modal show={showConfirmValidationModal} onClose={() => setShowConfirmValidationModal(false)} maxWidth="md">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
