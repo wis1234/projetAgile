@@ -807,11 +807,21 @@ onClick={() => {
           <ZoomMeeting project={project} />
         </div>
       </Modal>
-      {showLiveKitCall && (
-        <LiveKitCallModal
-          tokenEndpoint={`/projects/${project.id}/livekit-token`}
-          title={project.name}
-          onClose={() => {
+{showLiveKitCall && (
+  <LiveKitCallModal
+    tokenEndpoint={`/projects/${project.id}/livekit-token`}
+    title={project.name}
+    onAnswered={() => {
+      fetch(`/projects/${project.id}/livekit-call/answered`, {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+      }).catch(() => {});
+    }}
+    onClose={() => {
+      
   setShowLiveKitCall(false);
   fetch(`/projects/${project.id}/livekit-call/end`, {
     method: 'POST',

@@ -253,9 +253,13 @@ export default function AdminLayout({ children }) {
       playRingtone();
     });
 
-    channel.listen('.livekit.call.ended', () => {
+channel.listen('.livekit.call.ended', () => {
       setLiveKitInvite(null);
       stopRingtone();
+    });
+
+    channel.listen('.livekit.call.answered', () => {
+      stopRingtone(); // quelqu'un a répondu : plus la peine de continuer à sonner
     });
 
     return () => {
@@ -792,10 +796,19 @@ export default function AdminLayout({ children }) {
       )}
 
       {/* ─── Modal d'appel ProJA (LiveKit) ─── */}
-      {showLiveKitCall && liveKitInvite && (
+{showLiveKitCall && liveKitInvite && (
         <LiveKitCallModal
           tokenEndpoint={`/projects/${liveKitInvite.projectId}/livekit-token`}
           title={liveKitInvite.projectName}
+          onAnswered={() => {
+            fetch(`/projects/${liveKitInvite.projectId}/livekit-call/answered`, {
+              method: 'POST',
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+              },
+            }).catch(() => {});
+          }}
           onClose={() => {
             setShowLiveKitCall(false);
             setLiveKitInvite(null);

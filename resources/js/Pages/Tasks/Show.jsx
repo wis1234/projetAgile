@@ -2678,7 +2678,7 @@ return () => {
         {task?.project_id && (
           <div className="flex items-center gap-2">
             <div className="rounded-full bg-white/10 px-3 py-2 text-xs text-white border border-white/15">
-              {callState === 'idle' && 'Aucun appel actif'}
+              {/*callState === 'idle' && 'Aucun appel actif'*/}
               {callState === 'ringing' && incomingCall && `${incomingCall.initiator.name} vous appelle…`}
               {callState === 'connecting' && 'Connexion à l’appel…'}
               {callState === 'in-call' && 'Appel natif en cours'}

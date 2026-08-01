@@ -89,5 +89,11 @@ public function notifyCallEnded(Request $request, \App\Models\Project $project)
 
     return response()->json(['status' => 'ok']);
 }
+public function notifyCallAnswered(Request $request, \App\Models\Project $project)
+{
+    $memberIds = $project->users()->pluck('users.id')->toArray();
+    event(new \App\Events\LiveKitCallAnswered($project->id, $memberIds));
+    return response()->json(['status' => 'ok']);
+}
 
 }

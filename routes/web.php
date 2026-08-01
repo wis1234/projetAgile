@@ -112,7 +112,8 @@ Route::prefix('push')->group(function () {
     // Routes pour les appels LiveKit
    Route::middleware(['auth'])->post('/projects/{project}/livekit-call/notify', [LiveKitController::class, 'notifyCallStarted']);
    Route::middleware(['auth'])->post('/projects/{project}/livekit-call/end', [LiveKitController::class, 'notifyCallEnded']);
-
+   Route::middleware(['auth'])->post('/projects/{project}/livekit-call/answered', [LiveKitController::class, 'notifyCallAnswered']);
+   
     // Routes Zoom
     Route::prefix('projects/{project}')->group(function () {
         Route::get('/zoom/active', [\App\Http\Controllers\ZoomMeetingController::class, 'active'])->name('api.zoom.active');
