@@ -15,8 +15,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskCommentReactionController;
 use App\Models\User;
 use App\Notifications\ProjaNotification;
-use app\Http\Controllers\LiveKitController;
-
+use App\Http\Controllers\LiveKitController;
 
 
 
