@@ -38,3 +38,7 @@ Broadcast::channel('presence-project.{projectId}', function ($user, $projectId) 
     if (!$isMember) return false;
     return ['id' => $user->id, 'name' => $user->name, 'profile_photo_url' => $user->profile_photo_url];
 });
+
+Broadcast::channel('user.{id}', function ($user, $id) {
+    return (int) $user->id === (int) $id;
+});

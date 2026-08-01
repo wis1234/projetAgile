@@ -5,6 +5,7 @@ import { router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import GlobalFooter from '@/Components/GlobalFooter';
 import PushNotificationManager from '@/Components/PushNotificationManager';
+import LiveKitCallModal from '@/Components/LiveKitCallModal';
 
 const navLinks = [
   { href: '/dashboard', label: 'dashboard', icon: (
@@ -121,6 +122,53 @@ export default function AdminLayout({ children }) {
   const [currentLanguage, setCurrentLanguage] = useState('fr');
   const [isChangingLanguage, setIsChangingLanguage] = useState(false);
   const { t, i18n } = useTranslation();
+
+  // ─── Appel ProJA (LiveKit) — état global, actif peu importe la page ───
+  const [showLiveKitCall, setShowLiveKitCall] = useState(false);
+  const [liveKitInvite, setLiveKitInvite] = useState(null); // { projectId, projectName, initiatorName }
+  const ringtoneRef = useRef(null);
+
+  const playRingtone = () => {
+    if (ringtoneRef.current) return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    const audioCtx = new AudioCtx();
+    audioCtx.resume?.().catch(() => {});
+
+    const playTone = () => {
+      const now = audioCtx.currentTime;
+      [880, 1108].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + i * 0.15);
+        gain.gain.linearRampToValueAtTime(0.18, now + 0.05 + i * 0.15);
+        gain.gain.linearRampToValueAtTime(0, now + 0.35 + i * 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + i * 0.15);
+        osc.stop(now + 0.5 + i * 0.15);
+      });
+    };
+
+    playTone();
+    const interval = setInterval(playTone, 1800);
+    ringtoneRef.current = { audioCtx, interval };
+
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+  };
+
+  const stopRingtone = () => {
+    if (!ringtoneRef.current) return;
+    clearInterval(ringtoneRef.current.interval);
+    ringtoneRef.current.audioCtx.close().catch(() => {});
+    ringtoneRef.current = null;
+    if (navigator.vibrate) navigator.vibrate(0);
+  };
+
+  useEffect(() => stopRingtone, []);
   
   // Available languages with their display names and flag codes
   const languages = [
@@ -189,6 +237,32 @@ export default function AdminLayout({ children }) {
         });
     }
   }, []);
+
+  // ─── Écoute globale des appels ProJA (LiveKit), peu importe la page ───
+  useEffect(() => {
+    if (!window.Echo || !auth?.user?.id) return;
+
+    const channel = window.Echo.private(`user.${auth.user.id}`);
+
+    channel.listen('.livekit.call.started', (e) => {
+      setLiveKitInvite({
+        projectId: e.projectId,
+        projectName: e.projectName,
+        initiatorName: e.initiatorName,
+      });
+      playRingtone();
+    });
+
+    channel.listen('.livekit.call.ended', () => {
+      setLiveKitInvite(null);
+      stopRingtone();
+    });
+
+    return () => {
+      window.Echo.leave(`user.${auth.user.id}`);
+    };
+  }, [auth?.user?.id]);
+
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -686,7 +760,7 @@ export default function AdminLayout({ children }) {
         <Notification message={flash.error} type="error" />
         <Notification message={flash.info} type="info" />
         {/* Page content */}
-        <main className="flex-1 w-full h-full transition-colors pt-16 bg-white dark:bg-gray-900 flex flex-col">
+<main className="flex-1 w-full h-full transition-colors pt-16 bg-white dark:bg-gray-900 flex flex-col">
           <div className="flex-1">
             {children}
           </div>
@@ -695,6 +769,46 @@ export default function AdminLayout({ children }) {
           </footer>
         </main>
       </div>
+
+      {/* ─── Bannière d'appel ProJA entrant (visible sur toute page) ─── */}
+      {liveKitInvite && !showLiveKitCall && (
+        <div className="fixed bottom-6 right-6 z-[9999] bg-emerald-600 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3 animate-pulse">
+          <span className="text-sm font-medium">
+            {liveKitInvite.initiatorName} démarre un appel ProJA — {liveKitInvite.projectName}
+          </span>
+          <button
+            onClick={() => { setShowLiveKitCall(true); stopRingtone(); }}
+            className="bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-emerald-50"
+          >
+            Rejoindre
+          </button>
+          <button
+            onClick={() => { setLiveKitInvite(null); stopRingtone(); }}
+            className="text-white/70 hover:text-white text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ─── Modal d'appel ProJA (LiveKit) ─── */}
+      {showLiveKitCall && liveKitInvite && (
+        <LiveKitCallModal
+          tokenEndpoint={`/projects/${liveKitInvite.projectId}/livekit-token`}
+          title={liveKitInvite.projectName}
+          onClose={() => {
+            setShowLiveKitCall(false);
+            setLiveKitInvite(null);
+            fetch(`/projects/${liveKitInvite.projectId}/livekit-call/end`, {
+              method: 'POST',
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+              },
+            }).catch(() => {});
+          }}
+        />
+      )}
     </div>
   );
 }

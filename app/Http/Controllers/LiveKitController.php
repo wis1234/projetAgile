@@ -68,4 +68,26 @@ class LiveKitController extends Controller
     ]);
 }
 
+public function notifyCallStarted(Request $request, \App\Models\Project $project)
+{
+    $user = $request->user();
+    $memberIds = $project->users()->pluck('users.id')->toArray();
+
+    event(new \App\Events\LiveKitCallStarted(
+        $project->id, $project->name, $user->id, $user->name, $memberIds
+    ));
+
+    return response()->json(['status' => 'ok']);
+}
+
+public function notifyCallEnded(Request $request, \App\Models\Project $project)
+{
+    $user = $request->user();
+    $memberIds = $project->users()->pluck('users.id')->toArray();
+
+    event(new \App\Events\LiveKitCallEnded($project->id, $user->id, $memberIds));
+
+    return response()->json(['status' => 'ok']);
+}
+
 }

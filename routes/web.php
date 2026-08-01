@@ -109,8 +109,9 @@ Route::prefix('push')->group(function () {
     //LiveKit Routes
     Route::middleware(['auth'])->post('/tasks/{task}/livekit-token', [LiveKitController::class, 'livekitToken']);
     Route::middleware(['auth'])->post('/projects/{project}/livekit-token', [LiveKitController::class, 'livekitTokenForProject']);
-    
-
+    // Routes pour les appels LiveKit
+   Route::middleware(['auth'])->post('/projects/{project}/livekit-call/notify', [LiveKitController::class, 'notifyCallStarted']);
+   Route::middleware(['auth'])->post('/projects/{project}/livekit-call/end', [LiveKitController::class, 'notifyCallEnded']);
 
     // Routes Zoom
     Route::prefix('projects/{project}')->group(function () {
