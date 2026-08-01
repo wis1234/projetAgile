@@ -1103,7 +1103,11 @@ const retryComment = async (failedComment) => {
 
   
 
-const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState('details');
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
 useEffect(() => {
   initializeNativeCall();
@@ -1461,7 +1465,7 @@ const handleReplyComment = (commentId) => {
 
       setComments(prev => insertRealtimeComment(prev, withMeta));
 
-      if (activeTab === 'comments') {
+if (activeTabRef.current === 'comments') {
         setTimeout(() => {
           const container = document.getElementById('chat-messages-container');
           if (container) container.scrollTop = container.scrollHeight;
@@ -1488,10 +1492,10 @@ const handleReplyComment = (commentId) => {
       ));
     });
 
-    return () => {
+return () => {
       window.Echo.leave(`task.${task.id}.comments`);
     };
-  }, [task?.id, activeTab]);
+  }, [task?.id]);
 
   // Suivi de l'état de connexion websocket
   useEffect(() => {
