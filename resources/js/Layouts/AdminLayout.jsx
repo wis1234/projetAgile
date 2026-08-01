@@ -774,7 +774,7 @@ export default function AdminLayout({ children }) {
       {liveKitInvite && !showLiveKitCall && (
         <div className="fixed bottom-6 right-6 z-[9999] bg-emerald-600 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3 animate-pulse">
           <span className="text-sm font-medium">
-            {liveKitInvite.initiatorName} démarre un appel ProJA — {liveKitInvite.projectName}
+            {liveKitInvite.initiatorName} démarre un un appel — {liveKitInvite.projectName}
           </span>
           <button
             onClick={() => { setShowLiveKitCall(true); stopRingtone(); }}

@@ -2701,7 +2701,7 @@ return () => {
                   <FaStop /> Refuser
                 </button>
               </>
-            ) : (
+            ) : ( false && (
               <button
                 type="button"
                 onClick={callState === 'in-call' ? hangupNativeCall : startNativeCall}
@@ -2711,11 +2711,11 @@ return () => {
                 <FaVideo /> {callState === 'in-call' ? 'Terminer l’appel' : 'Démarrer appel natif'}
               </button>
               
-            )}
+            ))}
           </div>
         )}
 
-<button
+{/*<button
   type="button"
   onClick={() => {
     setShowLiveKitCall(true);
@@ -2729,7 +2729,7 @@ return () => {
 >
 <FaVideo /> Appel ProJA
 </button>
-
+*/}
 
         <label
           className="flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none border border-white/15"
@@ -2754,6 +2754,7 @@ return () => {
           </span>
         </label>
       </div>
+      
     </div>
 
     {/* ─── UI D’APPEL AUDIO/VIDÉO NATIF ─── */}
