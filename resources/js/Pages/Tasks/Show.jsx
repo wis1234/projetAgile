@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, usePage, router } from '@inertiajs/react';
 import ActionButton from '../../Components/ActionButton';
-import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaPlay, FaReply, FaStar, FaPaperPlane, FaEnvelope, FaPaperclip, FaSmile, FaSmileBeam } from 'react-icons/fa';
+import { FaTasks, FaUserCircle, FaProjectDiagram, FaFlagCheckered, FaUser, FaArrowLeft, FaFileUpload, FaCommentDots, FaDownload, FaInfoCircle, FaEdit, FaTrash, FaDollarSign, FaClock, FaMicrophone, FaStop, FaPlay, FaVideo, FaReply, FaStar, FaPaperPlane, FaEnvelope, FaPaperclip, FaSmile, FaSmileBeam } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
 import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
