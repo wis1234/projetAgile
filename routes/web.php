@@ -28,6 +28,11 @@ Route::get('/', function () {
     ]);
 });
 
+// Route pour la page de guide
+Route::get('/guide', function () {
+    return view('guide');
+})->name('guide');
+
 Route::get('/about', function () { return Inertia::render('About'); })->name('about');
 Route::get('/contact', function () { return Inertia::render('Contact'); })->name('contact');
 Route::get('/privacy-policy', function () { return Inertia::render('PrivacyPolicy'); })->name('privacy.policy');
@@ -117,7 +122,7 @@ Route::prefix('push')->group(function () {
    Route::middleware(['auth'])->get('/projects/{project}/livekit-call/status', [LiveKitController::class, 'callStatus']);
    Route::middleware(['auth'])->post('/projects/{project}/livekit-call/join-or-start', [LiveKitController::class, 'joinOrStartCall']);
    Route::middleware(['auth'])->post('/projects/{project}/livekit-call/mute-participant', [LiveKitController::class, 'muteParticipant']);
-    
+
 
     // Routes Zoom
     Route::prefix('projects/{project}')->group(function () {

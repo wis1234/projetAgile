@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Guide-Utilisateur-Proja.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/*
+
+Arduino® Light Theme - Stefania Mellai <s.mellai@arduino.cc>
+
+*/
+
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  background: #FFFFFF;
+}
+
+.hljs,
+.hljs-subst {
+  color: #434f54;
+}
+
+.hljs-keyword,
+.hljs-attribute,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-name {
+  color: #00979D;
+}
+
+.hljs-built_in,
+.hljs-literal,
+.hljs-bullet,
+.hljs-code,
+.hljs-addition {
+  color: #D35400;
+}
+
+.hljs-regexp,
+.hljs-symbol,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-link,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: #00979D;
+}
+
+.hljs-type,
+.hljs-string,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-quote,
+.hljs-template-tag,
+.hljs-deletion {
+  color: #005C5F;
+}
+
+.hljs-title,
+.hljs-section {
+  color: #880000;
+  font-weight: bold;
+}
+
+.hljs-comment {
+  color: rgba(149,165,166,.8);
+}
+
+.hljs-meta-keyword {
+  color: #728E00;
+}
+
+.hljs-meta {
+  color: #434f54;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+.hljs-function {
+  color: #728E00;
+}
+
+.hljs-number {
+  color: #8A7B52;  
+}
+
+</style>
+
+<style>
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family:   "HelveticaNeue-Light", sans-serif, "宋体","Segoe WPC", "Segoe UI", "SFUIText-Light","Droid Sans Fallback";
+	font-size: 18px;
+	padding: 0 12px;
+	line-height: 1.6;
+	word-wrap: break-word;
+	color: #333333;
+}
+
+.content-wrapper{
+	max-width: 860px;
+    margin: 0 auto;
+    padding: 0 30px;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	color: #4080D0;
+	text-decoration: none;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom: 1px solid #eee;
+}
+
+
+h2{
+	padding-bottom: .3em;
+    font-size: 2em;
+    line-height: 1.225;
+    border-bottom: 1px solid #eee;
+}
+
+h3{
+	font-size: 1.75em;
+    line-height: 1.225;
+}
+
+h1, h2, h3 {
+	font-weight: bold;
+}
+
+h1 code,
+h2 code,
+h3 code,
+h4 code,
+h5 code,
+h6 code {
+	font-size: inherit;
+	line-height: auto;
+}
+
+a:hover {
+	color: #4080D0;
+	text-decoration: underline;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left: 5px solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 14px;
+	line-height: 19px;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+.mac code {
+	font-size: 12px;
+	line-height: 18px;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+/** Theming */
+
+.vscode-light,
+.vscode-light pre code {
+	color: rgb(30, 30, 30);
+}
+
+.vscode-dark,
+.vscode-dark pre code {
+	color: #DDD;
+}
+
+.vscode-high-contrast,
+.vscode-high-contrast pre code {
+	color: white;
+}
+
+.vscode-light code {
+	color: #A31515;
+}
+
+.vscode-dark code {
+	color: #D7BA7D;
+}
+
+.vscode-light pre:not(.hljs),
+.vscode-light code > div {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre:not(.hljs),
+.vscode-dark code > div {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre:not(.hljs),
+.vscode-high-contrast code > div {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+.vscode-light blockquote,
+.vscode-dark blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.vscode-high-contrast blockquote {
+	background: transparent;
+	border-color: #fff;
+}
+</style>
+
+<style>
+/* Obsidian syntax defaults for legacy export (PDF / HTML / DOCX) */
+
+.callout {
+	--callout-accent: #0969da;
+	margin: 12px 0;
+	border-radius: 6px;
+	border-left: 4px solid var(--callout-accent);
+	background: rgba(9, 105, 218, 0.08);
+	color: #333333;
+	overflow: hidden;
+}
+
+.callout[data-callout="note"],
+.callout[data-callout="abstract"],
+.callout[data-callout="info"],
+.callout[data-callout="todo"],
+.callout[data-subtype="note"],
+.callout[data-subtype="abstract"],
+.callout[data-subtype="info"],
+.callout[data-subtype="todo"],
+.callout[data-callout="note" i],
+.callout[data-callout="abstract" i],
+.callout[data-callout="info" i],
+.callout[data-callout="todo" i],
+.callout[data-subtype="note" i],
+.callout[data-subtype="abstract" i],
+.callout[data-subtype="info" i],
+.callout[data-subtype="todo" i] {
+	--callout-accent: #0969da;
+	border-left-color: #0969da;
+	background: rgba(9, 105, 218, 0.08);
+}
+
+.callout[data-callout="tip"],
+.callout[data-callout="hint"],
+.callout[data-subtype="tip"],
+.callout[data-subtype="hint"],
+.callout[data-callout="tip" i],
+.callout[data-callout="hint" i],
+.callout[data-subtype="tip" i],
+.callout[data-subtype="hint" i] {
+	--callout-accent: #116329;
+	border-left-color: #116329;
+	background: rgba(17, 99, 41, 0.08);
+}
+
+.callout[data-callout="important"],
+.callout[data-subtype="important"],
+.callout[data-callout="important" i],
+.callout[data-subtype="important" i] {
+	--callout-accent: #8250df;
+	border-left-color: #8250df;
+	background: rgba(130, 80, 223, 0.08);
+}
+
+.callout[data-callout="warning"],
+.callout[data-subtype="warning"],
+.callout[data-callout="warning" i],
+.callout[data-subtype="warning" i] {
+	--callout-accent: #bc4c00;
+	border-left-color: #bc4c00;
+	background: rgba(188, 76, 0, 0.08);
+}
+
+.callout[data-callout="caution"],
+.callout[data-callout="danger"],
+.callout[data-callout="error"],
+.callout[data-callout="bug"],
+.callout[data-callout="fail"],
+.callout[data-subtype="caution"],
+.callout[data-subtype="danger"],
+.callout[data-subtype="error"],
+.callout[data-subtype="bug"],
+.callout[data-subtype="fail"],
+.callout[data-callout="caution" i],
+.callout[data-callout="danger" i],
+.callout[data-callout="error" i],
+.callout[data-callout="bug" i],
+.callout[data-callout="fail" i],
+.callout[data-subtype="caution" i],
+.callout[data-subtype="danger" i],
+.callout[data-subtype="error" i],
+.callout[data-subtype="bug" i],
+.callout[data-subtype="fail" i] {
+	--callout-accent: #cf222e;
+	border-left-color: #cf222e;
+	background: rgba(207, 34, 46, 0.08);
+}
+
+.callout[data-callout="question"],
+.callout[data-callout="help"],
+.callout[data-callout="faq"],
+.callout[data-subtype="question"],
+.callout[data-subtype="help"],
+.callout[data-subtype="faq"],
+.callout[data-callout="question" i],
+.callout[data-callout="help" i],
+.callout[data-callout="faq" i],
+.callout[data-subtype="question" i],
+.callout[data-subtype="help" i],
+.callout[data-subtype="faq" i] {
+	--callout-accent: #9a6700;
+	border-left-color: #9a6700;
+	background: rgba(154, 103, 0, 0.08);
+}
+
+.callout .callout-title,
+.callout .callout-info {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 12px 14px 0;
+	margin-bottom: 10px;
+	color: var(--callout-accent);
+}
+
+.callout .callout-title-icon,
+.callout .callout-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+	color: var(--callout-accent);
+}
+
+.callout .callout-title-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.callout .callout-title-inner,
+.callout .callout-info > .callout-title {
+	font-weight: 700;
+	font-size: 0.95em;
+	line-height: 1.35;
+	color: var(--callout-accent);
+}
+
+.callout .callout-content {
+	padding: 6px 14px 12px;
+	color: #333333;
+}
+
+.callout .callout-content > :first-child {
+	margin-top: 0;
+}
+
+.callout .callout-content > :last-child {
+	margin-bottom: 0;
+}
+
+.obsidian-wikilink {
+	color: #7c3aed;
+	text-decoration: underline;
+}
+
+.obsidian-wikilink-embed {
+	display: inline-block;
+	padding: 2px 8px;
+	border: 1px dashed #d0d7de;
+	border-radius: 4px;
+	color: #7c3aed;
+}
+
+.obsidian-tag {
+	color: #7c3aed;
+	background: rgba(124, 58, 237, 0.12);
+	border-radius: 4px;
+	padding: 0 4px;
+}
+
+mark {
+	background: rgba(154, 103, 0, 0.35);
+	color: inherit;
+	padding: 0 2px;
+	border-radius: 2px;
+}
+
+[data-type="yaml-front-matter"] {
+	margin: 0 0 16px;
+}
+
+.vditor-properties {
+	border: 1px solid #d0d7de;
+	border-radius: 8px;
+	background: #f6f8fa;
+	overflow: hidden;
+}
+
+.vditor-properties__heading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	border-bottom: 1px solid #d0d7de;
+	background: #f3f4f6;
+	font-size: 0.85rem;
+	font-weight: 600;
+	color: #6b7280;
+}
+
+.vditor-properties__heading-icon::before {
+	content: "☰";
+	opacity: 0.75;
+}
+
+.vditor-properties__table {
+	display: flex;
+	flex-direction: column;
+}
+
+.vditor-properties__row {
+	display: grid;
+	grid-template-columns: minmax(120px, 34%) 1fr;
+	gap: 8px 12px;
+	align-items: start;
+	padding: 8px 12px;
+	border-top: 1px solid rgba(208, 215, 222, 0.45);
+}
+
+.vditor-properties__row:first-child {
+	border-top: none;
+}
+
+.vditor-properties__key {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	color: #6b7280;
+	font-size: 0.85rem;
+}
+
+.vditor-properties__key-icon {
+	flex-shrink: 0;
+	width: 14px;
+	height: 14px;
+	opacity: 0.72;
+	text-align: center;
+}
+
+.vditor-properties__key-icon[data-icon="tag"]::before { content: "#"; }
+.vditor-properties__key-icon[data-icon="alias"]::before { content: "⛓"; }
+.vditor-properties__key-icon[data-icon="date"]::before { content: "📅"; }
+.vditor-properties__key-icon[data-icon="toggle"]::before { content: "◉"; }
+.vditor-properties__key-icon[data-icon="number"]::before { content: "#"; }
+.vditor-properties__key-icon[data-icon="list"]::before { content: "≡"; }
+.vditor-properties__key-icon[data-icon="text"]::before { content: "T"; }
+
+.vditor-properties__key-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.vditor-properties__value {
+	min-width: 0;
+	font-size: 0.92rem;
+	color: #333333;
+	word-break: break-word;
+}
+
+.vditor-properties__value--tags,
+.vditor-properties__value--aliases {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.vditor-properties__value--aliases {
+	gap: 6px;
+}
+
+.vditor-properties__list {
+	margin: 0;
+	padding-left: 1.1rem;
+}
+
+.vditor-properties__checkbox {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	margin-right: 6px;
+	border: 1px solid #d0d7de;
+	border-radius: 3px;
+	vertical-align: -2px;
+	background: #ffffff;
+}
+
+.vditor-properties__checkbox[is-checked="true"] {
+	background: #7c3aed;
+	border-color: #7c3aed;
+	box-shadow: inset 0 0 0 2px #ffffff;
+}
+
+.vditor-properties__empty {
+	opacity: 0.45;
+}
+
+</style>
+
+<style>
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+.table-of-contents li{
+	list-style-type: initial;
+}
+
+</style>
+
+<style>
+@font-face{font-display:block;font-family:KaTeX_AMS;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_AMS-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_AMS-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_AMS-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Caligraphic;font-style:normal;font-weight:700;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Caligraphic-Bold.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Caligraphic-Bold.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Caligraphic-Bold.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Caligraphic;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Caligraphic-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Caligraphic-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Caligraphic-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Fraktur;font-style:normal;font-weight:700;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Fraktur-Bold.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Fraktur-Bold.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Fraktur-Bold.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Fraktur;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Fraktur-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Fraktur-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Fraktur-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:normal;font-weight:700;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-Bold.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-Bold.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-Bold.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:italic;font-weight:700;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-BoldItalic.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-BoldItalic.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-BoldItalic.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:italic;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-Italic.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-Italic.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-Italic.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Main-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Math;font-style:italic;font-weight:700;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Math-BoldItalic.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Math-BoldItalic.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Math-BoldItalic.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Math;font-style:italic;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Math-Italic.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Math-Italic.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Math-Italic.ttf") format("truetype")}@font-face{font-display:block;font-family:"KaTeX_SansSerif";font-style:normal;font-weight:700;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_SansSerif-Bold.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_SansSerif-Bold.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_SansSerif-Bold.ttf") format("truetype")}@font-face{font-display:block;font-family:"KaTeX_SansSerif";font-style:italic;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_SansSerif-Italic.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_SansSerif-Italic.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_SansSerif-Italic.ttf") format("truetype")}@font-face{font-display:block;font-family:"KaTeX_SansSerif";font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_SansSerif-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_SansSerif-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_SansSerif-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Script;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Script-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Script-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Script-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size1;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size1-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size1-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size1-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size2;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size2-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size2-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size2-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size3;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size3-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size3-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size3-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size4;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size4-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size4-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Size4-Regular.ttf") format("truetype")}@font-face{font-display:block;font-family:KaTeX_Typewriter;font-style:normal;font-weight:400;src:url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Typewriter-Regular.woff2") format("woff2"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Typewriter-Regular.woff") format("woff"),url("https://cdn.jsdelivr.net/npm/katex@0.16.2/dist/fonts/KaTeX_Typewriter-Regular.ttf") format("truetype")}.katex{font:normal 1.21em KaTeX_Main,Times New Roman,serif;line-height:1.2;position:relative;text-indent:0;text-rendering:auto}.katex *{-ms-high-contrast-adjust:none!important;border-color:currentColor}.katex .katex-version:after{content:"0.16.47"}.katex .katex-mathml{border:0;-webkit-clip-path:inset(50%);clip-path:inset(50%);height:1px;overflow:hidden;padding:0;position:absolute;width:1px}.katex .katex-html>.newline{display:block}.katex .base{position:relative;white-space:nowrap;width:-webkit-min-content;width:-moz-min-content;width:min-content}.katex .base,.katex .strut{display:inline-block}.katex .textbf{font-weight:700}.katex .textit{font-style:italic}.katex .textrm{font-family:KaTeX_Main}.katex .textsf{font-family:KaTeX_SansSerif}.katex .texttt{font-family:KaTeX_Typewriter}.katex .mathnormal{font-family:KaTeX_Math;font-style:italic}.katex .mathit{font-family:KaTeX_Main;font-style:italic}.katex .mathrm{font-style:normal}.katex .mathbf{font-family:KaTeX_Main;font-weight:700}.katex .boldsymbol{font-family:KaTeX_Math;font-style:italic;font-weight:700}.katex .amsrm,.katex .mathbb,.katex .textbb{font-family:KaTeX_AMS}.katex .mathcal{font-family:KaTeX_Caligraphic}.katex .mathfrak,.katex .textfrak{font-family:KaTeX_Fraktur}.katex .mathboldfrak,.katex .textboldfrak{font-family:KaTeX_Fraktur;font-weight:700}.katex .mathtt{font-family:KaTeX_Typewriter}.katex .mathscr,.katex .textscr{font-family:KaTeX_Script}.katex .mathsf,.katex .textsf{font-family:KaTeX_SansSerif}.katex .mathboldsf,.katex .textboldsf{font-family:KaTeX_SansSerif;font-weight:700}.katex .mathitsf,.katex .mathsfit,.katex .textitsf{font-family:KaTeX_SansSerif;font-style:italic}.katex .mainrm{font-family:KaTeX_Main;font-style:normal}.katex .vlist-t{border-collapse:collapse;display:inline-table;table-layout:fixed}.katex .vlist-r{display:table-row}.katex .vlist{display:table-cell;position:relative;vertical-align:bottom}.katex .vlist>span{display:block;height:0;position:relative}.katex .vlist>span>span{display:inline-block}.katex .vlist>span>.pstrut{overflow:hidden;width:0}.katex .vlist-t2{margin-right:-2px}.katex .vlist-s{display:table-cell;font-size:1px;min-width:2px;vertical-align:bottom;width:2px}.katex .vbox{align-items:baseline;display:inline-flex;flex-direction:column}.katex .hbox{width:100%}.katex .hbox,.katex .thinbox{display:inline-flex;flex-direction:row}.katex .thinbox{max-width:0;width:0}.katex .msupsub{text-align:left}.katex .mfrac>span>span{text-align:center}.katex .mfrac .frac-line{border-bottom-style:solid;display:inline-block;width:100%}.katex .hdashline,.katex .hline,.katex .mfrac .frac-line,.katex .overline .overline-line,.katex .rule,.katex .underline .underline-line{min-height:1px}.katex .mspace{display:inline-block}.katex .smash{display:inline;line-height:0}.katex .clap,.katex .llap,.katex .rlap{position:relative;width:0}.katex .clap>.inner,.katex .llap>.inner,.katex .rlap>.inner{position:absolute}.katex .clap>.fix,.katex .llap>.fix,.katex .rlap>.fix{display:inline-block}.katex .llap>.inner{right:0}.katex .clap>.inner,.katex .rlap>.inner{left:0}.katex .clap>.inner>span{margin-left:-50%;margin-right:50%}.katex .rule{border:0 solid;display:inline-block;position:relative}.katex .hline,.katex .overline .overline-line,.katex .underline .underline-line{border-bottom-style:solid;display:inline-block;width:100%}.katex .hdashline{border-bottom-style:dashed;display:inline-block;width:100%}.katex .sqrt>.root{margin-left:.2777777778em;margin-right:-.5555555556em}.katex .fontsize-ensurer.reset-size1.size1,.katex .sizing.reset-size1.size1{font-size:1em}.katex .fontsize-ensurer.reset-size1.size2,.katex .sizing.reset-size1.size2{font-size:1.2em}.katex .fontsize-ensurer.reset-size1.size3,.katex .sizing.reset-size1.size3{font-size:1.4em}.katex .fontsize-ensurer.reset-size1.size4,.katex .sizing.reset-size1.size4{font-size:1.6em}.katex .fontsize-ensurer.reset-size1.size5,.katex .sizing.reset-size1.size5{font-size:1.8em}.katex .fontsize-ensurer.reset-size1.size6,.katex .sizing.reset-size1.size6{font-size:2em}.katex .fontsize-ensurer.reset-size1.size7,.katex .sizing.reset-size1.size7{font-size:2.4em}.katex .fontsize-ensurer.reset-size1.size8,.katex .sizing.reset-size1.size8{font-size:2.88em}.katex .fontsize-ensurer.reset-size1.size9,.katex .sizing.reset-size1.size9{font-size:3.456em}.katex .fontsize-ensurer.reset-size1.size10,.katex .sizing.reset-size1.size10{font-size:4.148em}.katex .fontsize-ensurer.reset-size1.size11,.katex .sizing.reset-size1.size11{font-size:4.976em}.katex .fontsize-ensurer.reset-size2.size1,.katex .sizing.reset-size2.size1{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size2.size2,.katex .sizing.reset-size2.size2{font-size:1em}.katex .fontsize-ensurer.reset-size2.size3,.katex .sizing.reset-size2.size3{font-size:1.1666666667em}.katex .fontsize-ensurer.reset-size2.size4,.katex .sizing.reset-size2.size4{font-size:1.3333333333em}.katex .fontsize-ensurer.reset-size2.size5,.katex .sizing.reset-size2.size5{font-size:1.5em}.katex .fontsize-ensurer.reset-size2.size6,.katex .sizing.reset-size2.size6{font-size:1.6666666667em}.katex .fontsize-ensurer.reset-size2.size7,.katex .sizing.reset-size2.size7{font-size:2em}.katex .fontsize-ensurer.reset-size2.size8,.katex .sizing.reset-size2.size8{font-size:2.4em}.katex .fontsize-ensurer.reset-size2.size9,.katex .sizing.reset-size2.size9{font-size:2.88em}.katex .fontsize-ensurer.reset-size2.size10,.katex .sizing.reset-size2.size10{font-size:3.4566666667em}.katex .fontsize-ensurer.reset-size2.size11,.katex .sizing.reset-size2.size11{font-size:4.1466666667em}.katex .fontsize-ensurer.reset-size3.size1,.katex .sizing.reset-size3.size1{font-size:.7142857143em}.katex .fontsize-ensurer.reset-size3.size2,.katex .sizing.reset-size3.size2{font-size:.8571428571em}.katex .fontsize-ensurer.reset-size3.size3,.katex .sizing.reset-size3.size3{font-size:1em}.katex .fontsize-ensurer.reset-size3.size4,.katex .sizing.reset-size3.size4{font-size:1.1428571429em}.katex .fontsize-ensurer.reset-size3.size5,.katex .sizing.reset-size3.size5{font-size:1.2857142857em}.katex .fontsize-ensurer.reset-size3.size6,.katex .sizing.reset-size3.size6{font-size:1.4285714286em}.katex .fontsize-ensurer.reset-size3.size7,.katex .sizing.reset-size3.size7{font-size:1.7142857143em}.katex .fontsize-ensurer.reset-size3.size8,.katex .sizing.reset-size3.size8{font-size:2.0571428571em}.katex .fontsize-ensurer.reset-size3.size9,.katex .sizing.reset-size3.size9{font-size:2.4685714286em}.katex .fontsize-ensurer.reset-size3.size10,.katex .sizing.reset-size3.size10{font-size:2.9628571429em}.katex .fontsize-ensurer.reset-size3.size11,.katex .sizing.reset-size3.size11{font-size:3.5542857143em}.katex .fontsize-ensurer.reset-size4.size1,.katex .sizing.reset-size4.size1{font-size:.625em}.katex .fontsize-ensurer.reset-size4.size2,.katex .sizing.reset-size4.size2{font-size:.75em}.katex .fontsize-ensurer.reset-size4.size3,.katex .sizing.reset-size4.size3{font-size:.875em}.katex .fontsize-ensurer.reset-size4.size4,.katex .sizing.reset-size4.size4{font-size:1em}.katex .fontsize-ensurer.reset-size4.size5,.katex .sizing.reset-size4.size5{font-size:1.125em}.katex .fontsize-ensurer.reset-size4.size6,.katex .sizing.reset-size4.size6{font-size:1.25em}.katex .fontsize-ensurer.reset-size4.size7,.katex .sizing.reset-size4.size7{font-size:1.5em}.katex .fontsize-ensurer.reset-size4.size8,.katex .sizing.reset-size4.size8{font-size:1.8em}.katex .fontsize-ensurer.reset-size4.size9,.katex .sizing.reset-size4.size9{font-size:2.16em}.katex .fontsize-ensurer.reset-size4.size10,.katex .sizing.reset-size4.size10{font-size:2.5925em}.katex .fontsize-ensurer.reset-size4.size11,.katex .sizing.reset-size4.size11{font-size:3.11em}.katex .fontsize-ensurer.reset-size5.size1,.katex .sizing.reset-size5.size1{font-size:.5555555556em}.katex .fontsize-ensurer.reset-size5.size2,.katex .sizing.reset-size5.size2{font-size:.6666666667em}.katex .fontsize-ensurer.reset-size5.size3,.katex .sizing.reset-size5.size3{font-size:.7777777778em}.katex .fontsize-ensurer.reset-size5.size4,.katex .sizing.reset-size5.size4{font-size:.8888888889em}.katex .fontsize-ensurer.reset-size5.size5,.katex .sizing.reset-size5.size5{font-size:1em}.katex .fontsize-ensurer.reset-size5.size6,.katex .sizing.reset-size5.size6{font-size:1.1111111111em}.katex .fontsize-ensurer.reset-size5.size7,.katex .sizing.reset-size5.size7{font-size:1.3333333333em}.katex .fontsize-ensurer.reset-size5.size8,.katex .sizing.reset-size5.size8{font-size:1.6em}.katex .fontsize-ensurer.reset-size5.size9,.katex .sizing.reset-size5.size9{font-size:1.92em}.katex .fontsize-ensurer.reset-size5.size10,.katex .sizing.reset-size5.size10{font-size:2.3044444444em}.katex .fontsize-ensurer.reset-size5.size11,.katex .sizing.reset-size5.size11{font-size:2.7644444444em}.katex .fontsize-ensurer.reset-size6.size1,.katex .sizing.reset-size6.size1{font-size:.5em}.katex .fontsize-ensurer.reset-size6.size2,.katex .sizing.reset-size6.size2{font-size:.6em}.katex .fontsize-ensurer.reset-size6.size3,.katex .sizing.reset-size6.size3{font-size:.7em}.katex .fontsize-ensurer.reset-size6.size4,.katex .sizing.reset-size6.size4{font-size:.8em}.katex .fontsize-ensurer.reset-size6.size5,.katex .sizing.reset-size6.size5{font-size:.9em}.katex .fontsize-ensurer.reset-size6.size6,.katex .sizing.reset-size6.size6{font-size:1em}.katex .fontsize-ensurer.reset-size6.size7,.katex .sizing.reset-size6.size7{font-size:1.2em}.katex .fontsize-ensurer.reset-size6.size8,.katex .sizing.reset-size6.size8{font-size:1.44em}.katex .fontsize-ensurer.reset-size6.size9,.katex .sizing.reset-size6.size9{font-size:1.728em}.katex .fontsize-ensurer.reset-size6.size10,.katex .sizing.reset-size6.size10{font-size:2.074em}.katex .fontsize-ensurer.reset-size6.size11,.katex .sizing.reset-size6.size11{font-size:2.488em}.katex .fontsize-ensurer.reset-size7.size1,.katex .sizing.reset-size7.size1{font-size:.4166666667em}.katex .fontsize-ensurer.reset-size7.size2,.katex .sizing.reset-size7.size2{font-size:.5em}.katex .fontsize-ensurer.reset-size7.size3,.katex .sizing.reset-size7.size3{font-size:.5833333333em}.katex .fontsize-ensurer.reset-size7.size4,.katex .sizing.reset-size7.size4{font-size:.6666666667em}.katex .fontsize-ensurer.reset-size7.size5,.katex .sizing.reset-size7.size5{font-size:.75em}.katex .fontsize-ensurer.reset-size7.size6,.katex .sizing.reset-size7.size6{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size7.size7,.katex .sizing.reset-size7.size7{font-size:1em}.katex .fontsize-ensurer.reset-size7.size8,.katex .sizing.reset-size7.size8{font-size:1.2em}.katex .fontsize-ensurer.reset-size7.size9,.katex .sizing.reset-size7.size9{font-size:1.44em}.katex .fontsize-ensurer.reset-size7.size10,.katex .sizing.reset-size7.size10{font-size:1.7283333333em}.katex .fontsize-ensurer.reset-size7.size11,.katex .sizing.reset-size7.size11{font-size:2.0733333333em}.katex .fontsize-ensurer.reset-size8.size1,.katex .sizing.reset-size8.size1{font-size:.3472222222em}.katex .fontsize-ensurer.reset-size8.size2,.katex .sizing.reset-size8.size2{font-size:.4166666667em}.katex .fontsize-ensurer.reset-size8.size3,.katex .sizing.reset-size8.size3{font-size:.4861111111em}.katex .fontsize-ensurer.reset-size8.size4,.katex .sizing.reset-size8.size4{font-size:.5555555556em}.katex .fontsize-ensurer.reset-size8.size5,.katex .sizing.reset-size8.size5{font-size:.625em}.katex .fontsize-ensurer.reset-size8.size6,.katex .sizing.reset-size8.size6{font-size:.6944444444em}.katex .fontsize-ensurer.reset-size8.size7,.katex .sizing.reset-size8.size7{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size8.size8,.katex .sizing.reset-size8.size8{font-size:1em}.katex .fontsize-ensurer.reset-size8.size9,.katex .sizing.reset-size8.size9{font-size:1.2em}.katex .fontsize-ensurer.reset-size8.size10,.katex .sizing.reset-size8.size10{font-size:1.4402777778em}.katex .fontsize-ensurer.reset-size8.size11,.katex .sizing.reset-size8.size11{font-size:1.7277777778em}.katex .fontsize-ensurer.reset-size9.size1,.katex .sizing.reset-size9.size1{font-size:.2893518519em}.katex .fontsize-ensurer.reset-size9.size2,.katex .sizing.reset-size9.size2{font-size:.3472222222em}.katex .fontsize-ensurer.reset-size9.size3,.katex .sizing.reset-size9.size3{font-size:.4050925926em}.katex .fontsize-ensurer.reset-size9.size4,.katex .sizing.reset-size9.size4{font-size:.462962963em}.katex .fontsize-ensurer.reset-size9.size5,.katex .sizing.reset-size9.size5{font-size:.5208333333em}.katex .fontsize-ensurer.reset-size9.size6,.katex .sizing.reset-size9.size6{font-size:.5787037037em}.katex .fontsize-ensurer.reset-size9.size7,.katex .sizing.reset-size9.size7{font-size:.6944444444em}.katex .fontsize-ensurer.reset-size9.size8,.katex .sizing.reset-size9.size8{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size9.size9,.katex .sizing.reset-size9.size9{font-size:1em}.katex .fontsize-ensurer.reset-size9.size10,.katex .sizing.reset-size9.size10{font-size:1.2002314815em}.katex .fontsize-ensurer.reset-size9.size11,.katex .sizing.reset-size9.size11{font-size:1.4398148148em}.katex .fontsize-ensurer.reset-size10.size1,.katex .sizing.reset-size10.size1{font-size:.2410800386em}.katex .fontsize-ensurer.reset-size10.size2,.katex .sizing.reset-size10.size2{font-size:.2892960463em}.katex .fontsize-ensurer.reset-size10.size3,.katex .sizing.reset-size10.size3{font-size:.337512054em}.katex .fontsize-ensurer.reset-size10.size4,.katex .sizing.reset-size10.size4{font-size:.3857280617em}.katex .fontsize-ensurer.reset-size10.size5,.katex .sizing.reset-size10.size5{font-size:.4339440694em}.katex .fontsize-ensurer.reset-size10.size6,.katex .sizing.reset-size10.size6{font-size:.4821600771em}.katex .fontsize-ensurer.reset-size10.size7,.katex .sizing.reset-size10.size7{font-size:.5785920926em}.katex .fontsize-ensurer.reset-size10.size8,.katex .sizing.reset-size10.size8{font-size:.6943105111em}.katex .fontsize-ensurer.reset-size10.size9,.katex .sizing.reset-size10.size9{font-size:.8331726133em}.katex .fontsize-ensurer.reset-size10.size10,.katex .sizing.reset-size10.size10{font-size:1em}.katex .fontsize-ensurer.reset-size10.size11,.katex .sizing.reset-size10.size11{font-size:1.1996142719em}.katex .fontsize-ensurer.reset-size11.size1,.katex .sizing.reset-size11.size1{font-size:.2009646302em}.katex .fontsize-ensurer.reset-size11.size2,.katex .sizing.reset-size11.size2{font-size:.2411575563em}.katex .fontsize-ensurer.reset-size11.size3,.katex .sizing.reset-size11.size3{font-size:.2813504823em}.katex .fontsize-ensurer.reset-size11.size4,.katex .sizing.reset-size11.size4{font-size:.3215434084em}.katex .fontsize-ensurer.reset-size11.size5,.katex .sizing.reset-size11.size5{font-size:.3617363344em}.katex .fontsize-ensurer.reset-size11.size6,.katex .sizing.reset-size11.size6{font-size:.4019292605em}.katex .fontsize-ensurer.reset-size11.size7,.katex .sizing.reset-size11.size7{font-size:.4823151125em}.katex .fontsize-ensurer.reset-size11.size8,.katex .sizing.reset-size11.size8{font-size:.578778135em}.katex .fontsize-ensurer.reset-size11.size9,.katex .sizing.reset-size11.size9{font-size:.6945337621em}.katex .fontsize-ensurer.reset-size11.size10,.katex .sizing.reset-size11.size10{font-size:.8336012862em}.katex .fontsize-ensurer.reset-size11.size11,.katex .sizing.reset-size11.size11{font-size:1em}.katex .delimsizing.size1{font-family:KaTeX_Size1}.katex .delimsizing.size2{font-family:KaTeX_Size2}.katex .delimsizing.size3{font-family:KaTeX_Size3}.katex .delimsizing.size4{font-family:KaTeX_Size4}.katex .delimsizing.mult .delim-size1>span{font-family:KaTeX_Size1}.katex .delimsizing.mult .delim-size4>span{font-family:KaTeX_Size4}.katex .nulldelimiter{display:inline-block;width:.12em}.katex .delimcenter,.katex .op-symbol{position:relative}.katex .op-symbol.small-op{font-family:KaTeX_Size1}.katex .op-symbol.large-op{font-family:KaTeX_Size2}.katex .accent>.vlist-t,.katex .op-limits>.vlist-t{text-align:center}.katex .accent .accent-body{position:relative}.katex .accent .accent-body:not(.accent-full){width:0}.katex .overlay{display:block}.katex .mtable .vertical-separator{display:inline-block;min-width:1px}.katex .mtable .arraycolsep{display:inline-block}.katex .mtable .col-align-c>.vlist-t{text-align:center}.katex .mtable .col-align-l>.vlist-t{text-align:left}.katex .mtable .col-align-r>.vlist-t{text-align:right}.katex .svg-align{text-align:left}.katex svg{fill:currentColor;stroke:currentColor;display:block;height:inherit;position:absolute;width:100%}.katex svg path{stroke:none}.katex svg{fill-rule:nonzero;fill-opacity:1;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1}.katex img{border-style:none;max-height:none;max-width:none;min-height:0;min-width:0}.katex .stretchy{display:block;overflow:hidden;position:relative;width:100%}.katex .stretchy:after,.katex .stretchy:before{content:""}.katex .hide-tail{overflow:hidden;position:relative;width:100%}.katex .halfarrow-left{left:0;overflow:hidden;position:absolute;width:50.2%}.katex .halfarrow-right{overflow:hidden;position:absolute;right:0;width:50.2%}.katex .brace-left{left:0;overflow:hidden;position:absolute;width:25.1%}.katex .brace-center{left:25%;overflow:hidden;position:absolute;width:50%}.katex .brace-right{overflow:hidden;position:absolute;right:0;width:25.1%}.katex .x-arrow-pad{padding:0 .5em}.katex .cd-arrow-pad{padding:0 .55556em 0 .27778em}.katex .mover,.katex .munder,.katex .x-arrow{text-align:center}.katex .boxpad{padding:0 .3em}.katex .fbox,.katex .fcolorbox{border:.04em solid;box-sizing:border-box}.katex .cancel-pad{padding:0 .2em}.katex .cancel-lap{margin-left:-.2em;margin-right:-.2em}.katex .sout{border-bottom-style:solid;border-bottom-width:.08em}.katex .angl{border-right:.049em solid;border-top:.049em solid;box-sizing:border-box;margin-right:.03889em}.katex .anglpad{padding:0 .03889em}.katex .eqn-num:before{content:"(" counter(katexEqnNo) ")";counter-increment:katexEqnNo}.katex .mml-eqn-num:before{content:"(" counter(mmlEqnNo) ")";counter-increment:mmlEqnNo}.katex .mtr-glue{width:50%}.katex .cd-vert-arrow{display:inline-block;position:relative}.katex .cd-label-left{display:inline-block;position:absolute;right:calc(50% + .3em);text-align:left}.katex .cd-label-right{display:inline-block;left:calc(50% + .3em);position:absolute;text-align:right}.katex-display{display:block;margin:1em 0;text-align:center}.katex-display>.katex{display:block;text-align:center;white-space:nowrap}.katex-display>.katex>.katex-html{display:block;position:relative}.katex-display>.katex>.katex-html>.tag{position:absolute;right:0}.katex-display.leqno>.katex>.katex-html>.tag{left:0;right:auto}.katex-display.fleqn>.katex{padding-left:2em;text-align:left}body{counter-reset:katexEqnNo mmlEqnNo}
+
+</style>
+<style>
+body {
+    padding-top: 25px;
+}
+</style>
+</head>
+<body>
+    <div class="content-wrapper">
+        <h1 id="guide-utilisateur-proja" tabindex="-1">Guide utilisateur ProJA</h1>
+<h3 id="le-guide-pratique-pour-utiliser-proja-au-quotidien%2C-de-a-%C3%A0-z" tabindex="-1">Le guide pratique pour utiliser ProJA au quotidien, de A à Z</h3>
+<hr>
+<h2 id="sommaire" tabindex="-1">Sommaire</h2>
+<ol>
+<li><a href="#1-d%C3%A9couvrir-proja">Découvrir ProJA</a></li>
+<li><a href="#2-se-connecter-et-cr%C3%A9er-son-compte">Se connecter et créer son compte</a></li>
+<li><a href="#3-le-tableau-de-bord">Le tableau de bord</a></li>
+<li><a href="#4-g%C3%A9rer-un-projet">Gérer un projet</a></li>
+<li><a href="#5-g%C3%A9rer-les-t%C3%A2ches">Gérer les tâches</a></li>
+<li><a href="#6-le-tableau-kanban">Le tableau Kanban</a></li>
+<li><a href="#7-discuter-et-commenter">Discuter et commenter</a></li>
+<li><a href="#8-les-sprints">Les sprints</a></li>
+<li><a href="#9-r%C3%A9unions-zoom">Réunions Zoom</a></li>
+<li><a href="#10-proja-meet--appels-audio-et-vid%C3%A9o">ProJA Meet — appels audio et vidéo</a></li>
+<li><a href="#11-fichiers-et-documents">Fichiers et documents</a></li>
+<li><a href="#12-notifications">Notifications</a></li>
+<li><a href="#13-recrutement">Recrutement</a></li>
+<li><a href="#14-abonnements-et-paiements">Abonnements et paiements</a></li>
+<li><a href="#15-r%C3%A9mun%C3%A9rations">Rémunérations</a></li>
+<li><a href="#16-mon-profil-et-mes-param%C3%A8tres">Mon profil et mes paramètres</a></li>
+<li><a href="#17-r%C3%B4les-et-permissions">Rôles et permissions</a></li>
+<li><a href="#18-messagerie">Messagerie</a></li>
+<li><a href="#19-astuces-et-bonnes-pratiques">Astuces et bonnes pratiques</a></li>
+<li><a href="#20-questions-fr%C3%A9quentes-et-d%C3%A9pannage">Questions fréquentes et dépannage</a></li>
+</ol>
+<hr>
+<h2 id="1.-d%C3%A9couvrir-proja" tabindex="-1">1. Découvrir ProJA</h2>
+<p>ProJA est une application qui permet à une équipe de travailler ensemble sur des projets : organiser des tâches, discuter, partager des fichiers, se réunir en visioconférence, et suivre l'avancement du travail en temps réel.</p>
+<p>Concrètement, ProJA vous permet de :</p>
+<ul>
+<li>Créer et suivre des <strong>projets</strong> avec votre équipe</li>
+<li>Organiser le travail en <strong>tâches</strong> avec des échéances et des priorités</li>
+<li><strong>Discuter</strong> directement sur chaque tâche, comme dans une messagerie</li>
+<li>Faire des <strong>appels vidéo</strong> ou des <strong>réunions Zoom</strong> sans quitter l'application</li>
+<li>Partager des <strong>fichiers</strong> et en garder l'historique des versions</li>
+<li>Recevoir des <strong>notifications</strong> en temps réel sur ce qui se passe</li>
+<li>Gérer du <strong>recrutement</strong>, des <strong>abonnements</strong>, et des <strong>rémunérations</strong> si votre organisation l'utilise</li>
+</ul>
+<p>Tout se passe dans votre navigateur — aucune installation n'est nécessaire.</p>
+<hr>
+<h2 id="2.-se-connecter-et-cr%C3%A9er-son-compte" tabindex="-1">2. Se connecter et créer son compte</h2>
+<h3 id="cr%C3%A9er-un-compte" tabindex="-1">Créer un compte</h3>
+<ol>
+<li>Rendez-vous sur la page d'accueil de ProJA.</li>
+<li>Cliquez sur <strong>&quot;S'inscrire&quot;</strong>.</li>
+<li>Renseignez votre nom, votre adresse e-mail et un mot de passe.</li>
+<li>Validez le formulaire.</li>
+<li>Un e-mail de vérification vous est envoyé : ouvrez-le et cliquez sur le lien pour confirmer votre adresse.</li>
+</ol>
+<h3 id="se-connecter" tabindex="-1">Se connecter</h3>
+<ol>
+<li>Cliquez sur <strong>&quot;Se connecter&quot;</strong>.</li>
+<li>Entrez votre e-mail et votre mot de passe.</li>
+<li>Vous accédez directement à votre tableau de bord.</li>
+</ol>
+<h3 id="mot-de-passe-oubli%C3%A9" tabindex="-1">Mot de passe oublié</h3>
+<ol>
+<li>Sur la page de connexion, cliquez sur <strong>&quot;Mot de passe oublié ?&quot;</strong>.</li>
+<li>Indiquez votre e-mail.</li>
+<li>Vous recevrez un lien pour définir un nouveau mot de passe.</li>
+</ol>
+<blockquote>
+<p>💡 <strong>Astuce</strong> : si vous restez inactif sur l'application pendant longtemps (environ 30 minutes), ProJA recharge automatiquement la page pour éviter les problèmes de session expirée. C'est normal, il suffit de vous reconnecter si demandé.</p>
+</blockquote>
+<hr>
+<h2 id="3.-le-tableau-de-bord" tabindex="-1">3. Le tableau de bord</h2>
+<p>Le tableau de bord est la page d'accueil une fois connecté. Il vous donne une vue d'ensemble de :</p>
+<ul>
+<li>Vos projets en cours</li>
+<li>Vos tâches à faire, en cours et terminées</li>
+<li>Les activités récentes de votre équipe</li>
+<li>Vos notifications</li>
+</ul>
+<p>C'est le point de départ pour naviguer vers le reste de l'application, via le menu principal.</p>
+<hr>
+<h2 id="4.-g%C3%A9rer-un-projet" tabindex="-1">4. Gérer un projet</h2>
+<p>Un <strong>projet</strong> est le conteneur principal de votre travail d'équipe : il regroupe des tâches, des membres, des sprints, des fichiers et des réunions.</p>
+<h3 id="cr%C3%A9er-un-projet" tabindex="-1">Créer un projet</h3>
+<ol>
+<li>Allez dans <strong>&quot;Projets&quot;</strong> depuis le menu.</li>
+<li>Cliquez sur <strong>&quot;Nouveau projet&quot;</strong>.</li>
+<li>Renseignez :
+<ul>
+<li>Le <strong>nom</strong> du projet</li>
+<li>Une <strong>description</strong> (optionnelle)</li>
+<li>Un <strong>lien de réunion</strong> externe si vous en avez un (optionnel)</li>
+<li>Le <strong>statut</strong> initial (par défaut : &quot;Nouveau&quot;)</li>
+</ul>
+</li>
+<li>Validez. Vous devenez automatiquement <strong>manager</strong> de ce projet.</li>
+</ol>
+<h3 id="les-statuts-d'un-projet" tabindex="-1">Les statuts d'un projet</h3>
+<p>Un projet évolue à travers plusieurs statuts :</p>
+<ul>
+<li><strong>Nouveau</strong> : le projet vient d'être créé</li>
+<li><strong>Démarrage</strong> : le projet commence tout juste</li>
+<li><strong>En cours</strong> : le travail est actif</li>
+<li><strong>Avancé</strong> : le projet est bien avancé</li>
+<li><strong>Terminé</strong> : le projet est achevé</li>
+<li><strong>Suspendu</strong> : le projet est mis en pause temporairement</li>
+</ul>
+<p>Seul un <strong>manager</strong> ou un <strong>administrateur</strong> peut changer le statut, et uniquement vers certains statuts autorisés (par exemple, on ne peut pas passer directement de &quot;Nouveau&quot; à &quot;Terminé&quot;).</p>
+<h3 id="ajouter-des-membres-%C3%A0-un-projet" tabindex="-1">Ajouter des membres à un projet</h3>
+<ol>
+<li>Ouvrez le projet concerné.</li>
+<li>Dans la section <strong>&quot;Actions rapides&quot;</strong>, cliquez sur <strong>&quot;Ajouter un membre&quot;</strong>.</li>
+<li>Recherchez la personne par son nom ou son e-mail.</li>
+<li>Choisissez son rôle dans le projet (membre, manager, observateur).</li>
+<li>Validez.</li>
+</ol>
+<h3 id="consulter-un-projet" tabindex="-1">Consulter un projet</h3>
+<p>La page d'un projet vous montre :</p>
+<ul>
+<li>Les <strong>informations générales</strong> (nom, date de création, description)</li>
+<li>Un accès rapide aux <strong>appels</strong> (Zoom et ProJA Meet)</li>
+<li>Des <strong>statistiques</strong> : tâches terminées, en cours, fichiers, commentaires</li>
+<li>La liste des <strong>sprints</strong></li>
+<li>La liste des <strong>tâches</strong> avec un aperçu rapide</li>
+<li>Les <strong>membres</strong> du projet et leur rôle</li>
+<li>La <strong>progression</strong> de chaque membre (nombre de tâches terminées)</li>
+<li>Un <strong>graphique d'évolution</strong> des tâches sur les 30 derniers jours</li>
+</ul>
+<h3 id="voir-qui-contribue-le-plus-aux-discussions" tabindex="-1">Voir qui contribue le plus aux discussions</h3>
+<p>Sur la page du projet, dans la carte des statistiques, cliquez sur <strong>&quot;Voir détail&quot;</strong> sous le compteur de commentaires. Une fenêtre s'ouvre avec :</p>
+<ul>
+<li>Le classement des membres les plus actifs dans les discussions (🥇🥈🥉)</li>
+<li>Un graphique comparant le nombre de commentaires par personne</li>
+</ul>
+<p>C'est un excellent moyen de repérer les collaborateurs les plus engagés dans les échanges d'équipe.</p>
+<h3 id="modifier-un-projet" tabindex="-1">Modifier un projet</h3>
+<ol>
+<li>Ouvrez le projet.</li>
+<li>Cliquez sur <strong>&quot;Modifier le projet&quot;</strong> (visible pour les managers et administrateurs).</li>
+<li>Changez les informations souhaitées.</li>
+<li>Enregistrez.</li>
+</ol>
+<h3 id="supprimer-un-projet" tabindex="-1">Supprimer un projet</h3>
+<p>La suppression d'un projet est <strong>volontairement stricte</strong>, car elle efface aussi tout ce qu'il contient (tâches, fichiers, discussions, etc.) :</p>
+<ul>
+<li><strong>Si vous êtes administrateur système</strong> : vous pouvez supprimer directement, après une simple confirmation.</li>
+<li><strong>Si vous êtes manager (non administrateur)</strong> : la suppression nécessite le <strong>consentement de tous les membres du projet</strong>. Chaque membre doit saisir son propre mot de passe de compte dans la fenêtre de confirmation. Le projet n'est supprimé que lorsque <strong>tous</strong> les membres ont donné leur accord.</li>
+</ul>
+<p>Cette double sécurité évite qu'un projet soit supprimé par erreur ou sans l'accord de l'équipe.</p>
+<h3 id="exporter-les-informations-d'un-projet" tabindex="-1">Exporter les informations d'un projet</h3>
+<p>Depuis les <strong>&quot;Actions rapides&quot;</strong> de la page projet, vous pouvez exporter :</p>
+<ul>
+<li>Un <strong>journal complet</strong> du projet (format texte)</li>
+<li>Un <strong>planning</strong> au format PDF, avec les sprints et les tâches organisées</li>
+</ul>
+<hr>
+<h2 id="5.-g%C3%A9rer-les-t%C3%A2ches" tabindex="-1">5. Gérer les tâches</h2>
+<p>Les tâches sont les unités de travail concrètes assignées aux membres d'un projet.</p>
+<h3 id="cr%C3%A9er-une-t%C3%A2che" tabindex="-1">Créer une tâche</h3>
+<ol>
+<li>Allez dans <strong>&quot;Tâches&quot;</strong> ou depuis un projet, cliquez sur <strong>&quot;Nouvelle tâche&quot;</strong>.</li>
+<li>Renseignez :
+<ul>
+<li>Le <strong>titre</strong></li>
+<li>Une <strong>description</strong></li>
+<li>Le <strong>projet</strong> associé</li>
+<li>La <strong>priorité</strong> : Faible, Moyenne ou Haute</li>
+<li>Le <strong>statut</strong> initial : À faire, En cours ou Terminé</li>
+<li>La <strong>personne assignée</strong></li>
+<li>La <strong>date d'échéance</strong></li>
+<li>Si la tâche est <strong>rémunérée</strong> (le cas échéant)</li>
+</ul>
+</li>
+<li>Validez.</li>
+</ol>
+<h3 id="vue-tableau-et-vue-cartes" tabindex="-1">Vue Tableau et vue Cartes</h3>
+<p>La liste des tâches peut s'afficher de deux façons, au choix :</p>
+<ul>
+<li><strong>Vue Tableau</strong> : idéale pour parcourir rapidement beaucoup de tâches et trier par colonne.</li>
+<li><strong>Vue Cartes</strong> : plus visuelle, avec les informations principales sur chaque carte.</li>
+</ul>
+<p>Basculez entre les deux via les boutons en haut de la liste des tâches.</p>
+<h3 id="filtrer-et-rechercher-des-t%C3%A2ches" tabindex="-1">Filtrer et rechercher des tâches</h3>
+<p>Cliquez sur <strong>&quot;Filtres &amp; Recherche&quot;</strong> pour affiner la liste selon :</p>
+<ul>
+<li>Un mot dans le titre</li>
+<li>Le statut (à faire, en cours, terminé, en retard)</li>
+<li>La priorité</li>
+<li>Le projet</li>
+<li>La personne assignée</li>
+<li>Une plage de dates d'échéance</li>
+</ul>
+<p>Un badge affiche le nombre de filtres actifs, et un bouton permet de tout réinitialiser en un clic.</p>
+<h3 id="suivre-la-progression-de-l'%C3%A9quipe" tabindex="-1">Suivre la progression de l'équipe</h3>
+<p>Cliquez sur <strong>&quot;Voir les progrès&quot;</strong> pour afficher, pour chaque membre :</p>
+<ul>
+<li>Le pourcentage de tâches complétées</li>
+<li>Le détail : à faire / en cours / terminé</li>
+<li>Le taux de tâches rendues à temps vs en retard</li>
+</ul>
+<p>Les trois membres les plus performants sont mis en avant avec des médailles 🥇🥈🥉.</p>
+<h3 id="modifier-ou-supprimer-une-t%C3%A2che" tabindex="-1">Modifier ou supprimer une tâche</h3>
+<p>Ouvrez la tâche concernée, puis utilisez les boutons <strong>&quot;Modifier&quot;</strong> ou <strong>&quot;Supprimer&quot;</strong> (visibles selon vos droits).</p>
+<h3 id="t%C3%A2ches-verrouill%C3%A9es" tabindex="-1">Tâches verrouillées</h3>
+<p>Si une tâche appartient à un <strong>sprint dont le délai est dépassé</strong>, elle est automatiquement <strong>verrouillée</strong> (un cadenas 🔒 s'affiche) tant qu'un chef de projet ne prolonge pas le sprint. Une bannière d'alerte apparaît en haut de la liste des tâches pour vous prévenir.</p>
+<hr>
+<h2 id="6.-le-tableau-kanban" tabindex="-1">6. Le tableau Kanban</h2>
+<p>Le Kanban offre une vue en colonnes (À faire / En cours / Terminé) pour visualiser et déplacer les tâches par glisser-déposer.</p>
+<ol>
+<li>Allez dans <strong>&quot;Kanban&quot;</strong> depuis le menu ou le bouton dédié sur la page des tâches.</li>
+<li>Faites glisser une tâche d'une colonne à une autre pour changer son statut instantanément.</li>
+<li>Le changement est enregistré automatiquement, aucune validation supplémentaire n'est nécessaire.</li>
+</ol>
+<hr>
+<h2 id="7.-discuter-et-commenter" tabindex="-1">7. Discuter et commenter</h2>
+<p>Chaque tâche dispose de son propre espace de discussion, semblable à une messagerie instantanée.</p>
+<h3 id="%C3%A9crire-un-commentaire" tabindex="-1">Écrire un commentaire</h3>
+<ol>
+<li>Ouvrez une tâche.</li>
+<li>Allez dans l'onglet <strong>&quot;Discussions&quot;</strong>.</li>
+<li>Tapez votre message dans la zone de texte en bas.</li>
+<li>Appuyez sur <strong>Entrée</strong> (ou cliquez sur le bouton d'envoi) pour publier.</li>
+</ol>
+<h3 id="r%C3%A9pondre-%C3%A0-un-commentaire-pr%C3%A9cis" tabindex="-1">Répondre à un commentaire précis</h3>
+<p>Survolez un message et cliquez sur l'icône de <strong>réponse</strong> 💬 pour répondre directement à ce message.</p>
+<h3 id="r%C3%A9agir-avec-un-%C3%A9moji" tabindex="-1">Réagir avec un émoji</h3>
+<p>Survolez un message et cliquez sur l'icône <strong>sourire</strong> 😊 pour ajouter une réaction rapide (👍 ❤️ 😂 etc.). Vous ne pouvez avoir qu'<strong>une seule réaction active par message</strong> — en choisir une nouvelle remplace la précédente.</p>
+<h3 id="envoyer-un-message-vocal" tabindex="-1">Envoyer un message vocal</h3>
+<p>Cliquez sur l'icône <strong>micro</strong> 🎙️ pour enregistrer un message vocal, puis envoyez-le comme un message classique.</p>
+<h3 id="emoji-et-autocollants" tabindex="-1">Emoji et autocollants</h3>
+<p>Le bouton <strong>sourire</strong> à côté de la zone de texte ouvre un sélecteur d'émojis et d'autocollants pour enrichir vos messages.</p>
+<h3 id="modifier-ou-supprimer-votre-message" tabindex="-1">Modifier ou supprimer votre message</h3>
+<p>Survolez votre propre message pour faire apparaître les boutons <strong>&quot;Modifier&quot;</strong> ✏️ et <strong>&quot;Supprimer&quot;</strong> 🗑️.</p>
+<h3 id="voir-qui-est-en-ligne" tabindex="-1">Voir qui est en ligne</h3>
+<p>Dans l'en-tête de la discussion, les avatars des membres actuellement connectés à cette tâche s'affichent avec un point vert. Vous voyez aussi en temps réel qui est <strong>&quot;en train d'écrire...&quot;</strong>.</p>
+<h3 id="accus%C3%A9s-de-lecture" tabindex="-1">Accusés de lecture</h3>
+<p>Une double coche ✓✓ apparaît sous vos messages ; elle devient bleue lorsque le destinataire a lu votre message.</p>
+<h3 id="recevoir-les-discussions-par-e-mail" tabindex="-1">Recevoir les discussions par e-mail</h3>
+<p>Dans l'en-tête de la discussion, une icône enveloppe ✉️ permet d'activer ou de désactiver l'envoi d'une copie des commentaires par e-mail.</p>
+<hr>
+<h2 id="8.-les-sprints" tabindex="-1">8. Les sprints</h2>
+<p>Un <strong>sprint</strong> est une période de travail définie (par exemple deux semaines) durant laquelle une équipe se concentre sur un ensemble précis de tâches.</p>
+<h3 id="cr%C3%A9er-un-sprint" tabindex="-1">Créer un sprint</h3>
+<ol>
+<li>Depuis un projet, allez dans <strong>&quot;Actions rapides&quot;</strong> puis <strong>&quot;Ajouter un sprint&quot;</strong>.</li>
+<li>Renseignez :
+<ul>
+<li>Le <strong>nom</strong> du sprint</li>
+<li>Un <strong>objectif</strong> (optionnel)</li>
+<li>Les <strong>dates de début et de fin</strong></li>
+</ul>
+</li>
+<li>Validez.</li>
+</ol>
+<h3 id="sprint-termin%C3%A9-et-t%C3%A2ches-verrouill%C3%A9es" tabindex="-1">Sprint terminé et tâches verrouillées</h3>
+<p>Lorsqu'un sprint dépasse sa date de fin, <strong>toutes les tâches inachevées</strong> qui lui sont rattachées sont automatiquement <strong>verrouillées</strong>. Une bannière d'avertissement s'affiche pour prévenir l'équipe. Seul un chef de projet peut débloquer la situation en <strong>prolongeant le sprint</strong>.</p>
+<hr>
+<h2 id="9.-r%C3%A9unions-zoom" tabindex="-1">9. Réunions Zoom</h2>
+<p>ProJA permet de planifier et suivre des réunions Zoom directement depuis un projet, sans changer d'application.</p>
+<h3 id="planifier-une-r%C3%A9union" tabindex="-1">Planifier une réunion</h3>
+<ol>
+<li>Ouvrez un projet.</li>
+<li>Cliquez sur le bandeau <strong>&quot;Réunions Zoom&quot;</strong>.</li>
+<li>Cliquez sur <strong>&quot;Planifier / voir&quot;</strong>.</li>
+<li>Renseignez le sujet, la date et la durée de la réunion.</li>
+<li>Validez : la réunion est créée et visible par les membres du projet.</li>
+</ol>
+<h3 id="rejoindre-une-r%C3%A9union-en-cours" tabindex="-1">Rejoindre une réunion en cours</h3>
+<p>Si une réunion Zoom est active, un badge <strong>&quot;En cours&quot;</strong> apparaît sur le bandeau Zoom de la page projet, avec un bouton <strong>&quot;Rejoindre&quot;</strong> pour y accéder directement.</p>
+<hr>
+<h2 id="10.-proja-meet-%E2%80%94-appels-audio-et-vid%C3%A9o" tabindex="-1">10. ProJA Meet — appels audio et vidéo</h2>
+<p>ProJA Meet est le système d'appel vidéo natif de l'application (jusqu'à 100 participants simultanés), sans dépendre de Zoom.</p>
+<h3 id="d%C3%A9marrer-ou-rejoindre-un-appel" tabindex="-1">Démarrer ou rejoindre un appel</h3>
+<ol>
+<li>Ouvrez un projet.</li>
+<li>Repérez la carte <strong>&quot;Appels &amp; réunions&quot;</strong>, section <strong>ProJA Meet</strong>.</li>
+<li>Cliquez sur <strong>&quot;Démarrer / Rejoindre&quot;</strong>.
+<ul>
+<li>Si aucun appel n'est en cours, un nouvel appel démarre et les autres membres du projet reçoivent une notification.</li>
+<li>Si un appel est déjà en cours (le nom de la personne qui l'a démarré s'affiche), vous rejoignez directement cet appel existant.</li>
+</ul>
+</li>
+</ol>
+<h3 id="pendant-l'appel" tabindex="-1">Pendant l'appel</h3>
+<ul>
+<li><strong>Micro / Caméra</strong> : icônes en bas de l'écran pour activer/couper votre son et votre image.</li>
+<li><strong>Partage d'écran</strong> 🖥️ : partagez votre écran avec les autres participants.</li>
+<li><strong>Lever la main</strong> ✋ : signalez que vous souhaitez intervenir.</li>
+<li><strong>Réactions</strong> 😊 : envoyez des émojis flottants visibles par tous, sans interrompre la conversation.</li>
+<li><strong>Liste des participants</strong> 👥 : consultez qui est présent dans l'appel.</li>
+<li><strong>Plein écran</strong> : agrandissez la fenêtre d'appel.</li>
+</ul>
+<h3 id="en-tant-qu'h%C3%B4te" tabindex="-1">En tant qu'hôte</h3>
+<p>Si vous avez démarré l'appel (ou si vous êtes manager/administrateur du projet), vous pouvez <strong>couper le micro ou la caméra</strong> d'un autre participant en survolant sa vignette vidéo.</p>
+<h3 id="quitter-l'appel" tabindex="-1">Quitter l'appel</h3>
+<p>Cliquez sur le bouton rouge <strong>&quot;Quitter&quot;</strong> en bas de l'écran d'appel.</p>
+<hr>
+<h2 id="11.-fichiers-et-documents" tabindex="-1">11. Fichiers et documents</h2>
+<h3 id="ajouter-un-fichier-%C3%A0-une-t%C3%A2che" tabindex="-1">Ajouter un fichier à une tâche</h3>
+<ol>
+<li>Ouvrez une tâche.</li>
+<li>Allez dans l'onglet <strong>&quot;Ressources&quot;</strong>.</li>
+<li>Cliquez sur <strong>&quot;Ajouter un fichier&quot;</strong>.</li>
+<li>Sélectionnez le fichier depuis votre ordinateur (ou depuis Dropbox si cette option est configurée).</li>
+<li>Ajoutez une description si besoin, puis validez.</li>
+</ol>
+<h3 id="consulter-et-t%C3%A9l%C3%A9charger-un-fichier" tabindex="-1">Consulter et télécharger un fichier</h3>
+<p>Cliquez simplement sur la vignette du fichier pour l'ouvrir, ou utilisez le bouton de téléchargement.</p>
+<h3 id="historique-des-versions" tabindex="-1">Historique des versions</h3>
+<p>Chaque fichier conserve un historique de ses versions précédentes. Vous pouvez consulter une ancienne version ou la <strong>restaurer</strong> si nécessaire.</p>
+<h3 id="prot%C3%A9ger-un-fichier-par-mot-de-passe" tabindex="-1">Protéger un fichier par mot de passe</h3>
+<p>Certains fichiers peuvent être protégés par un mot de passe pour en restreindre l'accès, même au sein du projet.</p>
+<h3 id="g%C3%A9rer-les-acc%C3%A8s-%C3%A0-un-fichier" tabindex="-1">Gérer les accès à un fichier</h3>
+<p>Vous pouvez définir précisément quels membres ont accès à un fichier particulier, au-delà de leur simple appartenance au projet.</p>
+<hr>
+<h2 id="12.-notifications" tabindex="-1">12. Notifications</h2>
+<p>ProJA vous informe de ce qui se passe via plusieurs canaux, que vous pouvez configurer selon vos préférences.</p>
+<h3 id="notifications-dans-l'application" tabindex="-1">Notifications dans l'application</h3>
+<p>Une cloche 🔔 dans le menu principal affiche vos notifications récentes : nouveaux commentaires, changements de statut, appels démarrés, etc.</p>
+<h3 id="notifications-push-(navigateur)" tabindex="-1">Notifications push (navigateur)</h3>
+<p>Vous pouvez activer les notifications push pour recevoir des alertes même lorsque ProJA n'est pas ouvert dans votre navigateur :</p>
+<ol>
+<li>Allez dans votre <strong>profil</strong> &gt; <strong>Préférences de notification</strong>.</li>
+<li>Autorisez les notifications lorsque votre navigateur vous le demande.</li>
+</ol>
+<h3 id="notifications-par-e-mail" tabindex="-1">Notifications par e-mail</h3>
+<p>Certaines actions (nouveaux commentaires, échéances de tâches) peuvent aussi vous être envoyées par e-mail, selon vos préférences définies dans votre profil.</p>
+<hr>
+<h2 id="13.-recrutement" tabindex="-1">13. Recrutement</h2>
+<p>Si votre organisation utilise le module de recrutement de ProJA :</p>
+<h3 id="publier-une-offre" tabindex="-1">Publier une offre</h3>
+<ol>
+<li>Allez dans <strong>&quot;Recrutement&quot;</strong>.</li>
+<li>Cliquez sur <strong>&quot;Nouvelle offre&quot;</strong>.</li>
+<li>Renseignez le poste, la description, le type de contrat, le niveau d'expérience requis, etc.</li>
+<li>Choisissez de <strong>publier immédiatement</strong> ou d'enregistrer en <strong>brouillon</strong>.</li>
+</ol>
+<h3 id="statuts-d'une-offre" tabindex="-1">Statuts d'une offre</h3>
+<ul>
+<li><strong>Brouillon</strong> : non visible publiquement, encore en préparation</li>
+<li><strong>Publiée</strong> : visible et ouverte aux candidatures</li>
+<li><strong>Clôturée</strong> : n'accepte plus de nouvelles candidatures (automatique après la date limite)</li>
+</ul>
+<h3 id="g%C3%A9rer-les-candidatures" tabindex="-1">Gérer les candidatures</h3>
+<ol>
+<li>Ouvrez l'offre concernée.</li>
+<li>Consultez la liste des candidatures reçues.</li>
+<li>Ouvrez une candidature pour voir le CV et les documents joints.</li>
+<li>Changez le <strong>statut</strong> de la candidature (en cours d'examen, acceptée, refusée, etc.).</li>
+<li>Exportez la liste des candidatures au format Excel si besoin.</li>
+</ol>
+<hr>
+<h2 id="14.-abonnements-et-paiements" tabindex="-1">14. Abonnements et paiements</h2>
+<h3 id="consulter-les-plans-disponibles" tabindex="-1">Consulter les plans disponibles</h3>
+<p>Allez dans <strong>&quot;Abonnements&quot;</strong> pour voir les différentes formules proposées.</p>
+<h3 id="souscrire-%C3%A0-un-abonnement" tabindex="-1">Souscrire à un abonnement</h3>
+<ol>
+<li>Choisissez le plan qui vous convient.</li>
+<li>Cliquez sur <strong>&quot;Souscrire&quot;</strong>.</li>
+<li>Vous êtes redirigé vers le tunnel de paiement sécurisé <strong>FedaPay</strong>.</li>
+<li>Complétez le paiement selon le moyen proposé (mobile money, carte, etc.).</li>
+<li>Une fois le paiement confirmé, votre abonnement passe au statut <strong>actif</strong>.</li>
+</ol>
+<h3 id="g%C3%A9rer-votre-abonnement" tabindex="-1">Gérer votre abonnement</h3>
+<p>Depuis <strong>&quot;Paramètres&quot;</strong> &gt; <strong>&quot;Facturation&quot;</strong>, vous pouvez consulter l'état de votre abonnement en cours et son historique.</p>
+<hr>
+<h2 id="15.-r%C3%A9mun%C3%A9rations" tabindex="-1">15. Rémunérations</h2>
+<p>Pour les tâches marquées comme rémunérées :</p>
+<h3 id="renseigner-ses-informations-de-paiement" tabindex="-1">Renseigner ses informations de paiement</h3>
+<ol>
+<li>Ouvrez la tâche rémunérée concernée.</li>
+<li>Allez dans l'onglet <strong>&quot;Rémunération&quot;</strong>.</li>
+<li>Choisissez votre opérateur de paiement mobile (MTN, Moov, Celtis) et indiquez votre numéro de téléphone.</li>
+<li>Enregistrez.</li>
+</ol>
+<h3 id="suivre-le-statut-de-paiement" tabindex="-1">Suivre le statut de paiement</h3>
+<p>Le statut affiché évolue de <strong>&quot;En attente&quot;</strong> à <strong>&quot;Payé&quot;</strong> une fois que le paiement a été validé par un manager ou un administrateur.</p>
+<h3 id="pour-les-managers-%3A-valider-un-paiement" tabindex="-1">Pour les managers : valider un paiement</h3>
+<p>Sur la page de la tâche, dans la liste des paiements de tous les membres, cliquez sur <strong>&quot;Valider le paiement&quot;</strong> en face de la personne concernée.</p>
+<h3 id="t%C3%A9l%C3%A9charger-un-re%C3%A7u" tabindex="-1">Télécharger un reçu</h3>
+<p>Une fois un paiement validé, un bouton <strong>&quot;Télécharger le reçu&quot;</strong> apparaît, permettant d'obtenir un justificatif PDF.</p>
+<hr>
+<h2 id="16.-mon-profil-et-mes-param%C3%A8tres" tabindex="-1">16. Mon profil et mes paramètres</h2>
+<h3 id="modifier-ses-informations-personnelles" tabindex="-1">Modifier ses informations personnelles</h3>
+<ol>
+<li>Cliquez sur votre avatar en haut à droite, puis <strong>&quot;Profil&quot;</strong>.</li>
+<li>Modifiez votre nom, votre photo, votre e-mail.</li>
+<li>Enregistrez.</li>
+</ol>
+<h3 id="changer-son-mot-de-passe" tabindex="-1">Changer son mot de passe</h3>
+<p>Dans la même page de profil, une section dédiée permet de définir un nouveau mot de passe.</p>
+<h3 id="informations-bancaires" tabindex="-1">Informations bancaires</h3>
+<p>Une section spécifique permet d'enregistrer vos coordonnées bancaires si votre organisation en a besoin pour les rémunérations.</p>
+<h3 id="supprimer-son-compte" tabindex="-1">Supprimer son compte</h3>
+<p>Une option de suppression de compte est disponible en bas de la page de profil. Cette action est définitive.</p>
+<h3 id="th%C3%A8me-sombre-%2F-clair" tabindex="-1">Thème sombre / clair</h3>
+<p>ProJA s'adapte automatiquement à la préférence de votre système (thème sombre ou clair). Vous n'avez rien à configurer, cela se fait tout seul.</p>
+<hr>
+<h2 id="17.-r%C3%B4les-et-permissions" tabindex="-1">17. Rôles et permissions</h2>
+<p>Chaque membre d'un projet possède un rôle qui détermine ce qu'il peut faire :</p>
+<table>
+<thead>
+<tr>
+<th>Rôle</th>
+<th>Icône</th>
+<th>Peut faire</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Membre</strong></td>
+<td>👤</td>
+<td>Consulter le projet, gérer ses propres tâches, discuter, participer aux appels</td>
+</tr>
+<tr>
+<td><strong>Manager</strong></td>
+<td>👑</td>
+<td>Tout ce qu'un membre peut faire, + modifier le projet, gérer les membres, valider les paiements, changer le statut du projet</td>
+</tr>
+<tr>
+<td><strong>Administrateur système</strong></td>
+<td>🛡️</td>
+<td>Accès complet à toute l'application, y compris la suppression directe de projets</td>
+</tr>
+</tbody>
+</table>
+<p>Un manager peut ajouter ou retirer des membres, et modifier leur rôle, depuis la page <strong>&quot;Membres du projet&quot;</strong>.</p>
+<hr>
+<h2 id="18.-messagerie" tabindex="-1">18. Messagerie</h2>
+<p>En dehors des discussions liées aux tâches, ProJA propose aussi un espace de <strong>messagerie</strong> générale pour échanger avec d'autres utilisateurs de l'application, accessible depuis le menu <strong>&quot;Messages&quot;</strong>.</p>
+<hr>
+<h2 id="19.-astuces-et-bonnes-pratiques" tabindex="-1">19. Astuces et bonnes pratiques</h2>
+<ul>
+<li><strong>Utilisez les filtres</strong> sur la page des tâches pour ne pas vous sentir submergé par le volume total de tâches de l'organisation.</li>
+<li><strong>Activez les notifications push</strong> pour ne rien manquer, surtout si vous n'avez pas ProJA ouvert en permanence.</li>
+<li><strong>Consultez régulièrement la vue &quot;Progrès&quot;</strong> sur la page des tâches ou du projet pour repérer les points de blocage de l'équipe.</li>
+<li><strong>Réagissez avec des émojis</strong> plutôt que d'écrire un commentaire complet pour de simples accusés de réception (&quot;vu&quot;, &quot;ok&quot;) — cela allège les discussions.</li>
+<li><strong>Prolongez vos sprints à temps</strong> : un sprint qui expire verrouille automatiquement les tâches inachevées, ce qui peut bloquer une partie de l'équipe si personne n'y prête attention.</li>
+<li><strong>Utilisez ProJA Meet</strong> pour les échanges rapides internes, et réservez <strong>Zoom</strong> pour les réunions plus formelles nécessitant l'enregistrement ou des intégrations externes.</li>
+</ul>
+<hr>
+<h2 id="20.-questions-fr%C3%A9quentes-et-d%C3%A9pannage" tabindex="-1">20. Questions fréquentes et dépannage</h2>
+<p><strong>Je ne reçois pas de notifications, que faire ?</strong>
+Vérifiez que vous avez bien autorisé les notifications dans votre navigateur, et consultez vos préférences dans votre profil.</p>
+<p><strong>Ma session a expiré, pourquoi ?</strong>
+Après une longue période d'inactivité (environ 30 minutes), ProJA vous déconnecte par sécurité. Reconnectez-vous simplement avec votre e-mail et mot de passe.</p>
+<p><strong>Je ne peux pas supprimer un projet seul en tant que manager, pourquoi ?</strong>
+C'est volontaire : seul un administrateur système peut supprimer un projet directement. Un manager doit obtenir le consentement (mot de passe) de <strong>tous</strong> les membres du projet.</p>
+<p><strong>Une tâche est verrouillée avec un cadenas, que faire ?</strong>
+Cela signifie que le sprint auquel elle appartient est arrivé à échéance. Un manager doit prolonger le sprint pour débloquer la tâche.</p>
+<p><strong>Je ne peux pas rejoindre un appel ProJA Meet, l'image reste bloquée sur &quot;Connexion...&quot;</strong>
+Cela peut arriver sur certains réseaux très restrictifs (Wi-Fi d'entreprise strict, certains réseaux mobiles). Essayez de changer de réseau, ou contactez votre administrateur technique.</p>
+<p><strong>J'ai plusieurs réactions actives sur un même message, est-ce normal ?</strong>
+Non, une seule réaction par personne et par message est permise. Si vous en sélectionnez une nouvelle, l'ancienne est automatiquement retirée.</p>
+<p><strong>Comment savoir qui a le plus contribué aux discussions d'un projet ?</strong>
+Sur la page du projet, cliquez sur <strong>&quot;Voir détail&quot;</strong> sous la carte des commentaires pour afficher le classement complet.</p>
+<hr>
+<p><em>Ce guide couvre les fonctionnalités principales de ProJA. Pour toute question non couverte ici, contactez votre administrateur ou l'équipe support de votre organisation.</em></p>
+
+    </div>
+</body>
+</html>

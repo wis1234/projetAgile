@@ -16,6 +16,10 @@ export default function GlobalFooter({ className = '' }) {
                         À propos
                     </Link>
                     <span className="text-gray-300 dark:text-gray-700">•</span>
+                    <Link href={route('guide')} className="text-xs font-medium tracking-wide text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
+                        Guide d'utilisation
+                    </Link>
+                    <span className="text-gray-300 dark:text-gray-700">•</span>
                     <Link href={route('contact')} className="text-xs font-medium tracking-wide text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
                         Contact
                     </Link>
