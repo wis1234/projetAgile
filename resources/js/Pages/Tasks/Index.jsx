@@ -353,7 +353,7 @@ const Index = ({
 }) => {
   const { t } = useTranslation();
   const { flash = {} } = usePage().props;
-  const [viewMode, setViewMode]   = useState('cards');
+  const [viewMode, setViewMode]   = useState('table');
   const [searchTerm, setSearchTerm] = useState(initialFilters.search || '');
   const [filters, setFilters]     = useState({ ...initialFilters, search: initialFilters.search || '' });
   const [isAlertDismissed, setIsAlertDismissed] = useState(false);
