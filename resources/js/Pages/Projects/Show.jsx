@@ -619,9 +619,17 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
             {/* Sprints */}
             {sprintsList.length > 0 && (
               <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
-                  <FaListUl className="text-purple-500" /> {t('sprints')} ({sprintsList.length})
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <FaListUl className="text-purple-500" /> {t('sprints')} ({sprintsList.length})
+                  </h3>
+                  <Link
+                    href={route('sprints.index', { project_id: project.id })}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-xl font-medium transition"
+                  >
+                    <FaEye className="text-xs" /> Voir tout
+                  </Link>
+                </div>
                 <div className="space-y-3">
                   {sprintsList.map(sprint => (
                     <div
@@ -650,12 +658,20 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <FaTasks className="text-blue-500" /> {t('tasks_section_title')} ({tasks.total || tasksData.length})
                 </h3>
-                <Link
-                  href={route('tasks.create', { project_id: project.id })}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-xl font-medium transition"
-                >
-                  <FaPlus className="text-xs" /> {t('new_task')}
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={route('tasks.index', { project_id: project.id })}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-xl font-medium transition"
+                  >
+                    <FaEye className="text-xs" /> Voir tout
+                  </Link>
+                  <Link
+                    href={route('tasks.create', { project_id: project.id })}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-xl font-medium transition"
+                  >
+                    <FaPlus className="text-xs" /> {t('new_task')}
+                  </Link>
+                </div>
               </div>
 
               {tasksData.length === 0 ? (
@@ -836,8 +852,8 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
               </h3>
               <div className="space-y-3">
                 {project.users?.slice(0, 5).map(user => {
-                  const userDoneTasks = tasksData.filter(t => t.status === 'done' && t.assigned_to === user.id).length;
-                  const percent = tasksData.length ? (userDoneTasks / tasksData.length) * 100 : 0;
+                  const userDoneTasks = stats.doneTasksByUser?.[user.id] ?? 0;
+                  const percent = stats.totalTasks ? (userDoneTasks / stats.totalTasks) * 100 : 0;
                   return (
                     <div key={user.id} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
