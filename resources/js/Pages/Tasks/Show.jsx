@@ -1989,8 +1989,31 @@ return () => {
         {activeTab === 'details' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
-              {/* Colonne principale : description */}
+              {/* Colonne principale : assigné + description */}
               <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 shadow-sm">
+
+                {/* Assigné à */}
+                <div className="mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
+                  <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                    <FaUser className="text-blue-500" /> {t('task_details.assigned_to')}
+                  </h4>
+                  {task.assigned_user ? (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={task.assigned_user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_user.name)}`}
+                        alt={task.assigned_user.name}
+                        className="w-11 h-11 rounded-full object-cover border-2 border-blue-200 dark:border-blue-700"
+                      />
+                      <span className="font-semibold text-gray-900 dark:text-white">{task.assigned_user.name}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <FaUserCircle className="w-11 h-11 text-gray-300 dark:text-gray-600" />
+                      <span className="text-sm text-gray-400 italic">{t('task_details.not_assigned')}</span>
+                    </div>
+                  )}
+                </div>
+
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-4">
                   <FaInfoCircle className="text-blue-500" /> {t('task_details.description')}
                 </h3>
@@ -2411,41 +2434,46 @@ return () => {
           )}
 
           {activeTab === 'files' && !hasAccess && isDeadlinePassed && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 shadow-sm mb-8">
               <div className="text-center py-12">
                 <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/50 mb-4">
-                  <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
+                  <FaFileUpload className="h-5 w-5 text-red-600 dark:text-red-400" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">{t('task_details.access_denied')}</h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-4">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">{t('task_details.access_denied')}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                   {t('task_details.access_denied_message')}
                 </p>
                 {isDeadlinePassed && (
-                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    {t('task_details.deadline_expired')}
+                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 inline-block px-3 py-1 rounded-full">
+                    {t('deadline_expired')}
                   </p>
                 )}
               </div>
             </div>
           )}
           
+
 {activeTab === 'files' && (hasAccess || !isDeadlinePassed) && (
-  <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 shadow-sm mb-8">
 
     {/* HEADER */}
     <div className="flex justify-between items-center mb-6">
-      <h2 className="text-2xl font-bold flex items-center gap-3 text-blue-700 dark:text-blue-200">
-        <FaFileUpload /> {t('task_details.resources')}
-      </h2>
+      <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+        <FaFileUpload className="text-blue-500" /> {t('task_details.resources')}
+        {task.files?.length > 0 && (
+          <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
+            {task.files.length}
+          </span>
+        )}
+      </h3>
 
       <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
-        <Link 
+        <Link
           href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
-          className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md`}
+          className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 text-sm`}
+          title={isDeadlinePassed ? t('deadline_expired') : ''}
         >
-          <FaFileUpload /> {t('task_details.add_file')}
+          <FaFileUpload className="text-xs" /> {t('task_details.add_file')}
         </Link>
 
         {isDeadlinePassed && (
@@ -2458,117 +2486,109 @@ return () => {
 
     {/* FILES */}
     {task.files && task.files.length > 0 ? (
-      
-      <>
-        {/* ✅ GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          
-          {task.files.map(file => {
-            const isUploadedByAssignedUser =
-              file.user_id === task.assigned_to?.id || file.user_id === task.assigned_to;
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
 
-            const isImage = file.type?.startsWith("image/");
-            const isPDF = file.type === "application/pdf";
+        {task.files.map(file => {
+          const isUploadedByAssignedUser =
+            file.user_id === task.assigned_to?.id || file.user_id === task.assigned_to;
 
-            return (
-              <Link
-                key={file.id}
-                href={`/files/${file.id}`}
-                className="group bg-gray-50 dark:bg-gray-700 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 hover:shadow-lg transition duration-300 flex flex-col"
-              >
+          const isImage = file.type?.startsWith("image/");
+          const isPDF = file.type === "application/pdf";
 
-                {/* PREVIEW */}
-                <div className="h-40 bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden">
-                  {isImage ? (
-                    <img
-                      src={`/storage/${file.file_path.replace('public/', '')}`}
-                      alt={file.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    />
-                  ) : isPDF ? (
-                    <span className="text-red-500 text-3xl font-bold">PDF</span>
-                  ) : (
-                    <FaFileUpload className="text-3xl text-gray-400" />
+          return (
+            <Link
+              key={file.id}
+              href={`/files/${file.id}`}
+              className="group bg-gray-50 dark:bg-gray-900/40 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-md transition duration-200 flex flex-col"
+            >
+
+              {/* PREVIEW */}
+              <div className="h-36 bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+                {isImage ? (
+                  <img
+                    src={`/storage/${file.file_path.replace('public/', '')}`}
+                    alt={file.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                ) : isPDF ? (
+                  <span className="text-red-500 text-2xl font-bold">PDF</span>
+                ) : (
+                  <FaFileUpload className="text-2xl text-gray-300 dark:text-gray-600" />
+                )}
+              </div>
+
+              {/* CONTENT */}
+              <div className="p-4 flex flex-col flex-grow">
+
+                {/* NAME */}
+                <h4 className="font-semibold text-sm text-gray-800 dark:text-gray-100 line-clamp-2 mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  {file.name}
+                </h4>
+
+                {/* BADGES */}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full ${
+                    isUploadedByAssignedUser
+                      ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                      : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                  }`}>
+                    {isUploadedByAssignedUser ? 'Traitement' : 'Ressources'}
+                  </span>
+
+                  {file.dropbox_path && (
+                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full bg-blue-600 text-white">
+                      Dropbox
+                    </span>
                   )}
                 </div>
 
-                {/* CONTENT */}
-                <div className="p-4 flex flex-col flex-grow">
+                {/* DESCRIPTION */}
+                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">
+                  {file.description || "Aucune description"}
+                </p>
 
-                  {/* NAME */}
-                  <h3 className="font-semibold text-blue-600 dark:text-blue-300 text-sm line-clamp-2 mb-2 group-hover:underline">
-                    {file.name}
-                  </h3>
-
-                  {/* BADGES */}
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                      isUploadedByAssignedUser
-                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                    }`}>
-                      {isUploadedByAssignedUser ? 'Traitement' : 'Ressources'}
-                    </span>
-
-                    {file.dropbox_path && (
-                      <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500 text-white">
-                        Dropbox
-                      </span>
-                    )}
-                  </div>
-
-                  {/* DESCRIPTION */}
-                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">
-                    {file.description || "Aucune description"}
-                  </p>
-
-                  {/* META */}
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                    {Math.round(file.size / 1024)} KB •{" "}
-                    {new Date(file.created_at).toLocaleDateString('fr-FR')}
-                  </div>
-
-                  {/* USER */}
-                  <div className="flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={
-                          file.user?.profile_photo_url ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(file.user?.name || '')}&background=3b82f6&color=fff`
-                        }
-                        alt={file.user?.name}
-                        className="w-6 h-6 rounded-full"
-                      />
-                      <span className="text-xs text-gray-700 dark:text-gray-200">
-                        {file.user?.name}
-                      </span>
-                    </div>
-
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      file.user?.role === 'admin' || file.user?.role === 'manager'
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                    }`}>
-                      {file.user?.role === 'admin'
-                        ? 'Admin'
-                        : file.user?.role === 'manager'
-                        ? 'Manager'
-                        : 'Membre'}
-                    </span>
-                  </div>
-
+                {/* META */}
+                <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">
+                  {Math.round(file.size / 1024)} KB • {new Date(file.created_at).toLocaleDateString('fr-FR')}
                 </div>
-              </Link>
-            );
-          })}
 
-        </div>
-      </>
+                {/* USER */}
+                <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <img
+                      src={
+                        file.user?.profile_photo_url ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(file.user?.name || '')}&background=3b82f6&color=fff`
+                      }
+                      alt={file.user?.name}
+                      className="w-6 h-6 rounded-full flex-shrink-0"
+                    />
+                    <span className="text-xs text-gray-600 dark:text-gray-300 truncate">
+                      {file.user?.name}
+                    </span>
+                  </div>
 
+                  <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 flex-shrink-0">
+                    {file.user?.role === 'admin'
+                      ? 'Admin'
+                      : file.user?.role === 'manager'
+                      ? 'Manager'
+                      : 'Membre'}
+                  </span>
+                </div>
+
+              </div>
+            </Link>
+          );
+        })}
+
+      </div>
     ) : (
-      <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-5 border border-blue-200 dark:border-blue-700 flex items-center gap-3">
-        <FaInfoCircle className="text-blue-600 dark:text-blue-300 text-xl" />
-        <p className="text-blue-800 dark:text-blue-200 italic">
+      <div className="text-center py-12">
+        <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
+          <FaFileUpload className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+        </div>
+        <p className="text-sm text-gray-400 dark:text-gray-500 italic">
           Aucun fichier rattaché à cette tâche.
         </p>
       </div>
@@ -2576,7 +2596,6 @@ return () => {
 
   </div>
 )}
-
 
 {activeTab === 'comments' && (
   <div className="flex flex-col bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8 shadow-xl" style={{ height: '85vh', maxHeight: '800px' }}>
