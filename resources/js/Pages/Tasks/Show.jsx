@@ -599,6 +599,9 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [readReceipts, setReadReceipts] = useState({}); // { commentId: Set(userIds) }
   const [lastSeenMap, setLastSeenMap] = useState({}); // { userId: timestamp }
   const [profileUser, setProfileUser] = useState(null); // user shown in the mini-profile modal
+  const [readReceiptsViewer, setReadReceiptsViewer] = useState(null); // commentId | null
+  const [reactionViewer, setReactionViewer] = useState(null); // { commentId, emoji } | null
+
   const presenceChannelRef = useRef(null);
   const typingTimeoutsRef = useRef({});
   const lastTypingSentRef = useRef(0);
@@ -701,6 +704,12 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     if (!userId) return false;
     return onlineUsers.some(u => String(u.id) === String(userId));
   }, [onlineUsers]);
+
+  // Résout un id utilisateur en objet {name, profile_photo_url} à partir des membres du projet
+  const resolveUser = useCallback((userId) => {
+    return projectMembers?.find(u => String(u.id) === String(userId)) || null;
+  }, [projectMembers]);
+
   // Charger les commentaires lus depuis le localStorage
   const [readComments, setReadComments] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -1764,48 +1773,100 @@ return () => {
     <div className="flex flex-col w-full bg-white dark:bg-gray-950 p-0 m-0 min-h-screen">
       <div className="flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
         
-        {/* Section En-tête */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-4">
-            {/* <FaTasks className="text-4xl text-blue-600 dark:text-blue-400" /> */}
-            <Link 
-                href="/tasks" 
-                className="bg-white-600 hover:bg-blue-200 text-blue text-4xl text-blue-600 dark:text-blue-400 px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+        {/* En-tête tâche : identité + détails rapides, côte à côte (empilés sur mobile) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+          {/* Carte gauche : identité de la tâche */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm flex flex-col justify-between">
+            <div className="flex items-start gap-4">
+              <Link
+                href="/tasks"
+                className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-blue-600 dark:text-blue-400 p-3 rounded-xl transition duration-200"
               >
-                <FaArrowLeft className="text-lg sm:text-xl" />
+                <FaArrowLeft className="text-lg" />
               </Link>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
-              {t('task_details.page_title')}
-              {process.env.NODE_ENV !== 'production' && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Droits: {isAdmin ? 'Admin' : isProjectManager ? 'Manager' : 'Membre'}
-                </div>
-              )}
-            </h1>
+              <div className="min-w-0">
+                <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight truncate">
+                  {task.title}
+                </h1>
+                {task.project && (
+                  <Link
+                    href={`/projects/${task.project.id}`}
+                    className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 mt-1"
+                  >
+                    <FaProjectDiagram className="text-xs" /> {task.project.name}
+                  </Link>
+                )}
+                {process.env.NODE_ENV !== 'production' && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    Droits: {isAdmin ? 'Admin' : isProjectManager ? 'Manager' : 'Membre'}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-5">
+              {getStatusBadge(task.status)}
+              {getPriorityBadge(task.priority)}
+            </div>
           </div>
-          
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <div className="flex flex-wrap items-center gap-3">
+
+          {/* Carte droite : assignation + actions rapides */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm flex flex-col gap-4">
+            <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+              Détails rapides
+            </h3>
+
+            <div className="flex items-center gap-3">
+              {task.assigned_user ? (
+                <>
+                  <img
+                    src={task.assigned_user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_user.name)}`}
+                    alt={task.assigned_user.name}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-blue-200 dark:border-blue-700"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{task.assigned_user.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Assigné à cette tâche</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <FaUserCircle className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+                  <p className="text-sm text-gray-400 italic">{t('task_details.not_assigned')}</p>
+                </>
+              )}
+            </div>
+
+            <div className="border-t border-gray-100 dark:border-gray-700" />
+
+            <div className="flex flex-wrap gap-2">
+              {(isAssigned || isAdmin) && (
+                <Link
+                  href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
+                  className={`${isDeadlinePassed ? 'pointer-events-none opacity-50' : ''} bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-3 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 text-sm`}
+                  title={isDeadlinePassed ? t('deadline_expired') : ''}
+                >
+                  <FaFileUpload className="text-xs" /> {t('actions.upload_file')}
+                </Link>
+              )}
               {canEditTask && (
                 <>
-                  <Link 
-                    href={`/tasks/${task.id}/edit`} 
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+                  <Link
+                    href={`/tasks/${task.id}/edit`}
+                    className="bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 text-sm"
                   >
-                    <FaEdit /> 
+                    <FaEdit className="text-xs" />
                     <span>{t('edit')}</span>
                   </Link>
                   <button
                     onClick={handleDeleteTask}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition duration-200 hover:shadow-md text-sm sm:text-base whitespace-nowrap"
+                    className="bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 px-3 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 text-sm"
                   >
-                    <FaTrash /> 
+                    <FaTrash className="text-xs" />
                     <span>{t('delete')}</span>
                   </button>
                 </>
               )}
-              
-
             </div>
           </div>
         </div>
@@ -2957,6 +3018,16 @@ return () => {
                           <span>
                             {new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                           </span>
+                          {comment.id && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setReadReceiptsViewer(comment.id); }}
+                              className="ml-0.5 opacity-70 hover:opacity-100 transition-opacity"
+                              title="Voir qui a lu ce message"
+                            >
+                              <FaInfoCircle className="w-2.5 h-2.5" />
+                            </button>
+                          )}
                           {isMe && (
                             hasFailed
                               ? <span className="text-red-300 text-xs">✕</span>
@@ -3018,19 +3089,32 @@ return () => {
                     {reactionEntries.map(([emoji, userIds]) => {
                       const hasReacted = userIds.includes(auth.user.id);
                       return (
-                        <button
+                        <div
                           key={emoji}
-                          type="button"
-                          onClick={() => handleReaction(comment.id, emoji)}
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-all ${
+                          className={`inline-flex items-center rounded-full border text-xs overflow-hidden transition-all ${
                             hasReacted
                               ? 'bg-blue-100 dark:bg-blue-900/60 border-blue-400 text-blue-700 dark:text-blue-300 font-semibold shadow-xs'
-                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
+                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'
                           }`}
                         >
-                          <span>{emoji}</span>
-                          <span className="text-[10px] font-bold">{userIds.length}</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReaction(comment.id, emoji)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                            title={hasReacted ? 'Retirer ma réaction' : 'Réagir'}
+                          >
+                            <span>{emoji}</span>
+                            <span className="text-[10px] font-bold">{userIds.length}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReactionViewer({ commentId: comment.id, emoji })}
+                            className="px-1.5 py-0.5 border-l border-current/20 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                            title="Voir qui a réagi"
+                          >
+                            <FaInfoCircle className="w-2.5 h-2.5 opacity-70" />
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -3375,6 +3459,71 @@ return () => {
             </div>
           </div>
         </Modal>
+
+          {/* Modal : qui a lu ce message */}
+        <Modal show={!!readReceiptsViewer} onClose={() => setReadReceiptsViewer(null)} maxWidth="sm">
+          <div className="p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+              <FaInfoCircle className="text-blue-500" /> Lu par
+            </h3>
+            {(() => {
+              const readerIds = readReceiptsViewer ? Array.from(readReceipts[readReceiptsViewer] || []) : [];
+              if (readerIds.length === 0) {
+                return <p className="text-sm text-gray-400 italic">Personne n'a encore lu ce message.</p>;
+              }
+              return (
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {readerIds.map(id => {
+                    const user = resolveUser(id);
+                    return (
+                      <div key={id} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                        <img
+                          src={user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Utilisateur')}`}
+                          alt={user?.name || 'Utilisateur'}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || 'Utilisateur inconnu'}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </Modal>
+
+        {/* Modal : qui a réagi avec cet emoji */}
+        <Modal show={!!reactionViewer} onClose={() => setReactionViewer(null)} maxWidth="sm">
+          <div className="p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+              <span className="text-xl">{reactionViewer?.emoji}</span> A réagi
+            </h3>
+            {(() => {
+              const userIds = reactionViewer ? (reactions[reactionViewer.commentId]?.[reactionViewer.emoji] || []) : [];
+              if (userIds.length === 0) {
+                return <p className="text-sm text-gray-400 italic">Aucune réaction.</p>;
+              }
+              return (
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {userIds.map(id => {
+                    const user = resolveUser(id);
+                    return (
+                      <div key={id} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                        <img
+                          src={user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Utilisateur')}`}
+                          alt={user?.name || 'Utilisateur'}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || 'Utilisateur inconnu'}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </Modal>
+
        {showLiveKitCall && (
   <LiveKitCallModal
     tokenEndpoint={`/tasks/${task.id}/livekit-token`}
