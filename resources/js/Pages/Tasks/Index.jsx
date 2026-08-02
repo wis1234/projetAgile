@@ -100,7 +100,7 @@ const PanelToggleButton = ({ icon: Icon, label, openLabel, open, onClick, count,
 
 // ── Filter panel (dynamic, fully controlled by parent — no internal open state) ─
 
-const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, onReset }) => {
+const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, onReset, searchTerm, setSearchTerm, handleSearchKeyDown }) => {
   if (!open) return null;
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
@@ -548,6 +548,9 @@ const Index = ({
           memberOptions={memberOptions}
           onChange={setFilters}
           onReset={handleReset}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          handleSearchKeyDown={handleSearchKeyDown}
         />
 
         {/* ── Progression des membres ── */}
