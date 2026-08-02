@@ -130,8 +130,9 @@ const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, o
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
             <input
               type="text"
-              value={filters.search || ''}
-              onChange={e => set('search', e.target.value)}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               placeholder="Titre de la tâche..."
               className="pl-9 pr-4 py-2 text-sm w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
@@ -145,7 +146,17 @@ const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, o
             { value: 'todo',        label: 'À faire' },
             { value: 'in_progress', label: 'En cours' },
             { value: 'done',        label: 'Terminé' },
+            { value: 'overdue',     label: 'En retard' },
           ]}
+        />
+
+        <Select
+          label="Retard"
+          field="overdue"
+          options={[
+            { value: 'yes', label: 'Uniquement en retard' },
+          ]}
+          placeholder="Tous"
         />
 
         <Select
@@ -327,8 +338,9 @@ const Index = ({
 }) => {
   const { t } = useTranslation();
   const { flash = {} } = usePage().props;
-  const [viewMode, setViewMode]   = useState('table');
-  const [filters, setFilters]     = useState(initialFilters);
+  const [viewMode, setViewMode]   = useState('cards');
+  const [searchTerm, setSearchTerm] = useState(initialFilters.search || '');
+  const [filters, setFilters]     = useState({ ...initialFilters, search: initialFilters.search || '' });
   const [isAlertDismissed, setIsAlertDismissed] = useState(false);
 
   const [showStats, setShowStats]     = useState(false);
@@ -336,13 +348,33 @@ const Index = ({
 
   const [displayedUserCount, setDisplayedUserCount] = useState(20);
 
-  const isFirstRender = useRef(true);
   const debounceTimer = useRef(null);
 
   const tasks = Array.isArray(initialTasks) ? initialTasks : (initialTasks.data || []);
   const pagination = !Array.isArray(initialTasks) ? initialTasks : null;
 
   const showLockedAlert = lockedSprints.length > 0 && !isAlertDismissed;
+
+
+  const handleSort = useCallback((field) => {
+    const newDir = filters.sort_by === field && filters.sort_dir === 'asc' ? 'desc' : 'asc';
+    const newFilters = { ...filters, sort_by: field, sort_dir: newDir };
+    setFilters(newFilters);
+  }, [filters]);
+
+  const handleReset = () => {
+    setFilters({});
+    setSearchTerm('');
+  };
+
+  const handleSearchKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      setFilters(prev => ({ ...prev, search: searchTerm }));
+    }
+  };
+
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -357,16 +389,6 @@ const Index = ({
 
     return () => clearTimeout(debounceTimer.current);
   }, [filters]);
-
-  const handleSort = useCallback((field) => {
-    const newDir = filters.sort_by === field && filters.sort_dir === 'asc' ? 'desc' : 'asc';
-    const newFilters = { ...filters, sort_by: field, sort_dir: newDir };
-    setFilters(newFilters);
-  }, [filters]);
-
-  const handleReset = () => {
-    setFilters({});
-  };
 
   useEffect(() => {
     setDisplayedUserCount(20);

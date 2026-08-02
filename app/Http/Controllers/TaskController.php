@@ -61,7 +61,19 @@ class TaskController extends Controller
         }
 
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            if ($request->status === 'overdue') {
+                $query->whereNotNull('due_date')
+                    ->where('due_date', '<', now())
+                    ->where('status', '!=', 'done');
+            } else {
+                $query->where('status', $request->status);
+            }
+        }
+
+        if ($request->filled('overdue') && $request->overdue === 'yes') {
+            $query->whereNotNull('due_date')
+                ->where('due_date', '<', now())
+                ->where('status', '!=', 'done');
         }
 
         if ($request->filled('priority')) {
@@ -181,7 +193,7 @@ class TaskController extends Controller
             ->values()
             ->all();
 
-        $tasks = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString()
+        $tasks = $query->orderBy('created_at', 'desc')->paginate(12)->withQueryString()
             ->through(function($task){
                 $is_muted = false;
                 if ($task->project && $task->project->users->isNotEmpty()) {
@@ -208,7 +220,7 @@ class TaskController extends Controller
 
         return Inertia::render('Tasks/Index', [
             'tasks' => $tasks,
-            'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to']),
+            'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to', 'overdue']),
             'summary' => $summary,
             'myTasksSummary' => $myTasksSummary,
             'userStats' => $userStats,
