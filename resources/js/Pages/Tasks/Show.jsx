@@ -1786,7 +1786,7 @@ return () => {
                 <FaArrowLeft className="text-lg" />
               </Link>
               <div className="min-w-0">
-                <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight truncate">
+                <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight ">
                   {task.title}
                 </h1>
                 {task.project && (
