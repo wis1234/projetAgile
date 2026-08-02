@@ -73,6 +73,21 @@ const SummaryCard = ({ label, value, icon: Icon, color, sub }) => (
   </div>
 );
 
+// ── Mini stat (compact, utilisé à l'intérieur d'une carte parente, sans bordure propre) ──
+const MiniStat = ({ label, value, icon: Icon, color, sub }) => (
+  <div className="rounded-xl bg-gray-50 dark:bg-gray-700/40 p-3.5 flex items-center gap-3">
+    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
+      <Icon className="text-sm text-white" />
+    </div>
+    <div className="min-w-0">
+      <p className="text-lg font-extrabold text-gray-900 dark:text-white leading-tight">{value ?? 0}</p>
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">{label}</p>
+      {sub && <p className="text-[11px] text-red-500 font-semibold mt-0.5">{sub}</p>}
+    </div>
+  </div>
+);
+
+
 // ── Collapsible panel toggle button (generic, reused for Filtres & Progression) ─
 
 const PanelToggleButton = ({ icon: Icon, label, openLabel, open, onClick, count, tone = 'default' }) => {
@@ -490,54 +505,97 @@ const Index = ({
           </div>
         )}
 
-        {/* ── Summary cards (global) ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <SummaryCard label="Total"    value={summary.total}       icon={FaTasks}              color="bg-blue-500" />
-          <SummaryCard label="À faire"  value={summary.todo}        icon={FaClock}              color="bg-slate-400" />
-          <SummaryCard label="En cours" value={summary.in_progress} icon={FaFire}               color="bg-amber-500" />
-          <SummaryCard label="Terminé"  value={summary.done}        icon={FaCheck}              color="bg-emerald-500"
-            sub={summary.overdue > 0 ? `${summary.overdue} en retard` : null} />
+        {/* ── Vue d'ensemble : global + mes tâches, côte à côte (empilés sur mobile) ── */}
+        <div className={`grid grid-cols-1 ${myTasksSummary ? 'lg:grid-cols-2' : ''} gap-6`}>
+
+          {/* Carte gauche : vue d'ensemble globale */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
+            <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-4">
+              Vue d'ensemble
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              <MiniStat label="Total"    value={summary.total}       icon={FaTasks} color="bg-blue-500" />
+              <MiniStat label="À faire"  value={summary.todo}        icon={FaClock} color="bg-slate-400" />
+              <MiniStat label="En cours" value={summary.in_progress} icon={FaFire}  color="bg-amber-500" />
+              <MiniStat
+                label="Terminé" value={summary.done} icon={FaCheck} color="bg-emerald-500"
+                sub={summary.overdue > 0 ? `${summary.overdue} en retard` : null}
+              />
+            </div>
+          </div>
+
+          {/* Carte droite : mes propres tâches */}
+          {myTasksSummary && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
+              <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-4">
+                Mes propres tâches
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                <MiniStat label="Total"    value={myTasksSummary.total}       icon={FaTasks} color="bg-indigo-500" />
+                <MiniStat label="À faire"  value={myTasksSummary.todo}        icon={FaClock} color="bg-slate-400" />
+                <MiniStat label="En cours" value={myTasksSummary.in_progress} icon={FaFire}  color="bg-amber-500" />
+                <MiniStat
+                  label="Terminé" value={myTasksSummary.done} icon={FaCheck} color="bg-emerald-500"
+                  sub={myTasksSummary.overdue > 0 ? `${myTasksSummary.overdue} en retard` : null}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* ── Summary cards "Mes propres tâches" ── */}
-        {myTasksSummary && (
-          <>
-            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 mt-2">
-              Mes propres tâches
-            </h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <SummaryCard label="Total"    value={myTasksSummary.total}       icon={FaTasks}  color="bg-indigo-500" />
-              <SummaryCard label="À faire"  value={myTasksSummary.todo}        icon={FaClock}  color="bg-slate-400" />
-              <SummaryCard label="En cours" value={myTasksSummary.in_progress} icon={FaFire}   color="bg-amber-500" />
-              <SummaryCard label="Terminé"  value={myTasksSummary.done}        icon={FaCheck}  color="bg-emerald-500"
-                sub={myTasksSummary.overdue > 0 ? `${myTasksSummary.overdue} en retard` : null} />
-            </div>
-          </>
-        )}
+        {/* ── Controls row : panneaux à gauche, compteur + vue à droite ── */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            {userStats.length > 0 && (
+              <PanelToggleButton
+                icon={FaChartBar}
+                label="Voir les progrès"
+                openLabel="Masquer les progrès"
+                open={showStats}
+                onClick={() => setShowStats(s => !s)}
+                tone="accent"
+              />
+            )}
 
-        {/* ── Controls row ── */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-3 lg:flex-wrap">
-          {userStats.length > 0 && (
             <PanelToggleButton
-              icon={FaChartBar}
-              label="Voir les progrès"
-              openLabel="Masquer les progrès"
-              open={showStats}
-              onClick={() => setShowStats(s => !s)}
-              tone="accent"
+              icon={FaFilter}
+              label="Filtres & Recherche"
+              openLabel="Masquer les filtres"
+              open={showFilters}
+              onClick={() => setShowFilters(f => !f)}
+              count={activeFilterCount}
             />
-          )}
+          </div>
 
-          <PanelToggleButton
-            icon={FaFilter}
-            label="Filtres & Recherche"
-            openLabel="Masquer les filtres"
-            open={showFilters}
-            onClick={() => setShowFilters(f => !f)}
-            count={activeFilterCount}
-          />
-
-          <div className="flex-1 hidden lg:block" />
+          <div className="flex items-center gap-3 flex-wrap">
+            <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              {pagination?.total !== undefined
+                ? `${pagination.from ?? 0}–${pagination.to ?? 0} sur ${pagination.total} résultats`
+                : `${tasks.length} résultats`}
+            </p>
+            <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-xl p-1">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === 'table'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
+                }`}
+              >
+                <HiOutlineViewList /> Tableau
+              </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === 'cards'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
+                }`}
+              >
+                <HiOutlineViewGrid /> Cartes
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* ── Filters ── */}
@@ -603,36 +661,7 @@ const Index = ({
           </div>
         )}
 
-        {/* ── View toggle + count ── */}
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {pagination?.total !== undefined
-              ? `${pagination.from ?? 0}–${pagination.to ?? 0} sur ${pagination.total} résultats`
-              : `${tasks.length} résultats`}
-          </p>
-          <div className="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-1 shadow-sm">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                viewMode === 'table'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
-              }`}
-            >
-              <HiOutlineViewList /> Tableau
-            </button>
-            <button
-              onClick={() => setViewMode('cards')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                viewMode === 'cards'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
-              }`}
-            >
-              <HiOutlineViewGrid /> Cartes
-            </button>
-          </div>
-        </div>
+         
 
         {/* ── TABLE view ── */}
         {viewMode === 'table' && (
