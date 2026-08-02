@@ -1986,257 +1986,129 @@ return () => {
 
         {/* Tab Content */}
         <div>
-          {activeTab === 'details' && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 mb-6">
-                {/* Assigned User */}
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">{t('task_details.assigned_to')} :</span>
-                  {Array.isArray(task.assigned_users) && task.assigned_users.length > 0 ? (
-                    <div className="flex flex-col gap-1">
-                      <ul>
-                        {task.assigned_users.map(u => (
-                          <li key={u.id} className="flex items-center gap-2">
-                            <img src={u.profile_photo_url || (u.profile_photo_path ? `/storage/${u.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`)} alt={u.name} className="w-10 h-10 rounded-full border-2 border-blue-300 dark:border-blue-600" />
-                            <span className="font-bold text-blue-700 dark:text-blue-200 text-lg">{u.name}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      {task.assigned_user || task.assignedUser ? (
-                        <img src={(task.assigned_user?.profile_photo_url || task.assignedUser?.profile_photo_url) || (task.assigned_user?.profile_photo_path ? `/storage/${task.assigned_user.profile_photo_path}` : task.assignedUser?.profile_photo_path ? `/storage/${task.assignedUser.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_user?.name || task.assignedUser?.name || '')}`)} alt={task.assigned_user?.name || task.assignedUser?.name} className="w-10 h-10 rounded-full border-2 border-blue-300 dark:border-blue-600 transition duration-200 hover:shadow-md" />
-                      ) : (
-                        <FaUserCircle className="w-10 h-10 text-gray-400 dark:text-gray-500" />
-                      )}
-                      <div className="font-bold text-lg text-black dark:text-blue-100">{task.assigned_user?.name || task.assignedUser?.name || <span className="italic text-gray-400">{t('task_details.not_assigned')}</span>}</div>
-                    </div>
-                  )}
-                </div>
+        {activeTab === 'details' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
-                {/* Task Title */}
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">{t('task_details.title')} :</span> 
-                  <span className="text-gray-900 dark:text-gray-100 text-lg font-medium">{task.title}</span>
-                </div>
-
-                {/* Project */}
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">{t('task_details.project')} :</span> 
-                  <Link href={`/projects/${task.project.id}`} className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 text-lg">
-                    <FaProjectDiagram /> {task.project ? task.project.name : <span className="italic text-gray-400">Aucun</span>}
-                  </Link>
-                </div>
-
-                {/* Sprint avec plus de détails */}
-                <div className="flex items-start gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.sprint')} :</span> 
-                  <div className="flex-1">
-                    {task.sprint_id ? (
-                      <div className="space-y-2">
-                        {task.sprint ? (
-                          <>
-                            <Link 
-                              href={`/sprints/${task.sprint.id}`} 
-                              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 text-lg"
-                            >
-                              <FaFlagCheckered /> {task.sprint.name}
-                            </Link>
-                            <div className="text-sm text-gray-600 dark:text-gray-400 pl-6">
-                              <p>Date de début: {new Date(task.sprint.start_date).toLocaleDateString('fr-FR')}</p>
-                              <p>Date de fin: {new Date(task.sprint.end_date).toLocaleDateString('fr-FR')}</p>
-                              {task.sprint.goal && (
-                                <p>Objectif: {task.sprint.goal}</p>
-                              )}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <FaFlagCheckered className="text-gray-400" />
-                            <span className="text-gray-600 dark:text-gray-400">
-                              Sprint ID: {task.sprint_id} (Détails non chargés)
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 italic">Aucun sprint associé</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Ces informations sont déjà affichées plus bas dans la section détaillée */}
-
-                {/* Due Date */}
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">{t('task_details.due_date')} :</span> 
-                  <span className="text-gray-900 dark:text-gray-100">{task.due_date ? new Date(task.due_date).toLocaleDateString() : <span className="italic text-gray-400">{t('task_details.not_assigned')}</span>}</span>
-                </div>
-                
-                {/* Ces informations sont déjà affichées plus bas dans la section détaillée */}
-              </div>
-
-              {/* Détails de la tâche */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                {/* Colonne de gauche */}
-                <div className="space-y-4">
-                  {/* Statut */}
-                  <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.status')} :</span> 
-                    {getStatusBadge(task.status)}
-                  </div>
-
-                  {/* Priorité */}
-                  <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.priority')} :</span>
-                    {getPriorityBadge(task.priority)}
-                  </div>
-
-                  {/* Date de création */}
-                  <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.created_at')} :</span>
-                    <span className="text-gray-600 dark:text-gray-400">
-                      {new Date(task.created_at).toLocaleString('fr-FR', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-
-                  {/* Cette section a été déplacée et fusionnée avec la date d'échéance */}
-                </div>
-
-                {/* Colonne de droite */}
-                <div className="space-y-4">
-                  {/* Assigné à */}
-                  <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.assigned_to')} :</span>
-                    {task.assigned_user ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                            {task.assigned_user.name.split(' ').map(n => n[0]).join('')}
-                          </span>
-                        </div>
-                        <span>{task.assigned_user.name}</span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 italic">{t('task_details.not_assigned')}</span>
-                    )}
-                  </div>
-
-                  {/* Compte à rebours et date d'échéance */}
-                  {task.due_date && (
-                    <div className="flex items-start gap-4">
-                      <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px] mt-1">{t('task_details.due_date')} :</span>
-                      <div className="flex-1">
-                        <div className={`mb-2 ${
-                          new Date(task.due_date) < new Date() && task.status !== 'done' 
-                            ? 'text-red-600 dark:text-red-400 font-medium' 
-                            : 'text-gray-600 dark:text-gray-400'
-                        }`}>
-                          {new Date(task.due_date).toLocaleString('fr-FR', {
-                            weekday: 'long',
-                            day: '2-digit',
-                            month: 'long',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                          {new Date(task.due_date) < new Date() && task.status !== 'done' && (
-                            <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-300">
-                              {t('task_details.overdue')}
-                            </span>
-                          )}
-                        </div>
-                        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                            <div className="text-right">
-                            <CountdownTimer 
-                              targetDate={task.due_date}
-                              taskStatus={task.status}
-                              taskUpdatedAt={task.updated_at}
-                              t={t}
-                              onComplete={() => console.log('Temps écoulé!')}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dernière mise à jour */}
-                  <div className="flex items-center gap-4">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('task_details.updated_at')} :</span>
-                    <span className="text-gray-600 dark:text-gray-400">
-                      {new Date(task.updated_at).toLocaleString('fr-FR', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{t('task_details.description')}</h3>
-                </div>
-                
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+              {/* Colonne principale : description */}
+              <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-700 shadow-sm">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-4">
+                  <FaInfoCircle className="text-blue-500" /> {t('task_details.description')}
+                </h3>
+                <div className="bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-700 rounded-xl p-5">
                   {task.description ? (
                     <div className="prose dark:prose-invert max-w-none">
                       {task.description.split('\n').map((paragraph, index) => (
-                        <p key={index} className="text-gray-700 dark:text-gray-300">
+                        <p key={index} className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
                           {paragraph || <br />}
                         </p>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-400 italic">
+                    <div className="text-center py-8 text-gray-400 italic text-sm">
                       {t('task_details.no_description')}
                     </div>
                   )}
                 </div>
-              </div>
 
-              <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                {(isAssigned || isAdmin) && (
-                  <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                    <Link 
-                      href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
-                      className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md`}
-                      title={isDeadlinePassed ? t('deadline_expired') : ''}
-                    >
-                      <FaFileUpload /> {t('actions.upload_file')}
-                    </Link>
-                    {isDeadlinePassed && (
-                      <div className="absolute -bottom-6 left-0 right-0 text-xs text-red-500 text-center">
-                        {t('deadline_expired')}
-                      </div>
-                    )}
+                {/* Assignations multiples, si présentes */}
+                {Array.isArray(task.assigned_users) && task.assigned_users.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
+                    <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
+                      {t('task_details.assigned_to')}
+                    </h4>
+                    <div className="flex flex-wrap gap-3">
+                      {task.assigned_users.map(u => (
+                        <div key={u.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/50 rounded-full pl-1.5 pr-3 py-1.5">
+                          <img
+                            src={u.profile_photo_url || (u.profile_photo_path ? `/storage/${u.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`)}
+                            alt={u.name}
+                            className="w-7 h-7 rounded-full border border-blue-200 dark:border-blue-700"
+                          />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{u.name}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
-                {(isAdmin || isProjectManager) && (
-                  <Link href={`/tasks/${task.id}/edit`} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md">
-                    <FaEdit /> {t('actions.edit_task')}
-                  </Link>
+              </div>
+
+              {/* Colonne latérale : sprint + échéance + méta */}
+              <div className="space-y-6">
+
+                {/* Sprint */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
+                  <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                    <FaFlagCheckered className="text-purple-500" /> {t('task_details.sprint')}
+                  </h4>
+                  {task.sprint_id ? (
+                    task.sprint ? (
+                      <div>
+                        <Link
+                          href={`/sprints/${task.sprint.id}`}
+                          className="font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 text-sm"
+                        >
+                          {task.sprint.name}
+                        </Link>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-1">
+                          <p>{new Date(task.sprint.start_date).toLocaleDateString('fr-FR')} → {new Date(task.sprint.end_date).toLocaleDateString('fr-FR')}</p>
+                          {task.sprint.goal && <p className="italic">« {task.sprint.goal} »</p>}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Sprint #{task.sprint_id} (détails non chargés)</span>
+                    )
+                  ) : (
+                    <span className="text-sm text-gray-400 italic">Aucun sprint associé</span>
+                  )}
+                </div>
+
+                {/* Échéance + compte à rebours */}
+                {task.due_date && (
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                      <FaClock className="text-amber-500" /> {t('task_details.due_date')}
+                    </h4>
+                    <div className={`text-sm mb-3 ${
+                      new Date(task.due_date) < new Date() && task.status !== 'done'
+                        ? 'text-red-600 dark:text-red-400 font-medium'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}>
+                      {new Date(task.due_date).toLocaleString('fr-FR', {
+                        weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                      {new Date(task.due_date) < new Date() && task.status !== 'done' && (
+                        <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-300">
+                          {t('task_details.overdue')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-3">
+                      <CountdownTimer
+                        targetDate={task.due_date}
+                        taskStatus={task.status}
+                        taskUpdatedAt={task.updated_at}
+                        t={t}
+                        onComplete={() => console.log('Temps écoulé!')}
+                      />
+                    </div>
+                  </div>
                 )}
-                {(isAdmin || isProjectManager) && (
-                  <button
-                    onClick={handleDeleteTask}
-                    className="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md"
-                  >
-                    <FaTrash /> {t('actions.delete_task')}
-                  </button>
-                )}
+
+                {/* Métadonnées */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500 dark:text-gray-400">{t('task_details.created_at')}</span>
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                      {new Date(task.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500 dark:text-gray-400">{t('task_details.updated_at')}</span>
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                      {new Date(task.updated_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
