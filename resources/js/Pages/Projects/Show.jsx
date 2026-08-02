@@ -11,7 +11,7 @@ import {
   FaPlus, FaGlobe, FaExternalLinkAlt, FaQuestionCircle, FaArrowUp, FaArrowDown,
   FaEquals, FaExclamationTriangle, FaSpinner, FaListUl, FaVideo, FaDoorOpen, FaTimes, FaLock
 } from 'react-icons/fa';
-import { Line } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
 import 'chart.js/auto';
 import Modal from '../../Components/Modal';
 import ZoomMeeting from '../../Components/ZoomMeeting';
@@ -49,7 +49,7 @@ const getPriorityInfo = (priority, t) => {
 };
 
 // ── Composants réutilisables ────────────────────────────────────────────────
-const StatCard = ({ icon, label, value, color }) => {
+const StatCard = ({ icon, label, value, color, onDetailClick }) => {
   const colors = {
     emerald: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
     blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
@@ -57,10 +57,18 @@ const StatCard = ({ icon, label, value, color }) => {
     amber: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
   };
   return (
-    <div className={`${colors[color]} rounded-xl p-4 border shadow-sm`}>
+    <div className={`${colors[color]} rounded-xl p-4 border shadow-sm flex flex-col`}>
       <div className="flex items-center justify-between mb-2">{icon}</div>
       <div className="text-2xl font-bold text-gray-900 dark:text-white">{value ?? 0}</div>
       <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{label}</div>
+      {onDetailClick && (
+        <button
+          onClick={onDetailClick}
+          className="mt-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline self-start"
+        >
+          Voir détail
+        </button>
+      )}
     </div>
   );
 };
@@ -159,7 +167,7 @@ const ZoomStatusBar = ({ project, onOpen }) => {
   }, [project.id]);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div className="flex items-center gap-3 min-w-0">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${liveMeeting ? 'bg-emerald-600' : 'bg-blue-600'}`}>
           <FaVideo className="text-white text-sm" />
@@ -291,6 +299,80 @@ const ConsentDeleteModal = ({ show, onClose, project, onSubmit, loading, errors 
   );
 };
 
+
+// Modale : contribution aux discussions, classement par nombre de commentaires
+const CommentStatsModal = ({ show, onClose, commentsByMember = [] }) => {
+  const sorted = [...commentsByMember].sort((a, b) => b.count - a.count);
+  const top3 = sorted.slice(0, 3);
+  const medals = ['🥇', '🥈', '🥉'];
+
+  const chartData = {
+    labels: sorted.map(m => (m.user?.name || 'Inconnu').split(' ')[0]),
+    datasets: [
+      {
+        label: 'Commentaires',
+        data: sorted.map(m => m.count),
+        backgroundColor: sorted.map((_, i) =>
+          i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#3b82f6'
+        ),
+        borderRadius: 8,
+        maxBarThickness: 32,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
+  };
+
+  return (
+    <Modal show={show} onClose={onClose} maxWidth="2xl">
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <FaCommentDots className="text-amber-500" /> Contribution aux discussions
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-lg">
+            <FaTimes />
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+          Nombre de commentaires postés par membre sur les tâches de ce projet.
+        </p>
+
+        {sorted.length === 0 ? (
+          <div className="py-10 text-center text-sm text-gray-400 italic">
+            Aucun commentaire n'a encore été posté sur ce projet.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              {top3.map((m, i) => (
+                <div key={m.user?.id ?? i} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 border border-gray-100 dark:border-gray-700">
+                  <span className="text-2xl">{medals[i]}</span>
+                  <MemberAvatar user={m.user || { name: 'Inconnu' }} size="md" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{m.user?.name || 'Inconnu'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{m.count} commentaire{m.count !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ height: Math.max(180, sorted.length * 40) }}>
+              <Bar data={chartData} options={chartOptions} />
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+};
+
 // ── Composant principal ─────────────────────────────────────────────────────
 function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
   const { t, i18n } = useTranslation();
@@ -304,6 +386,8 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
   const [callActive, setCallActive] = useState(false);
+  const [showCommentStatsModal, setShowCommentStatsModal] = useState(false);
+
 
   useEffect(() => {
     fetch(`/projects/${project.id}/livekit-call/status`)
@@ -422,64 +506,74 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
           </div>
         )}
 
-        {/* En-tête */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+{/* En-tête projet + Appels & réunions, côte à côte (empilés sur mobile) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* Carte gauche : identité du projet */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm flex flex-col justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                 <FaProjectDiagram className="text-white text-xl" />
               </div>
-              <div>
-                <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">{project.name}</h1>
+              <div className="min-w-0">
+                <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white truncate">{project.name}</h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
-                  <FaCalendarAlt className="text-xs" />
+                  <FaCalendarAlt className="text-xs flex-shrink-0" />
                   {new Date(project.created_at).toLocaleDateString(i18n.language, { day: '2-digit', month: 'long', year: 'numeric' })}
                 </p>
               </div>
             </div>
-            <Link
-              href="/projects"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl font-medium transition"
-            >
-              <FaArrowLeft className="text-sm" /> {t('back_to_projects')}
-            </Link>
-          </div>
-        </div>
-
-        {/* Bandeau de statut Zoom : compact, pleine largeur, ouvre le modal au clic */}
-{/* Bandeau de statut Zoom : compact, pleine largeur, ouvre le modal au clic */}
-        <ZoomStatusBar project={project} onOpen={() => setShowZoomModal(true)} />
-
-        {/* Bandeau appel LiveKit (jusqu'à ~100 participants) */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 shadow-sm flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-600">
-              <FaVideo className="text-white text-sm" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-bold text-gray-900 dark:text-white text-sm">ProJA Meet</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Jusqu'à 100 participants simultanés</p>
+            <div className="mt-5">
+              <Link
+                href="/projects"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl font-medium transition"
+              >
+                <FaArrowLeft className="text-sm" /> {t('back_to_projects')}
+              </Link>
             </div>
           </div>
-         <button
-  onClick={async () => {
-    setShowLiveKitCall(true);
-    const csrfToken = await getFreshCsrfToken();
-    fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
-      method: 'POST',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-TOKEN': csrfToken,
-      },
-    })
-      .then(res => res.json())
-      .then(data => setCallActive(true))
-      .catch(err => console.error('Erreur appel:', err));
-  }}
-  className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition flex-shrink-0"
->
-  <FaVideo className="text-xs" /> {callActive ? 'Rejoindre l’appel en cours' : 'Démarrer / Rejoindre'}
-</button>
+
+          {/* Carte droite : Appels & réunions (Zoom + ProJA Meet) */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm flex flex-col gap-4">
+            <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+              Appels & réunions
+            </h3>
+
+            <ZoomStatusBar project={project} onOpen={() => setShowZoomModal(true)} />
+
+            <div className="border-t border-gray-100 dark:border-gray-700" />
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-600">
+                  <FaVideo className="text-white text-sm" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm">ProJA Meet</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Jusqu'à 100 participants simultanés</p>
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  setShowLiveKitCall(true);
+                  const csrfToken = await getFreshCsrfToken();
+                  fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
+                    method: 'POST',
+                    headers: {
+                      'X-Requested-With': 'XMLHttpRequest',
+                      'X-CSRF-TOKEN': csrfToken,
+                    },
+                  })
+                    .then(res => res.json())
+                    .then(() => setCallActive(true))
+                    .catch(err => console.error('Erreur appel:', err));
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition flex-shrink-0"
+              >
+                <FaVideo className="text-xs" /> {callActive ? 'Rejoindre l’appel en cours' : 'Démarrer / Rejoindre'}
+              </button>
+            </div>
+          </div>
         </div>
 
 
@@ -513,7 +607,13 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
               <StatCard icon={<FaCheckCircle className="text-emerald-500 text-2xl" />} label={t('completed_tasks')} value={stats.doneTasksCount ?? 0} color="emerald" />
               <StatCard icon={<FaClock className="text-blue-500 text-2xl" />} label={t('tasks_in_progress')} value={stats.inProgressTasksCount ?? 0} color="blue" />
               <StatCard icon={<FaFileAlt className="text-purple-500 text-2xl" />} label={t('files')} value={stats.filesCount ?? 0} color="purple" />
-              <StatCard icon={<FaCommentDots className="text-amber-500 text-2xl" />} label={t('comments')} value={stats.commentsCount ?? 0} color="amber" />
+              <StatCard
+                icon={<FaCommentDots className="text-amber-500 text-2xl" />}
+                label={t('comments')}
+                value={stats.commentsCount ?? 0}
+                color="amber"
+                onDetailClick={() => setShowCommentStatsModal(true)}
+              />
             </div>
 
             {/* Sprints */}
@@ -812,6 +912,12 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
         onSubmit={handleConsentSubmit}
         loading={consentLoading}
         errors={consentErrors}
+      />
+
+      <CommentStatsModal
+        show={showCommentStatsModal}
+        onClose={() => setShowCommentStatsModal(false)}
+        commentsByMember={stats.commentsByMember || []}
       />
 
       {/* Modal Zoom : héberge le composant complet, inchangé fonctionnellement */}

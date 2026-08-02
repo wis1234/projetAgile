@@ -278,6 +278,25 @@ class ProjectController extends Controller
         ->get();
 
         $commentsCount = \App\Models\TaskComment::whereIn('task_id', $taskIds)->count();
+        $commentsByMember = \App\Models\TaskComment::whereIn('task_id', $taskIds)
+            ->selectRaw('user_id, count(*) as count')
+            ->groupBy('user_id')
+            ->with('user:id,name,profile_photo_path')
+            ->orderByDesc('count')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'user' => $row->user ? [
+                        'id'                 => $row->user->id,
+                        'name'               => $row->user->name,
+                        'profile_photo_url'  => $row->user->profile_photo_url ?? null,
+                    ] : null,
+                    'count' => $row->count,
+                ];
+            })
+            ->filter(fn($row) => $row['user'] !== null)
+            ->values();
+
         $filesCount = $project->files()->count();
         $doneTasks = $project->tasks()->where('status', 'done')->get();
         $doneTasksCount = $doneTasks->count();
@@ -291,12 +310,13 @@ class ProjectController extends Controller
 
         // Fusion finale – toutes les stats en un seul tableau
         $finalStats = array_merge($baseStats, [
-            'activitiesByUser' => $activitiesByUser,
-            'commentsCount'    => $commentsCount,
-            'filesCount'       => $filesCount,
-            'doneTasksCount'   => $doneTasksCount,
-            'doneTasksByUser'  => $doneTasksByUser,
-            'doneTasksByWeek'  => $doneTasksByWeek,
+            'activitiesByUser'  => $activitiesByUser,
+            'commentsCount'     => $commentsCount,
+            'commentsByMember'  => $commentsByMember,
+            'filesCount'        => $filesCount,
+            'doneTasksCount'    => $doneTasksCount,
+            'doneTasksByUser'   => $doneTasksByUser,
+            'doneTasksByWeek'   => $doneTasksByWeek,
         ]);
 
         return Inertia::render('Projects/Show', [
