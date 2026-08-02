@@ -190,11 +190,6 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     if (!callStarted) {
       setCallStarted(true);
 
-      // Synchronise la minuterie sur l'heure réelle de création de la room
-      // (partagée par tous les participants), pas sur l'heure locale d'arrivée.
-      // Si room.roomInfo n'existe pas dans votre version du SDK, vérifiez
-      // dans la console `console.log(room)` où se trouve le vrai timestamp
-      // (parfois room.metadata, room.info, ou une autre propriété selon la version).
       let startedAt = Date.now();
       if (room?.roomInfo?.creationTime) {
         startedAt = Number(room.roomInfo.creationTime) * 1000;
@@ -208,7 +203,36 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     }
   }, [participants.length, connecting, room]);
 
-  // ─── Attacher les flux distants ─────────────────────────────────────
+  // Détecte si quelqu'un (local ou distant) partage son écran
+  const remoteScreenShare = participants
+    .map(p => ({ p, pub: [...p.videoTrackPublications.values()].find(pub => pub.source === Track.Source.ScreenShare && pub.track) }))
+    .find(x => x.pub);
+  const isScreenSharingAnyone = screenSharing || !!remoteScreenShare;
+
+  // ─── Attacher la caméra LOCALE — se déclenche après chaque rendu concerné ───
+  // C'est le correctif clé : on n'attache plus au moment du clic (où l'élément
+  // <video> n'existe pas encore dans le DOM), mais dans un effet qui se relance
+  // dès que camEnabled ou la mise en page (grille ↔ partage d'écran) changent.
+  useEffect(() => {
+    if (!room || !camEnabled) return;
+    const camPub = [...room.localParticipant.videoTrackPublications.values()]
+      .find(pub => pub.source === Track.Source.Camera);
+    if (camPub?.track && localVideoRef.current) {
+      camPub.track.attach(localVideoRef.current);
+    }
+  }, [camEnabled, room, isScreenSharingAnyone, callStarted]);
+
+  // ─── Attacher le partage d'écran LOCAL — même principe ───
+  useEffect(() => {
+    if (!room || !screenSharing) return;
+    const pub = [...room.localParticipant.videoTrackPublications.values()]
+      .find(p => p.source === Track.Source.ScreenShare);
+    if (pub?.track && screenVideoRef.current) {
+      pub.track.attach(screenVideoRef.current);
+    }
+  }, [screenSharing, room]);
+
+  // ─── Attacher les flux DISTANTS (caméra + audio) — relancé aussi au changement de mise en page ───
   useEffect(() => {
     participants.forEach(p => {
       const camPub = [...p.videoTrackPublications.values()].find(pub => pub.source === Track.Source.Camera && pub.track);
@@ -218,17 +242,14 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
       const audioPub = [...p.audioTrackPublications.values()].find(pub => pub.track);
       if (audioPub?.track) audioPub.track.attach();
     });
-  }, [participants]);
+  }, [participants, isScreenSharingAnyone, callStarted, connecting]);
 
-  const remoteScreenShare = participants
-    .map(p => ({ p, pub: [...p.videoTrackPublications.values()].find(pub => pub.source === Track.Source.ScreenShare && pub.track) }))
-    .find(x => x.pub);
-
+  // ─── Attacher le partage d'écran DISTANT ───
   useEffect(() => {
     if (remoteScreenShare?.pub?.track && screenVideoRef.current) {
       remoteScreenShare.pub.track.attach(screenVideoRef.current);
     }
-  }, [remoteScreenShare]);
+  }, [remoteScreenShare, screenSharing]);
 
   // ─── Contrôles locaux ────────────────────────────────────────────
   const toggleMic = async () => {
@@ -243,11 +264,8 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     const next = !camEnabled;
     await room.localParticipant.setCameraEnabled(next);
     setCamEnabled(next);
-    if (next) {
-      const camPub = [...room.localParticipant.videoTrackPublications.values()]
-        .find(pub => pub.source === Track.Source.Camera);
-      if (camPub?.track && localVideoRef.current) camPub.track.attach(localVideoRef.current);
-    }
+    // L'attachement visuel est désormais géré par l'effet ci-dessus,
+    // pas ici — évite le bug qui obligeait à cliquer deux fois.
   };
 
   const toggleScreenShare = async () => {
@@ -256,13 +274,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
       const next = !screenSharing;
       await room.localParticipant.setScreenShareEnabled(next, { audio: true });
       setScreenSharing(next);
-      if (next) {
-        setTimeout(() => {
-          const pub = [...room.localParticipant.videoTrackPublications.values()]
-            .find(p => p.source === Track.Source.ScreenShare);
-          if (pub?.track && screenVideoRef.current) pub.track.attach(screenVideoRef.current);
-        }, 300);
-      }
+      // Idem : l'attachement est géré par l'effet dédié.
     } catch (err) {
       console.error('Erreur partage d’écran:', err);
       setError('Impossible de démarrer le partage d’écran.');
@@ -339,7 +351,6 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   };
 
   const totalCount = 1 + participants.length;
-  const isScreenSharingAnyone = screenSharing || !!remoteScreenShare;
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
