@@ -29,9 +29,11 @@ Route::get('/', function () {
 });
 
 // Route pour la page de guide
-Route::get('/guide', function () {
-    return view('guide');
-})->name('guide');
+Route::get('/guide', function () { return Inertia::render('Guide'); })->name('guide');
+//Route::get('/guide', function () {
+   // return view('guide');
+//})->name('guide');
+
 
 Route::get('/about', function () { return Inertia::render('About'); })->name('about');
 Route::get('/contact', function () { return Inertia::render('Contact'); })->name('contact');
