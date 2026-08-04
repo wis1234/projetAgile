@@ -404,36 +404,39 @@ foreach ($usersToNotify as $user) {
     /**
      * Display the specified resource.
      */
-    public function show(File $file)
-    {
-        $this->authorize('view', $file);
-        $file->load(['project', 'user', 'task']);
-        $statuses = ['pending', 'validated', 'rejected'];
-        $user = auth()->user();
+public function show(File $file)
+{
+    $this->authorize('view', $file);
+    $file->load(['project', 'user', 'task.project']); // ← task.project ajouté
+    $statuses = ['pending', 'validated', 'rejected'];
+    $user = auth()->user();
 
-        $canUpdateStatus = false;
-        $canManageFile = false;
+    $canUpdateStatus = false;
+    $canManageFile = false;
 
-        if ($user) {
-            if ($user->hasRole('admin')) {
+    if ($user) {
+        if ($user->hasRole('admin')) {
+            $canUpdateStatus = true;
+            $canManageFile = true;
+        } elseif ($file->project) {
+            $projectUser = $file->project->users()->where('user_id', $user->id)->first();
+            if ($projectUser && $projectUser->pivot->role === 'manager') {
                 $canUpdateStatus = true;
                 $canManageFile = true;
-            } elseif ($file->project) {
-                $projectUser = $file->project->users()->where('user_id', $user->id)->first();
-                if ($projectUser && $projectUser->pivot->role === 'manager') {
-                    $canUpdateStatus = true;
-                    $canManageFile = true;
-                }
             }
         }
-
-        return Inertia::render('Files/Show', [
-            'file' => $file,
-            'canUpdateStatus' => $canUpdateStatus,
-            'statuses' => $statuses,
-            'canManageFile' => $canManageFile,
-        ]);
     }
+
+    $canBypassLock = $user ? $file->isUnlockedFor($user) : false; // ← remplace l'ancien calcul
+
+    return Inertia::render('Files/Show', [
+        'file' => $file,
+        'canUpdateStatus' => $canUpdateStatus,
+        'statuses' => $statuses,
+        'canManageFile' => $canManageFile,
+        'canBypassLock' => $canBypassLock, // ← nouveau prop, remplace isLockOwner
+    ]);
+}
 
     /**
      * Show the form for editing the specified resource.
@@ -834,30 +837,6 @@ public function unlock(Request $request, File $file)
 }
 
 
-// For managers: set or remove a password
-public function setPassword(Request $request, File $file)
-{
-    $this->authorize('update', $file); // ✅ FIX HERE
-
-    if ($request->action === 'remove') {
-        $file->update([
-            'password_hash' => null,
-            'is_password_protected' => false,
-        ]);
-
-        return response()->json(['message' => 'Protection supprimée']);
-    }
-
-    $request->validate(['password' => 'required|string|min:6']);
-
-    $file->update([
-        'password_hash' => Hash::make($request->password),
-        'is_password_protected' => true,
-    ]);
-
-    return response()->json(['message' => 'Mot de passe enregistré']);
-}
-
 
 
 public function serveFile(Request $request, $filename)
@@ -898,5 +877,35 @@ public function serveFile(Request $request, $filename)
     ]);
 }
 
+
+public function setPassword(Request $request, File $file)
+{
+    $this->authorize('update', $file);
+
+    if ($request->action === 'remove') {
+        $file->update([
+            'password_hash'          => null,
+            'is_password_protected'  => false,
+            'locked_by'              => null,
+            'locked_by_role'         => null,
+        ]);
+
+        return response()->json(['message' => 'Protection supprimée']);
+    }
+
+    $request->validate(['password' => 'required|string|min:6']);
+
+    $currentUser = auth()->user();
+    $lockRole = $currentUser->hasRole('admin') ? 'admin' : 'manager';
+
+    $file->update([
+        'password_hash'          => Hash::make($request->password),
+        'is_password_protected'  => true,
+        'locked_by'              => $currentUser->id,
+        'locked_by_role'         => $lockRole,
+    ]);
+
+    return response()->json(['message' => 'Mot de passe enregistré']);
+}
     
 }

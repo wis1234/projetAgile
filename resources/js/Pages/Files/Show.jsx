@@ -444,10 +444,7 @@ const Show = ({ file, auth, canManageFile }) => {
   const [isDeleteModalOpen,   setIsDeleteModalOpen]   = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
-  // Session-level unlock: manager always unlocked, others start locked if file is protected
-  const [isUnlocked, setIsUnlocked] = useState(
-    canManageFile || !file.is_password_protected
-  );
+  const [isUnlocked, setIsUnlocked] = useState(canBypassLock);
 
   const isFileOwner  = currentFile.user_id === currentUser?.id;
   const canEditContent = isFileEditable(currentFile.type, currentFile.name);
@@ -479,10 +476,10 @@ const Show = ({ file, auth, canManageFile }) => {
   };
 
   // Called by PasswordManagerModal when a password is set/removed
-  const handlePasswordSaved = (isNowProtected) => {
-    setCurrentFile(prev => ({ ...prev, is_password_protected: isNowProtected }));
-    // Manager stays unlocked regardless
-  };
+const handlePasswordSaved = (isNowProtected) => {
+  setCurrentFile(prev => ({ ...prev, is_password_protected: isNowProtected }));
+  setIsUnlocked(true);
+};
 
   // Called by PasswordGate when the correct password is entered
   const handleUnlock = () => setIsUnlocked(true);

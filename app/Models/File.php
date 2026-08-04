@@ -7,7 +7,20 @@ use Illuminate\Support\Facades\Storage;
 
 class File extends Model
 {
-    protected $fillable = ['name', 'file_path', 'type', 'size', 'user_id', 'project_id', 'task_id', 'kanban_id', 'description', 'downloads', 'status', 'rejection_reason', 'dropbox_path', 'last_modified_by', 'password_hash', 'is_password_protected'];
+    protected $fillable = ['name',
+     'file_path', 'type', 'size', 'user_id',
+      'project_id',
+     'task_id', 'kanban_id', 'description',
+      'downloads', 'status', 'rejection_reason',
+       'dropbox_path', 'last_modified_by', 
+       'password_hash', 'is_password_protected',
+           'locked_by',
+    'locked_by_role',];
+
+
+
+
+
 
     /**
      * Get the full URL to the file
@@ -110,6 +123,45 @@ public function canUser(User $user, string $permission): bool
 }
 
 
-    
-    
+
+
+
+public function lockedBy()
+{
+    return $this->belongsTo(User::class, 'locked_by');
+}
+
+/**
+ * Détermine si $user peut voir ce fichier sans saisir le mot de passe.
+ */
+public function isUnlockedFor(User $user): bool
+{
+    if (! $this->is_password_protected) {
+        return true;
+    }
+
+    // Verrouillé par un admin → uniquement CET admin précis
+    if ($this->locked_by_role === 'admin') {
+        return (int) $this->locked_by === (int) $user->id;
+    }
+
+    // Verrouillé par un manager → tous les admins + les managers du projet
+    if ($this->locked_by_role === 'manager') {
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        $project = $this->project ?? $this->task?->project;
+        if (! $project) {
+            return false;
+        }
+
+        $projectUser = $project->users()->where('user_id', $user->id)->first();
+        return (bool) ($projectUser && $projectUser->pivot->role === 'manager');
+    }
+
+    return false;
+}
+
+
 }
