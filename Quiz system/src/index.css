@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 142 71% 45%; 
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84.2% 60.2%; 
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+    
+    /* Semantic State Tokens */
+    --success: 142 76% 36%;
+    --success-foreground: 144 100% 96%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 89%;
+    --error: 0 84.2% 60.2%;
+    --error-foreground: 0 100% 97%;
+    
+    /* Quiz Types & Grading Tokens */
+    --quiz-qcm: 200 90% 40%;
+    --quiz-qcm-foreground: 0 0% 100%;
+    --quiz-written: 280 80% 50%;
+    --quiz-written-foreground: 0 0% 100%;
+    --quiz-mixed: 320 80% 50%;
+    --quiz-mixed-foreground: 0 0% 100%;
+    
+    --status-pending: 40 90% 50%;
+    --status-pending-foreground: 0 0% 100%;
+    --status-graded: 140 70% 40%;
+    --status-graded-foreground: 0 0% 100%;
+
+    /* Server Point Verification Tokens */
+    --status-connected: 142 76% 36%;
+    --status-connected-foreground: 144 100% 96%;
+    --status-disconnected: 0 84.2% 60.2%;
+    --status-disconnected-foreground: 0 100% 97%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 142 71% 45%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    
+    --success: 142 70% 45%;
+    --success-foreground: 144 100% 10%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 10%;
+    --error: 0 84.2% 60.2%;
+    --error-foreground: 0 100% 10%;
+    
+    --quiz-qcm: 200 90% 60%;
+    --quiz-qcm-foreground: 222.2 84% 4.9%;
+    --quiz-written: 280 80% 65%;
+    --quiz-written-foreground: 222.2 84% 4.9%;
+    --quiz-mixed: 320 80% 65%;
+    --quiz-mixed-foreground: 222.2 84% 4.9%;
+    
+    --status-pending: 40 90% 60%;
+    --status-pending-foreground: 222.2 84% 4.9%;
+    --status-graded: 140 70% 50%;
+    --status-graded-foreground: 222.2 84% 4.9%;
+
+    /* Server Point Verification Tokens */
+    --status-connected: 142 70% 45%;
+    --status-connected-foreground: 144 100% 10%;
+    --status-disconnected: 0 62.8% 30.6%;
+    --status-disconnected-foreground: 210 40% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea,
+  button,
+  .touch-target {
+    @apply min-h-[44px];
+  }
+}
+
+@layer components {
+  .stat-number {
+    @apply text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900;
+  }
+  .stat-label {
+    @apply text-xs sm:text-sm font-medium uppercase text-gray-500;
+  }
+  .table-responsive {
+    @apply w-full overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200;
+  }
+  .chart-container {
+    @apply w-full h-[300px] bg-white rounded-lg shadow-sm border border-gray-200 p-4;
+  }
+
+  .badge-connected {
+    @apply bg-[hsl(var(--status-connected))] text-[hsl(var(--status-connected-foreground))] font-semibold px-3 py-1 rounded-full inline-flex items-center;
+  }
+  
+  .badge-disconnected {
+    @apply bg-[hsl(var(--status-disconnected))] text-[hsl(var(--status-disconnected-foreground))] font-semibold px-3 py-1 rounded-full inline-flex items-center;
+  }
+}
+
+@layer utilities {
+  .text-warning { color: hsl(var(--warning)); }
+  .bg-warning { background-color: hsl(var(--warning)); }
+  .text-success { color: hsl(var(--success)); }
+  .bg-success { background-color: hsl(var(--success)); color: hsl(var(--success-foreground)); }
+  .text-error { color: hsl(var(--error)); }
+  
+  .bg-quiz-qcm { background-color: hsl(var(--quiz-qcm)); color: hsl(var(--quiz-qcm-foreground)); }
+  .bg-quiz-written { background-color: hsl(var(--quiz-written)); color: hsl(var(--quiz-written-foreground)); }
+  .bg-quiz-mixed { background-color: hsl(var(--quiz-mixed)); color: hsl(var(--quiz-mixed-foreground)); }
+  
+  .bg-status-pending { background-color: hsl(var(--status-pending)); color: hsl(var(--status-pending-foreground)); }
+  .bg-status-graded { background-color: hsl(var(--status-graded)); color: hsl(var(--status-graded-foreground)); }
+  
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-sm;
+  }
+  
+  .admin-nav-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .admin-nav-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

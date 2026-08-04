@@ -135,9 +135,16 @@ class Project extends Model
             // Supprimer les logs d'audit
             $project->auditLogs()->delete();
             
+            // Supprimer les quiz
+            $project->quizzes()->delete();
+            
             // Supprimer les relations many-to-many avec les utilisateurs
             $project->users()->detach();
         });
+    }
+
+    public function quizzes() {
+        return $this->hasMany(Quiz::class);
     }
 
     public function users()

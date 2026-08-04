@@ -308,7 +308,12 @@ class ProjectController extends Controller
             ->orderBy('yearweek')
             ->get();
 
-        // Fusion finale – toutes les stats en un seul tableau
+        $quizzes = $project->quizzes()
+            ->withCount(['questions', 'attempts'])
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get();
+
         $finalStats = array_merge($baseStats, [
             'activitiesByUser'  => $activitiesByUser,
             'commentsCount'     => $commentsCount,
@@ -317,12 +322,14 @@ class ProjectController extends Controller
             'doneTasksCount'    => $doneTasksCount,
             'doneTasksByUser'   => $doneTasksByUser,
             'doneTasksByWeek'   => $doneTasksByWeek,
+            'quizzesCount'      => $project->quizzes()->count(),
         ]);
 
         return Inertia::render('Projects/Show', [
             'project'  => $project,
             'tasks'    => $tasks,
             'sprints'  => $sprints,
+            'quizzes'  => $quizzes,
             'auth'     => [
                 'user' => array_merge($authUser, [
                     'roles' => $currentUser->getRoleNames()->toArray()

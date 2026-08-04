@@ -40,6 +40,16 @@ Route::get('/contact', function () { return Inertia::render('Contact'); })->name
 Route::get('/privacy-policy', function () { return Inertia::render('PrivacyPolicy'); })->name('privacy.policy');
 Route::get('/terms-of-service', function () { return Inertia::render('TermsOfService'); })->name('terms.of.service');
 
+// Routes publiques pour passer un Quiz sans se connecter
+Route::prefix('q/{token}')->name('quizzes.public.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\PublicQuizController::class, 'show'])->name('show');
+    Route::post('/start', [\App\Http\Controllers\PublicQuizController::class, 'start'])->name('start');
+    Route::get('/take/{attempt}', [\App\Http\Controllers\PublicQuizController::class, 'take'])->name('take');
+    Route::post('/save-progress/{attempt}', [\App\Http\Controllers\PublicQuizController::class, 'saveProgress'])->name('save-progress');
+    Route::post('/submit/{attempt}', [\App\Http\Controllers\PublicQuizController::class, 'submit'])->name('submit');
+    Route::get('/results/{attempt}', [\App\Http\Controllers\PublicQuizController::class, 'results'])->name('results');
+});
+
 
 Route::get('/csrf-token', function () {
     return response()->json(['token' => csrf_token()])
@@ -231,6 +241,26 @@ Route::prefix('push')->group(function () {
     });
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
+
+    // Routes Quiz
+    Route::prefix('projects/{project}/quizzes')->name('projects.quizzes.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\QuizController::class, 'index'])->name('index');
+        Route::get('/create', [\App\Http\Controllers\QuizController::class, 'create'])->name('create');
+        Route::post('/', [\App\Http\Controllers\QuizController::class, 'store'])->name('store');
+        Route::get('/{quiz}', [\App\Http\Controllers\QuizController::class, 'show'])->name('show');
+        Route::get('/{quiz}/edit', [\App\Http\Controllers\QuizController::class, 'edit'])->name('edit');
+        Route::put('/{quiz}', [\App\Http\Controllers\QuizController::class, 'update'])->name('update');
+        Route::delete('/{quiz}', [\App\Http\Controllers\QuizController::class, 'destroy'])->name('destroy');
+        Route::post('/{quiz}/launch', [\App\Http\Controllers\QuizController::class, 'launch'])->name('launch');
+        Route::post('/{quiz}/submit', [\App\Http\Controllers\QuizController::class, 'submit'])->name('submit');
+        Route::get('/{quiz}/results', [\App\Http\Controllers\QuizController::class, 'results'])->name('results');
+        Route::get('/{quiz}/ranking', [\App\Http\Controllers\QuizController::class, 'ranking'])->name('ranking');
+        Route::post('/{quiz}/grade/{response}', [\App\Http\Controllers\QuizController::class, 'gradeResponse'])->name('grade');
+        Route::post('/{quiz}/toggle-public-link', [\App\Http\Controllers\QuizController::class, 'togglePublicLink'])->name('toggle-public-link');
+    });
+
+    Route::post('/quiz-attempts/{attempt}/save-progress', [\App\Http\Controllers\QuizAttemptController::class, 'saveProgress'])
+        ->name('quiz-attempts.save-progress');
     Route::resource('files', App\Http\Controllers\FileController::class);
    // Route::post('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])
       //  ->name('files.update-content');

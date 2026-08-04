@@ -374,7 +374,7 @@ const CommentStatsModal = ({ show, onClose, commentsByMember = [] }) => {
 };
 
 // ── Composant principal ─────────────────────────────────────────────────────
-function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
+function Show({ project, tasks = [], sprints = [], quizzes = [], auth, stats = {} }) {
   const { t, i18n } = useTranslation();
   const { flash = {} } = usePage().props;
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -603,7 +603,7 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
             </div>
 
             {/* Stats cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <StatCard icon={<FaCheckCircle className="text-emerald-500 text-2xl" />} label={t('completed_tasks')} value={stats.doneTasksCount ?? 0} color="emerald" />
               <StatCard icon={<FaClock className="text-blue-500 text-2xl" />} label={t('tasks_in_progress')} value={stats.inProgressTasksCount ?? 0} color="blue" />
               <StatCard icon={<FaFileAlt className="text-purple-500 text-2xl" />} label={t('files')} value={stats.filesCount ?? 0} color="purple" />
@@ -614,6 +614,66 @@ function Show({ project, tasks = [], sprints = [], auth, stats = {} }) {
                 color="amber"
                 onDetailClick={() => setShowCommentStatsModal(true)}
               />
+              <StatCard
+                icon={<FaQuestionCircle className="text-indigo-500 text-2xl" />}
+                label="Quiz"
+                value={stats.quizzesCount ?? 0}
+                color="blue"
+                onDetailClick={() => router.visit(route('projects.quizzes.index', project.id))}
+              />
+            </div>
+
+            {/* Section Quiz */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <FaQuestionCircle className="text-indigo-500" /> Quiz du projet ({stats.quizzesCount ?? quizzes.length})
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={route('projects.quizzes.index', project.id)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-xl font-medium transition"
+                  >
+                    <FaEye className="text-xs" /> Voir tout
+                  </Link>
+                  {(isAdmin || isManager) && (
+                    <Link
+                      href={route('projects.quizzes.create', project.id)}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-xl font-medium transition"
+                    >
+                      <FaPlus className="text-xs" /> Nouveau Quiz
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              {quizzes.length === 0 ? (
+                <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm">
+                  Aucun quiz disponible pour ce projet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {quizzes.slice(0, 4).map((quiz) => (
+                    <div
+                      key={quiz.id}
+                      className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 flex items-center justify-between gap-3"
+                    >
+                      <div>
+                        <h4 className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-1">{quiz.title}</h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          {quiz.duration_minutes} min | {quiz.questions_count ?? 0} questions
+                        </p>
+                      </div>
+                      <Link
+                        href={route('projects.quizzes.show', [project.id, quiz.id])}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex-shrink-0"
+                      >
+                        Accéder
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Sprints */}
