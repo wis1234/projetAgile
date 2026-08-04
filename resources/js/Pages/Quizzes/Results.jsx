@@ -194,7 +194,7 @@ function Results({ project, quiz, result, attempt, questions = [], responses = [
               );
             } else {
               const userAns = answers[q.id];
-              const isCorrect = userAns !== undefined && (int)userAns === (int)q.correct_answer;
+              const isCorrect = userAns !== undefined && parseInt(userAns) === parseInt(q.correct_answer);
 
               return (
                 <div
