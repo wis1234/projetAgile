@@ -213,8 +213,14 @@ class QuizController extends Controller
             ->first();
 
         $latestResult = QuizResult::where('quiz_id', $quiz->id)
-            ->where('user_id', Auth::id())
-            ->orderBy('created_at', 'desc')
+            ->where(function ($query) {
+                $query->where('user_id', Auth::id())
+                      ->orWhere(function ($query) {
+                          $query->whereNull('user_id')
+                                ->where('guest_email', Auth::user()->email);
+                      });
+            })
+            ->orderBy('completed_at', 'desc')
             ->first();
 
         $userRole = $project->users()->where('user_id', Auth::id())->first()?->pivot->role;
@@ -397,14 +403,20 @@ class QuizController extends Controller
         $userRole = $project->users()->where('user_id', $user->id)->first()?->pivot->role;
         $isManager = $user->hasRole('admin') || $userRole === 'manager';
 
-        if ($isManager && request()->has('user_id')) {
-            $targetUserId = request()->input('user_id');
-        }
+        if ($isManager && request()->has('attempt_id')) {
+            $result = QuizResult::where('quiz_id', $quiz->id)
+                ->where('attempt_id', request()->input('attempt_id'))
+                ->firstOrFail();
+        } else {
+            if ($isManager && request()->has('user_id')) {
+                $targetUserId = request()->input('user_id');
+            }
 
-        $result = QuizResult::where('quiz_id', $quiz->id)
-            ->where('user_id', $targetUserId)
-            ->orderBy('completed_at', 'desc')
-            ->firstOrFail();
+            $result = QuizResult::where('quiz_id', $quiz->id)
+                ->where('user_id', $targetUserId)
+                ->orderBy('completed_at', 'desc')
+                ->firstOrFail();
+        }
 
         $attempt = QuizAttempt::findOrFail($result->attempt_id);
         $questions = $quiz->questions()->get();
@@ -435,6 +447,7 @@ class QuizController extends Controller
         $rankings = QuizResult::where('quiz_id', $quiz->id)
             ->with('user:id,name,profile_photo_path')
             ->orderBy('score', 'desc')
+            ->orderBy('completed_at', 'asc')
             ->orderBy('created_at', 'asc')
             ->get();
 

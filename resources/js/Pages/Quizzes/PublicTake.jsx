@@ -63,7 +63,6 @@ export default function PublicTake({ quiz, questions = [], attempt }) {
   const handleTimeExpired = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    alert('Temps écoulé ! Votre évaluation va être soumise.');
     router.post(route('quizzes.public.submit', [quiz.public_token, attempt.id]), {
       answers: answersRef.current,
     });

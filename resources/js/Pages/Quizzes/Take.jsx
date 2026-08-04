@@ -68,7 +68,6 @@ export default function Take({ project, quiz, questions = [], attempt }) {
   const handleTimeExpired = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    alert('Temps écoulé ! Votre quiz va être soumis automatiquement.');
     router.post(route('projects.quizzes.submit', [project.id, quiz.id]), {
       attempt_id: attempt.id,
       answers: answersRef.current,

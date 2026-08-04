@@ -45,6 +45,27 @@ class PublicQuizController extends Controller
             'guest_email' => 'required|email|max:255',
         ]);
 
+        $existingAttempt = QuizAttempt::where('quiz_id', $quiz->id)
+            ->whereNull('user_id')
+            ->where('guest_email', $validated['guest_email'])
+            ->where('status', 'in_progress')
+            ->first();
+
+        if ($existingAttempt) {
+            return redirect()->route('quizzes.public.take', [$token, $existingAttempt->id]);
+        }
+
+        $completedAttempts = QuizAttempt::where('quiz_id', $quiz->id)
+            ->whereNull('user_id')
+            ->where('guest_email', $validated['guest_email'])
+            ->where('status', 'completed')
+            ->count();
+
+        if ($quiz->max_attempts > 0 && $completedAttempts >= $quiz->max_attempts) {
+            return redirect()->route('quizzes.public.show', $token)
+                ->with('error', 'Vous avez atteint le nombre maximum de tentatives pour ce quiz.');
+        }
+
         $attempt = QuizAttempt::create([
             'quiz_id' => $quiz->id,
             'user_id' => null,
@@ -64,8 +85,12 @@ class PublicQuizController extends Controller
             ->where('allow_public_access', true)
             ->firstOrFail();
 
-        if ($attempt->quiz_id !== $quiz->id || $attempt->status === 'completed') {
+        if ($attempt->quiz_id !== $quiz->id) {
             return redirect()->route('quizzes.public.show', $token);
+        }
+
+        if ($attempt->status === 'completed') {
+            return redirect()->route('quizzes.public.results', [$token, $attempt->id]);
         }
 
         $questions = $quiz->questions()->get()->map(function ($q) {
@@ -123,7 +148,11 @@ class PublicQuizController extends Controller
     {
         $quiz = Quiz::where('public_token', $token)->firstOrFail();
 
-        if ($attempt->quiz_id !== $quiz->id || $attempt->status === 'completed') {
+        if ($attempt->quiz_id !== $quiz->id) {
+            return redirect()->route('quizzes.public.show', $token);
+        }
+
+        if ($attempt->status === 'completed') {
             return redirect()->route('quizzes.public.results', [$token, $attempt->id]);
         }
 

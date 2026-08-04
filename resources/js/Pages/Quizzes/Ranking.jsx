@@ -7,7 +7,7 @@ function Ranking({ project, quiz, rankings = [], canManage }) {
   const [search, setSearch] = useState('');
 
   const filteredRankings = rankings.filter((r) =>
-    r.user?.name?.toLowerCase().includes(search.toLowerCase())
+    (r.user?.name || r.guest_name || 'Utilisateur').toLowerCase().includes(search.toLowerCase())
   );
 
   const getRankBadge = (index) => {
@@ -73,7 +73,7 @@ function Ranking({ project, quiz, rankings = [], canManage }) {
                     <div className="w-8 text-center flex justify-center">{getRankBadge(idx)}</div>
                     <div>
                       <h4 className="font-bold text-gray-900 dark:text-white text-sm">
-                        {row.user?.name || 'Utilisateur'}
+                        {row.user?.name || row.guest_name || 'Utilisateur'}
                       </h4>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         Total questions : {row.total_questions} | Correctes : {row.correct_answers}
@@ -88,7 +88,7 @@ function Ranking({ project, quiz, rankings = [], canManage }) {
 
                     {canManage && (
                       <Link
-                        href={`${route('projects.quizzes.results', [project.id, quiz.id])}?user_id=${row.user_id}`}
+                        href={`${route('projects.quizzes.results', [project.id, quiz.id])}?attempt_id=${row.attempt_id}`}
                         className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition"
                         title="Voir la copie"
                       >

@@ -5,6 +5,8 @@ export default function QuizTimer({ startedAt, durationMinutes, onExpire }) {
   const [timeLeft, setTimeLeft] = useState({ minutes: 0, seconds: 0, isExpired: false });
 
   useEffect(() => {
+    let hasExpired = false;
+
     const calculateTime = () => {
       const start = new Date(startedAt).getTime();
       const durationMs = durationMinutes * 60 * 1000;
@@ -14,7 +16,10 @@ export default function QuizTimer({ startedAt, durationMinutes, onExpire }) {
 
       if (remainingMs <= 0) {
         setTimeLeft({ minutes: 0, seconds: 0, isExpired: true });
-        if (onExpire) onExpire();
+        if (!hasExpired && onExpire) {
+          hasExpired = true;
+          onExpire();
+        }
         return;
       }
 
@@ -28,7 +33,7 @@ export default function QuizTimer({ startedAt, durationMinutes, onExpire }) {
     calculateTime();
     const interval = setInterval(calculateTime, 1000);
     return () => clearInterval(interval);
-  }, [startedAt, durationMinutes]);
+  }, [startedAt, durationMinutes, onExpire]);
 
   const isLowTime = timeLeft.minutes < 2;
 
