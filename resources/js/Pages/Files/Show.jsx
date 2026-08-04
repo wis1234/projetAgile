@@ -432,7 +432,7 @@ const PasswordManagerModal = ({ isOpen, onClose, file, onSaved }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Show component
 // ─────────────────────────────────────────────────────────────────────────────
-const Show = ({ file, auth, canManageFile }) => {
+const Show = ({ file, auth, canManageFile, canBypassLock }) => {
   const { user: currentUser } = auth;
 
   const [currentFile, setCurrentFile] = useState({
