@@ -85,8 +85,7 @@ class AuthenticatedSessionController extends Controller
             $user = Auth::user();
             activity_log('login', 'Connexion réussie', $user);
 
-            $fallback = $request->input('redirect') ?: route('dashboard', absolute: false);
-            return redirect()->intended($fallback);
+            return redirect()->intended(route('dashboard', absolute: false));
             
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Incrémenter le compteur d'échecs

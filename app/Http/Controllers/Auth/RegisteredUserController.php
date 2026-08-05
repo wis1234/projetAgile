@@ -15,7 +15,6 @@ use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Support\Facades\Validator;
-use Spatie\Permission\Models\Role;
 
 class RegisteredUserController extends Controller
 {
@@ -55,8 +54,6 @@ class RegisteredUserController extends Controller
             'company' => 'nullable|string|max:100',
             'bio' => 'nullable|string|max:1000',
             'recaptcha_token' => 'required|string',
-            'redirect' => 'nullable|string',
-            'candidate' => 'nullable|boolean',
         ]);
 
         // Validation du token reCAPTCHA
@@ -192,8 +189,7 @@ class RegisteredUserController extends Controller
 
         try {
             // Création de l'utilisateur avec les données validées
-            $role = $validated['candidate'] ? 'candidate' : null;
-            $userData = [
+            $user = User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
@@ -201,18 +197,7 @@ class RegisteredUserController extends Controller
                 'job_title' => $validated['job_title'] ?? null,
                 'company' => $validated['company'] ?? null,
                 'bio' => $validated['bio'] ?? null,
-            ];
-
-            if ($role) {
-                $userData['role'] = $role;
-            }
-
-            $user = User::create($userData);
-
-            if ($role) {
-                Role::firstOrCreate(['name' => $role]);
-                $user->assignRole($role);
-            }
+            ]);
 
             // Gestion de la photo de profil si fournie
             if ($request->hasFile('profile_photo')) {
@@ -231,20 +216,8 @@ class RegisteredUserController extends Controller
             // Déconnecter l'utilisateur pour forcer la vérification
             Auth::logout();
 
-            $redirect = $request->input('redirect');
-            $candidate = $request->boolean('candidate');
-            $routeParams = [];
-
-            if ($redirect) {
-                $routeParams['redirect'] = $redirect;
-            }
-            if ($candidate) {
-                $routeParams['candidate'] = 1;
-            }
-
-            $loginRoute = route('login', $routeParams);
-
-            return redirect($loginRoute)
+            // Rediriger vers la page de connexion avec un message pour vérifier l'email
+            return redirect()->route('login')
                 ->with('status', 'Un lien de vérification a été envoyé à votre adresse email. Veuillez vérifier votre boîte de réception pour activer votre compte.');
 
         } catch (\Exception $e) {

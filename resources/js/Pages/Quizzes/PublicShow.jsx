@@ -1,15 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
-import { FaClock, FaQuestionCircle, FaPlay, FaShieldAlt, FaSignInAlt, FaUserPlus } from 'react-icons/fa';
-import { Link } from '@inertiajs/react';
+import { FaClock, FaQuestionCircle, FaPlay, FaUser, FaEnvelope, FaShieldAlt } from 'react-icons/fa';
 
-export default function PublicShow({ quiz, currentUser, activeAttemptId, latestResultId }) {
+export default function PublicShow({ quiz }) {
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleStart = async (e) => {
+  const handleStart = (e) => {
     e.preventDefault();
     setLoading(true);
-    router.post(route('quizzes.public.start', quiz.public_token));
+    router.post(route('quizzes.public.start', quiz.public_token), {
+      guest_name: guestName,
+      guest_email: guestEmail,
+    });
   };
 
   return (
@@ -26,6 +30,7 @@ export default function PublicShow({ quiz, currentUser, activeAttemptId, latestR
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white dark:bg-gray-800 py-8 px-6 shadow-xl rounded-2xl border border-gray-100 dark:border-gray-700 space-y-6">
+          {/* Info Badge */}
           <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center text-xs">
             <div>
               <FaClock className="mx-auto mb-1 text-blue-500 text-base" />
@@ -45,65 +50,53 @@ export default function PublicShow({ quiz, currentUser, activeAttemptId, latestR
             </p>
           )}
 
-          {currentUser ? (
-            <div className="space-y-5">
-              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-200">
-                <p className="font-semibold">Connecté en tant que {currentUser.name}</p>
-                <p>Votre compte candidat est utilisé pour sécuriser l'accès à ce test et retrouver vos résultats.</p>
-              </div>
-
-              {activeAttemptId ? (
-                <Link
-                  href={route('quizzes.public.take', [quiz.public_token, activeAttemptId])}
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded-xl text-sm transition shadow-md"
-                >
-                  <FaPlay /> Reprendre le Quiz
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={handleStart}
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition shadow-md"
-                >
-                  <FaPlay /> Commencer le Quiz
-                </button>
-              )}
-
-              {latestResultId && (
-                <Link
-                  href={route('quizzes.public.results', [quiz.public_token, latestResultId])}
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 border border-gray-200 bg-white text-gray-700 font-semibold rounded-xl text-sm transition hover:bg-gray-50"
-                >
-                  Voir mon dernier résultat
-                </Link>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-5 text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Un compte est requis pour démarrer ce test. Créez un compte ou connectez-vous avec votre adresse email.
-              </p>
-
-              <div className="grid gap-3">
-                <Link
-                  href={route('login', { redirect: route('quizzes.public.show', quiz.public_token), candidate: 1 })}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition shadow-md"
-                >
-                  <FaSignInAlt /> Se connecter
-                </Link>
-                <Link
-                  href={route('register', { redirect: route('quizzes.public.show', quiz.public_token), candidate: 1 })}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-gray-200 bg-white text-gray-700 font-semibold rounded-xl text-sm transition hover:bg-gray-50"
-                >
-                  <FaUserPlus /> Créer un compte candidat
-                </Link>
+          {/* Form */}
+          <form onSubmit={handleStart} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                Nom complet *
+              </label>
+              <div className="relative">
+                <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Jean Dupont"
+                  className="pl-9 w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                />
               </div>
             </div>
-          )}
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                Adresse Email *
+              </label>
+              <div className="relative">
+                <FaEnvelope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                <input
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder="jean.dupont@example.com"
+                  className="pl-9 w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition shadow-md"
+            >
+              <FaPlay /> Commencer le Quiz
+            </button>
+          </form>
 
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 text-center">
-            <FaShieldAlt /> Les données affichées sont strictement liées à votre épreuve.
+            <FaShieldAlt /> Aucune création de compte n'est requise.
           </div>
         </div>
       </div>

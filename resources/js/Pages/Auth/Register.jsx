@@ -177,23 +177,12 @@ const fieldLabelClasses =
 /* ------------------------------------------------------------------ */
 
 export default function Register() {
-    const { redirect, candidate } = useMemo(() => {
-        if (typeof window === 'undefined') return { redirect: '', candidate: false };
-        const params = new URLSearchParams(window.location.search);
-        return {
-            redirect: params.get('redirect') || '',
-            candidate: params.get('candidate') === '1',
-        };
-    }, []);
-
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         email: '',
         password: '',
         password_confirmation: '',
         recaptcha_token: '',
-        redirect,
-        candidate,
     });
 
     const recaptchaRef = useRef(null);
@@ -349,7 +338,7 @@ export default function Register() {
                             Déjà membre ?
                         </span>
                         <Link
-                            href={route('login', { redirect, candidate: candidate ? 1 : undefined })}
+                            href={route('login')}
                             className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 transition hover:border-blue-600 hover:text-blue-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-400 dark:hover:text-blue-400"
                         >
                             Se connecter
@@ -425,8 +414,6 @@ export default function Register() {
                         )}
 
                         <form onSubmit={submit} className="max-w-md space-y-5" noValidate>
-                            <input type="hidden" name="redirect" value={data.redirect} />
-                            <input type="hidden" name="candidate" value={data.candidate ? 1 : 0} />
                             {/* Nom et email, côte à côte sur grand écran */}
                             <div className="grid gap-5 sm:grid-cols-2">
                                 <div>
@@ -643,7 +630,7 @@ export default function Register() {
                         <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400 md:hidden">
                             Vous avez déjà un compte ?{' '}
                             <Link
-                                href={route('login', { redirect, candidate: candidate ? 1 : undefined })}
+                                href={route('login')}
                                 className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
                             >
                                 Connectez-vous
