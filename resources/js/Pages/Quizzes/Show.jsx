@@ -102,7 +102,7 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
                 Permet à des candidats sans compte ProJA de passer ce quiz via une URL unique.
               </p>
 
-              {quiz.allow_public_access && quiz.public_token && (
+              {quiz.allow_public_access && quiz.public_token && quiz.is_active && (
                 <div className="flex items-center gap-2 pt-1">
                   <input
                     type="text"
@@ -119,6 +119,11 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
                     <span>{copied ? 'Copié !' : 'Copier le lien'}</span>
                   </button>
                 </div>
+              )}
+              {quiz.allow_public_access && quiz.public_token && !quiz.is_active && (
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  Le lien public est configuré, mais le quiz est inactif. Réactivez le quiz pour que le lien fonctionne.
+                </p>
               )}
             </div>
           )}

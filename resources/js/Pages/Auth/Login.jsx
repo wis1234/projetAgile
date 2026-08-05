@@ -192,7 +192,7 @@ export default function Login({ status, canResetPassword }) {
                     <div className="mt-6 text-center md:hidden">
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                             Pas encore de compte ?{' '}
-                            <Link href={route('register', { redirect: redirect })} className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+                            <Link href={route('register', { redirect: redirect, candidate: candidate ? 1 : undefined })} className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
                                 Créer un compte
                             </Link>
                         </p>

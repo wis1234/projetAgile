@@ -93,7 +93,7 @@ export default function QuizCard({ quiz, project, canManage }) {
               </button>
             </div>
 
-            {quiz.allow_public_access && quiz.public_token && (
+            {quiz.allow_public_access && quiz.public_token && quiz.is_active && (
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="text"
@@ -111,6 +111,11 @@ export default function QuizCard({ quiz, project, canManage }) {
                   <span>{copied ? 'Copié !' : 'Copier'}</span>
                 </button>
               </div>
+            )}
+            {quiz.allow_public_access && quiz.public_token && !quiz.is_active && (
+              <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                Le lien public ne fonctionne que si le quiz est actif. Activez-le pour rendre ce lien accessible.
+              </p>
             )}
           </div>
         )}

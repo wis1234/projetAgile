@@ -205,6 +205,7 @@ class RegisteredUserController extends Controller
 
             if ($role) {
                 $userData['role'] = $role;
+                $userData['email_verified_at'] = now();
             }
 
             $user = User::create($userData);
@@ -219,11 +220,22 @@ class RegisteredUserController extends Controller
                 $user->updateProfilePhoto($request->file('profile_photo'));
             }
 
-            // Déclencher l'événement d'inscription
-            event(new Registered($user));
-
             // Connecter automatiquement l'utilisateur
             Auth::login($user);
+
+            $redirect = $request->input('redirect');
+            $candidate = $request->boolean('candidate');
+
+            if ($candidate) {
+                if ($redirect) {
+                    return redirect()->to($redirect);
+                }
+
+                return redirect()->route('dashboard');
+            }
+
+            // Déclencher l'événement d'inscription pour les utilisateurs classiques
+            event(new Registered($user));
 
             // Envoyer l'email de vérification
             $user->sendEmailVerificationNotification();
@@ -231,10 +243,7 @@ class RegisteredUserController extends Controller
             // Déconnecter l'utilisateur pour forcer la vérification
             Auth::logout();
 
-            $redirect = $request->input('redirect');
-            $candidate = $request->boolean('candidate');
             $routeParams = [];
-
             if ($redirect) {
                 $routeParams['redirect'] = $redirect;
             }

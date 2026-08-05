@@ -131,6 +131,7 @@ export default function AdminLayout({ children }) {
   const profileRef = useRef();
   const [globalLoading, setGlobalLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isCandidate, setIsCandidate] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('fr');
   const [isChangingLanguage, setIsChangingLanguage] = useState(false);
   const { t, i18n } = useTranslation();
@@ -198,7 +199,12 @@ export default function AdminLayout({ children }) {
       (Array.isArray(auth.user?.roles) && auth.user.roles.includes('admin')) || // Tableau de rôles
       auth.user?.is_admin === true;                     // Colonne 'is_admin' si elle existe
       
+    const userIsCandidate =
+      auth.user?.role === 'candidate' ||
+      (Array.isArray(auth.user?.roles) && auth.user.roles.includes('candidate'));
+
     setIsAdmin(userIsAdmin);
+    setIsCandidate(userIsCandidate);
   }, [auth.user]);
 
   useEffect(() => {
@@ -408,7 +414,7 @@ channel.listen('.livekit.call.ended', () => {
 
         {/* Menu */}
         <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide space-y-1.5">
-          {navLinks.map((link, index) => (
+          {visibleNavLinks.map((link, index) => (
             <Link
               key={link.href}
               href={link.href}
@@ -441,21 +447,27 @@ channel.listen('.livekit.call.ended', () => {
         </div>
       </aside>
       {/* Overlay for mobile */}
-      {sidebarOpen && <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
+      {sidebarOpen && !isCandidate && <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
+      <div className={pageWrapperClass}>
         {/* ═══════════════════════════════════════════════════════════
             HEADER — Entièrement responsive (mobile / tablet / desktop)
         ═══════════════════════════════════════════════════════════ */}
-        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300">
+        <header className={`fixed top-0 left-0 ${isCandidate ? '' : 'md:left-64'} right-0 h-16 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300`}>
 
           {/* ── Gauche : burger + logo ── */}
           <div className="flex items-center gap-3 min-w-0">
-            <button
-              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Ouvrir le menu"
-            >
+            {!isCandidate && (
+              <button
+                className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Ouvrir le menu"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            )}
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
