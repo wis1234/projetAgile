@@ -4,14 +4,25 @@ import InputError from '@/Components/InputError';
 import TextInput from '@/Components/TextInput';
 import { FaEnvelope, FaLock, FaSignInAlt, FaExclamationTriangle } from 'react-icons/fa';
 import ApplicationLogo from '@/Components/ApplicationLogo';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import GlobalFooter from '@/Components/GlobalFooter';
 
 export default function Login({ status, canResetPassword }) {
+    const { redirect, candidate } = useMemo(() => {
+        if (typeof window === 'undefined') return { redirect: '', candidate: false };
+        const params = new URLSearchParams(window.location.search);
+        return {
+            redirect: params.get('redirect') || '',
+            candidate: params.get('candidate') === '1',
+        };
+    }, []);
+
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
         remember: false,
+        redirect,
+        candidate,
     });
 
     const { props } = usePage();
@@ -50,7 +61,7 @@ export default function Login({ status, canResetPassword }) {
                     <div className="mt-8">
                         <p className="text-blue-200">Pas encore de compte ?</p>
                         <Link 
-                            href={route('register')} 
+                            href={route('register', { redirect, candidate: candidate ? 1 : undefined })} 
                             className="mt-2 inline-flex items-center px-6 py-2 border border-transparent text-base font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                             Créer un compte
@@ -95,6 +106,8 @@ export default function Login({ status, canResetPassword }) {
                     )}
 
                     <form onSubmit={submit} className="space-y-5 sm:space-y-6">
+                        <input type="hidden" name="redirect" value={data.redirect} />
+                        <input type="hidden" name="candidate" value={data.candidate ? 1 : 0} />
                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Adresse email
@@ -179,7 +192,7 @@ export default function Login({ status, canResetPassword }) {
                     <div className="mt-6 text-center md:hidden">
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                             Pas encore de compte ?{' '}
-                            <Link href={route('register')} className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+                            <Link href={route('register', { redirect: redirect })} className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
                                 Créer un compte
                             </Link>
                         </p>
