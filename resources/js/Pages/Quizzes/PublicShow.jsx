@@ -87,13 +87,13 @@ export default function PublicShow({ quiz, currentUser, activeAttemptId, latestR
 
               <div className="grid gap-3">
                 <Link
-                  href={route('login', { redirect: route('quizzes.public.start', quiz.public_token), candidate: 1 })}
+                  href={route('login', { redirect: route('quizzes.public.show', quiz.public_token), candidate: 1 })}
                   className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition shadow-md"
                 >
                   <FaSignInAlt /> Se connecter
                 </Link>
                 <Link
-                  href={route('register', { redirect: route('quizzes.public.start', quiz.public_token), candidate: 1 })}
+                  href={route('register', { redirect: route('quizzes.public.show', quiz.public_token), candidate: 1 })}
                   className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-gray-200 bg-white text-gray-700 font-semibold rounded-xl text-sm transition hover:bg-gray-50"
                 >
                   <FaUserPlus /> Créer un compte candidat
