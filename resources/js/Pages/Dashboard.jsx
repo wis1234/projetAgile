@@ -5,6 +5,7 @@ import { Line, Bar, Pie } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload, FaUserPlus } from 'react-icons/fa';
 import RecruitmentCard from '@/Components/RecruitmentCard';
+import GlobalSearch from '@/Components/GlobalSearch';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
@@ -12,10 +13,12 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement
 
 const Widget = ({ title, count, color, link, icon }) => {
   const { t } = useTranslation();
-  return (
+
+  const content = (
     <motion.div 
       whileHover={{ y: -5, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
-      className={`${color} rounded-xl p-6 shadow-md transition-all duration-300`}
+      whileTap={{ scale: 0.98 }}
+      className={`${color} rounded-xl p-6 shadow-md transition-all duration-300 ${link ? 'cursor-pointer' : ''} group`}
     >
       <div className="flex items-center justify-between">
         <div>
@@ -27,15 +30,19 @@ const Widget = ({ title, count, color, link, icon }) => {
         </div>
       </div>
       {link && (
-        <Link 
-          href={link} 
-          className="mt-3 inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-        >
-          {t('view_more')} <FaChevronRight className="ml-1 h-3 w-3" />
-        </Link>
+        <span className="mt-3 inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 group-hover:text-blue-800 dark:group-hover:text-blue-300">
+          {t('view_more')}
+          <FaChevronRight className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+        </span>
       )}
     </motion.div>
   );
+
+  return link ? (
+    <Link href={link} className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+      {content}
+    </Link>
+  ) : content;
 };
 
 const QuickAccess = () => {
@@ -263,15 +270,18 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           transition={{ duration: 0.5 }}
           className="mb-8"
         >
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('dashboard').toUpperCase()}</h1>
               <p className="text-gray-500 dark:text-gray-400">
                 {t('dashboard_subtitle')}
               </p>
             </div>
-            <div className="w-64">
-              <RecruitmentCard />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+              <GlobalSearch />
+              <div className="w-full sm:w-64">
+                <RecruitmentCard />
+              </div>
             </div>
           </div>
         </motion.div>
@@ -426,13 +436,16 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentProjects && recentProjects.length > 0 ? (
               recentProjects.map((project) => (
-                <div 
+                <Link
                   key={project.id}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                  href={`/projects/${project.id}`}
+                  className="group border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
                   <div className="p-4">
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-medium text-gray-900 dark:text-white">{project.name}</h3>
+                      <h3 className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {project.name}
+                      </h3>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                         {project.status}
                       </span>
@@ -463,14 +476,11 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                     </div>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700 px-4 py-2 text-right">
-                    <Link 
-                      href={`/projects/${project.id}`}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                    >
-                      {t('view_project')}
-                    </Link>
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400 group-hover:text-blue-800 dark:group-hover:text-blue-300 inline-flex items-center gap-1">
+                      {t('view_project')} <FaChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
+                    </span>
                   </div>
-                </div>
+                </Link>
               ))
             ) : (
               <div className="col-span-full text-center py-8 text-gray-400">
@@ -500,13 +510,17 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           <div className="space-y-3">
             {recentFiles && recentFiles.length > 0 ? (
               recentFiles.map((file) => (
-                <div key={file.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                <Link
+                  key={file.id}
+                  href={`/files/${file.id}`}
+                  className="group flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
                       <FaFileAlt className="text-blue-500 dark:text-blue-400" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate max-w-xs transition-colors">
                         {file.name}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -518,11 +532,13 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                     href={file.url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-2 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 flex-shrink-0 transition-colors"
+                    title="Télécharger"
                   >
                     <FaDownload />
                   </a>
-                </div>
+                </Link>
               ))
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
@@ -551,34 +567,41 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           
           <div className="space-y-4">
             {recentActivities && recentActivities.length > 0 ? (
-              recentActivities.map((activity) => (
-                <div key={activity.id} className="flex items-start space-x-3">
-                  <div className="flex-shrink-0">
-                    {activity.user?.avatar ? (
-                      <img 
-                        src={activity.user.avatar} 
-                        alt={activity.user.name} 
-                        className="w-8 h-8 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                        <span className="text-gray-500 dark:text-gray-400 text-xs font-medium">
-                          {activity.user?.name?.charAt(0)?.toUpperCase() || '?'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800 dark:text-gray-200">
-                      <span className="font-medium">{activity.user?.name || t('unknown_user')}</span>
-                      {' '}{activity.description}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {activity.created_at}
-                    </p>
-                  </div>
-                </div>
-              ))
+              recentActivities.map((activity) => {
+                const ActivityWrapper = activity.url ? Link : 'div';
+                const wrapperProps = activity.url
+                  ? { href: activity.url, className: 'group flex items-start space-x-3 p-2 -mx-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400' }
+                  : { className: 'flex items-start space-x-3 p-2 -mx-2' };
+
+                return (
+                  <ActivityWrapper key={activity.id} {...wrapperProps}>
+                    <div className="flex-shrink-0">
+                      {activity.user?.avatar ? (
+                        <img 
+                          src={activity.user.avatar} 
+                          alt={activity.user.name} 
+                          className="w-8 h-8 rounded-full"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                          <span className="text-gray-500 dark:text-gray-400 text-xs font-medium">
+                            {activity.user?.name?.charAt(0)?.toUpperCase() || '?'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm text-gray-800 dark:text-gray-200 ${activity.url ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors' : ''}`}>
+                        <span className="font-medium">{activity.user?.name || t('unknown_user')}</span>
+                        {' '}{activity.description}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {activity.created_at}
+                      </p>
+                    </div>
+                  </ActivityWrapper>
+                );
+              })
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
                 {t('no_recent_activity')}

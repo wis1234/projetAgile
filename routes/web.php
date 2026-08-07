@@ -34,6 +34,10 @@ Route::get('/guide', function () { return Inertia::render('Guide'); })->name('gu
    // return view('guide');
 //})->name('guide');
 
+//global search route
+Route::middleware(['auth'])->get('/api/search', [\App\Http\Controllers\SearchController::class, 'search']);
+
+
 
 Route::get('/about', function () { return Inertia::render('About'); })->name('about');
 Route::get('/contact', function () { return Inertia::render('Contact'); })->name('contact');
