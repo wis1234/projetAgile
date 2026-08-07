@@ -724,6 +724,12 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [error, setError] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
 
+  // ─── Mentions (@) ───
+const [showMentionPicker, setShowMentionPicker] = useState(false);
+const [mentionQuery, setMentionQuery] = useState('');
+const [mentionedUserIds, setMentionedUserIds] = useState([]); // ids taggés dans le message en cours
+const commentTextareaRef = useRef(null);
+
   const handleCommentKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -731,6 +737,16 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
         handleCommentSubmit(e);
       }
     }
+  };
+
+  const highlightMentions = (text) => {
+    if (!projectMembers) return text;
+    let out = text;
+    projectMembers.forEach(m => {
+      const re = new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+      out = out.replace(re, `<span class="font-semibold text-blue-500">@${m.name}</span>`);
+    });
+    return out;
   };
 
   const formatCommentDate = (dateString) => {
@@ -832,6 +848,7 @@ const handleCommentSubmit = async (e, textOverride = null) => {
   setAudioBlob(null);
   setAudioUrl(null);
   setReplyingTo(null);
+  setMentionedUserIds([]);
   setError('');
   emitStopTyping();
 
@@ -847,6 +864,7 @@ const handleCommentSubmit = async (e, textOverride = null) => {
     formData.append('content', savedContent || 'Message audio enregistré et sauvegardé');
     if (savedAudioBlob) formData.append('audio', savedAudioBlob, 'voice_message.webm');
     if (savedReplyingTo) formData.append('parent_id', savedReplyingTo);
+    mentionedUserIds.forEach(id => formData.append('mentioned_user_ids[]', id));
 
     const res = await fetch(`/api/tasks/${task.id}/comments`, {
       method: 'POST',
@@ -1360,9 +1378,22 @@ const handleReplyComment = (commentId) => {
   }, 100);
 };
 
-  const cancelReply = () => {
-    setReplyingTo(null);
-  };
+
+const insertMention = (member) => {
+  const textarea = commentTextareaRef.current;
+  const cursor = textarea?.selectionStart ?? commentContent.length;
+  const textBefore = commentContent.slice(0, cursor).replace(/@(\w*)$/, `@${member.name} `);
+  const textAfter = commentContent.slice(cursor);
+  setCommentContent(textBefore + textAfter);
+  setMentionedUserIds(prev => [...new Set([...prev, member.id])]);
+  setShowMentionPicker(false);
+  setTimeout(() => textarea?.focus(), 0);
+};
+
+const cancelReply = () => {
+  setReplyingTo(null);
+};
+
   
   const handleUpdateComment = async (e) => {
     e.preventDefault();
@@ -2888,7 +2919,7 @@ return () => {
                           <div
                             className={`text-sm whitespace-pre-wrap break-words leading-relaxed ${isMe ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`}
                             dangerouslySetInnerHTML={{
-                              __html: comment.content
+                              __html: highlightMentions(comment.content)
                                 .replace(/<table([^>]*)>/g, '<div class="overflow-x-auto"><table class="min-w-full border-collapse border border-gray-300 dark:border-gray-600 text-xs" $1>')
                                 .replace(/<\/table>/g, '</table></div>')
                                 .replace(/<th([^>]*)>/g, '<th class="border border-gray-300 px-2 py-1 bg-gray-100 dark:bg-gray-700" $1>')
@@ -3222,14 +3253,24 @@ return () => {
           <div className="flex-1 relative">
             <textarea
               value={commentContent}
-              onChange={e => {
-                setCommentContent(e.target.value);
-                if (e.target.value.trim()) {
-                  emitTyping();
-                } else {
-                  emitStopTyping();
-                }
-              }}
+onChange={e => {
+  const value = e.target.value;
+  setCommentContent(value);
+  value.trim() ? emitTyping() : emitStopTyping();
+
+  // Détecte un "@query" en cours de frappe juste avant le curseur
+  const cursor = e.target.selectionStart;
+  const textBeforeCursor = value.slice(0, cursor);
+  const match = textBeforeCursor.match(/@(\w*)$/);
+  if (match) {
+    setMentionQuery(match[1].toLowerCase());
+    setShowMentionPicker(true);
+  } else {
+    setShowMentionPicker(false);
+  }
+}}
+ref={commentTextareaRef}
+
               onBlur={emitStopTyping}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -3243,11 +3284,33 @@ return () => {
               maxLength={2000}
               className="w-full px-4 py-2.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-2xl border-none focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none leading-relaxed transition-all"
               style={{ minHeight: '42px', maxHeight: '120px', overflowY: 'auto' }}
-              onInput={e => {
+onInput={e => {
                 e.target.style.height = 'auto';
                 e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
               }}
             />
+
+            {showMentionPicker && (
+              <div className="absolute bottom-full mb-2 left-0 w-64 max-h-48 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-30">
+                {projectMembers
+                  ?.filter(m => m.name.toLowerCase().includes(mentionQuery))
+                  .slice(0, 6)
+                  .map(member => (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => insertMention(member)}
+                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-left"
+                    >
+                      <img
+                        src={member.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}`}
+                        className="w-6 h-6 rounded-full"
+                      />
+                      <span className="text-sm text-gray-800 dark:text-gray-100">{member.name}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
 
           {/* Bouton Dynamique : Micro ou Envoyer */}

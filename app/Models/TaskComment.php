@@ -14,6 +14,11 @@ class TaskComment extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function mentions()
+{
+    return $this->belongsToMany(User::class, 'comment_mentions', 'task_comment_id', 'user_id');
+}
+
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);

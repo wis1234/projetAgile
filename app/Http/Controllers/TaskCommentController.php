@@ -30,6 +30,7 @@ class TaskCommentController extends Controller
         $comments = TaskComment::with([
                 'user',
                 'reactions',
+                'mentions',
                 'replies' => function ($query) {
                     $query->with(['user', 'reactions', 'replies' => function ($q) {
                         $q->with(['user', 'reactions']);
@@ -57,6 +58,8 @@ class TaskCommentController extends Controller
             'content' => 'nullable|string|max:2000',
             'audio' => 'nullable|file|mimes:mp3,wav,ogg,webm|max:10240', // Max 10MB
             'parent_id' => 'nullable|exists:task_comments,id',
+            'mentioned_user_ids' => 'nullable|array',
+            'mentioned_user_ids.*' => 'exists:users,id',
         ]);
 
         if (!$request->filled('content') && !$request->hasFile('audio')) {
@@ -90,8 +93,17 @@ class TaskCommentController extends Controller
             'level' => $level,
         ]);
         
+        // Enregistrer les mentions et notifier les utilisateurs taggés
+        $mentionedIds = collect($request->input('mentioned_user_ids', []))
+            ->unique()
+            ->reject(fn($id) => (int) $id === (int) Auth::id());
+
+        if ($mentionedIds->isNotEmpty()) {
+            $comment->mentions()->sync($mentionedIds);
+        }
+
         // Charger les relations nécessaires pour la réponse
-        $comment->load('user', 'parent.user');
+        $comment->load('user', 'parent.user', 'mentions');
 
         // ── Diffusion temps réel (WebSocket via Pusher) ──────────────────
         event(new TaskCommentPosted($comment, (int) $taskId));
@@ -158,6 +170,22 @@ foreach ($usersToNotify as $user) {
     }
 
 }
+
+        // Notification dédiée pour les utilisateurs explicitement mentionnés (@)
+        if ($mentionedIds->isNotEmpty()) {
+            $mentionedUsers = \App\Models\User::whereIn('id', $mentionedIds)->get();
+            foreach ($mentionedUsers as $mentionedUser) {
+                $mentionedUser->notify(
+                    new ProjaNotification(
+                        'Vous avez été mentionné',
+                        $author->name.' vous a mentionné dans un commentaire sur la tâche "'.$task->title.'"',
+                        '/tasks/'.$task->id,
+                        null,
+                        'task_comment_mention'
+                    )
+                );
+            }
+        }
 
         
         // Retourner la réponse avec le commentaire créé
