@@ -470,17 +470,17 @@ channel.listen('.livekit.call.ended', () => {
               <span className="text-lg font-bold text-gray-800 dark:text-white tracking-wide">ProJA</span>
             </div>
 
-            {/* Titre page (desktop uniquement) */}
-            <div className="hidden md:flex items-center gap-2">
-              <span className="text-xl font-light tracking-wider text-gray-700 dark:text-white">ProJA</span>
-              <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-semibold rounded-full border border-blue-100 dark:border-blue-800">
-                place de barre de recherche
-              </span>
+            </div>
+
+          {/* ── Centre : barre de recherche globale ── */}
+          <div className="flex-1 flex justify-center px-2 sm:px-4 min-w-0">
+            <div className="w-full max-w-xs sm:max-w-sm md:max-w-md">
+              <GlobalSearch />
             </div>
           </div>
 
           {/* ── Droite : actions ── */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
 
             {/* ─── Sélecteur de langue ─── */}
             <div className="relative" ref={useRef(null)}>
