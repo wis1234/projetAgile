@@ -5,7 +5,6 @@ import { Line, Bar, Pie } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload, FaUserPlus } from 'react-icons/fa';
 import RecruitmentCard from '@/Components/RecruitmentCard';
-import GlobalSearch from '@/Components/GlobalSearch';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
@@ -277,11 +276,8 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                 {t('dashboard_subtitle')}
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-              <GlobalSearch />
-              <div className="w-full sm:w-64">
-                <RecruitmentCard />
-              </div>
+            <div className="w-full sm:w-64">
+              <RecruitmentCard />
             </div>
           </div>
         </motion.div>

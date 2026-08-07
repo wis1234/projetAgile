@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import GlobalFooter from '@/Components/GlobalFooter';
 import PushNotificationManager from '@/Components/PushNotificationManager';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
+import GlobalSearch from '@/Components/GlobalSearch';
 const getFreshCsrfToken = async () => {
   try {
     const res = await fetch('/csrf-token', { credentials: 'include' });
@@ -436,7 +437,7 @@ channel.listen('.livekit.call.ended', () => {
         {/* Version */}
         <div className="p-4 border-t border-white/10 dark:border-gray-700 text-center">
           <div className="text-sm font-medium text-white/60 dark:text-gray-400">
-            ProJA v1.0
+            ProJA v2.3.1
           </div>
         </div>
       </aside>
@@ -473,7 +474,7 @@ channel.listen('.livekit.call.ended', () => {
             <div className="hidden md:flex items-center gap-2">
               <span className="text-xl font-light tracking-wider text-gray-700 dark:text-white">ProJA</span>
               <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-semibold rounded-full border border-blue-100 dark:border-blue-800">
-                v1.0
+                place de barre de recherche
               </span>
             </div>
           </div>
