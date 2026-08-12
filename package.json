@@ -77,8 +77,11 @@
         "highlight.js": "^11.11.1",
         "i18next": "^25.5.2",
         "i18next-browser-languagedetector": "^8.2.0",
+        "jszip": "^3.10.1",
         "laravel-echo": "^2.1.6",
+        "livekit-client": "^2.7.5",
         "lowlight": "^3.3.0",
+        "mammoth": "^1.8.0",
         "pusher-js": "^8.4.0",
         "react-beautiful-dnd": "^13.1.1",
         "react-chartjs-2": "^5.3.0",
@@ -91,6 +94,7 @@
         "react-pdf": "^10.1.0",
         "react-quill": "^0.0.2",
         "react-toastify": "^11.0.5",
+        "xlsx": "^0.18.5",
         "ziggy-js": "^2.5.3"
     }
 }
