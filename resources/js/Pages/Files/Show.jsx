@@ -1,33 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Head, router, Link } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { motion } from 'framer-motion';
-import FileHeader from '@/Components/FileDetails/FileHeader';
+import { motion, AnimatePresence } from 'framer-motion';
 import FilePreview from '@/Components/FileDetails/FilePreview';
 import FileMetadata from '@/Components/FileDetails/FileMetadata';
 import CommentsSection from '@/Components/FileDetails/CommentsSection';
 import RelatedInfo from '@/Components/FileDetails/RelatedInfo';
 import SaveToDropboxButton from '@/Components/Files/SaveToDropboxButton';
+import CollaborativeEditorBanner, {
+  CollaboratorAvatar,
+  EditModeToggle,
+} from '@/Components/FileViewer/CollaborativeEditor';
+import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import {
-  FaProjectDiagram,
-  FaTasks,
-  FaUser,
-  FaFileAlt,
-  FaClock,
-  FaArrowLeft,
-  FaTimes,
-  FaLock,
-  FaLockOpen,
-  FaEye,
-  FaEyeSlash,
-  FaShieldAlt,
-  FaKey,
-  FaExclamationTriangle,
-  FaCheckCircle,
+  FaProjectDiagram, FaTasks, FaUser, FaFileAlt, FaClock,
+  FaArrowLeft, FaTimes, FaLock, FaLockOpen, FaEye, FaEyeSlash,
+  FaShieldAlt, FaKey, FaExclamationTriangle, FaCheckCircle,
+  FaVideo, FaEdit, FaUsers, FaChevronDown, FaDownload,
 } from 'react-icons/fa';
-import { isFileEditable } from '@/utils/fileUtils';
+import { isFileEditable, isOfficeOrDocFile } from '@/utils/fileUtils';
 import axios from 'axios';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -443,11 +436,59 @@ const Show = ({ file, auth, canManageFile, canBypassLock }) => {
 
   const [isDeleteModalOpen,   setIsDeleteModalOpen]   = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isCallOpen,          setIsCallOpen]          = useState(false);
+
+  // ── Édition collaborative ─────────────────────────────────────────────────
+  const [isEditModeActive, setIsEditModeActive] = useState(false);
+  const [editHistory,      setEditHistory]      = useState([]);
+  const [isSaving,         setIsSaving]         = useState(false);
+  // Simulated collaborators — in production these come from a WebSocket/Pusher channel
+  const [activeCollaborators, setActiveCollaborators] = useState([]);
 
   const [isUnlocked, setIsUnlocked] = useState(canBypassLock);
 
-  const isFileOwner  = currentFile.user_id === currentUser?.id;
-  const canEditContent = isFileEditable(currentFile.type, currentFile.name);
+  const isFileOwner     = currentFile.user_id === currentUser?.id;
+  const canEditContent  = isFileEditable(currentFile.type, currentFile.name);
+  const isCollabFile    = isOfficeOrDocFile(currentFile.type, currentFile.name);
+  // Only managers/admins OR the file owner can activate collaborative edit mode
+  const canToggleEdit   = canManageFile || isFileOwner;
+
+  // Add current user to active collaborators when edit mode is activated
+  useEffect(() => {
+    if (isEditModeActive && currentUser) {
+      setActiveCollaborators(prev => {
+        if (prev.find(u => u.id === currentUser.id)) return prev;
+        return [...prev, currentUser];
+      });
+      // Track activation in history
+      setEditHistory(prev => [{
+        userId: currentUser.id,
+        userName: currentUser.name,
+        description: 'a activé le mode d\'édition',
+        at: new Date().toISOString(),
+      }, ...prev]);
+    } else {
+      setActiveCollaborators(prev => prev.filter(u => u.id !== currentUser?.id));
+    }
+  }, [isEditModeActive]);
+
+  const handleSaveContent = useCallback(async (html) => {
+    setIsSaving(true);
+    try {
+      // Save via API — adjust endpoint as needed
+      await axios.patch(route('files.update', currentFile.id), { content: html });
+      setEditHistory(prev => [{
+        userId: currentUser.id,
+        userName: currentUser.name,
+        description: 'a sauvegardé des modifications',
+        at: new Date().toISOString(),
+      }, ...prev]);
+    } catch (err) {
+      console.error('Sauvegarde échouée', err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [currentFile.id, currentUser]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleDelete   = () => setIsDeleteModalOpen(true);
@@ -510,78 +551,115 @@ const handlePasswordSaved = (isNowProtected) => {
 
       <div className="min-h-screen bg-gray-50">
         {/* ── Page Header ─────────────────────────────────────────────────── */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex flex-col space-y-4">
-              <div className="flex items-center space-x-3 flex-wrap gap-y-2">
+        <div className="bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+            {/* Row 1 : nav + actions */}
+            <div className="flex items-center justify-between gap-3 py-3 border-b border-gray-100">
+              {/* Left nav */}
+              <div className="flex items-center gap-2">
                 <Link
                   href={route('files.index')}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200
-                             text-gray-700 rounded-lg transition-colors duration-200"
-                  title="Retour à la liste des fichiers"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
                 >
-                  <FaArrowLeft className="h-4 w-4" />
-                  <span className="text-sm font-medium">Retour</span>
+                  <FaArrowLeft className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Retour</span>
                 </Link>
 
-                <button
-                  onClick={handlePreview}
-                  className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700
-                             text-white rounded-lg transition-colors duration-200 shadow-sm"
-                  title="Prévisualiser dans un nouvel onglet"
-                >
-                  <FaEye className="h-4 w-4" />
-                  <span className="text-sm font-medium">Prévisualiser (Nouvel onglet)</span>
-                </button>
+                {/* Breadcrumb */}
+                <span className="text-gray-300 hidden sm:inline">/</span>
+                {currentFile.project && (
+                  <>
+                    <Link href={route('projects.show', currentFile.project.id)}
+                      className="text-xs text-gray-500 hover:text-blue-600 transition-colors hidden sm:inline truncate max-w-[100px]">
+                      {currentFile.project.name}
+                    </Link>
+                    <span className="text-gray-300 hidden sm:inline">/</span>
+                  </>
+                )}
+                <span className="text-xs text-gray-400 hidden sm:inline truncate max-w-[140px]" title={currentFile.name}>
+                  {currentFile.name}
+                </span>
+              </div>
 
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3">
-                    <FaFileAlt className="h-6 w-6 text-gray-400" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 truncate"
-                            title={currentFile.name}>
-                          {currentFile.name}
-                        </h1>
-                        {/* Lock badge */}
-                        {currentFile.is_password_protected && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
-                                           text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                            <FaLock className="h-2.5 w-2.5" /> Protégé
-                          </span>
-                        )}
-                      </div>
+              {/* Right actions */}
+              <div className="flex items-center gap-2">
 
-                      <div className="mt-1">
-                        <span className="text-sm text-gray-600 font-medium">Tâche : </span>
-                        {currentFile.task ? (
-                          <Link
-                            href={`/tasks/${currentFile.task.id}`}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs
-                                       font-medium bg-blue-100 text-blue-800 hover:bg-blue-200
-                                       transition-colors duration-200"
-                            title="Voir la tâche"
-                          >
-                            <FaTasks className="mr-1.5 h-3 w-3" />
-                            {currentFile.task.title}
-                          </Link>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full
-                                           text-xs font-medium bg-gray-100 text-gray-600">
-                            <FaTimes className="mr-1.5 h-3 w-3" /> Aucune
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                {/* Collaborators online (shown only when NOT in edit mode) */}
+                {!isEditModeActive && activeCollaborators.length > 0 && (
+                  <div className="flex -space-x-1.5 mr-1">
+                    {activeCollaborators.slice(0, 4).map(u => (
+                      <CollaboratorAvatar key={u.id} user={u} size={7} />
+                    ))}
                   </div>
+                )}
 
-                  <p className="mt-1 text-sm text-gray-500">
-                    Dernière mise à jour :{' '}
-                    {new Date(currentFile.updated_at).toLocaleDateString('fr-FR', {
-                      day: '2-digit', month: 'long', year: 'numeric',
-                      hour: '2-digit', minute: '2-digit',
-                    })}
-                  </p>
+                {/* Toggle édition collaborative (Word/Excel uniquement) */}
+                {isCollabFile && (
+                  <EditModeToggle
+                    isEnabled={isEditModeActive}
+                    canToggle={canToggleEdit}
+                    onToggle={() => setIsEditModeActive(v => !v)}
+                    isCollabFile={isCollabFile}
+                  />
+                )}
+
+                {/* Lancer un appel projet */}
+                <button
+                  onClick={() => setIsCallOpen(true)}
+                  className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-br from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg text-sm font-semibold shadow-sm transition-all"
+                  title="Lancer un appel projet"
+                >
+                  <FaVideo className="h-4 w-4" />
+                  <span className="hidden sm:inline">Appel</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2 : titre + meta */}
+            <div className="py-4">
+              <div className="flex items-start gap-3">
+                <div className="shrink-0 w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center mt-0.5">
+                  <FaFileAlt className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate" title={currentFile.name}>
+                      {currentFile.name}
+                    </h1>
+                    {currentFile.is_password_protected && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                        <FaLock className="h-2.5 w-2.5" /> Protégé
+                      </span>
+                    )}
+                    {isEditModeActive && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                        <FaEdit className="h-2.5 w-2.5" /> Mode Édition
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    {/* Tâche associée */}
+                    {currentFile.task ? (
+                      <Link href={`/tasks/${currentFile.task.id}`}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors">
+                        <FaTasks className="h-2.5 w-2.5" /> {currentFile.task.title}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-gray-400">Aucune tâche</span>
+                    )}
+                    <span className="text-xs text-gray-400">
+                      Modifié {new Date(currentFile.updated_at).toLocaleDateString('fr-FR', {
+                        day: '2-digit', month: 'short', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                      })}
+                    </span>
+                    {currentFile.user && (
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        <FaUser className="h-2.5 w-2.5" /> {currentFile.user.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -596,6 +674,32 @@ const handlePasswordSaved = (isNowProtected) => {
           >
             {/* Left — 3 columns */}
             <div className="lg:col-span-3 space-y-6">
+
+              {/* ── Bandeau édition collaborative ──────────────────────────── */}
+              <AnimatePresence>
+                {isEditModeActive && isCollabFile && (
+                  <motion.div
+                    key="collab-editor"
+                    initial={{ opacity: 0, y: -12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={{ duration: 0.25 }}
+                    variants={item}
+                  >
+                    <CollaborativeEditorBanner
+                      file={currentFile}
+                      currentUser={currentUser}
+                      activeCollaborators={activeCollaborators}
+                      editHistory={editHistory}
+                      onSave={handleSaveContent}
+                      onDeactivate={() => setIsEditModeActive(false)}
+                      canDeactivate={canToggleEdit}
+                      isSaving={isSaving}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <motion.div
                 className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
                 variants={item}
@@ -829,6 +933,17 @@ const handlePasswordSaved = (isNowProtected) => {
         file={currentFile}
         onSaved={handlePasswordSaved}
       />
+
+      {/* ── Appel projet (LiveKit) ───────────────────────────────────────── */}
+      {isCallOpen && (
+        <LiveKitCallModal
+          tokenEndpoint={`/api/livekit/token?room=file-${currentFile.id}&identity=${currentUser?.id}`}
+          muteEndpoint="/api/livekit/mute"
+          isHost={canManageFile || isFileOwner}
+          title={`Appel Projet — ${currentFile.name}`}
+          onClose={() => setIsCallOpen(false)}
+        />
+      )}
     </AdminLayout>
   );
 };
