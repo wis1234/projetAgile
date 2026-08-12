@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Room, RoomEvent, Track } from 'livekit-client';
 import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
   FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
@@ -21,6 +20,7 @@ const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '�
 
 export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, onClose, onAnswered }) {
   const [room, setRoom] = useState(null);
+  const [livekitLib, setLivekitLib] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [micEnabled, setMicEnabled] = useState(true);
   const [camEnabled, setCamEnabled] = useState(false);
@@ -89,6 +89,22 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
 
     const connect = async () => {
       try {
+        let livekit = window.LivekitClient;
+        if (!livekit) {
+          try {
+            livekit = await import('livekit-client');
+          } catch (e) {
+            console.warn('livekit-client non installe:', e);
+          }
+        }
+
+        if (!livekit) {
+          throw new Error("Le service d'appel (livekit-client) n'est pas installé sur le serveur. Veuillez exécuter 'npm install livekit-client'.");
+        }
+
+        const { Room, RoomEvent } = livekit;
+        setLivekitLib(livekit);
+
         const csrfToken = await getFreshCsrfToken();
         const res = await fetch(tokenEndpoint, {
           method: 'POST',
@@ -203,20 +219,20 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     }
   }, [participants.length, connecting, room]);
 
+  const TrackSourceScreenShare = livekitLib?.Track?.Source?.ScreenShare || 'screen_share';
+  const TrackSourceCamera = livekitLib?.Track?.Source?.Camera || 'camera';
+
   // Détecte si quelqu'un (local ou distant) partage son écran
   const remoteScreenShare = participants
-    .map(p => ({ p, pub: [...p.videoTrackPublications.values()].find(pub => pub.source === Track.Source.ScreenShare && pub.track) }))
+    .map(p => ({ p, pub: [...p.videoTrackPublications.values()].find(pub => (pub.source === TrackSourceScreenShare || pub.source === 'screen_share') && pub.track) }))
     .find(x => x.pub);
   const isScreenSharingAnyone = screenSharing || !!remoteScreenShare;
 
   // ─── Attacher la caméra LOCALE — se déclenche après chaque rendu concerné ───
-  // C'est le correctif clé : on n'attache plus au moment du clic (où l'élément
-  // <video> n'existe pas encore dans le DOM), mais dans un effet qui se relance
-  // dès que camEnabled ou la mise en page (grille ↔ partage d'écran) changent.
   useEffect(() => {
     if (!room || !camEnabled) return;
     const camPub = [...room.localParticipant.videoTrackPublications.values()]
-      .find(pub => pub.source === Track.Source.Camera);
+      .find(pub => pub.source === TrackSourceCamera || pub.source === 'camera');
     if (camPub?.track && localVideoRef.current) {
       camPub.track.attach(localVideoRef.current);
     }
@@ -226,7 +242,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   useEffect(() => {
     if (!room || !screenSharing) return;
     const pub = [...room.localParticipant.videoTrackPublications.values()]
-      .find(p => p.source === Track.Source.ScreenShare);
+      .find(p => p.source === TrackSourceScreenShare || p.source === 'screen_share');
     if (pub?.track && screenVideoRef.current) {
       pub.track.attach(screenVideoRef.current);
     }
@@ -235,7 +251,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   // ─── Attacher les flux DISTANTS (caméra + audio) — relancé aussi au changement de mise en page ───
   useEffect(() => {
     participants.forEach(p => {
-      const camPub = [...p.videoTrackPublications.values()].find(pub => pub.source === Track.Source.Camera && pub.track);
+      const camPub = [...p.videoTrackPublications.values()].find(pub => (pub.source === TrackSourceCamera || pub.source === 'camera') && pub.track);
       const el = remoteVideoRefs.current[p.identity];
       if (camPub?.track && el) camPub.track.attach(el);
 
@@ -318,7 +334,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     if (!isHost || !muteEndpoint) return;
     const pub = kind === 'audio'
       ? [...participant.audioTrackPublications.values()][0]
-      : [...participant.videoTrackPublications.values()].find(p => p.source === Track.Source.Camera);
+      : [...participant.videoTrackPublications.values()].find(p => p.source === TrackSourceCamera || p.source === 'camera');
     if (!pub) return;
 
     try {
