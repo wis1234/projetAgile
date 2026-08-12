@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
   FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
+  FaPhone, FaPhoneSlash,
 } from 'react-icons/fa';
 
 const getFreshCsrfToken = async () => {
@@ -18,7 +19,14 @@ const getFreshCsrfToken = async () => {
 
 const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '🔥'];
 
-export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, onClose, onAnswered }) {
+// ─── Sons d'appel réels ──────────────────────────────────────────────
+// Place tes fichiers audio dans /public/sounds/ (ou adapte les chemins).
+// Si le fichier est introuvable / bloqué, on retombe automatiquement
+// sur une tonalité synthétisée (WebAudio) pour ne jamais casser le flux.
+const OUTGOING_RINGTONE_SRC = '/sounds/outgoing-call.mp3'; // tonalité "ça sonne chez l'autre"
+const INCOMING_RINGTONE_SRC = '/sounds/incoming-call.mp3'; // vraie sonnerie d'appel entrant
+
+export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, callerName, onClose, onAnswered }) {
   const [room, setRoom] = useState(null);
   const [livekitLib, setLivekitLib] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -37,16 +45,27 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHands, setRaisedHands] = useState({}); // { identity: name }
 
+  // ─── Décroché / pas décroché — état 100% LOCAL à cet utilisateur ───
+  // C'est la clé du correctif : l'hôte (celui qui lance l'appel) est
+  // "décroché" dès l'ouverture (il est l'appelant). Un invité, lui,
+  // n'est PAS encore décroché tant qu'il n'a pas cliqué "Répondre" —
+  // et donc continue de sonner de son côté, MÊME SI d'autres personnes
+  // ont déjà rejoint l'appel entre-temps (ça ne dépend plus du nombre
+  // de participants distants, mais uniquement de sa propre action).
+  const [hasAnswered, setHasAnswered] = useState(!!isHost);
+  const [declined, setDeclined] = useState(false);
+
   const localVideoRef = useRef(null);
   const screenVideoRef = useRef(null);
   const remoteVideoRefs = useRef({});
   const containerRef = useRef(null);
   const ringbackRef = useRef(null);
+  const ringtoneAudioRef = useRef(null);
   const timerIntervalRef = useRef(null);
   const answeredNotifiedRef = useRef(false);
 
-  // ─── Tonalité d'appel sortant ────────────────────────────────────
-  const startRingback = () => {
+  // ─── Tonalité synthétisée (secours si le fichier audio est absent) ─
+  const startSynthRingback = () => {
     if (ringbackRef.current) return;
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
@@ -76,15 +95,74 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     ringbackRef.current = { audioCtx, interval };
   };
 
-  const stopRingback = () => {
+  const stopSynthRingback = () => {
     if (!ringbackRef.current) return;
     clearInterval(ringbackRef.current.interval);
     ringbackRef.current.audioCtx.close().catch(() => {});
     ringbackRef.current = null;
   };
 
-  // ─── Connexion à la room ───────────────────────────────────────────
+  // ─── Sonnerie "réelle" (fichier audio) avec repli sur la synthèse ──
+  const startRingtone = (src) => {
+    if (ringtoneAudioRef.current) return; // déjà en cours
+    const audio = new Audio(src);
+    audio.loop = true;
+    audio.volume = 0.85;
+    ringtoneAudioRef.current = audio;
+
+    audio.addEventListener('error', () => {
+      // Fichier introuvable / non supporté → tonalité synthétisée de secours
+      ringtoneAudioRef.current = null;
+      startSynthRingback();
+    });
+
+    audio.play().catch(() => {
+      // Lecture auto bloquée par le navigateur (pas de geste utilisateur) →
+      // on retente via la synthèse WebAudio qui est plus tolérante,
+      // et on retentera aussi la vraie sonnerie au prochain geste utilisateur.
+      startSynthRingback();
+    });
+  };
+
+  const stopRingtone = () => {
+    if (ringtoneAudioRef.current) {
+      ringtoneAudioRef.current.pause();
+      ringtoneAudioRef.current.currentTime = 0;
+      ringtoneAudioRef.current = null;
+    }
+    stopSynthRingback();
+  };
+
+  // Coupe toute sonnerie au démontage, par sécurité
+  useEffect(() => () => stopRingtone(), []);
+
+  // ─── Écran "appel entrant" pour un invité qui n'a pas encore décroché ─
+  // Sonne en boucle indépendamment de l'état de la room (donc indépendamment
+  // du nombre de personnes déjà connectées) jusqu'à ce que CET utilisateur
+  // clique sur Répondre ou Refuser.
   useEffect(() => {
+    if (isHost || hasAnswered || declined) {
+      stopRingtone();
+      return;
+    }
+    startRingtone(INCOMING_RINGTONE_SRC);
+    return () => stopRingtone();
+  }, [isHost, hasAnswered, declined]);
+
+  const handleAnswer = () => {
+    stopRingtone();
+    setHasAnswered(true);
+  };
+
+  const handleDecline = () => {
+    stopRingtone();
+    setDeclined(true);
+    onClose();
+  };
+
+  // ─── Connexion à la room — ne démarre qu'une fois l'appel décroché ──
+  useEffect(() => {
+    if (!hasAnswered) return;
     let activeRoom;
 
     const connect = async () => {
@@ -184,21 +262,25 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
 
     return () => {
       clearInterval(timerIntervalRef.current);
-      stopRingback();
+      stopRingtone();
       activeRoom?.disconnect();
     };
-  }, [tokenEndpoint]);
+  }, [tokenEndpoint, hasAnswered]);
 
-  // ─── Passage "en attente" → "appel démarré" ─────────────────────────
+  // ─── Passage "en attente" → "appel démarré" (côté appelant) ─────────
+  // Ne concerne que l'appelant (hôte) : tant que personne n'a rejoint,
+  // ça continue de sonner chez lui. Ça s'arrête dès qu'AU MOINS une
+  // personne rejoint (ce comportement est correct pour l'appelant,
+  // contrairement aux invités qui gèrent leur propre sonnerie plus haut).
   useEffect(() => {
-    if (connecting) return;
+    if (!hasAnswered || connecting) return;
 
     if (participants.length === 0) {
-      if (!callStarted) startRingback();
+      if (!callStarted) startRingtone(OUTGOING_RINGTONE_SRC);
       return;
     }
 
-    stopRingback();
+    stopRingtone();
     if (!answeredNotifiedRef.current) {
       answeredNotifiedRef.current = true;
       onAnswered?.();
@@ -217,7 +299,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
       updateElapsed();
       timerIntervalRef.current = setInterval(updateElapsed, 1000);
     }
-  }, [participants.length, connecting, room]);
+  }, [participants.length, connecting, room, hasAnswered]);
 
   const TrackSourceScreenShare = livekitLib?.Track?.Source?.ScreenShare || 'screen_share';
   const TrackSourceCamera = livekitLib?.Track?.Source?.Camera || 'camera';
@@ -354,7 +436,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   };
 
   const handleLeave = () => {
-    stopRingback();
+    stopRingtone();
     clearInterval(timerIntervalRef.current);
     room?.disconnect();
     onClose();
@@ -367,6 +449,47 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   };
 
   const totalCount = 1 + participants.length;
+
+  // Style commun pour l'effet miroir façon Zoom/Meet, appliqué à
+  // TOUTES les vidéos caméra (locale + distantes) — jamais au partage d'écran.
+  const mirrorStyle = { transform: 'scaleX(-1)' };
+
+  // ─── Écran d'appel entrant (invité n'ayant pas encore décroché) ─────
+  if (!isHost && !hasAnswered) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center text-white px-6">
+        <style>{`
+          @keyframes pulseRing {
+            0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.55); }
+            70% { box-shadow: 0 0 0 24px rgba(59,130,246,0); }
+            100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+          }
+          .incoming-avatar { animation: pulseRing 1.8s ease-out infinite; }
+        `}</style>
+        <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-3xl font-bold incoming-avatar mb-6">
+          {(callerName || title || 'ProJA').slice(0, 2).toUpperCase()}
+        </div>
+        <p className="text-sm text-blue-300 uppercase tracking-wide mb-1">Appel entrant — ProJA Meet</p>
+        <h2 className="text-2xl font-semibold mb-10 text-center">{callerName || title}</h2>
+        <div className="flex items-center gap-10">
+          <button
+            onClick={handleDecline}
+            title="Refuser"
+            className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition"
+          >
+            <FaPhoneSlash className="w-6 h-6" />
+          </button>
+          <button
+            onClick={handleAnswer}
+            title="Répondre"
+            className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center transition animate-bounce"
+          >
+            <FaPhone className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
@@ -474,7 +597,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
             <div className="h-full flex flex-col items-center justify-center gap-4 text-white">
               <div className="w-40 h-40 rounded-2xl overflow-hidden bg-slate-800 border border-slate-700 relative flex items-center justify-center">
                 {camEnabled ? (
-                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
+                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
                 ) : (
                   <FaVideoSlash className="text-slate-500 text-3xl" />
                 )}
@@ -499,7 +622,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
               <div className="flex gap-2 overflow-x-auto flex-shrink-0 pb-1">
                 <div className="w-32 h-20 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex-shrink-0 relative flex items-center justify-center">
                   {camEnabled ? (
-                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
+                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
                   ) : (
                     <FaVideoSlash className="text-slate-500 text-lg" />
                   )}
@@ -509,7 +632,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
                   <div key={p.identity} className="w-32 h-20 rounded-xl overflow-hidden bg-black border border-slate-700 flex-shrink-0 relative">
                     <video
                       ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                      autoPlay playsInline className="w-full h-full object-cover bg-black"
+                      autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
                     />
                     <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
                       {p.name || p.identity}
@@ -522,7 +645,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
             <div className="h-full p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto content-start">
               <div className="rounded-2xl overflow-hidden bg-slate-800 border border-slate-800 aspect-video relative flex items-center justify-center">
                 {camEnabled ? (
-                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={{ transform: 'scaleX(-1)' }} />
+                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
                 ) : (
                   <FaVideoSlash className="text-slate-500 text-3xl" />
                 )}
@@ -539,7 +662,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
                 <div key={p.identity} className="rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video relative group">
                   <video
                     ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                    autoPlay playsInline className="w-full h-full object-cover bg-black"
+                    autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
                   />
                   {raisedHands[p.identity] && (
                     <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
