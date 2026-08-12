@@ -1,31 +1,144 @@
 import React, { useCallback, useState } from 'react';
 import { router, Link } from '@inertiajs/react';
 import FileIcon from '../FileIcon';
-import { 
-  FaPaperclip, 
-  FaEdit, 
-  FaDownload, 
-  FaTrash, 
-  FaShare, 
-  FaEllipsisH,
-  FaTimes,
-  FaCopy,
-  FaFileAlt,
-  FaEye
+import {
+  FaEdit, FaDownload, FaTrash, FaShare,
+  FaEllipsisH, FaTimes, FaEye, FaFilePdf,
+  FaFileAlt, FaExternalLinkAlt
 } from 'react-icons/fa';
-import { isFileEditable, isPdfFile } from '../../utils/fileUtils';
-import GoogleStylePreviewer, { isOfficeOrDocFile } from '../FileViewer/GoogleStylePreviewer';
+import { isFileEditable, isPdfFile, isOfficeOrDocFile } from '../../utils/fileUtils';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 
+// ─── Vignette de prévisualisation selon le type de fichier ─────────────────
+const FileThumbnail = ({ file, fileUrl, onOpenPreview }) => {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const ext = (file.name || '').split('.').pop().toLowerCase();
+  const isImage = file.type?.startsWith('image/');
+  const isPdf   = isPdfFile(file.type, file.name);
+  const isOffice = isOfficeOrDocFile(file.type, file.name);
+  const isTxt   = ext === 'txt' || ext === 'md' || file.type?.startsWith('text/');
+
+  // ── Image ────────────────────────────────────────────────────────────────
+  if (isImage) {
+    return (
+      <div className="relative group cursor-zoom-in" onClick={onOpenPreview}>
+        {!imgLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg animate-pulse">
+            <FaFileAlt className="text-gray-300 text-5xl" />
+          </div>
+        )}
+        <img
+          src={fileUrl}
+          alt={file.name}
+          className={`max-h-64 w-auto mx-auto rounded-lg shadow transition-opacity duration-300 object-contain ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setImgLoaded(true)}
+        />
+        <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200">
+          <span className="flex items-center gap-2 px-4 py-2 bg-white/90 text-gray-800 rounded-full text-sm font-semibold shadow">
+            <FaEye className="h-4 w-4 text-blue-600" /> Agrandir
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── PDF ─────────────────────────────────────────────────────────────────
+  if (isPdf) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-4">
+        {/* Miniature PDF via iframe clip */}
+        <div className="w-full max-w-[280px] h-[180px] rounded-xl overflow-hidden border border-red-200 shadow-md bg-white relative pointer-events-none">
+          <iframe
+            src={`${fileUrl}#page=1&zoom=60&toolbar=0&navpanes=0&scrollbar=0`}
+            className="w-full h-full scale-[0.85] origin-top"
+            title="Aperçu PDF"
+            style={{ border: 'none', pointerEvents: 'none' }}
+          />
+          {/* Gradient overlay to hint "more content below" */}
+          <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent" />
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">
+            <FaFilePdf className="h-3 w-3" /> PDF
+          </span>
+          <p className="text-xs text-gray-400">Prévisualisation de la 1ère page</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Fichiers Office / Texte ────────────────────────────────────────────
+  if (isOffice || isTxt) {
+    // Détermine la couleur d'accentuation selon le type
+    const accentMap = {
+      docx: 'blue', doc: 'blue', odt: 'blue', rtf: 'blue',
+      xlsx: 'green', xls: 'green', csv: 'green', ods: 'green', tsv: 'green',
+      pptx: 'orange', ppt: 'orange', odp: 'orange',
+      txt: 'slate', md: 'slate',
+    };
+    const accent = accentMap[ext] || 'blue';
+    const accentClasses = {
+      blue: 'bg-blue-50 border-blue-200 text-blue-700',
+      green: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+      orange: 'bg-orange-50 border-orange-200 text-orange-700',
+      slate: 'bg-slate-50 border-slate-200 text-slate-700',
+    };
+
+    return (
+      <div className={`flex flex-col items-center gap-4 py-6 px-8 w-full max-w-sm mx-auto rounded-2xl border ${accentClasses[accent]} transition-all`}>
+        <FileIcon type={file.type} size="text-6xl" />
+        <div className="text-center">
+          <p className="font-semibold text-sm text-gray-800 truncate max-w-[200px]">{file.name}</p>
+          <p className="text-xs text-gray-400 mt-0.5 uppercase tracking-wider">{ext?.toUpperCase() || 'Fichier'}</p>
+          {file.size && (
+            <p className="text-xs text-gray-400 mt-0.5">{(file.size / 1024).toFixed(1)} Ko</p>
+          )}
+        </div>
+        <button
+          onClick={onOpenPreview}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow transition-colors"
+        >
+          <FaExternalLinkAlt className="h-3 w-3" />
+          Prévisualiser
+        </button>
+      </div>
+    );
+  }
+
+  // ── Générique (video, audio, archive, autre) ───────────────────────────
+  return (
+    <div className="flex flex-col items-center gap-3 py-8">
+      <div className="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center shadow-inner">
+        <FileIcon type={file.type} size="text-4xl" />
+      </div>
+      <div className="text-center">
+        <p className="font-semibold text-sm text-gray-700 truncate max-w-[200px]">{file.name}</p>
+        <p className="text-xs text-gray-400 mt-0.5">{file.type || 'Type inconnu'}</p>
+        {file.size && (
+          <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} Ko</p>
+        )}
+      </div>
+      <p className="text-xs text-gray-400 italic">Aucune prévisualisation disponible pour ce format.</p>
+    </div>
+  );
+};
+
+// ─── Composant principal ────────────────────────────────────────────────────
 const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownload }) => {
-  const [isImageLoaded, setIsImageLoaded] = useState(false);
   const fileUrl = `/storage/${file.file_path}`;
   const isImage = file.type?.startsWith('image/');
   const isEditable = isFileEditable(file.type, file.name);
   const isPdf = isPdfFile(file.type, file.name);
-  const isOfficeDoc = isOfficeOrDocFile(file.type, file.name);
-  const [showFullPreview, setShowFullPreview] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+
+  const openPreviewTab = useCallback(() => {
+    if (isImage) {
+      setShowImageModal(true);
+    } else {
+      window.open(`/files/${file.id}/preview`, '_blank');
+    }
+  }, [file.id, isImage]);
 
   const handleEditContent = useCallback(() => {
     router.visit(`/files/${file.id}/edit-content`);
@@ -37,7 +150,6 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
       onShare();
     } else {
       navigator.clipboard.writeText(window.location.href);
-      // Vous pourriez ajouter une notification ici
       alert('Lien copié dans le presse-papier');
     }
   }, [onShare]);
@@ -53,267 +165,187 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
 
   const handleDelete = useCallback((e) => {
     e?.preventDefault();
-    if (onDelete) {
-      onDelete();
-    }
+    if (onDelete) onDelete();
   }, [onDelete]);
-
-  const handlePreview = useCallback((e) => {
-    e?.preventDefault();
-    if (isImage) {
-      setShowFullPreview(true);
-    } else {
-      window.open(`/files/${file.id}/preview`, '_blank');
-    }
-  }, [file.id, isImage]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {/* En-tête avec actions rapides */}
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Aperçu du fichier</h2>
-        
-        {/* Menu déroulant des actions */}
-        <Menu as="div" className="relative">
-          <Menu.Button className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-            <FaEllipsisH className="h-5 w-5" />
-          </Menu.Button>
-          <Transition
-            as={Fragment}
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
-          >
-            <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-              <div className="py-1">
-                <Menu.Item>
-                  {({ active }) => (
-                    <button
-                      onClick={handlePreview}
-                      className={`${
-                        active ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
-                      } group flex items-center w-full px-4 py-2 text-sm`}
-                    >
-                      <FaEye className="mr-3 h-5 w-5 text-emerald-500" />
-                      Prévisualiser (Nouvel onglet)
-                    </button>
-                  )}
-                </Menu.Item>
-                <Menu.Item>
-                  {({ active }) => (
-                    <button
-                      onClick={handleDownload}
-                      className={`${
-                        active ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
-                      } group flex items-center w-full px-4 py-2 text-sm`}
-                    >
-                      <FaDownload className="mr-3 h-5 w-5 text-gray-500 dark:text-gray-400" />
-                      Télécharger
-                    </button>
-                  )}
-                </Menu.Item>
-                
-                <Menu.Item>
-                  {({ active }) => (
-                    <button
-                      onClick={handleShare}
-                      className={`${
-                        active ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
-                      } group flex items-center w-full px-4 py-2 text-sm`}
-                    >
-                      <FaShare className="mr-3 h-5 w-5 text-indigo-500" />
-                      Partager
-                    </button>
-                  )}
-                </Menu.Item>
-                
-                {isEditable && !isPdf && (
+
+      {/* ── En-tête ─────────────────────────────────────────────────────── */}
+      <div className="px-6 py-3.5 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800/80">
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+          Aperçu du fichier
+        </h2>
+
+        {/* Menu contextuel ⋯ */}
+        <div className="flex items-center gap-2">
+          <Menu as="div" className="relative">
+            <Menu.Button className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors">
+              <FaEllipsisH className="h-4 w-4" />
+            </Menu.Button>
+            <Transition
+              as={Fragment}
+              enter="transition ease-out duration-100"
+              enterFrom="transform opacity-0 scale-95"
+              enterTo="transform opacity-100 scale-100"
+              leave="transition ease-in duration-75"
+              leaveFrom="transform opacity-100 scale-100"
+              leaveTo="transform opacity-0 scale-95"
+            >
+              <Menu.Items className="absolute right-0 z-20 mt-1 w-52 origin-top-right rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 focus:outline-none border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div className="py-1">
+                  {/* Prévisualiser */}
                   <Menu.Item>
                     {({ active }) => (
-                      <button
-                        onClick={handleEditContent}
-                        className={`${
-                          active ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
-                        } group flex items-center w-full px-4 py-2 text-sm`}
-                      >
-                        <FaEdit className="mr-3 h-5 w-5 text-green-500" />
-                        Modifier le contenu
+                      <button onClick={openPreviewTab}
+                        className={`${active ? 'bg-blue-50 text-blue-700' : 'text-gray-700 dark:text-gray-300'} flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium`}>
+                        <FaEye className="h-4 w-4 text-blue-500 shrink-0" />
+                        Prévisualiser
                       </button>
                     )}
                   </Menu.Item>
-                )}
-                
-                {canManageFile && (
-                  <>
-                    <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+
+                  {/* Télécharger */}
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button onClick={handleDownload}
+                        className={`${active ? 'bg-gray-50 dark:bg-gray-700' : 'text-gray-700 dark:text-gray-300'} flex items-center gap-3 w-full px-4 py-2.5 text-sm`}>
+                        <FaDownload className="h-4 w-4 text-gray-400 shrink-0" />
+                        Télécharger
+                      </button>
+                    )}
+                  </Menu.Item>
+
+                  {/* Partager */}
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button onClick={handleShare}
+                        className={`${active ? 'bg-gray-50 dark:bg-gray-700' : 'text-gray-700 dark:text-gray-300'} flex items-center gap-3 w-full px-4 py-2.5 text-sm`}>
+                        <FaShare className="h-4 w-4 text-indigo-400 shrink-0" />
+                        Partager le lien
+                      </button>
+                    )}
+                  </Menu.Item>
+
+                  {/* Modifier le contenu */}
+                  {isEditable && !isPdf && (
                     <Menu.Item>
                       {({ active }) => (
-                        <Link
-                          href={`/files/${file.id}/edit`}
-                          className={`${
-                            active ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
-                          } group flex items-center w-full px-4 py-2 text-sm`}
-                        >
-                          <FaEdit className="mr-3 h-5 w-5 text-blue-500" />
-                          Modifier les métadonnées
-                        </Link>
-                      )}
-                    </Menu.Item>
-                    <Menu.Item>
-                      {({ active }) => (
-                        <button
-                          onClick={handleDelete}
-                          className={`${
-                            active ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' : 'text-red-600 dark:text-red-400'
-                          } group flex items-center w-full px-4 py-2 text-sm`}
-                        >
-                          <FaTrash className="mr-3 h-5 w-5" />
-                          Supprimer
+                        <button onClick={handleEditContent}
+                          className={`${active ? 'bg-gray-50 dark:bg-gray-700' : 'text-gray-700 dark:text-gray-300'} flex items-center gap-3 w-full px-4 py-2.5 text-sm`}>
+                          <FaEdit className="h-4 w-4 text-green-500 shrink-0" />
+                          Modifier le contenu
                         </button>
                       )}
                     </Menu.Item>
-                  </>
-                )}
-              </div>
-            </Menu.Items>
-          </Transition>
-        </Menu>
-      </div>
-      
-      {/* Contenu de l'aperçu */}
-      <div className="p-4 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-700 min-h-64">
-        {isOfficeDoc ? (
-          <div className="w-full">
-            <GoogleStylePreviewer file={file} fileUrl={fileUrl} />
-          </div>
-        ) : isImage ? (
-          <div className="relative group">
-            <div className={`mb-4 w-full max-w-full max-h-96 ${!isImageLoaded ? 'animate-pulse bg-gray-200 dark:bg-gray-600' : ''} rounded-lg overflow-hidden`}>
-              <img 
-                src={fileUrl} 
-                alt={file.name} 
-                className={`max-h-96 w-auto mx-auto transition-opacity duration-300 ${isImageLoaded ? 'opacity-100' : 'opacity-0'}`}
-                onLoad={() => setIsImageLoaded(true)}
-                onClick={handlePreview}
-              />
-            </div>
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <button 
-                onClick={handlePreview}
-                className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
-                title="Afficher en grand"
-              >
-                <FaEye className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center">
-            <div className="mx-auto">
-              <FileIcon type={file.type} size="text-6xl mb-4" />
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-300 mt-2">
-              {file.type || 'Type de fichier inconnu'}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              {file.size ? (file.size / 1024).toFixed(1) + ' Ko' : 'Taille inconnue'}
-            </p>
-          </div>
-        )}
-        
-        {/* Boutons d'action rapide en bas */}
-        <div className="flex flex-wrap justify-center gap-3 mt-6 w-full">
-          {isEditable && !isPdf && (
-            <button
-              onClick={handleEditContent}
-              className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex-1 sm:flex-none"
-            >
-              <FaEdit className="mr-2 h-4 w-4" />
-              Modifier le contenu
-            </button>
-          )}
-          
-          <button
-            onClick={handlePreview}
-            className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 flex-1 sm:flex-none"
-          >
-            <FaEye className="mr-2 h-4 w-4" />
-            {isImage ? 'Aperçu plein écran' : 'Prévisualiser (Nouvel onglet)'}
-          </button>
-          
-          <button
-            onClick={handleDownload}
-            className="inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex-1 sm:flex-none"
-          >
-            <FaDownload className="mr-2 h-4 w-4" />
-            Télécharger
-          </button>
-          
-          <button
-            onClick={handleShare}
-            className="inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex-1 sm:flex-none"
-          >
-            <FaShare className="mr-2 h-4 w-4 text-indigo-600" />
-            Partager
-          </button>
+                  )}
+
+                  {/* Actions manager */}
+                  {canManageFile && (
+                    <>
+                      <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+                      <Menu.Item>
+                        {({ active }) => (
+                          <Link href={`/files/${file.id}/edit`}
+                            className={`${active ? 'bg-gray-50 dark:bg-gray-700' : 'text-gray-700 dark:text-gray-300'} flex items-center gap-3 w-full px-4 py-2.5 text-sm`}>
+                            <FaEdit className="h-4 w-4 text-blue-400 shrink-0" />
+                            Modifier les métadonnées
+                          </Link>
+                        )}
+                      </Menu.Item>
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button onClick={handleDelete}
+                            className={`${active ? 'bg-red-50 text-red-700' : 'text-red-600 dark:text-red-400'} flex items-center gap-3 w-full px-4 py-2.5 text-sm`}>
+                            <FaTrash className="h-4 w-4 shrink-0" />
+                            Supprimer
+                          </button>
+                        )}
+                      </Menu.Item>
+                    </>
+                  )}
+                </div>
+              </Menu.Items>
+            </Transition>
+          </Menu>
         </div>
       </div>
-      
-      {/* Modal d'aperçu plein écran pour les images */}
-      {showFullPreview && isImage && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div 
-              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
-              aria-hidden="true"
-              onClick={() => setShowFullPreview(false)}
-            ></div>
-            
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
-            <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start justify-between">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">
-                    {file.name}
-                  </h3>
-                  <button
-                    type="button"
-                    className="ml-3 bg-white dark:bg-gray-700 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none"
-                    onClick={() => setShowFullPreview(false)}
-                  >
-                    <span className="sr-only">Fermer</span>
-                    <FaTimes className="h-6 w-6" />
-                  </button>
-                </div>
-                <div className="mt-2 max-h-[70vh] overflow-auto flex justify-center">
-                  <img 
-                    src={fileUrl} 
-                    alt={file.name} 
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </div>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-gray-200 dark:border-gray-700">
+
+      {/* ── Zone de vignette ────────────────────────────────────────────── */}
+      <div className="px-6 py-6 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-700/30 min-h-[220px]">
+        <FileThumbnail file={file} fileUrl={fileUrl} onOpenPreview={openPreviewTab} />
+      </div>
+
+      {/* ── Barre d'actions rapides ──────────────────────────────────────── */}
+      <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-wrap items-center gap-2">
+        {/* Bouton principal : Prévisualiser */}
+        <button
+          onClick={openPreviewTab}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          <FaEye className="h-4 w-4" />
+          Prévisualiser
+        </button>
+
+        {/* Modifier le contenu (fichiers éditables) */}
+        {isEditable && !isPdf && (
+          <button
+            onClick={handleEditContent}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <FaEdit className="h-4 w-4 text-green-500" />
+            Modifier
+          </button>
+        )}
+
+        {/* Télécharger */}
+        <button
+          onClick={handleDownload}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          <FaDownload className="h-4 w-4 text-gray-500" />
+          Télécharger
+        </button>
+
+        {/* Partager */}
+        <button
+          onClick={handleShare}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ml-auto"
+        >
+          <FaShare className="h-4 w-4 text-indigo-500" />
+          Partager
+        </button>
+      </div>
+
+      {/* ── Modal image plein écran ──────────────────────────────────────── */}
+      {showImageModal && isImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowImageModal(false)}
+        >
+          <div
+            className="relative max-w-5xl w-full bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700">
+              <span className="text-sm font-semibold text-gray-800 dark:text-white truncate max-w-md">{file.name}</span>
+              <div className="flex items-center gap-2">
                 <button
-                  type="button"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
                   onClick={handleDownload}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
                 >
-                  <FaDownload className="mr-2 h-4 w-4" />
-                  Télécharger
+                  <FaDownload className="h-3 w-3" /> Télécharger
                 </button>
                 <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => setShowFullPreview(false)}
+                  onClick={() => setShowImageModal(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 hover:text-gray-700 transition-colors"
                 >
-                  Fermer
+                  <FaTimes className="h-5 w-5" />
                 </button>
               </div>
+            </div>
+            <div className="max-h-[80vh] overflow-auto flex items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
+              <img src={fileUrl} alt={file.name} className="max-h-full max-w-full object-contain rounded" />
             </div>
           </div>
         </div>
