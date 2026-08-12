@@ -14,6 +14,7 @@ import {
   FaEye
 } from 'react-icons/fa';
 import { isFileEditable, isPdfFile } from '../../utils/fileUtils';
+import GoogleStylePreviewer, { isOfficeOrDocFile } from '../FileViewer/GoogleStylePreviewer';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 
@@ -23,6 +24,7 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
   const isImage = file.type?.startsWith('image/');
   const isEditable = isFileEditable(file.type, file.name);
   const isPdf = isPdfFile(file.type, file.name);
+  const isOfficeDoc = isOfficeOrDocFile(file.type, file.name);
   const [showFullPreview, setShowFullPreview] = useState(false);
 
   const handleEditContent = useCallback(() => {
@@ -169,8 +171,12 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
       </div>
       
       {/* Contenu de l'aperçu */}
-      <div className="p-6 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-700 min-h-64">
-        {isImage ? (
+      <div className="p-4 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-700 min-h-64">
+        {isOfficeDoc ? (
+          <div className="w-full">
+            <GoogleStylePreviewer file={file} fileUrl={fileUrl} />
+          </div>
+        ) : isImage ? (
           <div className="relative group">
             <div className={`mb-4 w-full max-w-full max-h-96 ${!isImageLoaded ? 'animate-pulse bg-gray-200 dark:bg-gray-600' : ''} rounded-lg overflow-hidden`}>
               <img 

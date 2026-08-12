@@ -71,6 +71,28 @@ export const isPdfFile = (fileType, fileName) => {
 };
 
 /**
+ * Vérifie si un fichier est un document Office / Texte prévisualisable style Google Docs / Sheets / Slides
+ * @param {string} fileType - Le type MIME du fichier
+ * @param {string} fileName - Le nom du fichier avec extension
+ * @returns {boolean} - True si le fichier est prévisualisable
+ */
+export const isOfficeOrDocFile = (fileType = '', fileName = '') => {
+  const name = (fileName || '').toLowerCase();
+  const type = (fileType || '').toLowerCase();
+  
+  const officeExtensions = [
+    'pptx', 'ppt', 'ppsx', 'xlsx', 'xls', 'csv', 'ods', 'tsv',
+    'docx', 'doc', 'rtf', 'odt', 'txt', 'md'
+  ];
+
+  const extension = name.split('.').pop();
+  if (officeExtensions.includes(extension)) return true;
+
+  return type.includes('word') || type.includes('spreadsheet') || type.includes('excel') ||
+         type.includes('powerpoint') || type.includes('presentation') || type.includes('csv');
+};
+
+/**
  * Formate une taille de fichier en octets en une chaîne lisible
  * @param {number} bytes - Taille en octets
  * @param {number} [decimals=2] - Nombre de décimales à afficher
