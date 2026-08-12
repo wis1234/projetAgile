@@ -307,6 +307,7 @@ Route::prefix('push')->group(function () {
         ->name('projects.planning');
     
     // Gestion des fichiers
+    Route::get('files/{file}/preview', [App\Http\Controllers\FileController::class, 'previewPage'])->name('files.preview-page');
     Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])->name('files.edit-content');
     Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])->name('files.update-content');
     Route::get('files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])->name('files.download');

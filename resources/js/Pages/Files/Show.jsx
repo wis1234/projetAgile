@@ -464,9 +464,9 @@ const Show = ({ file, auth, canManageFile, canBypassLock }) => {
   };
 
   const handlePreview = (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!isUnlocked) return;
-    window.open(route('files.preview', 'public/' + currentFile.id), '_blank');
+    window.open(route('files.preview-page', currentFile.id), '_blank');
   };
 
   const handleShare = () => {
@@ -513,16 +513,26 @@ const handlePasswordSaved = (isNowProtected) => {
         <div className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="flex flex-col space-y-4">
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3 flex-wrap gap-y-2">
                 <Link
                   href={route('files.index')}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700
-                             text-white rounded-lg transition-colors duration-200"
+                  className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200
+                             text-gray-700 rounded-lg transition-colors duration-200"
                   title="Retour à la liste des fichiers"
                 >
                   <FaArrowLeft className="h-4 w-4" />
                   <span className="text-sm font-medium">Retour</span>
                 </Link>
+
+                <button
+                  onClick={handlePreview}
+                  className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700
+                             text-white rounded-lg transition-colors duration-200 shadow-sm"
+                  title="Prévisualiser dans un nouvel onglet"
+                >
+                  <FaEye className="h-4 w-4" />
+                  <span className="text-sm font-medium">Prévisualiser (Nouvel onglet)</span>
+                </button>
 
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">

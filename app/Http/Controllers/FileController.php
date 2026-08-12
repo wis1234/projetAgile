@@ -630,6 +630,27 @@ public function download(File $file)
     return \Storage::disk('public')->download($path, $filename);
 }
 
+/**
+ * Affiche la page de prévisualisation autonome du fichier dans un nouvel onglet
+ */
+public function previewPage(File $file)
+{
+    $currentUser = auth()->user();
+
+    if (
+        !$currentUser->hasRole('admin') &&
+        (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())
+    ) {
+        abort(403, 'Vous n\'êtes pas autorisé à visualiser ce fichier.');
+    }
+
+    $file->load(['project:id,name', 'user:id,name', 'task:id,title']);
+
+    return Inertia::render('Files/Preview', [
+        'file' => $file,
+    ]);
+}
+
     /**
      * Affiche le formulaire d'édition du contenu d'un fichier
      *

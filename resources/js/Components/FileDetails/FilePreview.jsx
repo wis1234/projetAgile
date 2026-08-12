@@ -63,9 +63,9 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
     if (isImage) {
       setShowFullPreview(true);
     } else {
-      window.open(fileUrl, '_blank');
+      window.open(`/files/${file.id}/preview`, '_blank');
     }
-  }, [fileUrl, isImage]);
+  }, [file.id, isImage]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -89,6 +89,19 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
           >
             <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
               <div className="py-1">
+                <Menu.Item>
+                  {({ active }) => (
+                    <button
+                      onClick={handlePreview}
+                      className={`${
+                        active ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
+                      } group flex items-center w-full px-4 py-2 text-sm`}
+                    >
+                      <FaEye className="mr-3 h-5 w-5 text-emerald-500" />
+                      Prévisualiser (Nouvel onglet)
+                    </button>
+                  )}
+                </Menu.Item>
                 <Menu.Item>
                   {({ active }) => (
                     <button
@@ -221,15 +234,13 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
               <FaEdit className="mr-2 h-4 w-4" />
               Modifier le contenu
             </button>
-          ) : (
-            <button
-              onClick={handlePreview}
-              className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex-1 sm:flex-none"
-            >
-              <FaEye className="mr-2 h-4 w-4" />
-              {isImage ? 'Aperçu' : 'Ouvrir'}
-            </button>
-          )}
+          <button
+            onClick={handlePreview}
+            className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 flex-1 sm:flex-none"
+          >
+            <FaEye className="mr-2 h-4 w-4" />
+            {isImage ? 'Aperçu plein écran' : 'Prévisualiser (Nouvel onglet)'}
+          </button>
           
           <button
             onClick={handleDownload}
