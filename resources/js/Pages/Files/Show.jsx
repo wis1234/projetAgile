@@ -604,15 +604,7 @@ const handlePasswordSaved = (isNowProtected) => {
                   />
                 )}
 
-                {/* Lancer un appel projet */}
-                <button
-                  onClick={() => setIsCallOpen(true)}
-                  className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-br from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg text-sm font-semibold shadow-sm transition-all"
-                  title="Lancer un appel projet"
-                >
-                  <FaVideo className="h-4 w-4" />
-                  <span className="hidden sm:inline">Appel</span>
-                </button>
+                
               </div>
             </div>
 
