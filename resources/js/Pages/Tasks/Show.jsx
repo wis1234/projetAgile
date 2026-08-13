@@ -749,6 +749,20 @@ const commentTextareaRef = useRef(null);
     return out;
   };
 
+
+  const linkifyText = (text, isMe) => {
+  if (!text) return text;
+  const urlRegex = /(https?:\/\/[^\s<]+[^\s<.,:;!?)'"\]])/g;
+  const linkClasses = isMe
+    ? 'underline decoration-white/70 hover:decoration-white text-white font-medium break-all'
+    : 'underline decoration-blue-400 hover:decoration-blue-600 text-blue-600 dark:text-blue-400 font-medium break-all';
+  return text.replace(
+    urlRegex,
+    (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="${linkClasses}">${url}</a>`
+  );
+};
+
+
   const formatCommentDate = (dateString) => {
     if (!dateString) return 'Date inconnue';
     
@@ -2919,7 +2933,7 @@ return () => {
                           <div
                             className={`text-sm whitespace-pre-wrap break-words leading-relaxed ${isMe ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`}
                             dangerouslySetInnerHTML={{
-                              __html: highlightMentions(comment.content)
+                              __html: highlightMentions(linkifyText(comment.content, isMe))
                                 .replace(/<table([^>]*)>/g, '<div class="overflow-x-auto"><table class="min-w-full border-collapse border border-gray-300 dark:border-gray-600 text-xs" $1>')
                                 .replace(/<\/table>/g, '</table></div>')
                                 .replace(/<th([^>]*)>/g, '<th class="border border-gray-300 px-2 py-1 bg-gray-100 dark:bg-gray-700" $1>')
@@ -3062,7 +3076,10 @@ return () => {
                               ? 'bg-blue-500 dark:bg-blue-700 text-white bubble-right'
                               : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-600 bubble-left'
                           }`}>
-                            <p className="whitespace-pre-wrap break-words leading-relaxed">{reply.content}</p>
+                            <p
+                              className="whitespace-pre-wrap break-words leading-relaxed"
+                              dangerouslySetInnerHTML={{ __html: linkifyText(reply.content, isReplyMe) }}
+                            />
                             {reply.audio_path && (
                               <div className="mt-1 max-w-full overflow-hidden">
                                 <VoiceMessagePlayer src={`/storage/public/${reply.audio_path}`} isMe={isReplyMe} />
