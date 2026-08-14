@@ -7,7 +7,7 @@ import Modal from '@/Components/Modal';
 import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
 // Ajout de FaSave à la liste des icônes importées
-import { FaSave, FaTimes, FaExpand, FaCompress } from 'react-icons/fa';
+import { FaSave, FaTimes, FaExpand, FaCompress, FaCopy, FaPause, FaCheck } from 'react-icons/fa';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 
 // Composant de compte à rebours réutilisable
@@ -209,15 +209,70 @@ return (
   );
 };
 
-// ─── VoiceMessagePlayer ───────────────────────────────────────────────────────
+// ─── VoiceMessagePlayer (lecture façon Messenger) ───────────────────────────
 const VoiceMessagePlayer = ({ src, isMe }) => {
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onLoaded = () => setDuration(audio.duration || 0);
+    const onTime = () => setCurrentTime(audio.currentTime);
+    const onEnd = () => { setIsPlaying(false); setCurrentTime(0); };
+    audio.addEventListener('loadedmetadata', onLoaded);
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('ended', onEnd);
+    return () => {
+      audio.removeEventListener('loadedmetadata', onLoaded);
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('ended', onEnd);
+    };
+  }, [src]);
+
+  const togglePlay = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) { audio.pause(); setIsPlaying(false); }
+    else { audio.play(); setIsPlaying(true); }
+  };
+
+  const formatDuration = (s) => {
+    if (!isFinite(s) || isNaN(s)) return '0:00';
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const trackColor = isMe ? 'bg-white/30' : 'bg-blue-200 dark:bg-blue-800';
+  const fillColor = isMe ? 'bg-white' : 'bg-blue-600 dark:bg-blue-400';
+  const buttonBg = isMe ? 'bg-white/20 hover:bg-white/30' : 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60';
+  const iconColor = isMe ? 'text-white' : 'text-blue-600 dark:text-blue-400';
+  const textColor = isMe ? 'text-white/75' : 'text-gray-500 dark:text-gray-400';
+
   return (
-    <audio
-      controls
-      preload="metadata"
-      src={src}
-      className="h-9 w-full max-w-[220px]"
-    />
+    <div className="flex items-center gap-2.5 min-w-[180px] max-w-[240px] py-0.5">
+      <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
+      <button
+        type="button"
+        onClick={togglePlay}
+        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${buttonBg}`}
+        title={isPlaying ? 'Pause' : 'Lire le message vocal'}
+      >
+        {isPlaying ? <FaPause className={`w-3 h-3 ${iconColor}`} /> : <FaPlay className={`w-3 h-3 ml-0.5 ${iconColor}`} />}
+      </button>
+      <div className="flex-1 flex flex-col gap-1 min-w-0">
+        <div className={`relative h-1 rounded-full ${trackColor} overflow-hidden`}>
+          <div className={`absolute top-0 left-0 h-full rounded-full ${fillColor} transition-all duration-100`} style={{ width: `${progress}%` }} />
+        </div>
+        <span className={`text-[10px] font-medium tabular-nums ${textColor}`}>
+          {formatDuration(isPlaying || currentTime > 0 ? currentTime : duration)}
+        </span>
+      </div>
+    </div>
   );
 };
 
@@ -434,6 +489,10 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [audioUrl, setAudioUrl] = useState(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState(null);
+  const [recordingCancelled, setRecordingCancelled] = useState(false);
+  const [dragX, setDragX] = useState(0);
+  const dragStartXRef = useRef(0);
+  const recordingCancelledRef = useRef(false);
 
   // ─── Partage de photos ───
   const [imageFile, setImageFile] = useState(null);
@@ -555,6 +614,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
 
       recorder.onstop = () => {
         clearInterval(recordingInterval);
+
+        if (recordingCancelledRef.current) {
+          recordingCancelledRef.current = false;
+          setRecordingTime(0);
+          stream.getTracks().forEach(track => { track.stop(); stream.removeTrack(track); });
+          return;
+        }
+
         try {
           const blob = new Blob(chunks, { type: mimeType });
           setAudioChunks(chunks);
@@ -595,6 +662,43 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
       setIsRecording(false);
       clearInterval(recordingInterval);
     }
+  };
+
+  const cancelRecording = () => {
+    recordingCancelledRef.current = true;
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      clearInterval(recordingInterval);
+    }
+  };
+
+  // ─── Enregistrement façon Messenger : maintenir pour parler, glisser pour annuler ───
+  const handleMicPointerDown = (e) => {
+    e.preventDefault();
+    dragStartXRef.current = e.touches ? e.touches[0].clientX : e.clientX;
+    setDragX(0);
+    setRecordingCancelled(false);
+    startRecording();
+  };
+
+  const handleMicPointerMove = (e) => {
+    if (!isRecording) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const delta = clientX - dragStartXRef.current;
+    setDragX(delta);
+    setRecordingCancelled(delta < -80);
+  };
+
+  const handleMicPointerUp = () => {
+    if (!isRecording) return;
+    if (recordingCancelled) {
+      cancelRecording();
+    } else {
+      stopRecording();
+    }
+    setDragX(0);
+    setRecordingCancelled(false);
   };
   
   const formatTime = (seconds) => {
@@ -677,22 +781,22 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [readReceipts, setReadReceipts] = useState({}); // { commentId: Set(userIds) }
   const [lastSeenMap, setLastSeenMap] = useState({}); // { userId: timestamp }
   const [profileUser, setProfileUser] = useState(null); // user shown in the mini-profile modal
-  const [readReceiptsViewer, setReadReceiptsViewer] = useState(null); // commentId | null
+const [readReceiptsViewer, setReadReceiptsViewer] = useState(null); // commentId | null
   const [reactionViewer, setReactionViewer] = useState(null); // { commentId, emoji } | null
   const [imageLightbox, setImageLightbox] = useState(null); // url | null
-  // ─── Fermer le lightbox avec la touche Échap ───
-  useEffect(() => {
-    if (!imageLightbox) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') setImageLightbox(null);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
-    };
-  }, [imageLightbox]);
+  const [copiedCommentId, setCopiedCommentId] = useState(null); // commentId | null
+
+  // ─── Copier le texte d'un message dans le presse-papiers ───
+  const handleCopyMessage = useCallback(async (commentId, content) => {
+    if (!content) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedCommentId(commentId);
+      setTimeout(() => setCopiedCommentId(prev => (prev === commentId ? null : prev)), 1800);
+    } catch (e) {
+      console.error('Erreur lors de la copie:', e);
+    }
+  }, []);
 
   const presenceChannelRef = useRef(null);
   const typingTimeoutsRef = useRef({});
@@ -3119,10 +3223,11 @@ return () => {
                                 : `/storage/public/${comment.image_path}`}
                               alt="Photo partagée"
                               className="max-w-full max-h-72 rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => setImageLightbox(
+                              onClick={() => window.open(
                                 comment.image_path.startsWith('blob:') || comment.image_path.startsWith('http')
                                   ? comment.image_path
-                                  : `/storage/public/${comment.image_path}`
+                                  : `/storage/public/${comment.image_path}`,
+                                '_blank'
                               )}
                             />
                           </div>
@@ -3191,6 +3296,19 @@ return () => {
                       >
                         <FaReply className="w-3.5 h-3.5" />
                       </button>
+                      {comment.content && (
+                        <button
+                          onClick={() => handleCopyMessage(comment.id, comment.content)}
+                          className="text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400 p-1 rounded-full transition-colors"
+                          title={copiedCommentId === comment.id ? 'Copié' : 'Copier le message'}
+                        >
+                          {copiedCommentId === comment.id ? (
+                            <FaCheck className="w-3.5 h-3.5 text-emerald-500" />
+                          ) : (
+                            <FaCopy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
                       {isMe && (
                         <>
                           <button onClick={() => handleEditComment(comment)} className="text-gray-500 hover:text-blue-500 p-1 rounded-full transition-colors" title={t('edit')}>
@@ -3435,18 +3553,41 @@ return () => {
         </div>
       )}
 
-      {/* Mode enregistrement vocal en cours */}
+      {/* Mode enregistrement vocal en cours (façon Messenger) */}
       {isRecording ? (
-        <div className="flex items-center gap-3 px-3 py-2 bg-red-50 dark:bg-red-900/30 rounded-2xl border border-red-200 dark:border-red-800">
-          <span className="relative flex h-3 w-3">
+        <div
+          className="relative flex items-center gap-3 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-200 dark:border-red-800/60 select-none touch-none"
+          onMouseMove={handleMicPointerMove}
+          onMouseUp={handleMicPointerUp}
+          onMouseLeave={handleMicPointerUp}
+          onTouchMove={handleMicPointerMove}
+          onTouchEnd={handleMicPointerUp}
+        >
+          <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
           </span>
-          <span className="text-xs sm:text-sm text-red-700 dark:text-red-300 font-semibold flex-1">Enregistrement vocal en cours...</span>
-          <span className="font-mono text-xs sm:text-sm bg-white dark:bg-gray-700 px-2 py-0.5 rounded-md text-red-600 dark:text-red-300 shadow-xs">{formatTime(recordingTime)}</span>
-          <button onClick={stopRecording} type="button" className="w-9 h-9 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-md transition-transform active:scale-95" title="Arrêter l'enregistrement">
-            <FaStop className="w-4 h-4" />
-          </button>
+          <span className="font-mono text-sm text-red-600 dark:text-red-300 font-semibold tabular-nums flex-shrink-0">
+            {formatTime(recordingTime)}
+          </span>
+          <div className={`flex-1 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-medium transition-colors ${recordingCancelled ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>
+            {recordingCancelled ? (
+              <span className="font-bold">Relâchez pour annuler</span>
+            ) : (
+              <>
+                <FaTimes className="w-3 h-3 opacity-60" />
+                <span>Glissez pour annuler</span>
+              </>
+            )}
+          </div>
+          <div
+            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg flex-shrink-0 transition-colors duration-150 ${
+              recordingCancelled ? 'bg-gray-400 dark:bg-gray-600' : 'bg-red-600'
+            }`}
+            style={{ transform: `translateX(${Math.min(0, Math.max(dragX, -80))}px)` }}
+          >
+            <FaMicrophone className="w-4.5 h-4.5 text-white" />
+          </div>
         </div>
       ) : (
         <div className="flex items-end gap-2">
@@ -3566,10 +3707,11 @@ onInput={e => {
           ) : (
             <button
               type="button"
-              onClick={startRecording}
+              onMouseDown={handleMicPointerDown}
+              onTouchStart={handleMicPointerDown}
               disabled={posting}
-              className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-blue-600 flex items-center justify-center transition-all"
-              title="Enregistrer un message vocal"
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-blue-600 flex items-center justify-center transition-all active:scale-95 touch-none select-none"
+              title="Maintenez pour enregistrer un message vocal"
             >
               <FaMicrophone className="w-4.5 h-4.5" />
             </button>
@@ -3735,30 +3877,6 @@ onInput={e => {
             </div>
           </div>
         </Modal>
-
-        {/* ─── Lightbox : aperçu plein écran d'une photo partagée ─── */}
-        {imageLightbox && (
-          <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200"
-            onClick={() => setImageLightbox(null)}
-          >
-            <button
-              type="button"
-              onClick={() => setImageLightbox(null)}
-              className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center backdrop-blur-md transition-colors"
-              title="Fermer"
-            >
-              <FaTimes className="w-4 h-4" />
-            </button>
-
-            <img
-              src={imageLightbox}
-              alt="Aperçu de la photo"
-              onClick={(e) => e.stopPropagation()}
-              className="max-w-[92vw] max-h-[88vh] object-contain rounded-lg shadow-2xl select-none"
-            />
-          </div>
-        )}
 
        {showLiveKitCall && (
   <LiveKitCallModal
