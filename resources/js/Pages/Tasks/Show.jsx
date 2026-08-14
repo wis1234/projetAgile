@@ -1019,7 +1019,7 @@ const handleCommentSubmit = async (e, textOverride = null) => {
     id: null,              // pas encore d'id serveur
     _pending: true,
     _failed: false,
-    content: textToSend || (audioBlob ? 'Message audio enregistré et sauvegardé' : (imageFile ? 'Photo partagée' : '')),
+    content: textToSend || (audioBlob ? '' : (imageFile ? 'Photo partagée' : '')),
     audio_path: audioBlob ? audioUrl : null, // aperçu local
     image_path: imageFile ? imagePreviewUrl : null, // aperçu local
     created_at: now,
@@ -1075,7 +1075,7 @@ const handleCommentSubmit = async (e, textOverride = null) => {
   // ─── Envoi réel en arrière-plan ───
   try {
     const formData = new FormData();
-    formData.append('content', savedContent || (savedAudioBlob ? 'Message audio enregistré et sauvegardé' : (savedImageFile ? 'Photo partagée' : '')));
+    formData.append('content', savedContent || (savedAudioBlob ? '' : (savedImageFile ? 'Photo partagée' : '')));
     if (savedAudioBlob) formData.append('audio', savedAudioBlob, 'voice_message.webm');
     if (savedImageFile) formData.append('image', savedImageFile);
     if (savedReplyingTo) formData.append('parent_id', savedReplyingTo);
@@ -1144,7 +1144,7 @@ const retryComment = async (failedComment) => {
   setComments(prev => removeOptimistic(prev));
 
   // Remettre le contenu dans le formulaire
-  setCommentContent(failedComment.content === 'Message audio enregistré et sauvegardé' ? '' : failedComment.content);
+  setCommentContent(failedComment.content === '' ? '' : failedComment.content);
   if (failedComment.parent_id) setReplyingTo(failedComment.parent_id);
 };
 
