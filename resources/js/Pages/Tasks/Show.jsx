@@ -440,13 +440,11 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const imageInputRef = useRef(null);
 
-  const handleImageSelect = (e) => {
-    const file = e.target.files?.[0];
+  const setSelectedImage = (file) => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
       setError("Seules les photos peuvent être partagées ici. Pour tout autre type de fichier, rendez-vous dans l'onglet « Ressources » pour l'ajouter.");
-      e.target.value = '';
       return;
     }
 
@@ -454,7 +452,26 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
     setImageFile(file);
     setImagePreviewUrl(URL.createObjectURL(file));
     setError('');
+  };
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    setSelectedImage(file);
     e.target.value = '';
+  };
+
+  const handlePasteImage = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault(); // évite de coller un nom de fichier texte parasite
+        const file = item.getAsFile();
+        if (file) setSelectedImage(file);
+        break;
+      }
+    }
   };
 
   const removeSelectedImage = () => {
@@ -3454,6 +3471,7 @@ return () => {
           <div className="flex-1 relative">
             <textarea
               value={commentContent}
+              onPaste={handlePasteImage}
 onChange={e => {
   const value = e.target.value;
   setCommentContent(value);

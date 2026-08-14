@@ -34,13 +34,14 @@ class TaskCommentPosted implements ShouldBroadcastNow
     {
         return [
             'comment' => [
-                'id'         => $this->comment->id,
-                'content'    => $this->comment->content,
-                'audio_path' => $this->comment->audio_path,
-                'parent_id'  => $this->comment->parent_id,
-                'level'      => $this->comment->level,
-                'created_at' => $this->comment->created_at->toIso8601String(),
-                'updated_at' => $this->comment->updated_at->toIso8601String(),
+    'id'         => $this->comment->id,
+    'content'    => $this->comment->content,
+    'audio_path' => $this->comment->audio_path,
+    'image_path' => $this->comment->image_path,
+    'parent_id'  => $this->comment->parent_id,
+    'level'      => $this->comment->level,
+    'created_at' => $this->comment->created_at->toIso8601String(),
+    'updated_at' => $this->comment->updated_at->toIso8601String(),
                 'user' => [
                     'id'                => $this->comment->user->id,
                     'name'              => $this->comment->user->name,
