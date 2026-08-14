@@ -209,70 +209,15 @@ return (
   );
 };
 
-// ─── VoiceMessagePlayer (lecture façon Messenger) ───────────────────────────
+// ─── VoiceMessagePlayer (lecteur natif du navigateur) ────────────────────────
 const VoiceMessagePlayer = ({ src, isMe }) => {
-  const audioRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onLoaded = () => setDuration(audio.duration || 0);
-    const onTime = () => setCurrentTime(audio.currentTime);
-    const onEnd = () => { setIsPlaying(false); setCurrentTime(0); };
-    audio.addEventListener('loadedmetadata', onLoaded);
-    audio.addEventListener('timeupdate', onTime);
-    audio.addEventListener('ended', onEnd);
-    return () => {
-      audio.removeEventListener('loadedmetadata', onLoaded);
-      audio.removeEventListener('timeupdate', onTime);
-      audio.removeEventListener('ended', onEnd);
-    };
-  }, [src]);
-
-  const togglePlay = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (isPlaying) { audio.pause(); setIsPlaying(false); }
-    else { audio.play(); setIsPlaying(true); }
-  };
-
-  const formatDuration = (s) => {
-    if (!isFinite(s) || isNaN(s)) return '0:00';
-    const mins = Math.floor(s / 60);
-    const secs = Math.floor(s % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const trackColor = isMe ? 'bg-white/30' : 'bg-blue-200 dark:bg-blue-800';
-  const fillColor = isMe ? 'bg-white' : 'bg-blue-600 dark:bg-blue-400';
-  const buttonBg = isMe ? 'bg-white/20 hover:bg-white/30' : 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60';
-  const iconColor = isMe ? 'text-white' : 'text-blue-600 dark:text-blue-400';
-  const textColor = isMe ? 'text-white/75' : 'text-gray-500 dark:text-gray-400';
-
   return (
-    <div className="flex items-center gap-2.5 min-w-[180px] max-w-[240px] py-0.5">
-      <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
-      <button
-        type="button"
-        onClick={togglePlay}
-        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${buttonBg}`}
-        title={isPlaying ? 'Pause' : 'Lire le message vocal'}
-      >
-        {isPlaying ? <FaPause className={`w-3 h-3 ${iconColor}`} /> : <FaPlay className={`w-3 h-3 ml-0.5 ${iconColor}`} />}
-      </button>
-      <div className="flex-1 flex flex-col gap-1 min-w-0">
-        <div className={`relative h-1 rounded-full ${trackColor} overflow-hidden`}>
-          <div className={`absolute top-0 left-0 h-full rounded-full ${fillColor} transition-all duration-100`} style={{ width: `${progress}%` }} />
-        </div>
-        <span className={`text-[10px] font-medium tabular-nums ${textColor}`}>
-          {formatDuration(isPlaying || currentTime > 0 ? currentTime : duration)}
-        </span>
-      </div>
-    </div>
+    <audio
+      controls
+      preload="metadata"
+      src={src}
+      className="h-9 w-full min-w-[200px] max-w-[240px]"
+    />
   );
 };
 
@@ -1019,7 +964,7 @@ const handleCommentSubmit = async (e, textOverride = null) => {
     id: null,              // pas encore d'id serveur
     _pending: true,
     _failed: false,
-    content: textToSend || (audioBlob ? '' : (imageFile ? 'Photo partagée' : '')),
+    content: textToSend || (audioBlob ? 'Message audio enregistré et sauvegardé' : (imageFile ? 'Photo partagée' : '')),
     audio_path: audioBlob ? audioUrl : null, // aperçu local
     image_path: imageFile ? imagePreviewUrl : null, // aperçu local
     created_at: now,
@@ -1075,7 +1020,7 @@ const handleCommentSubmit = async (e, textOverride = null) => {
   // ─── Envoi réel en arrière-plan ───
   try {
     const formData = new FormData();
-    formData.append('content', savedContent || (savedAudioBlob ? '' : (savedImageFile ? 'Photo partagée' : '')));
+    formData.append('content', savedContent || (savedAudioBlob ? 'Message audio enregistré et sauvegardé' : (savedImageFile ? 'Photo partagée' : '')));
     if (savedAudioBlob) formData.append('audio', savedAudioBlob, 'voice_message.webm');
     if (savedImageFile) formData.append('image', savedImageFile);
     if (savedReplyingTo) formData.append('parent_id', savedReplyingTo);
@@ -1144,7 +1089,7 @@ const retryComment = async (failedComment) => {
   setComments(prev => removeOptimistic(prev));
 
   // Remettre le contenu dans le formulaire
-  setCommentContent(failedComment.content === '' ? '' : failedComment.content);
+  setCommentContent(failedComment.content === 'Message audio enregistré et sauvegardé' ? '' : failedComment.content);
   if (failedComment.parent_id) setReplyingTo(failedComment.parent_id);
 };
 
@@ -3142,7 +3087,7 @@ return () => {
                   )}
 
                   {/* Bulle de Message */}
-                  <div className={`relative px-3.5 py-2.5 shadow-sm min-w-[120px] ${
+                  <div className={`relative px-3.5 py-2.5 shadow-sm ${comment.audio_path ? 'min-w-[220px]' : 'min-w-[120px]'} ${
                     isPending ? 'bubble-pending' : ''
                   } ${
                     isMe
@@ -3375,7 +3320,7 @@ return () => {
                               className="w-5 h-5 rounded-full flex-shrink-0 mb-0.5 object-cover"
                             />
                           )}
-                          <div className={`px-3 py-1.5 shadow-xs text-sm min-w-0 ${
+                          <div className={`px-3 py-1.5 shadow-xs text-sm ${reply.audio_path ? 'min-w-[220px]' : 'min-w-0'} ${
                             isReplyMe
                               ? 'bg-blue-500 dark:bg-blue-700 text-white bubble-right'
                               : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-600 bubble-left'
