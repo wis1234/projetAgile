@@ -7,7 +7,7 @@ import Modal from '@/Components/Modal';
 import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
 // Ajout de FaSave à la liste des icônes importées
-import { FaSave, FaTimes } from 'react-icons/fa';
+import { FaSave, FaTimes, FaExpand, FaCompress } from 'react-icons/fa';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 
 // Composant de compte à rebours réutilisable
@@ -1181,6 +1181,26 @@ const retryComment = async (failedComment) => {
   const [activeTab, setActiveTab] = useState('details');
   const activeTabRef = useRef(activeTab);
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
+  const [isFullscreenChat, setIsFullscreenChat] = useState(false);
+const [fullscreenVisible, setFullscreenVisible] = useState(false);
+
+
+
+useEffect(() => {
+  if (isFullscreenChat) {
+    const timer = setTimeout(() => setFullscreenVisible(true), 20);
+    document.body.style.overflow = 'hidden';
+    return () => { clearTimeout(timer); document.body.style.overflow = ''; };
+  }
+  setFullscreenVisible(false);
+  document.body.style.overflow = '';
+}, [isFullscreenChat]);
+
+const closeFullscreenChat = () => {
+  setFullscreenVisible(false);
+  setTimeout(() => setIsFullscreenChat(false), 350);
+};
+
   const [liveKitInvite, setLiveKitInvite] = useState(null); // { initiatorName, initiatorId }
   useEffect(() => {
     activeTabRef.current = activeTab;
@@ -2676,7 +2696,21 @@ return () => {
 )}
 
 {activeTab === 'comments' && (
-  <div className="flex flex-col bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8 shadow-xl" style={{ height: '85vh', maxHeight: '800px' }}>
+  <>
+    {isFullscreenChat && (
+      <div
+        className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300 ${fullscreenVisible ? 'opacity-100' : 'opacity-0'}`}
+        onClick={closeFullscreenChat}
+      />
+    )}
+    <div
+      className={
+        isFullscreenChat
+          ? `fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl rounded-t-3xl w-full max-w-3xl mx-auto left-0 right-0 transition-transform duration-500 ease-out ${fullscreenVisible ? 'translate-y-0' : 'translate-y-full'}`
+          : "flex flex-col bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8 shadow-xl"
+      }
+      style={{ height: isFullscreenChat ? '94vh' : '85vh', maxHeight: isFullscreenChat ? '94vh' : '800px' }}
+    >
     
     {/* ─── HEADER STYLE WHATSAPP AVEC MEMBRES CONNECTÉS ─── */}
     <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-800 text-white flex-shrink-0 shadow-md">
@@ -2704,6 +2738,17 @@ return () => {
       {/* MILIEU & DROITE : PHOTOS DES MEMBRES CONNECTÉS & COPIE EMAIL */}
       <div className="flex items-center gap-3">
         <OnlineAvatarStack users={onlineUsers} />
+
+        <button
+          type="button"
+          onClick={() => (isFullscreenChat ? closeFullscreenChat() : setIsFullscreenChat(true))}
+          className="flex-shrink-0 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors"
+          title={isFullscreenChat ? "Quitter le plein écran" : "Passer en plein écran"}
+        >
+          {isFullscreenChat ? <FaCompress className="w-3.5 h-3.5" /> : <FaExpand className="w-3.5 h-3.5" />}
+        </button>
+
+      
 
         {task?.project_id && (
           <div className="flex items-center gap-2">
@@ -3396,6 +3441,7 @@ onInput={e => {
       )}
     </div>
   </div>
+  </>
 )}
 
         
