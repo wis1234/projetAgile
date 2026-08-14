@@ -1323,6 +1323,16 @@ useEffect(() => {
   document.body.style.overflow = '';
 }, [isFullscreenChat]);
 
+// ─── Ouvre le plein écran par défaut dès qu'on arrive sur l'onglet Discussions ───
+useEffect(() => {
+  if (activeTab === 'comments') {
+    setIsFullscreenChat(true);
+  } else if (isFullscreenChat) {
+    setFullscreenVisible(false);
+    setIsFullscreenChat(false);
+  }
+}, [activeTab]);
+
 const closeFullscreenChat = () => {
   setFullscreenVisible(false);
   setTimeout(() => setIsFullscreenChat(false), 500);
