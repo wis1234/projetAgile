@@ -679,6 +679,20 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [profileUser, setProfileUser] = useState(null); // user shown in the mini-profile modal
   const [readReceiptsViewer, setReadReceiptsViewer] = useState(null); // commentId | null
   const [reactionViewer, setReactionViewer] = useState(null); // { commentId, emoji } | null
+  const [imageLightbox, setImageLightbox] = useState(null); // url | null
+  // ─── Fermer le lightbox avec la touche Échap ───
+  useEffect(() => {
+    if (!imageLightbox) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setImageLightbox(null);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [imageLightbox]);
 
   const presenceChannelRef = useRef(null);
   const typingTimeoutsRef = useRef({});
@@ -3105,11 +3119,10 @@ return () => {
                                 : `/storage/public/${comment.image_path}`}
                               alt="Photo partagée"
                               className="max-w-full max-h-72 rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => window.open(
+                              onClick={() => setImageLightbox(
                                 comment.image_path.startsWith('blob:') || comment.image_path.startsWith('http')
                                   ? comment.image_path
-                                  : `/storage/public/${comment.image_path}`,
-                                '_blank'
+                                  : `/storage/public/${comment.image_path}`
                               )}
                             />
                           </div>
@@ -3722,6 +3735,30 @@ onInput={e => {
             </div>
           </div>
         </Modal>
+
+        {/* ─── Lightbox : aperçu plein écran d'une photo partagée ─── */}
+        {imageLightbox && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setImageLightbox(null)}
+          >
+            <button
+              type="button"
+              onClick={() => setImageLightbox(null)}
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center backdrop-blur-md transition-colors"
+              title="Fermer"
+            >
+              <FaTimes className="w-4 h-4" />
+            </button>
+
+            <img
+              src={imageLightbox}
+              alt="Aperçu de la photo"
+              onClick={(e) => e.stopPropagation()}
+              className="max-w-[92vw] max-h-[88vh] object-contain rounded-lg shadow-2xl select-none"
+            />
+          </div>
+        )}
 
        {showLiveKitCall && (
   <LiveKitCallModal
