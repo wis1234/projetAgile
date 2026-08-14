@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TaskComment extends Model
 {
-    protected $fillable = ['task_id', 'user_id', 'content', 'audio_path', 'parent_id', 'level'];
+    protected $fillable = ['task_id', 'user_id', 'content', 'audio_path', 'image_path', 'parent_id', 'level'];
 
     public function user(): BelongsTo
     {

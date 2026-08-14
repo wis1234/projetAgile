@@ -435,6 +435,34 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState(null);
 
+  // ─── Partage de photos ───
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+  const imageInputRef = useRef(null);
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError("Seules les photos peuvent être partagées ici. Pour tout autre type de fichier, rendez-vous dans l'onglet « Ressources » pour l'ajouter.");
+      e.target.value = '';
+      return;
+    }
+
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setError('');
+    e.target.value = '';
+  };
+
+  const removeSelectedImage = () => {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageFile(null);
+    setImagePreviewUrl(null);
+  };
+
   const startRecording = async () => {
     try {
       // Vérifier si le navigateur supporte l'enregistrement audio
@@ -842,8 +870,8 @@ const handleCommentSubmit = async (e, textOverride = null) => {
   if (e && e.preventDefault) { e.preventDefault(); e.stopPropagation(); }
 
   const textToSend = (textOverride !== null ? textOverride : commentContent).trim();
-  if (!textToSend && !audioBlob) {
-    setError('Veuillez écrire un message ou enregistrer un message vocal.');
+  if (!textToSend && !audioBlob && !imageFile) {
+    setError('Veuillez écrire un message, enregistrer un vocal ou joindre une photo.');
     return false;
   }
 
@@ -856,8 +884,9 @@ const handleCommentSubmit = async (e, textOverride = null) => {
     id: null,              // pas encore d'id serveur
     _pending: true,
     _failed: false,
-    content: textToSend || 'Message audio enregistré et sauvegardé',
+    content: textToSend || (audioBlob ? 'Message audio enregistré et sauvegardé' : (imageFile ? 'Photo partagée' : '')),
     audio_path: audioBlob ? audioUrl : null, // aperçu local
+    image_path: imageFile ? imagePreviewUrl : null, // aperçu local
     created_at: now,
     updated_at: now,
     user: {
@@ -890,10 +919,13 @@ const handleCommentSubmit = async (e, textOverride = null) => {
   // Vider le formulaire immédiatement
   const savedContent = textToSend;
   const savedAudioBlob = audioBlob;
+  const savedImageFile = imageFile;
   const savedReplyingTo = replyingTo;
   setCommentContent('');
   setAudioBlob(null);
   setAudioUrl(null);
+  setImageFile(null);
+  setImagePreviewUrl(null);
   setReplyingTo(null);
   setMentionedUserIds([]);
   setError('');
@@ -908,8 +940,9 @@ const handleCommentSubmit = async (e, textOverride = null) => {
   // ─── Envoi réel en arrière-plan ───
   try {
     const formData = new FormData();
-    formData.append('content', savedContent || 'Message audio enregistré et sauvegardé');
+    formData.append('content', savedContent || (savedAudioBlob ? 'Message audio enregistré et sauvegardé' : (savedImageFile ? 'Photo partagée' : '')));
     if (savedAudioBlob) formData.append('audio', savedAudioBlob, 'voice_message.webm');
+    if (savedImageFile) formData.append('image', savedImageFile);
     if (savedReplyingTo) formData.append('parent_id', savedReplyingTo);
     mentionedUserIds.forEach(id => formData.append('mentioned_user_ids[]', id));
 
@@ -3046,6 +3079,25 @@ return () => {
                           />
                         )}
 
+                        {/* Photo partagée */}
+                        {comment.image_path && (
+                          <div className="mt-1.5 max-w-full overflow-hidden rounded-xl">
+                            <img
+                              src={comment.image_path.startsWith('blob:') || comment.image_path.startsWith('http')
+                                ? comment.image_path
+                                : `/storage/public/${comment.image_path}`}
+                              alt="Photo partagée"
+                              className="max-w-full max-h-72 rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => window.open(
+                                comment.image_path.startsWith('blob:') || comment.image_path.startsWith('http')
+                                  ? comment.image_path
+                                  : `/storage/public/${comment.image_path}`,
+                                '_blank'
+                              )}
+                            />
+                          </div>
+                        )}
+
                         {/* Audio */}
                         {comment.audio_path && (
                           <div className="mt-1.5 max-w-full overflow-hidden">
@@ -3341,6 +3393,18 @@ return () => {
         </div>
       )}
 
+
+      {/* Aperçu photo sélectionnée */}
+      {imagePreviewUrl && (
+        <div className="mb-2 flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700">
+          <img src={imagePreviewUrl} alt="Aperçu" className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+          <span className="text-xs text-gray-600 dark:text-gray-300 flex-1 truncate">{imageFile?.name}</span>
+          <button onClick={removeSelectedImage} className="text-red-400 hover:text-red-600 p-1">
+            <FaTimes className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Mode enregistrement vocal en cours */}
       {isRecording ? (
         <div className="flex items-center gap-3 px-3 py-2 bg-red-50 dark:bg-red-900/30 rounded-2xl border border-red-200 dark:border-red-800">
@@ -3370,6 +3434,22 @@ return () => {
             <FaSmile className="w-5 h-5" />
           </button>
 
+          {/* Bouton Joindre une photo */}
+          <input
+            type="file"
+            ref={imageInputRef}
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="Partager une photo"
+          >
+            <FaPaperclip className="w-4.5 h-4.5" />
+          </button>
+
           {/* Zone de texte principale */}
           <div className="flex-1 relative">
             <textarea
@@ -3396,7 +3476,7 @@ ref={commentTextareaRef}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  if (commentContent.trim() || audioBlob) handleCommentSubmit(e);
+                  if (commentContent.trim() || audioBlob || imageFile) handleCommentSubmit(e);
                 }
               }}
               placeholder={replyingTo ? "Écrire une réponse..." : "Tapez un message..."}
@@ -3435,7 +3515,7 @@ onInput={e => {
           </div>
 
           {/* Bouton Dynamique : Micro ou Envoyer */}
-          {commentContent.trim() || audioBlob ? (
+          {commentContent.trim() || audioBlob || imageFile ? (
             <button
               type="button"
               onClick={e => handleCommentSubmit(e)}

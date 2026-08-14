@@ -54,13 +54,18 @@ class TaskCommentController extends Controller
     // Ajoute un commentaire ou une réponse à une tâche
     public function store(Request $request, $taskId)
     {
-        $request->validate([
-            'content' => 'nullable|string|max:2000',
-            'audio' => 'nullable|file|mimes:mp3,wav,ogg,webm|max:10240', // Max 10MB
-            'parent_id' => 'nullable|exists:task_comments,id',
-            'mentioned_user_ids' => 'nullable|array',
-            'mentioned_user_ids.*' => 'exists:users,id',
-        ]);
+$request->validate([
+    'content' => 'nullable|string|max:2000',
+    'audio' => 'nullable|file|mimes:mp3,wav,ogg,webm|max:10240', // Max 10MB
+    'image' => 'nullable|file|mimes:jpeg,jpg,png,gif,webp|max:8192', // Max 8MB
+    'parent_id' => 'nullable|exists:task_comments,id',
+    'mentioned_user_ids' => 'nullable|array',
+    'mentioned_user_ids.*' => 'exists:users,id',
+]);
+
+if (!$request->filled('content') && !$request->hasFile('audio') && !$request->hasFile('image')) {
+    return response()->json(['message' => 'Le contenu, un fichier audio ou une image est requis.'], 422);
+}
 
         if (!$request->filled('content') && !$request->hasFile('audio')) {
             return response()->json(['message' => 'Le contenu ou un fichier audio est requis.'], 422);
@@ -79,19 +84,26 @@ class TaskCommentController extends Controller
             }
         }
 
-        $audioPath = null;
-        if ($request->hasFile('audio')) {
-            $audioPath = $request->file('audio')->store('task_comments/audio', 'public');
-        }
+$audioPath = null;
+if ($request->hasFile('audio')) {
+    $audioPath = $request->file('audio')->store('task_comments/audio', 'public');
+}
 
-        $comment = TaskComment::create([
-            'task_id' => $taskId,
-            'user_id' => Auth::id(),
-            'content' => $request->content,
-            'audio_path' => $audioPath,
-            'parent_id' => $request->parent_id,
-            'level' => $level,
-        ]);
+$imagePath = null;
+if ($request->hasFile('image')) {
+    $imagePath = $request->file('image')->store('task_comments/images', 'public');
+}
+
+$comment = TaskComment::create([
+    'task_id' => $taskId,
+    'user_id' => Auth::id(),
+    'content' => $request->content,
+    'audio_path' => $audioPath,
+    'image_path' => $imagePath,
+    'parent_id' => $request->parent_id,
+    'level' => $level,
+]);
+
         
         // Enregistrer les mentions et notifier les utilisateurs taggés
         $mentionedIds = collect($request->input('mentioned_user_ids', []))
