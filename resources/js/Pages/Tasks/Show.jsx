@@ -1198,7 +1198,22 @@ useEffect(() => {
 
 const closeFullscreenChat = () => {
   setFullscreenVisible(false);
-  setTimeout(() => setIsFullscreenChat(false), 350);
+  setTimeout(() => setIsFullscreenChat(false), 500);
+};
+
+const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+
+const requestCloseFullscreenChat = () => {
+  if (commentContent.trim() || audioBlob) {
+    setShowCloseConfirm(true);
+  } else {
+    closeFullscreenChat();
+  }
+};
+
+const confirmCloseFullscreenChat = () => {
+  setShowCloseConfirm(false);
+  closeFullscreenChat();
 };
 
   const [liveKitInvite, setLiveKitInvite] = useState(null); // { initiatorName, initiatorId }
@@ -2700,16 +2715,16 @@ return () => {
     {isFullscreenChat && (
       <div
         className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300 ${fullscreenVisible ? 'opacity-100' : 'opacity-0'}`}
-        onClick={closeFullscreenChat}
+        onClick={requestCloseFullscreenChat}
       />
     )}
     <div
       className={
         isFullscreenChat
-          ? `fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl rounded-t-3xl w-full max-w-3xl mx-auto left-0 right-0 transition-transform duration-500 ease-out ${fullscreenVisible ? 'translate-y-0' : 'translate-y-full'}`
+          ? `fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl rounded-t-3xl w-full max-w-6xl mx-auto left-0 right-0 transition-transform duration-500 ${fullscreenVisible ? 'translate-y-0 ease-out' : 'translate-y-full ease-in'}`
           : "flex flex-col bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8 shadow-xl"
       }
-      style={{ height: isFullscreenChat ? '94vh' : '85vh', maxHeight: isFullscreenChat ? '94vh' : '800px' }}
+      style={{ height: isFullscreenChat ? '96vh' : '85vh', maxHeight: isFullscreenChat ? '96vh' : '800px' }}
     >
     
     {/* ─── HEADER STYLE WHATSAPP AVEC MEMBRES CONNECTÉS ─── */}
@@ -2741,7 +2756,7 @@ return () => {
 
         <button
           type="button"
-          onClick={() => (isFullscreenChat ? closeFullscreenChat() : setIsFullscreenChat(true))}
+          onClick={() => (isFullscreenChat ? requestCloseFullscreenChat() : setIsFullscreenChat(true))}
           className="flex-shrink-0 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors"
           title={isFullscreenChat ? "Quitter le plein écran" : "Passer en plein écran"}
         >
@@ -3571,6 +3586,31 @@ onInput={e => {
                 </div>
               );
             })()}
+          </div>
+        </Modal>
+
+       <Modal show={showCloseConfirm} onClose={() => setShowCloseConfirm(false)} maxWidth="sm">
+          <div className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <FaInfoCircle className="text-amber-500" /> Message non envoyé
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Vous avez un message en cours de rédaction{audioBlob ? ' (ou un vocal enregistré)' : ''}. Il ne sera pas perdu, mais voulez-vous vraiment fermer le mode plein écran ?
+            </p>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowCloseConfirm(false)}
+                className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Continuer d'écrire
+              </button>
+              <button
+                onClick={confirmCloseFullscreenChat}
+                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+              >
+                Fermer quand même
+              </button>
+            </div>
           </div>
         </Modal>
 
