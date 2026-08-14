@@ -2721,7 +2721,7 @@ return () => {
     <div
       className={
         isFullscreenChat
-          ? `fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl rounded-t-3xl w-full max-w-6xl mx-auto left-0 right-0 transition-transform duration-500 ${fullscreenVisible ? 'translate-y-0 ease-out' : 'translate-y-full ease-in'}`
+          ? `fixed bottom-0 right-0 left-0 lg:left-64 z-50 flex flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl rounded-t-3xl transition-transform duration-500 ${fullscreenVisible ? 'translate-y-0 ease-out' : 'translate-y-full ease-in'}`
           : "flex flex-col bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8 shadow-xl"
       }
       style={{ height: isFullscreenChat ? '96vh' : '85vh', maxHeight: isFullscreenChat ? '96vh' : '800px' }}
@@ -2754,14 +2754,25 @@ return () => {
       <div className="flex items-center gap-3">
         <OnlineAvatarStack users={onlineUsers} />
 
-        <button
-          type="button"
-          onClick={() => (isFullscreenChat ? requestCloseFullscreenChat() : setIsFullscreenChat(true))}
-          className="flex-shrink-0 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors"
-          title={isFullscreenChat ? "Quitter le plein écran" : "Passer en plein écran"}
-        >
-          {isFullscreenChat ? <FaCompress className="w-3.5 h-3.5" /> : <FaExpand className="w-3.5 h-3.5" />}
-        </button>
+        {isFullscreenChat ? (
+          <button
+            type="button"
+            onClick={requestCloseFullscreenChat}
+            className="flex-shrink-0 flex items-center gap-2 px-3.5 h-9 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-md transition-colors"
+            title="Quitter le plein écran"
+          >
+            <FaCompress className="w-3 h-3" /> Quitter
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsFullscreenChat(true)}
+            className="flex-shrink-0 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors"
+            title="Passer en plein écran"
+          >
+            <FaExpand className="w-3.5 h-3.5" />
+          </button>
+        )}
 
       
 
