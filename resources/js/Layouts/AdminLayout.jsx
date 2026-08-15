@@ -130,6 +130,7 @@ export default function AdminLayout({ children }) {
   const [notifCount, setNotifCount] = useState(0);
   const [selectedNotif, setSelectedNotif] = useState(null);
   const profileRef = useRef();
+  const notifRef = useRef();
   const [globalLoading, setGlobalLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('fr');
@@ -316,6 +317,9 @@ channel.listen('.livekit.call.ended', () => {
     function handleClickOutside(event) {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
         setProfileDropdown(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setNotifDropdown(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -590,7 +594,7 @@ channel.listen('.livekit.call.ended', () => {
             </div>
 
             {/* ─── Cloche notifications ─── */}
-            <div className="relative">
+            <div className="relative" ref={notifRef}>
               <button
                 className="relative flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 title="Notifications"
