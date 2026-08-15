@@ -230,26 +230,57 @@ export default function AdminLayout({ children }) {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  useEffect(() => {
-    if (auth?.user || auth?.id) {
-      fetch('/api/activities/notifications')
-        .then(res => res.json())
-        .then(data => {
-          setNotifications(data);
-          setNotifCount(data.length);
-        });
-    }
-  }, [auth]);
+  const userId = auth?.user?.id || auth?.id;
+
+  const fetchNotifications = React.useCallback(() => {
+    if (!userId) return;
+    fetch('/activities/notifications')
+      .then(res => res.json())
+      .then(data => {
+        setNotifications(data.activities || []);
+        setNotifCount(data.unread_count || 0);
+      })
+      .catch(() => {});
+  }, [userId]);
 
   useEffect(() => {
-    if (window.Echo) {
-      window.Echo.channel('activities')
-        .listen('ActivityLogged', (e) => {
-          setNotifications(prev => [e.activity, ...prev.slice(0, 9)]);
-          setNotifCount(prev => prev + 1);
-        });
-    }
-  }, []);
+    fetchNotifications();
+    // Filet de sécurité en cas de coupure websocket
+    const interval = setInterval(fetchNotifications, 90000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  // ─── Temps réel : nouvelle activité poussée immédiatement ───
+  useEffect(() => {
+    if (!window.Echo || !userId) return;
+
+    const channel = window.Echo.private(`App.Models.User.${userId}`);
+
+    channel.listen('.activity.created', (payload) => {
+      setNotifications(prev => [
+        { ...payload, is_read: false },
+        ...prev.filter(n => n.id !== payload.id),
+      ].slice(0, 15));
+      setNotifCount(prev => prev + 1);
+    });
+
+    return () => {
+      window.Echo.leave(`App.Models.User.${userId}`);
+    };
+  }, [userId]);
+
+  const markNotificationsRead = () => {
+    if (notifCount === 0) return;
+    fetch('/activities/notifications/mark-read', {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    }).catch(() => {});
+    setNotifCount(0);
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+  };
 
   // ─── Écoute globale des appels ProJA (LiveKit), peu importe la page ───
   useEffect(() => {
@@ -563,14 +594,20 @@ channel.listen('.livekit.call.ended', () => {
               <button
                 className="relative flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 title="Notifications"
-                onClick={() => { setNotifDropdown(d => !d); setProfileDropdown(false); setLanguageOpen(false); }}
+                onClick={() => {
+                  const opening = !notifDropdown;
+                  setNotifDropdown(opening);
+                  setProfileDropdown(false);
+                  setLanguageOpen(false);
+                  if (opening) markNotificationsRead();
+                }}
                 aria-label="Notifications"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                <svg className={`w-5 h-5 ${notifCount > 0 ? 'text-orange-500 animate-pulse' : ''}`} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {notifCount > 0 && (
-                  <span className="absolute top-1 right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 shadow animate-pulse">
+                  <span className="absolute top-1 right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 shadow">
                     {notifCount > 99 ? '99+' : notifCount}
                   </span>
                 )}
@@ -599,28 +636,21 @@ channel.listen('.livekit.call.ended', () => {
                         <span className="text-sm">Aucune notification</span>
                       </li>
                     )}
-                    {notifications.slice(0, 6).map(n => {
-                      let message = n.message;
-                      const match = n.message.match(/User #(\d+)/);
-                      if (match && n.data?.user) {
-                        message = message.replace(`User #${match[1]}`, n.data.user.name || `#${match[1]}`);
-                      }
-                      return (
-                        <li
-                          key={n.id}
-                          className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors ${!n.read_at ? 'bg-blue-50/60 dark:bg-blue-900/10' : ''}`}
-                          onClick={() => { setSelectedNotif(n); setNotifDropdown(false); if (n.url) window.location.href = n.url; }}
-                        >
-                          <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${!n.read_at ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-800 dark:text-gray-100 line-clamp-2">{message}</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                              {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
-                        </li>
-                      );
-                    })}
+                    {notifications.slice(0, 6).map(n => (
+                      <li
+                        key={n.id}
+                        className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors ${!n.is_read ? 'bg-orange-50/60 dark:bg-orange-900/10' : ''}`}
+                        onClick={() => { setNotifDropdown(false); if (n.url) router.visit(n.url); }}
+                      >
+                        <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${!n.is_read ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-800 dark:text-gray-100 line-clamp-2">{n.message}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                            {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
                   </ul>
                   <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <Link href="/activities" className="flex items-center justify-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">

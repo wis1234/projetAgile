@@ -1,7 +1,7 @@
 import React from 'react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
-import { FaHistory, FaUserCircle, FaRegListAlt, FaProjectDiagram, FaTasks, FaFileAlt, FaUser, FaArrowLeft } from 'react-icons/fa';
+import { FaHistory, FaUserCircle, FaRegListAlt, FaProjectDiagram, FaTasks, FaFileAlt, FaUser, FaSearch, FaCommentDots } from 'react-icons/fa';
 
 function renderSubjectDetails(subject, type) {
   if (!subject) return null;
@@ -49,6 +49,20 @@ function renderSubjectDetails(subject, type) {
       </div>
     );
   }
+
+
+  if (type === 'App\\Models\\TaskComment') {
+    return (
+      <div className="space-y-2">
+        <div><span className="font-semibold">Contenu :</span> {subject.content || <span className="italic text-gray-400">Message vocal/photo</span>}</div>
+        <div><span className="font-semibold">Tâche :</span> {subject.task?.title || subject.task_id || '-'}</div>
+        <div><span className="font-semibold">Auteur :</span> {subject.user?.name || subject.user_id || '-'}</div>
+        <div><span className="font-semibold">Réponse à :</span> {subject.parent_id ? `Commentaire #${subject.parent_id}` : 'Message principal'}</div>
+        <div><span className="font-semibold">Créé le :</span> {subject.created_at ? new Date(subject.created_at).toLocaleString() : '-'}</div>
+      </div>
+    );
+  }
+  
   // Fallback: affiche tout sauf les id techniques
   return (
     <div className="space-y-2">
@@ -66,14 +80,16 @@ export default function Show({ activity, subject }) {
     return <span className={`px-2 py-1 rounded text-xs font-bold capitalize ${color}`}>{type}</span>;
   };
   // Helper pour icône objet
-  const getSubjectIcon = (type) => {
-    if (!type) return <FaRegListAlt className="text-gray-400" />;
-    if (type.includes('Project')) return <FaProjectDiagram className="text-blue-500" />;
-    if (type.includes('Task')) return <FaTasks className="text-yellow-500" />;
-    if (type.includes('File')) return <FaFileAlt className="text-green-500" />;
-    if (type.includes('User')) return <FaUser className="text-purple-500" />;
-    return <FaRegListAlt className="text-gray-400" />;
-  };
+ const getSubjectIcon = (type) => {
+  if (!type) return <FaRegListAlt className="text-gray-400" />;
+  if (type.includes('Project')) return <FaProjectDiagram className="text-blue-500" />;
+  if (type.includes('Task') && !type.includes('Comment')) return <FaTasks className="text-yellow-500" />;
+  if (type.includes('File')) return <FaFileAlt className="text-green-500" />;
+  if (type.includes('User')) return <FaUser className="text-purple-500" />;
+  if (type.includes('Comment')) return <FaCommentDots className="text-orange-500" />;
+  return <FaRegListAlt className="text-gray-400" />;
+};
+
   return (
     <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900">
       <div className="flex-1 flex flex-col w-full max-w-7xl mx-auto px-4 py-6">

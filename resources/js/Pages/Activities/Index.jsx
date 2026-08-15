@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { router, usePage } from '@inertiajs/react';
-import { FaHistory, FaUserCircle, FaRegListAlt, FaProjectDiagram, FaTasks, FaFileAlt, FaUser, FaSearch } from 'react-icons/fa';
+import { FaHistory, FaUserCircle, FaRegListAlt, FaProjectDiagram, FaTasks, FaFileAlt, FaUser, FaSearch, FaCommentDots } from 'react-icons/fa';
 import { Inertia } from '@inertiajs/inertia';
 
 export default function Index({ activities, users, filters = {}, types = [], flash = {} }) {
@@ -21,14 +21,15 @@ export default function Index({ activities, users, filters = {}, types = [], fla
   };
 
   // Helper pour icône objet
-  const getSubjectIcon = (type) => {
-    if (!type) return <FaRegListAlt className="text-gray-400" />;
-    if (type.includes('Project')) return <FaProjectDiagram className="text-blue-500" />;
-    if (type.includes('Task')) return <FaTasks className="text-yellow-500" />;
-    if (type.includes('File')) return <FaFileAlt className="text-green-500" />;
-    if (type.includes('User')) return <FaUser className="text-purple-500" />;
-    return <FaRegListAlt className="text-gray-400" />;
-  };
+const getSubjectIcon = (type) => {
+  if (!type) return <FaRegListAlt className="text-gray-400" />;
+  if (type.includes('Project')) return <FaProjectDiagram className="text-blue-500" />;
+  if (type.includes('Task') && !type.includes('Comment')) return <FaTasks className="text-yellow-500" />;
+  if (type.includes('File')) return <FaFileAlt className="text-green-500" />;
+  if (type.includes('User')) return <FaUser className="text-purple-500" />;
+  if (type.includes('Comment')) return <FaCommentDots className="text-orange-500" />;
+  return <FaRegListAlt className="text-gray-400" />;
+};
 
   // Helper pour badge type
   const getTypeBadge = (type) => {

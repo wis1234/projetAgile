@@ -9,6 +9,8 @@ use App\Models\Activity;
 use App\Models\User;
 use Inertia\Inertia;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Models\TaskComment;
+
 
 class ActivityController extends Controller
 {
@@ -185,4 +187,32 @@ class ActivityController extends Controller
             ];
         }));
     }
+
+    use App\Models\TaskComment;
+
+private function scopeToUserVisibility($query, $user)
+{
+    if ($user->hasRole('admin')) {
+        return $query;
+    }
+
+    $projectIds = $user->projects()->pluck('projects.id');
+
+    return $query->where(function ($q) use ($projectIds, $user) {
+        $q->whereHasMorph('subject', [\App\Models\Project::class], function ($sq) use ($projectIds) {
+                $sq->whereIn('id', $projectIds);
+            })
+            ->orWhereHasMorph('subject', [\App\Models\Task::class, \App\Models\File::class], function ($sq) use ($projectIds) {
+                $sq->whereIn('project_id', $projectIds);
+            })
+            ->orWhereHasMorph('subject', [TaskComment::class], function ($sq) use ($projectIds) {
+                $sq->whereHas('task', fn($tq) => $tq->whereIn('project_id', $projectIds));
+            })
+            ->orWhereHasMorph('subject', [\App\Models\Payment::class], function ($sq) use ($projectIds) {
+                $sq->whereHas('task', fn($tq) => $tq->whereIn('project_id', $projectIds));
+            })
+            ->orWhere('user_id', $user->id);
+    });
+}
+
 }
