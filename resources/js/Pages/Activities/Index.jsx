@@ -69,8 +69,8 @@ export default function Index({ activities, users, filters = {}, types = [], sta
           <div className="absolute -top-10 -right-10 w-56 h-56 bg-white/10 rounded-full blur-2xl" />
           <div className="absolute -bottom-16 -left-10 w-56 h-56 bg-white/5 rounded-full blur-2xl" />
 
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
-            <div className="flex items-center gap-4 min-w-0">
+          <div className="relative flex flex-wrap items-center gap-4 min-w-0">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
               <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
                 <FaHistory className="text-2xl text-white" />
               </div>
