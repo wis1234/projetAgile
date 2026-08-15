@@ -69,43 +69,42 @@ export default function Index({ activities, users, filters = {}, types = [], sta
           <div className="absolute -top-10 -right-10 w-56 h-56 bg-white/10 rounded-full blur-2xl" />
           <div className="absolute -bottom-16 -left-10 w-56 h-56 bg-white/5 rounded-full blur-2xl" />
 
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-            <div className="flex items-center gap-4">
+          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+
+            {/* Titre */}
+            <div className="flex items-center gap-4 min-w-0">
               <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
                 <FaHistory className="text-2xl text-white" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-bold text-blue-100 uppercase tracking-widest mb-1">Suivi &amp; traçabilité</p>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Journal d'activité</h1>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight truncate">Journal d'activité</h1>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleExport}
-              className="inline-flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm border border-white/20 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors"
-            >
-              <FaDownload className="w-3.5 h-3.5" /> Exporter en Excel
-            </button>
-          </div>
-
-          {/* Mini stats */}
-          {(stats.total !== undefined || stats.today !== undefined) && (
-            <div className="relative flex flex-wrap gap-3 mt-6">
+            {/* Stats + export, côte à côte */}
+            <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
               {stats.total !== undefined && (
-                <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
-                  <span className="text-lg font-extrabold text-white">{stats.total}</span>
-                  <span className="text-xs font-medium text-blue-100">activités au total</span>
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
+                  <span className="text-lg font-extrabold text-white leading-none">{stats.total}</span>
+                  <span className="text-xs font-medium text-blue-100 whitespace-nowrap">activités au total</span>
                 </div>
               )}
               {stats.today !== undefined && (
-                <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
-                  <span className="text-lg font-extrabold text-white">{stats.today}</span>
-                  <span className="text-xs font-medium text-blue-100">aujourd'hui</span>
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
+                  <span className="text-lg font-extrabold text-white leading-none">{stats.today}</span>
+                  <span className="text-xs font-medium text-blue-100 whitespace-nowrap">aujourd'hui</span>
                 </div>
               )}
+              <button
+                type="button"
+                onClick={handleExport}
+                className="inline-flex items-center justify-center gap-2 bg-white text-indigo-700 hover:bg-blue-50 px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-sm whitespace-nowrap"
+              >
+                <FaDownload className="w-3.5 h-3.5" /> Exporter
+              </button>
             </div>
-          )}
+          </div>
         </div>
 
         {/* ─── Filtres ─── */}
