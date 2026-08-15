@@ -61,8 +61,8 @@ export default function Index({ activities, users, filters = {}, types = [], sta
   };
 
   return (
-    <div className="flex flex-col w-full min-h-screen min-w-0 bg-gray-50 dark:bg-gray-950">
-      <main className="flex-1 flex flex-col w-full min-w-0 max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div className="flex flex-col w-full min-h-screen bg-gray-50 dark:bg-gray-950 p-0 m-0">
+      <main className="flex-1 flex flex-col w-full py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-8">
 
         {/* ─── Header avec dégradé ─── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 rounded-3xl shadow-lg shadow-blue-500/10 p-6 sm:p-8 mb-8">
