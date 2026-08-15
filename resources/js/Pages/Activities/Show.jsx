@@ -1,7 +1,7 @@
 import React from 'react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
-import { FaHistory, FaUserCircle, FaRegListAlt, FaProjectDiagram, FaTasks, FaFileAlt, FaUser, FaSearch, FaCommentDots } from 'react-icons/fa';
+import { FaHistory, FaUserCircle, FaRegListAlt, FaProjectDiagram, FaTasks, FaFileAlt, FaUser, FaSearch, FaCommentDots, FaArrowLeft } from 'react-icons/fa';
 
 function renderSubjectDetails(subject, type) {
   if (!subject) return null;
