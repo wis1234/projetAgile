@@ -188,8 +188,6 @@ class ActivityController extends Controller
         }));
     }
 
-    use App\Models\TaskComment;
-
 private function scopeToUserVisibility($query, $user)
 {
     if ($user->hasRole('admin')) {
