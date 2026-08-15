@@ -202,120 +202,54 @@ export default function Index({ activities, users, filters = {}, types = [], sta
               <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Essayez d'ajuster vos filtres de recherche.</p>
             </div>
           ) : (
-            <>
-              {/* Vue tableau — desktop */}
-              <div className="hidden lg:block overflow-x-auto min-w-0">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700">
-                      <th className="px-5 py-3.5 text-left text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Date</th>
-                      <th className="px-5 py-3.5 text-left text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Utilisateur</th>
-                      <th className="px-5 py-3.5 text-left text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Type</th>
-                      <th className="px-5 py-3.5 text-left text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Description</th>
-                      <th className="px-5 py-3.5 text-left text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Objet</th>
-                      <th className="px-5 py-3.5" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
-                    {activities.data.map(activity => (
-                      <tr
-                        key={activity.id}
-                        className="group cursor-pointer hover:bg-blue-50/60 dark:hover:bg-gray-700/40 transition-colors"
-                        onClick={() => router.visit(`/activities/${activity.id}`)}
-                        tabIndex={0}
-                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.visit(`/activities/${activity.id}`); }}
-                      >
-                        <td className="px-5 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+            /* Vue cartes — conservée par défaut, y compris sur PC */
+            <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
+              {activities.data.map(activity => (
+                <div
+                  key={activity.id}
+                  onClick={() => router.visit(`/activities/${activity.id}`)}
+                  tabIndex={0}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.visit(`/activities/${activity.id}`); }}
+                  className="group relative p-4 sm:p-5 cursor-pointer transition-all duration-150 hover:bg-blue-50/60 dark:hover:bg-gray-700/40 hover:shadow-[inset_3px_0_0_0_theme(colors.blue.500)] active:bg-blue-100/60 dark:active:bg-gray-700/60 focus:outline-none focus-visible:bg-blue-50/60 dark:focus-visible:bg-gray-700/40"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {activity.user ? (
+                        <img
+                          src={activity.user.profile_photo_url || (activity.user.profile_photo_path ? `/storage/${activity.user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.user.name)}&background=2563eb&color=fff`)}
+                          alt={activity.user.name}
+                          className="w-9 h-9 rounded-full object-cover border border-blue-100 dark:border-blue-900 flex-shrink-0 transition-transform duration-150 group-hover:scale-105"
+                        />
+                      ) : (
+                        <FaUserCircle className="w-9 h-9 text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-800 dark:text-gray-100 text-sm truncate group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                          {activity.user ? activity.user.name : <span className="italic text-gray-400 font-normal">Invité</span>}
+                        </p>
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <FaCalendarAlt className="w-2.5 h-2.5" />
                           {new Date(activity.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2.5">
-                            {activity.user ? (
-                              <img
-                                src={activity.user.profile_photo_url || (activity.user.profile_photo_path ? `/storage/${activity.user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.user.name)}&background=2563eb&color=fff`)}
-                                alt={activity.user.name}
-                                className="w-8 h-8 rounded-full object-cover border border-blue-100 dark:border-blue-900 flex-shrink-0"
-                              />
-                            ) : (
-                              <FaUserCircle className="w-8 h-8 text-gray-300 dark:text-gray-600 flex-shrink-0" />
-                            )}
-                            <div className="min-w-0">
-                              <p className="font-semibold text-gray-800 dark:text-gray-100 truncate">
-                                {activity.user ? activity.user.name : <span className="italic text-gray-400 font-normal">Invité</span>}
-                              </p>
-                              {activity.user?.roles?.length > 0 && (
-                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase">{activity.user.roles[0].name}</span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <TypeBadge type={activity.type} />
-                        </td>
-                        <td className="px-5 py-4 max-w-xs">
-                          <p className="truncate text-gray-600 dark:text-gray-300" title={activity.description}>
-                            {activity.description || <span className="italic text-gray-400">—</span>}
-                          </p>
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400 text-xs font-medium bg-gray-50 dark:bg-gray-900/40 px-2.5 py-1 rounded-full">
-                            {getSubjectIcon(activity.subject_type)}
-                            {activity.subject_type ? `${activity.subject_type.split('\\').pop()} #${activity.subject_id}` : '—'}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <FaChevronRight className="w-3 h-3 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all inline-block" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Vue cartes — mobile / tablette */}
-              <div className="lg:hidden divide-y divide-gray-100 dark:divide-gray-700/60">
-                {activities.data.map(activity => (
-                  <div
-                    key={activity.id}
-                    onClick={() => router.visit(`/activities/${activity.id}`)}
-                    className="p-4 active:bg-blue-50 dark:active:bg-gray-700/40 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-2.5">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {activity.user ? (
-                          <img
-                            src={activity.user.profile_photo_url || (activity.user.profile_photo_path ? `/storage/${activity.user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.user.name)}&background=2563eb&color=fff`)}
-                            alt={activity.user.name}
-                            className="w-9 h-9 rounded-full object-cover border border-blue-100 dark:border-blue-900 flex-shrink-0"
-                          />
-                        ) : (
-                          <FaUserCircle className="w-9 h-9 text-gray-300 dark:text-gray-600 flex-shrink-0" />
-                        )}
-                        <div className="min-w-0">
-                          <p className="font-semibold text-gray-800 dark:text-gray-100 text-sm truncate">
-                            {activity.user ? activity.user.name : <span className="italic text-gray-400 font-normal">Invité</span>}
-                          </p>
-                          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                            <FaCalendarAlt className="w-2.5 h-2.5" />
-                            {new Date(activity.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
+                        </p>
                       </div>
-                      <TypeBadge type={activity.type} />
                     </div>
-
-                    {activity.description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-300 mb-2 line-clamp-2">{activity.description}</p>
-                    )}
-
-                    <div className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400 text-xs font-medium bg-gray-50 dark:bg-gray-900/40 px-2.5 py-1 rounded-full">
-                      {getSubjectIcon(activity.subject_type)}
-                      {activity.subject_type ? `${activity.subject_type.split('\\').pop()} #${activity.subject_id}` : '—'}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <TypeBadge type={activity.type} />
+                      <FaChevronRight className="w-3 h-3 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all hidden sm:inline-block" />
                     </div>
                   </div>
-                ))}
-              </div>
-            </>
+
+                  {activity.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-2 line-clamp-2">{activity.description}</p>
+                  )}
+
+                  <div className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400 text-xs font-medium bg-gray-50 dark:bg-gray-900/40 px-2.5 py-1 rounded-full group-hover:bg-blue-50 group-hover:text-blue-600 dark:group-hover:bg-blue-900/30 dark:group-hover:text-blue-300 transition-colors">
+                    {getSubjectIcon(activity.subject_type)}
+                    {activity.subject_type ? `${activity.subject_type.split('\\').pop()} #${activity.subject_id}` : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
