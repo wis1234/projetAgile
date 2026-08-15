@@ -61,8 +61,8 @@ export default function Index({ activities, users, filters = {}, types = [], sta
   };
 
   return (
-    <div className="flex flex-col w-full min-h-screen bg-gray-50 dark:bg-gray-950">
-      <main className="flex-1 flex flex-col w-full max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div className="flex flex-col w-full min-h-screen min-w-0 bg-gray-50 dark:bg-gray-950">
+      <main className="flex-1 flex flex-col w-full min-w-0 max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
 
         {/* ─── Header avec dégradé ─── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 rounded-3xl shadow-lg shadow-blue-500/10 p-6 sm:p-8 mb-8">
@@ -194,7 +194,7 @@ export default function Index({ activities, users, filters = {}, types = [], sta
           ) : (
             <>
               {/* Vue tableau — desktop */}
-              <div className="hidden lg:block overflow-x-auto">
+              <div className="hidden lg:block overflow-x-auto min-w-0">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700">

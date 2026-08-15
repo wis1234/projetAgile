@@ -807,8 +807,8 @@ channel.listen('.livekit.call.ended', () => {
         <Notification message={flash.error} type="error" />
         <Notification message={flash.info} type="info" />
         {/* Page content */}
-<main className="flex-1 w-full h-full transition-colors pt-16 bg-white dark:bg-gray-900 flex flex-col">
-          <div className="flex-1">
+<main className="flex-1 w-full h-full min-w-0 transition-colors pt-16 bg-white dark:bg-gray-900 flex flex-col">
+          <div className="flex-1 min-w-0">
             {children}
           </div>
           <footer className="mt-auto border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
