@@ -153,6 +153,7 @@ public function store(Request $request)
     ]);
 
     $sprint = Sprint::create($validated);
+    activity_log('create', "Sprint « {$sprint->name} » créé", $sprint);
     event(new SprintUpdated($sprint));
 
     if ($request->boolean('from_project')) {
@@ -290,6 +291,7 @@ public function show(Request $request, string $id)
             }
         }
 
+        activity_log('update', "Sprint « {$sprint->name} » mis à jour", $sprint);
         event(new SprintUpdated($sprint));
         return redirect()->route('sprints.index');
     }
@@ -305,6 +307,7 @@ public function show(Request $request, string $id)
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
+        activity_log('delete', "Sprint « {$sprint->name} » supprimé", $sprint);
         $sprint->delete();
         event(new SprintUpdated($sprint));
         return redirect()->route('sprints.index');

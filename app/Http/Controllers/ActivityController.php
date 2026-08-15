@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ActivitiesExport;
 use App\Models\Activity;
+use App\Models\ActivityRead;
 use App\Models\User;
-use Inertia\Inertia;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use App\Models\TaskComment;
-
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ActivityController extends Controller
 {
@@ -19,37 +18,10 @@ class ActivityController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Activity::with('user');
-        
-        // Pour les non-admins, filtrer pour ne montrer que les activités liées à leurs projets
-        if (!$user->hasRole('admin')) {
-            $projectIds = $user->projects()->pluck('projects.id');
-            
-            $query->where(function($q) use ($projectIds, $user) {
-                // Activités sur les projets de l'utilisateur
-                $q->whereHasMorph('subject', 'App\Models\Project', 
-                    function($q) use ($projectIds) {
-                        $q->whereIn('id', $projectIds);
-                    }
-                )
-                // Activités sur les tâches des projets de l'utilisateur
-                ->orWhereHasMorph('subject', 'App\Models\Task',
-                    function($q) use ($projectIds) {
-                        $q->whereIn('project_id', $projectIds);
-                    }
-                )
-                // Activités sur les fichiers des projets de l'utilisateur
-                ->orWhereHasMorph('subject', 'App\Models\File',
-                    function($q) use ($projectIds) {
-                        $q->whereIn('project_id', $projectIds);
-                    }
-                )
-                // Ou activités effectuées par l'utilisateur
-                ->orWhere('user_id', $user->id);
-            });
-        }
-        
-        // Filtres additionnels
+
+        $query = Activity::with(['user.roles'])
+            ->visibleTo($user);
+
         if ($request->user_id) {
             $query->where('user_id', $request->user_id);
         }
@@ -59,77 +31,38 @@ class ActivityController extends Controller
         if ($request->date) {
             $query->whereDate('created_at', $request->date);
         }
-        
+        if ($request->search) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                    ->orWhere('type', 'like', "%{$search}%");
+            });
+        }
+
         $activities = $query->orderByDesc('created_at')->paginate(30)->withQueryString();
-        
-        // Pour le filtre des utilisateurs, ne montrer que les utilisateurs pertinents
-        $usersQuery = $user->hasRole('admin') 
-            ? User::query() 
-            : User::whereIn('id', 
-                Activity::where(function($q) use ($user) {
-                    $projectIds = $user->projects()->pluck('projects.id');
-                    
-                    $q->whereHasMorph('subject', 'App\Models\Project', 
-                        function($q) use ($projectIds) {
-                            $q->whereIn('id', $projectIds);
-                        }
-                    )->orWhereHasMorph('subject', 'App\Models\Task',
-                        function($q) use ($projectIds) {
-                            $q->whereIn('project_id', $projectIds);
-                        }
-                    )->orWhereHasMorph('subject', 'App\Models\File',
-                        function($q) use ($projectIds) {
-                            $q->whereIn('project_id', $projectIds);
-                        }
-                    )->orWhere('user_id', $user->id);
-                })->pluck('user_id')
-            );
-            
-        $users = $usersQuery->orderBy('name')->get(['id', 'name']);
-        $types = Activity::select('type')->distinct()->pluck('type');
-        
+
+        $users = $this->filterUsersForActivities($user);
+        $types = Activity::visibleTo($user)->select('type')->distinct()->orderBy('type')->pluck('type');
+        $stats = [
+            'total' => Activity::visibleTo($user)->count(),
+            'today' => Activity::visibleTo($user)->whereDate('created_at', today())->count(),
+        ];
+
         return Inertia::render('Activities/Index', [
             'activities' => $activities,
             'users' => $users,
-            'filters' => $request->only('user_id', 'type', 'date'),
+            'filters' => $request->only('user_id', 'type', 'date', 'search'),
             'types' => $types,
+            'typeLabels' => Activity::typeLabels(),
+            'stats' => $stats,
         ]);
     }
 
     public function export(Request $request)
     {
         $user = $request->user();
-        $query = Activity::with('user');
-        
-        // Appliquer le même filtrage que pour l'index
-        if (!$user->hasRole('admin')) {
-            $projectIds = $user->projects()->pluck('projects.id');
-            
-            $query->where(function($q) use ($projectIds, $user) {
-                // Activités sur les projets de l'utilisateur
-                $q->whereHasMorph('subject', 'App\Models\Project', 
-                    function($q) use ($projectIds) {
-                        $q->whereIn('id', $projectIds);
-                    }
-                )
-                // Activités sur les tâches des projets de l'utilisateur
-                ->orWhereHasMorph('subject', 'App\Models\Task',
-                    function($q) use ($projectIds) {
-                        $q->whereIn('project_id', $projectIds);
-                    }
-                )
-                // Activités sur les fichiers des projets de l'utilisateur
-                ->orWhereHasMorph('subject', 'App\Models\File',
-                    function($q) use ($projectIds) {
-                        $q->whereIn('project_id', $projectIds);
-                    }
-                )
-                // Ou activités effectuées par l'utilisateur
-                ->orWhere('user_id', $user->id);
-            });
-        }
-        
-        // Appliquer les filtres additionnels
+        $query = Activity::with('user')->visibleTo($user);
+
         if ($request->user_id) {
             $query->where('user_id', $request->user_id);
         }
@@ -139,78 +72,101 @@ class ActivityController extends Controller
         if ($request->date) {
             $query->whereDate('created_at', $request->date);
         }
-        
+        if ($request->search) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                    ->orWhere('type', 'like', "%{$search}%");
+            });
+        }
+
         $activities = $query->orderByDesc('created_at')->get();
+
         return Excel::download(new ActivitiesExport($activities), 'activities.xlsx');
     }
 
-    public function show($id)
+    public function show(Request $request, Activity $activity)
     {
-        $activity = \App\Models\Activity::with('user')->findOrFail($id);
-        // Charger l'objet lié si possible
+        $user = $request->user();
+
+        $visible = Activity::query()
+            ->where('id', $activity->id)
+            ->visibleTo($user)
+            ->exists();
+
+        abort_unless($visible, 403);
+
+        $activity->load(['user.roles']);
+
         $subject = null;
         if ($activity->subject_type && $activity->subject_id) {
             $subjectModel = app($activity->subject_type);
-            $relations = [];
-            if ($activity->subject_type === 'App\\Models\\File') {
-                $relations = ['user', 'project', 'task'];
-            } elseif ($activity->subject_type === 'App\\Models\\Task') {
-                $relations = ['assignedUser', 'project'];
-            } elseif ($activity->subject_type === 'App\\Models\\Project') {
-                $relations = ['users'];
-            } elseif ($activity->subject_type === 'App\\Models\\User') {
-                $relations = ['roles'];
-            }
+            $relations = match ($activity->subject_type) {
+                'App\\Models\\File' => ['user', 'project', 'task'],
+                'App\\Models\\Task' => ['assignedUser', 'project'],
+                'App\\Models\\Project' => ['users'],
+                'App\\Models\\User' => ['roles'],
+                'App\\Models\\TaskComment' => ['user', 'task.project'],
+                'App\\Models\\Sprint' => ['project'],
+                default => [],
+            };
             $subject = $subjectModel->with($relations)->find($activity->subject_id);
         }
+
         return Inertia::render('Activities/Show', [
             'activity' => $activity,
             'subject' => $subject,
+            'typeLabels' => Activity::typeLabels(),
         ]);
     }
 
-    public function notifications()
+    public function notifications(Request $request)
     {
-        $activities = \App\Models\Activity::with('user')
+        $user = $request->user();
+        $lastReadAt = ActivityRead::where('user_id', $user->id)->value('last_read_at');
+
+        $activities = Activity::with('user')
+            ->visibleTo($user)
+            ->where('user_id', '!=', $user->id)
             ->orderByDesc('created_at')
-            ->limit(10)
+            ->limit(20)
             ->get();
-        return response()->json($activities->map(function($a) {
-            return [
-                'id' => $a->id,
-                'message' => $a->notification_message,
-                'created_at' => $a->created_at,
-                'read_at' => null, // à gérer si besoin
-                'url' => route('activities.show', $a->id),
-                'user' => $a->user ? $a->user->name : null,
-                'type' => $a->type,
-            ];
-        }));
+
+        $payload = $activities->map(function (Activity $activity) use ($lastReadAt) {
+            $isRead = $lastReadAt && $activity->created_at <= $lastReadAt;
+
+            return $activity->toNotificationPayload($isRead);
+        });
+
+        $unreadCount = Activity::visibleTo($user)
+            ->where('user_id', '!=', $user->id)
+            ->when($lastReadAt, fn ($q) => $q->where('created_at', '>', $lastReadAt))
+            ->count();
+
+        return response()->json([
+            'activities' => $payload,
+            'unread_count' => $unreadCount,
+        ]);
     }
 
-private function scopeToUserVisibility($query, $user)
-{
-    if ($user->hasRole('admin')) {
-        return $query;
+    public function markNotificationsRead(Request $request)
+    {
+        ActivityRead::updateOrCreate(
+            ['user_id' => $request->user()->id],
+            ['last_read_at' => now()]
+        );
+
+        return response()->json(['success' => true]);
     }
 
-    $projectIds = $user->projects()->pluck('projects.id');
+    protected function filterUsersForActivities(User $user)
+    {
+        if ($user->hasRole('admin')) {
+            return User::orderBy('name')->get(['id', 'name']);
+        }
 
-    return $query->where(function ($q) use ($projectIds, $user) {
-        $q->whereHasMorph('subject', [\App\Models\Project::class], function ($sq) use ($projectIds) {
-                $sq->whereIn('id', $projectIds);
-            })
-            ->orWhereHasMorph('subject', [\App\Models\Task::class, \App\Models\File::class], function ($sq) use ($projectIds) {
-                $sq->whereIn('project_id', $projectIds);
-            })
-            ->orWhereHasMorph('subject', [TaskComment::class], function ($sq) use ($projectIds) {
-                $sq->whereHas('task', fn($tq) => $tq->whereIn('project_id', $projectIds));
-            })
-            ->orWhereHasMorph('subject', [\App\Models\Payment::class], function ($sq) use ($projectIds) {
-                $sq->whereHas('task', fn($tq) => $tq->whereIn('project_id', $projectIds));
-            })
-            ->orWhere('user_id', $user->id);
-    });
-}
+        $userIds = Activity::visibleTo($user)->distinct()->pluck('user_id')->filter();
 
+        return User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name']);
+    }
 }

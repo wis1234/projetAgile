@@ -566,6 +566,8 @@ public function show(File $file)
     {
         $this->authorize('delete', $file);
         
+        activity_log('delete', "Fichier « {$file->name} » supprimé", $file);
+
         // Supprimer le fichier physique
         Storage::disk('public')->delete($file->file_path);
         

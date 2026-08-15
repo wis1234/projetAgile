@@ -298,6 +298,8 @@ public function store(Request $request)
 
     $task = Task::create($validated);
 
+    activity_log('create', "Tâche « {$task->title} » créée", $task);
+
     // Créer un fichier de suivi pour la tâche
     $project = Project::find($validated['project_id']);
 
@@ -627,6 +629,14 @@ public function store(Request $request)
             }
         }
 
+        if ($oldStatus !== $task->status) {
+            activity_log('status', "Statut de la tâche « {$task->title} » : {$oldStatus} → {$task->status}", $task);
+        } elseif ($oldAssignee != $task->assigned_to) {
+            activity_log('assign', "Tâche « {$task->title} » réassignée", $task);
+        } else {
+            activity_log('update', "Tâche « {$task->title} » mise à jour", $task);
+        }
+
         // Déclencher l'événement de mise à jour de tâche
         event(new TaskUpdated($task));
 
@@ -641,6 +651,7 @@ public function store(Request $request)
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
+        activity_log('delete', "Tâche « {$task->title} » supprimée", $task);
         $task->delete();
         return redirect()->route('tasks.index');
     }

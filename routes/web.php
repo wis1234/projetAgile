@@ -127,11 +127,13 @@ Route::prefix('push')->group(function () {
 
 });
 
-Route::get('/activities/notifications', [ActivityController::class, 'notifications'])
-    ->name('activities.notifications');
+Route::middleware(['auth'])->group(function () {
+    Route::get('/activities/notifications', [ActivityController::class, 'notifications'])
+        ->name('activities.notifications');
 
-Route::post('/activities/notifications/mark-read', [ActivityController::class, 'markNotificationsRead'])
-    ->name('activities.notifications.markRead');
+    Route::post('/activities/notifications/mark-read', [ActivityController::class, 'markNotificationsRead'])
+        ->name('activities.notifications.markRead');
+});
     
     //LiveKit Routes
     Route::middleware(['auth'])->post('/tasks/{task}/livekit-token', [LiveKitController::class, 'livekitToken']);

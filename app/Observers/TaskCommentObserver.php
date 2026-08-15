@@ -3,51 +3,49 @@
 namespace App\Observers;
 
 use App\Models\TaskComment;
-use App\Models\Activity;
 
 class TaskCommentObserver
 {
-    public function created(TaskComment $comment)
+    public function created(TaskComment $comment): void
     {
-        // Ne pas logger les réponses comme des commentaires "vides" si le contenu est juste un fallback
-        $action = $comment->parent_id ? 'a répondu à un commentaire sur' : 'a commenté la tâche';
+        $comment->loadMissing('task');
 
-        Activity::create([
-            'user_id' => $comment->user_id,
-            'type' => 'create',
-            'subject_type' => TaskComment::class,
-            'subject_id' => $comment->id,
-            'description' => "{$action} « {$comment->task->title} »",
-            'ip_address' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
+        $action = $comment->parent_id
+            ? 'a répondu à un commentaire sur'
+            : 'a commenté la tâche';
+
+        activity_log(
+            'comment',
+            "{$action} « {$comment->task->title} »",
+            $comment,
+            $comment->user_id
+        );
     }
 
-    public function updated(TaskComment $comment)
+    public function updated(TaskComment $comment): void
     {
-        if ($comment->wasChanged('content')) {
-            Activity::create([
-                'user_id' => $comment->user_id,
-                'type' => 'update',
-                'subject_type' => TaskComment::class,
-                'subject_id' => $comment->id,
-                'description' => "a modifié un commentaire sur « {$comment->task->title} »",
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+        if (!$comment->wasChanged('content')) {
+            return;
         }
+
+        $comment->loadMissing('task');
+
+        activity_log(
+            'update',
+            "a modifié un commentaire sur « {$comment->task->title} »",
+            $comment,
+            $comment->user_id
+        );
     }
 
-    public function deleted(TaskComment $comment)
+    public function deleted(TaskComment $comment): void
     {
-        Activity::create([
-            'user_id' => auth()->id(),
-            'type' => 'delete',
-            'subject_type' => TaskComment::class,
-            'subject_id' => $comment->id,
-            'description' => "a supprimé un commentaire sur « {$comment->task->title} »",
-            'ip_address' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
+        $comment->loadMissing('task');
+
+        activity_log(
+            'delete',
+            "a supprimé un commentaire sur « {$comment->task->title} »",
+            $comment
+        );
     }
 }

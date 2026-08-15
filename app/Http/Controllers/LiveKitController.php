@@ -79,6 +79,8 @@ public function notifyCallStarted(Request $request, \App\Models\Project $project
         $project->id, $project->name, $user->id, $user->name, $memberIds
     ));
 
+    activity_log('call_started', "Appel ProJA démarré sur « {$project->name} »", $project);
+
     return response()->json(['status' => 'ok']);
 }
 
@@ -89,12 +91,17 @@ public function notifyCallEnded(Request $request, \App\Models\Project $project)
 
     event(new \App\Events\LiveKitCallEnded($project->id, $user->id, $memberIds));
 
+    activity_log('call_ended', "Appel ProJA terminé sur « {$project->name} »", $project);
+
     return response()->json(['status' => 'ok']);
 }
 public function notifyCallAnswered(Request $request, \App\Models\Project $project)
 {
     $memberIds = $project->users()->pluck('users.id')->toArray();
     event(new \App\Events\LiveKitCallAnswered($project->id, $memberIds));
+
+    activity_log('call_answered', "Appel ProJA accepté sur « {$project->name} »", $project);
+
     return response()->json(['status' => 'ok']);
 }
 
