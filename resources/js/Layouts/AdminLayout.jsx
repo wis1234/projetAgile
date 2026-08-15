@@ -254,7 +254,7 @@ export default function AdminLayout({ children }) {
   useEffect(() => {
     if (!window.Echo || !userId) return;
 
-    const channel = window.Echo.private(`App.Models.User.${userId}`);
+    const channel = window.Echo.private(`user.${userId}`);
 
     channel.listen('.activity.created', (payload) => {
       setNotifications(prev => [
@@ -265,7 +265,7 @@ export default function AdminLayout({ children }) {
     });
 
     return () => {
-      window.Echo.leave(`App.Models.User.${userId}`);
+      window.Echo.leave(`user.${userId}`);
     };
   }, [userId]);
 
