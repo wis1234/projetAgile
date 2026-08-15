@@ -4,7 +4,7 @@ import { router } from '@inertiajs/react';
 import {
   FaHistory, FaUserCircle, FaRegListAlt, FaProjectDiagram, FaTasks,
   FaFileAlt, FaUser, FaSearch, FaCommentDots, FaDownload, FaFilter,
-  FaChevronRight, FaTimes, FaCalendarAlt
+  FaChevronRight, FaTimes, FaCalendarAlt, FaChartBar, FaSun
 } from 'react-icons/fa';
 
 // ─── Config visuelle par type d'activité (cohérente avec la page Show) ────
@@ -61,17 +61,15 @@ export default function Index({ activities, users, filters = {}, types = [], sta
   };
 
   return (
-    <div className="flex flex-col w-full min-h-screen bg-gray-50 dark:bg-gray-950 p-0 m-0">
-      <main className="flex-1 flex flex-col w-full py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-8">
+    <div className="flex flex-col w-full min-h-screen bg-gray-50 dark:bg-gray-950 p-0 m-0 overflow-x-hidden">
+      <main className="flex-1 flex flex-col w-full min-w-0 py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-8">
 
         {/* ─── Header avec dégradé ─── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 rounded-3xl shadow-lg shadow-blue-500/10 p-6 sm:p-8 mb-8">
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 rounded-3xl shadow-lg shadow-blue-500/10 p-6 sm:p-8 mb-6">
           <div className="absolute -top-10 -right-10 w-56 h-56 bg-white/10 rounded-full blur-2xl" />
           <div className="absolute -bottom-16 -left-10 w-56 h-56 bg-white/5 rounded-full blur-2xl" />
 
-          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-
-            {/* Titre */}
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
             <div className="flex items-center gap-4 min-w-0">
               <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
                 <FaHistory className="text-2xl text-white" />
@@ -82,105 +80,118 @@ export default function Index({ activities, users, filters = {}, types = [], sta
               </div>
             </div>
 
-            {/* Stats + export, côte à côte */}
-            <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex items-center justify-center gap-2 bg-white text-indigo-700 hover:bg-blue-50 px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-sm whitespace-nowrap flex-shrink-0"
+            >
+              <FaDownload className="w-3.5 h-3.5" /> Exporter
+            </button>
+          </div>
+        </div>
+
+        {/* ─── Stats + Filtres : côte à côte sur écran large ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] gap-4 sm:gap-6 mb-6 min-w-0">
+
+          {/* Carte stats */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 sm:p-6 min-w-0">
+            <div className="flex items-center gap-2 mb-4">
+              <FaChartBar className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Statistiques</span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
               {stats.total !== undefined && (
-                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
-                  <span className="text-lg font-extrabold text-white leading-none">{stats.total}</span>
-                  <span className="text-xs font-medium text-blue-100 whitespace-nowrap">activités au total</span>
+                <div className="flex lg:flex-col items-center lg:items-start justify-between lg:justify-center gap-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900 rounded-xl px-4 py-3">
+                  <span className="text-2xl font-extrabold text-blue-700 dark:text-blue-300 leading-none">{stats.total}</span>
+                  <span className="text-xs font-medium text-blue-600/80 dark:text-blue-300/70 whitespace-nowrap">activités au total</span>
                 </div>
               )}
               {stats.today !== undefined && (
-                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
-                  <span className="text-lg font-extrabold text-white leading-none">{stats.today}</span>
-                  <span className="text-xs font-medium text-blue-100 whitespace-nowrap">aujourd'hui</span>
+                <div className="flex lg:flex-col items-center lg:items-start justify-between lg:justify-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900 rounded-xl px-4 py-3">
+                  <span className="text-2xl font-extrabold text-indigo-700 dark:text-indigo-300 leading-none flex items-center gap-1.5">
+                    <FaSun className="w-4 h-4 opacity-60" />{stats.today}
+                  </span>
+                  <span className="text-xs font-medium text-indigo-600/80 dark:text-indigo-300/70 whitespace-nowrap">aujourd'hui</span>
                 </div>
               )}
-              <button
-                type="button"
-                onClick={handleExport}
-                className="inline-flex items-center justify-center gap-2 bg-white text-indigo-700 hover:bg-blue-50 px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-sm whitespace-nowrap"
-              >
-                <FaDownload className="w-3.5 h-3.5" /> Exporter
-              </button>
             </div>
           </div>
-        </div>
 
-        {/* ─── Filtres ─── */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 sm:p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FaFilter className="w-3.5 h-3.5 text-gray-400" />
-            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Filtrer les résultats</span>
-          </div>
-
-          <form onSubmit={handleFilter} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
-              <label htmlFor="user-select" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                Utilisateur
-              </label>
-              <select
-                id="user-select"
-                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white transition-colors"
-                value={userId}
-                onChange={e => setUserId(e.target.value)}
-              >
-                <option value="">Tous les utilisateurs</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+          {/* Carte filtres */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 sm:p-6 min-w-0">
+            <div className="flex items-center gap-2 mb-4">
+              <FaFilter className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Filtrer les résultats</span>
             </div>
 
-            <div>
-              <label htmlFor="type-select" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                Type d'action
-              </label>
-              <select
-                id="type-select"
-                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white transition-colors"
-                value={type}
-                onChange={e => setType(e.target.value)}
-              >
-                <option value="">Tous les types</option>
-                {types.map(t => <option key={t} value={t}>{typeLabels[t] || t}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="date-input" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                Date
-              </label>
-              <input
-                type="date"
-                id="date-input"
-                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white transition-colors"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-end gap-2">
-              <button
-                type="submit"
-                className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-sm"
-              >
-                <FaSearch className="w-3.5 h-3.5" /> Filtrer
-              </button>
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 transition-colors"
-                  title="Réinitialiser les filtres"
+            <form onSubmit={handleFilter} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 min-w-0">
+              <div className="min-w-0">
+                <label htmlFor="user-select" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                  Utilisateur
+                </label>
+                <select
+                  id="user-select"
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white transition-colors"
+                  value={userId}
+                  onChange={e => setUserId(e.target.value)}
                 >
-                  <FaTimes className="w-3.5 h-3.5" />
+                  <option value="">Tous les utilisateurs</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+
+              <div className="min-w-0">
+                <label htmlFor="type-select" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                  Type d'action
+                </label>
+                <select
+                  id="type-select"
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white transition-colors"
+                  value={type}
+                  onChange={e => setType(e.target.value)}
+                >
+                  <option value="">Tous les types</option>
+                  {types.map(t => <option key={t} value={t}>{typeLabels[t] || t}</option>)}
+                </select>
+              </div>
+
+              <div className="min-w-0">
+                <label htmlFor="date-input" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  id="date-input"
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900/50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white transition-colors"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-end gap-2 min-w-0">
+                <button
+                  type="submit"
+                  className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-sm"
+                >
+                  <FaSearch className="w-3.5 h-3.5" /> Filtrer
                 </button>
-              )}
-            </div>
-          </form>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 transition-colors"
+                    title="Réinitialiser les filtres"
+                  >
+                    <FaTimes className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
         </div>
 
         {/* ─── Liste des activités ─── */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-8 min-w-0">
 
           {activities.data.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center px-4">
