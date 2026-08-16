@@ -31,49 +31,25 @@
             overflow: hidden;
         }
 
+        /* ===== Header aligné sur le template "sprint-deadline extended" ===== */
         .header {
-            background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
-            padding: 40px 30px;
+            background: #f5f7fac5;
+            padding: 28px 30px 22px 30px;
             text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: pulse 15s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.3; }
-            50% { transform: scale(1.1); opacity: 0.6; }
-        }
-
-        .logo {
-            font-size: 32px;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
-            position: relative;
-            z-index: 1;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            border-bottom: 1px solid #e2e8f0;
         }
 
         .header-title {
-            color: #f8fafc;
-            font-size: 22px;
+            color: #1e293b;
+            font-size: 19px;
             font-weight: 600;
-            position: relative;
-            z-index: 1;
-            margin: 0;
+            text-align: center;
+            width: 100%;
+            display: block;
+            line-height: 1.35;
+            margin-top: 2px;
         }
+        /* ===== fin header ===== */
 
         .content {
             padding: 35px 30px;
@@ -250,15 +226,11 @@
 
         @media (max-width: 600px) {
             .header {
-                padding: 30px 20px;
-            }
-
-            .logo {
-                font-size: 28px;
+                padding: 24px 20px 18px 20px;
             }
 
             .header-title {
-                font-size: 18px;
+                font-size: 17px;
             }
 
             .content {
@@ -296,9 +268,37 @@
 </head>
 <body>
     <div class="email-wrapper">
+
         <div class="header">
-            <div class="logo">{{ config('app.name') }}</div>
-            <h1 class="header-title">Nouvelle Tâche Assignée</h1>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td align="center" style="text-align:center;">
+
+                        <img src="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png"
+                             alt="ProJA"
+                             width="140"
+                             style="
+                                display:block;
+                                margin:0 auto 6px auto;
+                                border:0;
+                                outline:none;
+                                text-decoration:none;
+                                max-width:140px;
+                                width:140px;
+                                height:auto;
+                                color:#4361ee;
+                                font-size:20px;
+                                font-weight:700;
+                                font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                             ">
+
+                        <div class="header-title">
+                            Nouvelle tâche assignée
+                        </div>
+
+                    </td>
+                </tr>
+            </table>
         </div>
 
         <div class="content">
@@ -333,7 +333,7 @@
             @endphp
 
             <div class="greeting">
-                Salut <strong>{{ $prenom }}</strong> 👋
+                Salut <strong>{{ $prenom }}</strong> ,
             </div>
 
             <p class="intro-text">
