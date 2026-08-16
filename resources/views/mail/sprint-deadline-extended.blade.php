@@ -35,17 +35,17 @@
         }
 
         .logo {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 700;
             color: #4361ee;
             letter-spacing: 0.3px;
-            margin-bottom: 4px;
+            margin-bottom: 0;
         }
 
         .header-title {
-            color: #334155;
-            font-size: 15px;
-            font-weight: 500;
+            color: #1e293b;
+            font-size: 19px;
+            font-weight: 600;
         }
 
         .content {
@@ -79,12 +79,6 @@
             margin-bottom: 18px;
         }
 
-        .task-meta {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-
         .meta-item {
             background: white;
             padding: 12px 14px;
@@ -105,23 +99,19 @@
         }
 
         .box-heading {
-            display: flex;
-            align-items: center;
-            gap: 8px;
             font-weight: 700;
         }
 
         .icon-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
+            display: inline-block;
             width: 20px;
             height: 20px;
             border-radius: 50%;
             font-size: 12px;
             font-weight: 700;
-            line-height: 1;
-            flex-shrink: 0;
+            line-height: 20px;
+            text-align: center;
+            vertical-align: middle;
         }
 
         .success-box {
@@ -151,9 +141,6 @@
         }
 
         .reminder-note {
-            display: flex;
-            gap: 10px;
-            align-items: flex-start;
             margin-top: 24px;
             font-size: 14px;
             color: #64748b;
@@ -162,7 +149,6 @@
         .reminder-note .icon-badge {
             background: #eef2ff;
             color: #4361ee;
-            margin-top: 2px;
         }
 
         ul {
@@ -194,13 +180,6 @@
             color: #64748b;
         }
 
-
-        @media(max-width:600px){
-            .task-meta{
-                grid-template-columns:1fr;
-            }
-        }
-
     </style>
 </head>
 
@@ -216,10 +195,10 @@
             <td align="center" style="text-align:center;">
 
                 <div class="logo" style="
-                    font-size:22px;
+                    font-size:20px;
                     font-weight:700;
                     color:#4361ee;
-                    margin:0 auto 4px auto;
+                    margin:0 auto;
                     text-align:center;
                     width:100%;
                     display:block;
@@ -230,15 +209,16 @@
 
 
                 <div class="header-title" style="
-                    color:#334155;
-                    font-size:15px;
-                    font-weight:500;
+                    color:#1e293b;
+                    font-size:19px;
+                    font-weight:600;
                     text-align:center;
                     width:100%;
                     display:block;
-                    line-height:1.4;
+                    line-height:1.35;
+                    margin-top:2px;
                 ">
-                    Alerte : Prolongation du délai d'un sprint (objectif)
+                    Alerte : Prolongation du délai d'atteinte d'un objectif(sprint)
                 </div>
 
             </td>
@@ -252,12 +232,12 @@
 
 
         <div class="greeting">
-            Bonjour à toute l'équipe,
+            Salut la team,
         </div>
 
 
         <p class="intro-text">
-            Le délai initialement prévu pour le sprint(objectif) 
+            Le délai initialement prévu pour atteindre l'objectif (sprint)
             <strong>{{ $sprint->name }}</strong>
             a été prolongé afin de permettre la finalisation des tâches restantes.
         </p>
@@ -271,39 +251,50 @@
             </div>
 
 
-            <div class="task-meta">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td width="50%" valign="top" style="width:50%;">
+                        <div class="meta-item">
+                            <span class="meta-label">
+                                Ancienne date de fin
+                            </span>
 
-                <div class="meta-item">
-                    <span class="meta-label">
-                        Ancienne date de fin
-                    </span>
+                            <span class="meta-value">
+                                {{ \Carbon\Carbon::parse($oldEndDate)->translatedFormat('d F Y à H:i') }}
+                            </span>
+                        </div>
+                    </td>
+                    <td width="12" style="width:12px;line-height:0;font-size:0;">&nbsp;</td>
+                    <td width="50%" valign="top" style="width:50%;">
+                        <div class="meta-item">
+                            <span class="meta-label">
+                                Nouvelle date de fin
+                            </span>
 
-                    <span class="meta-value">
-                        {{ \Carbon\Carbon::parse($oldEndDate)->translatedFormat('d F Y à H:i') }}
-                    </span>
-                </div>
-
-
-                <div class="meta-item">
-                    <span class="meta-label">
-                        Nouvelle date de fin
-                    </span>
-
-                    <span class="meta-value">
-                        {{ \Carbon\Carbon::parse($sprint->end_date)->translatedFormat('d F Y à H:i') }}
-                    </span>
-                </div>
-
-            </div>
+                            <span class="meta-value">
+                                {{ \Carbon\Carbon::parse($sprint->end_date)->translatedFormat('d F Y à H:i') }}
+                            </span>
+                        </div>
+                    </td>
+                </tr>
+            </table>
 
 
 
             <div class="success-box">
 
-                <div class="box-heading">
-                    <span class="icon-badge">&#10003;</span>
-                    <span>Tâches achevées jusqu'à ce jour</span>
-                </div>
+                <table cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td width="22" valign="middle" style="width:22px;">
+                            <table cellpadding="0" cellspacing="0" border="0" width="20" height="20" style="width:20px;height:20px;">
+                                <tr>
+                                    <td align="center" valign="middle" width="20" height="20" style="width:20px;height:20px;background-color:#10b981;border-radius:50%;color:#ffffff;font-size:12px;font-weight:700;line-height:20px;">&#10003;</td>
+                                </tr>
+                            </table>
+                        </td>
+                        <td valign="middle" class="box-heading">Tâches achevées jusqu'à ce jour</td>
+                    </tr>
+                </table>
 
 
                 @if($completedTasks->isNotEmpty())
@@ -332,10 +323,18 @@
 
             <div class="warning-box">
 
-                <div class="box-heading">
-                    <span class="icon-badge">!</span>
-                    <span>Tâches non achevées</span>
-                </div>
+                <table cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td width="22" valign="middle" style="width:22px;">
+                            <table cellpadding="0" cellspacing="0" border="0" width="20" height="20" style="width:20px;height:20px;">
+                                <tr>
+                                    <td align="center" valign="middle" width="20" height="20" style="width:20px;height:20px;background-color:#f97316;border-radius:50%;color:#ffffff;font-size:12px;font-weight:700;line-height:20px;">!</td>
+                                </tr>
+                            </table>
+                        </td>
+                        <td valign="middle" class="box-heading">Tâches non achevées</td>
+                    </tr>
+                </table>
 
 
                 @if($unfinishedTasks->isNotEmpty())
@@ -377,18 +376,26 @@
 
 
 
-        <div class="reminder-note">
-            <span class="icon-badge">i</span>
-            <p>
-                <strong>Rappel important :</strong>
-                Nous vous invitons à mobiliser tous les moyens nécessaires
-                pour finaliser les tâches restantes.
-                Un nouveau report du sprint pourrait avoir un impact important
-                sur le calendrier global du projet.
-                La collaboration et l'engagement de chacun sont essentiels
-                pour atteindre les objectifs fixés.
-            </p>
-        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" class="reminder-note">
+            <tr>
+                <td width="30" valign="top" style="width:30px;padding-top:2px;">
+                    <table cellpadding="0" cellspacing="0" border="0" width="20" height="20" style="width:20px;height:20px;">
+                        <tr>
+                            <td align="center" valign="middle" width="20" height="20" style="width:20px;height:20px;background-color:#eef2ff;border-radius:50%;color:#4361ee;font-size:12px;font-weight:700;line-height:20px;">i</td>
+                        </tr>
+                    </table>
+                </td>
+                <td valign="top">
+                    <strong>Rappel important :</strong>
+                    Nous vous invitons à mobiliser tous les moyens nécessaires
+                    pour finaliser les tâches restantes.
+                    Un nouveau report du sprint pourrait avoir un impact important
+                    sur le calendrier global du projet.
+                    La collaboration et l'engagement de chacun sont essentiels
+                    pour atteindre les objectifs fixés.
+                </td>
+            </tr>
+        </table>
 
 
 
