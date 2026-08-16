@@ -31,49 +31,25 @@
             overflow: hidden;
         }
         
+        /* ===== Header aligné sur le template "sprint-deadline extended" ===== */
         .header {
-            background: linear-gradient(135deg, #4361ee 10%, #6d28d9 100%);
-            padding: 40px 30px;
+            background: #f5f7fac5;
+            padding: 28px 30px 22px 30px;
             text-align: center;
-            position: relative;
-            overflow: hidden;
+            border-bottom: 1px solid #e2e8f0;
         }
-        
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: pulse 15s ease-in-out infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.3; }
-            50% { transform: scale(1.1); opacity: 0.6; }
-        }
-        
-        .logo {
-            font-size: 32px;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
-            position: relative;
-            z-index: 1;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-        
+
         .header-title {
-            color: #f8fafc;
-            font-size: 20px;
-            font-weight: 500;
-            position: relative;
-            z-index: 1;
-            opacity: 0.95;
+            color: #1e293b;
+            font-size: 19px;
+            font-weight: 600;
+            text-align: center;
+            width: 100%;
+            display: block;
+            line-height: 1.35;
+            margin-top: 2px;
         }
+        /* ===== fin header ===== */
         
         .content {
             padding: 35px 30px;
@@ -114,18 +90,20 @@
         }
         
         .task-meta {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 6px;
+            margin: 0 -6px 20px -6px;
         }
         
         .meta-item {
+            width: 50%;
             background: white;
             padding: 10px 14px;
             border-radius: 8px;
             font-size: 13px;
             border: 1px solid #e2e8f0;
+            vertical-align: top;
         }
         
         .meta-label {
@@ -253,12 +231,12 @@
         
         
         @media (max-width: 600px) {
-            .task-meta {
-                grid-template-columns: 1fr;
+            .header {
+                padding: 24px 20px 18px 20px;
             }
             
-            .header {
-                padding: 30px 20px;
+            .header-title {
+                font-size: 17px;
             }
             
             .content {
@@ -273,9 +251,37 @@
 </head>
 <body>
     <div class="email-wrapper">
+
         <div class="header">
-            <div class="logo">ProJA</div>
-            <div class="header-title">Nouveau fichier sur une tâche</div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td align="center" style="text-align:center;">
+
+                        <img src="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png"
+                             alt="ProJA"
+                             width="140"
+                             style="
+                                display:block;
+                                margin:0 auto 6px auto;
+                                border:0;
+                                outline:none;
+                                text-decoration:none;
+                                max-width:140px;
+                                width:140px;
+                                height:auto;
+                                color:#4361ee;
+                                font-size:20px;
+                                font-weight:700;
+                                font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                             ">
+
+                        <div class="header-title">
+                            Nouveau fichier sur une tâche
+                        </div>
+
+                    </td>
+                </tr>
+            </table>
         </div>
         
         <div class="content">
@@ -298,38 +304,44 @@
                     'moyenne' => 'Moyenne',
                     'haute' => 'Haute'
                 ];
+
+                $prenom = $notifiable->name ? explode(' ', $notifiable->name)[0] : 'Utilisateur';
             @endphp
             
             <div class="greeting">
-                Bonjour ,
+                Bonjour <strong>{{ $prenom }}</strong>,
             </div>
             
             <p class="intro-text">
                 <strong>{{ $uploader->name }}</strong>
-                 a  téléversé un nouveau fichier sur la tâche <strong>{{ $task->title }}</strong> du projet <strong>{{ $task->project->name ?? 'Sans projet' }}</strong>.
+                 a téléversé un nouveau fichier sur la tâche <strong>{{ $task->title }}</strong> du projet <strong>{{ $task->project->name ?? 'Sans projet' }}</strong>.
             </p>
             
             <div class="task-card">
                 <div class="task-title">{{ $task->title }}</div>
                 
-                <div class="task-meta">
-                    <div class="meta-item">
-                        <span class="meta-label">Statut</span>
-                        <span class="meta-value">{{ $statuses[$task->status] ?? $task->status }}</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Priorité</span>
-                        <span class="meta-value">{{ $priorities[$task->priority] ?? $task->priority }}</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Assigné à</span>
-                        <span class="meta-value">{{ $task->assignedUser->name ?? 'Non assigné' }}</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Date d'échéance</span>
-                        <span class="meta-value">{{ $task->due_date ? \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') : 'Non définie' }}</span>
-                    </div>
-                </div>
+                <table class="task-meta" role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td class="meta-item">
+                            <span class="meta-label">Statut</span>
+                            <span class="meta-value">{{ $statuses[$task->status] ?? $task->status }}</span>
+                        </td>
+                        <td class="meta-item">
+                            <span class="meta-label">Priorité</span>
+                            <span class="meta-value">{{ $priorities[$task->priority] ?? $task->priority }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="meta-item">
+                            <span class="meta-label">Assigné à</span>
+                            <span class="meta-value">{{ $task->assignedUser->name ?? 'Non assigné' }}</span>
+                        </td>
+                        <td class="meta-item">
+                            <span class="meta-label">Date d'échéance</span>
+                            <span class="meta-value">{{ $task->due_date ? \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') : 'Non définie' }}</span>
+                        </td>
+                    </tr>
+                </table>
                 
                 <div class="file-box">
                     <div class="file-header">
@@ -418,22 +430,21 @@
                         </div>
                     </div>
 
-             <div style="text-align: center; margin-top: 20px;">
-                <a href="{{ route('tasks.show', $task->id) }}" class="btn" style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <span style="color: white;">Voir la tâche complète</span>
-                </a>
-            </div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <a href="{{ route('tasks.show', $task->id) }}" class="btn" style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <span style="color: white;">Voir la tâche complète</span>
+                        </a>
+                    </div>
                 </div>
             </div>
             
             <p style="margin-top: 24px; font-size: 14px; color: #64748b; line-height: 1.6;">
                 Vous recevez cette notification car vous êtes impliqué dans cette tâche. Si vous pensez qu'il s'agit d'une erreur, veuillez contacter un administrateur.
             </p>
-            
 
         </div>
         
-            <div class="footer">
+        <div class="footer">
             <p class="footer-copyright">
                 © {{ date('Y') }} {{ config('app.name') }}. Tous droits réservés.
             </p>

@@ -427,4 +427,11 @@ class User extends Authenticatable implements MustVerifyEmail
         
         return 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&color=FFFFFF&background=0D8ABC';
     }
+
+    //Email verification 
+    public function sendEmailVerificationNotification()
+{
+    $this->notify(new \App\Notifications\VerifyEmailNotification);
+}
+
 }
