@@ -34,14 +34,6 @@
             border-bottom: 1px solid #e2e8f0;
         }
 
-        .logo {
-            font-size: 20px;
-            font-weight: 700;
-            color: #4361ee;
-            letter-spacing: 0.3px;
-            margin-bottom: 0;
-        }
-
         .header-title {
             color: #1e293b;
             font-size: 19px;
@@ -194,18 +186,23 @@
         <tr>
             <td align="center" style="text-align:center;">
 
-                <div class="logo" style="
-                    font-size:20px;
-                    font-weight:700;
-                    color:#4361ee;
-                    margin:0 auto;
-                    text-align:center;
-                    width:100%;
-                    display:block;
-                    line-height:1.2;
-                ">
-                    ProJA
-                </div>
+                <img src="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png"
+                     alt="ProJA"
+                     width="140"
+                     style="
+                        display:block;
+                        margin:0 auto 6px auto;
+                        border:0;
+                        outline:none;
+                        text-decoration:none;
+                        max-width:140px;
+                        width:140px;
+                        height:auto;
+                        color:#4361ee;
+                        font-size:20px;
+                        font-weight:700;
+                        font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                     ">
 
 
                 <div class="header-title" style="
@@ -218,7 +215,7 @@
                     line-height:1.35;
                     margin-top:2px;
                 ">
-                    Alerte : Prolongation du délai d'atteinte d'un objectif(sprint)
+                    Alerte : Prolongation du délai d'un sprint (objectif)
                 </div>
 
             </td>
@@ -232,7 +229,7 @@
 
 
         <div class="greeting">
-            Salut la team,
+            Bonjour à toute l'équipe,
         </div>
 
 
