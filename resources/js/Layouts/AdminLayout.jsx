@@ -140,6 +140,7 @@ export default function AdminLayout({ children }) {
   // ─── Appel ProJA (LiveKit) — état global, actif peu importe la page ───
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
   const [liveKitInvite, setLiveKitInvite] = useState(null); // { projectId, projectName, initiatorName }
+  const [joinToast, setJoinToast] = useState(null); // { projectName, userName }
   const ringtoneRef = useRef(null);
 
   const playRingtone = () => {
@@ -305,6 +306,14 @@ channel.listen('.livekit.call.ended', () => {
 
     channel.listen('.livekit.call.answered', () => {
       stopRingtone(); // quelqu'un a répondu : plus la peine de continuer à sonner
+    });
+
+    // ─── Signal discret : un membre rejoint un appel déjà en cours ───
+    // Contrairement à `.livekit.call.started`, ceci ne sonne pas et n'ouvre
+    // pas l'écran "appel entrant" : c'est juste une notification passagère.
+    channel.listen('.livekit.participant.joined', (e) => {
+      setJoinToast({ projectName: e.projectName, userName: e.userName });
+      setTimeout(() => setJoinToast(null), 4000);
     });
 
     return () => {
@@ -820,6 +829,22 @@ channel.listen('.livekit.call.ended', () => {
           </footer>
         </main>
       </div>
+
+      {/* ─── Toast discret : quelqu'un a rejoint un appel déjà en cours ─── */}
+      {joinToast && (
+        <div className="fixed bottom-6 right-6 z-[9998] bg-gray-900 dark:bg-gray-700 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+          <span className="text-sm">
+            <strong>{joinToast.userName}</strong> a rejoint l'appel — {joinToast.projectName}
+          </span>
+          <button
+            onClick={() => setJoinToast(null)}
+            className="text-white/50 hover:text-white text-xs ml-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ─── Bannière d'appel ProJA entrant (visible sur toute page) ─── */}
       {liveKitInvite && !showLiveKitCall && (

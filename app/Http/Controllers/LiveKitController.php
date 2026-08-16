@@ -139,12 +139,24 @@ public function joinOrStartCall(Request $request, \App\Models\Project $project)
         $alreadyActive = false;
     }
 
+    $memberIds = $project->users()->pluck('users.id')->toArray();
+
     if (!$alreadyActive) {
-        $memberIds = $project->users()->pluck('users.id')->toArray();
+        // Personne n'est encore dans l'appel : c'est un vrai démarrage,
+        // les autres membres reçoivent l'invite avec sonnerie.
         event(new \App\Events\LiveKitCallStarted(
             $project->id, $project->name, $user->id, $user->name, $memberIds
         ));
+    } else {
+        // L'appel existe déjà : ce membre le rejoint simplement, en retard.
+        // Les autres reçoivent une notification discrète, sans sonnerie
+        // ni écran "appel entrant".
+        event(new \App\Events\LiveKitParticipantJoined(
+            $project->id, $project->name, $user->id, $user->name, $memberIds
+        ));
     }
+
+    activity_log('call_answered', "{$user->name} a rejoint l'appel ProJA Meet sur « {$project->name} »", $project);
 
     return response()->json(['alreadyActive' => $alreadyActive]);
 }
