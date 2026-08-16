@@ -126,45 +126,43 @@ const ZoomStatusBar = ({ project, onOpen }) => {
   const [liveMeeting, setLiveMeeting] = useState(null);
   const [checked, setChecked] = useState(false);
 
+// ─── Statut initial de l'appel (une seule fois au chargement) ───
   useEffect(() => {
-    let cancelled = false;
-
-    const fetchLiveMeeting = async () => {
-      try {
-        const response = await fetch(route('api.zoom.active', { project: project.id }), {
-          headers: {
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-          },
-          credentials: 'include',
-        });
-        if (!response.ok) return;
-        const result = await response.json();
-        if (cancelled) return;
-
-        if (result.success && result.meeting) {
-          const start = parseISO(result.meeting.start_time);
-          const end = addMinutes(start, result.meeting.duration);
-          const isOngoing = isBefore(new Date(), end) && isAfter(new Date(), start);
-          setLiveMeeting(isOngoing ? result.meeting : null);
-        } else {
-          setLiveMeeting(null);
-        }
-      } catch (e) {
-        // Échec silencieux : le badge "En cours" reste simplement masqué,
-        // l'utilisateur peut toujours ouvrir le modal pour vérifier.
-      } finally {
-        if (!cancelled) setChecked(true);
-      }
-    };
-
-    fetchLiveMeeting();
-    const interval = setInterval(fetchLiveMeeting, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+    fetch(`/projects/${project.id}/livekit-call/status`)
+      .then(res => res.json())
+      .then(data => setCallActive(!!data.active))
+      .catch(() => {});
   }, [project.id]);
+
+  // ─── Temps réel : mise à jour instantanée via le système d'events déjà en place ───
+  // Réutilise exactement les mêmes events que la bannière globale d'AdminLayout
+  // (LiveKitCallStarted / LiveKitCallEnded / LiveKitCallAnswered), diffusés sur le
+  // canal privé `user.{id}` de chaque membre du projet. Ainsi, même un membre arrivé
+  // en retard voit le bouton "Rejoindre" apparaître dès que l'appel démarre, sans
+  // avoir besoin de recharger la page ni d'attendre un polling.
+  useEffect(() => {
+    if (!window.Echo || !auth?.user?.id) return;
+
+    const channel = window.Echo.private(`user.${auth.user.id}`);
+
+    const handleStarted = (e) => {
+      if (String(e.projectId) === String(project.id)) setCallActive(true);
+    };
+    const handleEnded = (e) => {
+      if (String(e.projectId) === String(project.id)) setCallActive(false);
+    };
+    const handleAnswered = (e) => {
+      if (String(e.projectId) === String(project.id)) setCallActive(true);
+    };
+
+    channel.listen('.livekit.call.started', handleStarted);
+    channel.listen('.livekit.call.ended', handleEnded);
+    channel.listen('.livekit.call.answered', handleAnswered);
+
+    return () => {
+      window.Echo.leave(`user.${auth.user.id}`);
+    };
+  }, [auth?.user?.id, project.id]);
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
