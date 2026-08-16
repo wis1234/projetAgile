@@ -126,44 +126,6 @@ const ZoomStatusBar = ({ project, onOpen }) => {
   const [liveMeeting, setLiveMeeting] = useState(null);
   const [checked, setChecked] = useState(false);
 
-// ─── Statut initial de l'appel (une seule fois au chargement) ───
-  useEffect(() => {
-    fetch(`/projects/${project.id}/livekit-call/status`)
-      .then(res => res.json())
-      .then(data => setCallActive(!!data.active))
-      .catch(() => {});
-  }, [project.id]);
-
-  // ─── Temps réel : mise à jour instantanée via le système d'events déjà en place ───
-  // Réutilise exactement les mêmes events que la bannière globale d'AdminLayout
-  // (LiveKitCallStarted / LiveKitCallEnded / LiveKitCallAnswered), diffusés sur le
-  // canal privé `user.{id}` de chaque membre du projet. Ainsi, même un membre arrivé
-  // en retard voit le bouton "Rejoindre" apparaître dès que l'appel démarre, sans
-  // avoir besoin de recharger la page ni d'attendre un polling.
-  useEffect(() => {
-    if (!window.Echo || !auth?.user?.id) return;
-
-    const channel = window.Echo.private(`user.${auth.user.id}`);
-
-    const handleStarted = (e) => {
-      if (String(e.projectId) === String(project.id)) setCallActive(true);
-    };
-    const handleEnded = (e) => {
-      if (String(e.projectId) === String(project.id)) setCallActive(false);
-    };
-    const handleAnswered = (e) => {
-      if (String(e.projectId) === String(project.id)) setCallActive(true);
-    };
-
-    channel.listen('.livekit.call.started', handleStarted);
-    channel.listen('.livekit.call.ended', handleEnded);
-    channel.listen('.livekit.call.answered', handleAnswered);
-
-    return () => {
-      window.Echo.leave(`user.${auth.user.id}`);
-    };
-  }, [auth?.user?.id, project.id]);
-
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div className="flex items-center gap-3 min-w-0">
@@ -406,6 +368,31 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
     };
   }, [project.id]);
 
+  // ─── Temps réel : mise à jour instantanée du statut d'appel ProJA Meet ───
+  useEffect(() => {
+    const authUserId = auth?.user?.id;
+    if (!window.Echo || !authUserId) return;
+
+    const channel = window.Echo.private(`user.${authUserId}`);
+
+    const handleStarted = (e) => {
+      if (String(e.projectId) === String(project.id)) setCallActive(true);
+    };
+    const handleEnded = (e) => {
+      if (String(e.projectId) === String(project.id)) setCallActive(false);
+    };
+    const handleAnswered = (e) => {
+      if (String(e.projectId) === String(project.id)) setCallActive(true);
+    };
+
+    channel.listen('.livekit.call.started', handleStarted);
+    channel.listen('.livekit.call.ended', handleEnded);
+    channel.listen('.livekit.call.answered', handleAnswered);
+
+    return () => {
+      window.Echo.leave(`user.${authUserId}`);
+    };
+  }, [auth?.user?.id, project.id]);
 
   const userRoles = Array.isArray(auth?.user?.roles) ? auth.user.roles : [];
   const isAdmin = userRoles.includes('admin');
