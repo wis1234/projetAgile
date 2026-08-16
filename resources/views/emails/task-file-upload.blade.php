@@ -320,7 +320,7 @@
             <div class="task-card">
                 <div class="task-title">{{ $task->title }}</div>
                 
-                <table class="task-meta" role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <!--    <table class="task-meta" role="presentation" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                         <td class="meta-item">
                             <span class="meta-label">Statut</span>
@@ -341,7 +341,7 @@
                             <span class="meta-value">{{ $task->due_date ? \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') : 'Non définie' }}</span>
                         </td>
                     </tr>
-                </table>
+                </table> -->
                 
                 <div class="file-box">
                     <div class="file-header">
