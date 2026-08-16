@@ -45,10 +45,10 @@ class TaskFileUploadNotification extends Notification
         $task = $this->task;
         $file = $this->file;
         $uploader = $this->uploader;
-        
+
         return (new MailMessage)
             ->subject("Nouveau fichier sur la tâche : " . $task->title)
-            ->view('emails.task-file-upload', compact('task', 'file', 'uploader'));
+            ->view('emails.task-file-upload', compact('task', 'file', 'uploader', 'notifiable'));
     }
 
     /**
