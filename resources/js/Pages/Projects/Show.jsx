@@ -372,9 +372,10 @@ const CommentStatsModal = ({ show, onClose, commentsByMember = [] }) => {
 };
 
 // ── Composant principal ─────────────────────────────────────────────────────
-function Show({ project, tasks = [], sprints = [], quizzes = [], auth, stats = {} }) {
+function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp, stats = {} }) {
   const { t, i18n } = useTranslation();
-  const { flash = {} } = usePage().props;
+  const { flash = {}, auth: authFromPage } = usePage().props;
+  const auth = authProp || authFromPage || {};
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
