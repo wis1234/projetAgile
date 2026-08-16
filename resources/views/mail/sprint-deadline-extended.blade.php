@@ -28,21 +28,23 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #4361ee 10%, #6d28d9 100%);
-            padding: 40px 30px;
+            background: #ffffff;
+            padding: 28px 30px 22px 30px;
             text-align: center;
+            border-bottom: 1px solid #e2e8f0;
         }
 
         .logo {
-            font-size: 32px;
+            font-size: 22px;
             font-weight: 700;
-            color: white;
-            margin-bottom: 12px;
+            color: #4361ee;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
         }
 
         .header-title {
-            color: #f8fafc;
-            font-size: 20px;
+            color: #334155;
+            font-size: 15px;
             font-weight: 500;
         }
 
@@ -102,6 +104,26 @@
             color: #1e293b;
         }
 
+        .box-heading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+        }
+
+        .icon-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
         .success-box {
             background: #ecfdf5;
             border-left: 4px solid #10b981;
@@ -110,12 +132,37 @@
             margin-top: 20px;
         }
 
+        .success-box .icon-badge {
+            background: #10b981;
+            color: #ffffff;
+        }
+
         .warning-box {
             background: #fff7ed;
             border-left: 4px solid #f97316;
             padding: 18px;
             border-radius: 8px;
             margin-top: 20px;
+        }
+
+        .warning-box .icon-badge {
+            background: #f97316;
+            color: #ffffff;
+        }
+
+        .reminder-note {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin-top: 24px;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .reminder-note .icon-badge {
+            background: #eef2ff;
+            color: #4361ee;
+            margin-top: 2px;
         }
 
         ul {
@@ -133,6 +180,7 @@
             text-align: center;
             color: #94a3b8;
             background: white;
+            border-top: 1px solid #e2e8f0;
         }
 
         .footer-copyright {
@@ -161,21 +209,17 @@
 
 <div class="email-wrapper">
 
-<div class="header" style="
-    background: linear-gradient(135deg, #4361ee 10%, #6d28d9 100%);
-    padding: 40px 30px;
-    text-align: center;
-">
+<div class="header">
 
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
             <td align="center" style="text-align:center;">
 
                 <div class="logo" style="
-                    font-size:32px;
+                    font-size:22px;
                     font-weight:700;
-                    color:white;
-                    margin:0 auto 12px auto;
+                    color:#4361ee;
+                    margin:0 auto 4px auto;
                     text-align:center;
                     width:100%;
                     display:block;
@@ -186,15 +230,15 @@
 
 
                 <div class="header-title" style="
-                    color:#f8fafc;
-                    font-size:20px;
+                    color:#334155;
+                    font-size:15px;
                     font-weight:500;
                     text-align:center;
                     width:100%;
                     display:block;
                     line-height:1.4;
                 ">
-                    Alerte : Prolongation du délai d'un sprint(objectif)
+                    Alerte : Prolongation du délai d'un sprint (objectif)
                 </div>
 
             </td>
@@ -256,9 +300,10 @@
 
             <div class="success-box">
 
-                <strong>
-                    ✅ Tâches achevées jusqu'à ce jour
-                </strong>
+                <div class="box-heading">
+                    <span class="icon-badge">&#10003;</span>
+                    <span>Tâches achevées jusqu'à ce jour</span>
+                </div>
 
 
                 @if($completedTasks->isNotEmpty())
@@ -275,7 +320,7 @@
 
                 @else
 
-                    <p>
+                    <p style="margin-top:8px;">
                         Aucune tâche n'a été achevée pour l'instant.
                     </p>
 
@@ -287,9 +332,10 @@
 
             <div class="warning-box">
 
-                <strong>
-                     Tâches non achevées
-                </strong>
+                <div class="box-heading">
+                    <span class="icon-badge">!</span>
+                    <span>Tâches non achevées</span>
+                </div>
 
 
                 @if($unfinishedTasks->isNotEmpty())
@@ -317,7 +363,7 @@
 
                 @else
 
-                    <p>
+                    <p style="margin-top:8px;">
                         Toutes les tâches sont terminées.
                     </p>
 
@@ -331,19 +377,18 @@
 
 
 
-        <p style="margin-top:24px;font-size:14px;color:#64748b">
-
-            ⚠️ <strong>Rappel important :</strong>
-
-            Nous vous invitons à mobiliser tous les moyens nécessaires
-            pour finaliser les tâches restantes.
-            Un nouveau report du sprint pourrait avoir un impact important
-            sur le calendrier global du projet.
-
-            La collaboration et l'engagement de chacun sont essentiels
-            pour atteindre les objectifs fixés.
-
-        </p>
+        <div class="reminder-note">
+            <span class="icon-badge">i</span>
+            <p>
+                <strong>Rappel important :</strong>
+                Nous vous invitons à mobiliser tous les moyens nécessaires
+                pour finaliser les tâches restantes.
+                Un nouveau report du sprint pourrait avoir un impact important
+                sur le calendrier global du projet.
+                La collaboration et l'engagement de chacun sont essentiels
+                pour atteindre les objectifs fixés.
+            </p>
+        </div>
 
 
 
@@ -370,4 +415,3 @@
 
 </body>
 </html>
-
