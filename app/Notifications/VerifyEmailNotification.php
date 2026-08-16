@@ -35,7 +35,7 @@ class VerifyEmailNotification extends VerifyEmail
 
         return (new MailMessage)
             ->subject('Vérifiez votre adresse email')
-            ->view('emails.email-verification', [
+            ->view('emails.verify-email.blade', [
                 'user' => $notifiable,
                 'verificationUrl' => $verificationUrl,
             ]);
