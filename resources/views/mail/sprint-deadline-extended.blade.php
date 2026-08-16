@@ -215,7 +215,7 @@
                     line-height:1.35;
                     margin-top:2px;
                 ">
-                    Alerte : Prolongation du délai d'un sprint (objectif)
+                    Prolongation du délai d’atteinte d’un objectif (sprint)
                 </div>
 
             </td>
@@ -229,7 +229,7 @@
 
 
         <div class="greeting">
-            Bonjour à toute l'équipe,
+            Salut la team,
         </div>
 
 
