@@ -26,7 +26,7 @@ const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '�
 const OUTGOING_RINGTONE_SRC = '/sounds/outgoing-call.mp3'; // tonalité "ça sonne chez l'autre"
 const INCOMING_RINGTONE_SRC = '/sounds/incoming-call.mp3'; // vraie sonnerie d'appel entrant
 
-export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, callerName, onClose, onAnswered }) {
+export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, callerName, onClose, onAnswered, skipIncomingScreen = false }) {
   const [room, setRoom] = useState(null);
   const [livekitLib, setLivekitLib] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -52,7 +52,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   // et donc continue de sonner de son côté, MÊME SI d'autres personnes
   // ont déjà rejoint l'appel entre-temps (ça ne dépend plus du nombre
   // de participants distants, mais uniquement de sa propre action).
-  const [hasAnswered, setHasAnswered] = useState(!!isHost);
+  const [hasAnswered, setHasAnswered] = useState(!!isHost || !!skipIncomingScreen);
   const [declined, setDeclined] = useState(false);
 
   const localVideoRef = useRef(null);

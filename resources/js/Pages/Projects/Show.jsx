@@ -390,10 +390,21 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth, stats = {
 
 
   useEffect(() => {
-    fetch(`/projects/${project.id}/livekit-call/status`)
-      .then(res => res.json())
-      .then(data => setCallActive(!!data.active))
-      .catch(() => {});
+    let cancelled = false;
+
+    const fetchCallStatus = () => {
+      fetch(`/projects/${project.id}/livekit-call/status`)
+        .then(res => res.json())
+        .then(data => { if (!cancelled) setCallActive(!!data.active); })
+        .catch(() => {});
+    };
+
+    fetchCallStatus();
+    const interval = setInterval(fetchCallStatus, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [project.id]);
 
 
@@ -545,12 +556,21 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth, stats = {
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-600">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${callActive ? 'bg-emerald-600' : 'bg-blue-600'}`}>
                   <FaVideo className="text-white text-sm" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-bold text-gray-900 dark:text-white text-sm">ProJA Meet</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Jusqu'à 100 participants simultanés</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-gray-900 dark:text-white text-sm">ProJA Meet</h3>
+                    {callActive && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 flex-shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> En cours
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {callActive ? 'Un appel est en cours sur ce projet' : "Jusqu'à 100 participants simultanés"}
+                  </p>
                 </div>
               </div>
               <button
@@ -568,9 +588,12 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth, stats = {
                     .then(() => setCallActive(true))
                     .catch(err => console.error('Erreur appel:', err));
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition flex-shrink-0"
+                className={`inline-flex items-center gap-1.5 px-3 py-2 text-white text-sm font-medium rounded-lg transition flex-shrink-0 ${
+                  callActive ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
-                <FaVideo className="text-xs" /> {callActive ? 'Rejoindre l’appel en cours' : 'Démarrer / Rejoindre'}
+                {callActive ? <FaDoorOpen className="text-xs" /> : <FaVideo className="text-xs" />}
+                {callActive ? 'Rejoindre' : 'Démarrer un appel'}
               </button>
             </div>
           </div>
@@ -1019,6 +1042,7 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth, stats = {
   tokenEndpoint={`/projects/${project.id}/livekit-token`}
   muteEndpoint={`/projects/${project.id}/livekit-call/mute-participant`}
   isHost={isAdmin || isManager}
+  skipIncomingScreen={true}
   title={project.name}
 
     onAnswered={async () => {
