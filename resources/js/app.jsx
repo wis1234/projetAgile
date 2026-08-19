@@ -52,60 +52,73 @@ createInertiaApp({
     },
 });
 
-// Fix 1 — Rechargement sur retour d'onglet inactif (bfcache)
 if (typeof window !== 'undefined') {
-    // Fix 1 — Duplication d'onglet et bfcache
+    // Fix 1 — Duplication d'onglet / retour depuis le cache navigateur (bfcache)
     window.addEventListener('pageshow', async (event) => {
-        if (event.persisted) {
-            // Vérifier si la session est encore valide avant de recharger
-            try {
-                const res = await fetch('/api/check-auth', {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json',
-                    },
-                    credentials: 'include',
-                });
-                if (res.status === 401 || res.status === 419) {
-                    window.location.href = '/login';
-                } else {
-                    window.location.reload();
-                }
-            } catch {
+        if (!event.persisted) return;
+
+        try {
+            const res = await fetch('/api/check-auth', {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                credentials: 'include',
+            });
+
+            if (res.status === 401 || res.status === 419) {
                 window.location.href = '/login';
+                return;
             }
+
+            // On repasse par le router Inertia plutôt qu'un reload() complet,
+            // pour forcer une visite fraîche (HTML) sans casser le comportement SPA.
+            //
+            // Important : on n'utilise PAS `only: []`. `only` sert aux partial
+            // reloads (le serveur ne renvoie que les props listées) ; un tableau
+            // vide ne garantit pas un rechargement complet et fiable des données.
+            // Un visit standard (sans `only`) fait une requête Inertia normale,
+            // renvoie toutes les props, et avec preserveState: false le composant
+            // est remonté avec un état 100% frais (utile si la session/les
+            // permissions ont changé pendant que l'onglet était en bfcache).
+            router.visit(window.location.pathname, {
+                preserveScroll: true,
+                preserveState: false,
+            });
+        } catch {
+            window.location.href = '/login';
         }
     });
 
-    // Fix 2 — Rechargement si l'onglet était inactif plus de 30 minutes
+    // Fix 2 — Rechargement si l'onglet est resté inactif plus de 30 minutes
     let hiddenAt = null;
     const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             hiddenAt = Date.now();
-        } else if (document.visibilityState === 'visible' && hiddenAt !== null) {
+            return;
+        }
+
+        if (document.visibilityState === 'visible' && hiddenAt !== null) {
             const elapsed = Date.now() - hiddenAt;
             if (elapsed > INACTIVITY_LIMIT) {
-                window.location.reload();
+                router.visit(window.location.pathname);
             }
             hiddenAt = null;
         }
     });
 
-    // Fix 3 — Intercepter les erreurs 419 (CSRF expiré) globalement
-router.on('invalid', (event) => {
-    event.preventDefault();
-    const status = event.detail.response.status;
-    
-    if (status === 401 || status === 419) {
-        // Session ou CSRF expirés → redirection propre vers login
-        window.location.href = '/login';
-    } else if (status === 403) {
-        window.location.href = '/403';
-    } else {
-        // Autre réponse invalide inattendue → login par sécurité
-        window.location.href = '/login';
-    }
-});
+    // Fix 3 — Interception globale des réponses invalides (401 / 403 / 419)
+    router.on('invalid', (event) => {
+        event.preventDefault();
+        const status = event.detail.response.status;
+
+        if (status === 403) {
+            window.location.href = '/403';
+        } else {
+            // 401, 419 (CSRF/session expirés), ou tout autre cas inattendu
+            window.location.href = '/login';
+        }
+    });
 }
