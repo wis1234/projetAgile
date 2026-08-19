@@ -265,7 +265,7 @@
                             <span class="meta-value">{{ $projectName }}</span>
                         </td>
                         <td class="meta-item">
-                            <span class="meta-label">🕐 Heure</span>
+                            <span class="meta-label">🕐 Heure (UTC)</span>
                             <span class="meta-value">{{ $scheduledAt ? \Carbon\Carbon::parse($scheduledAt)->format('d/m/Y H:i') : 'Maintenant' }}</span>
                         </td>
                     </tr>
