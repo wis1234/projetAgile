@@ -146,6 +146,9 @@ Route::middleware(['auth'])->group(function () {
    Route::middleware(['auth'])->get('/projects/{project}/livekit-call/status', [LiveKitController::class, 'callStatus']);
    Route::middleware(['auth'])->post('/projects/{project}/livekit-call/join-or-start', [LiveKitController::class, 'joinOrStartCall']);
    Route::middleware(['auth'])->post('/projects/{project}/livekit-call/mute-participant', [LiveKitController::class, 'muteParticipant']);
+   Route::middleware(['auth'])->get('/projects/{project}/scheduled-calls', [\App\Http\Controllers\ScheduledCallController::class, 'index']);
+   Route::middleware(['auth'])->post('/projects/{project}/scheduled-calls', [\App\Http\Controllers\ScheduledCallController::class, 'store']);
+   Route::middleware(['auth'])->delete('/projects/{project}/scheduled-calls/{schedule}', [\App\Http\Controllers\ScheduledCallController::class, 'destroy']);
    Route::middleware(['auth'])->get('/projects/{project}/livekit-call/invite-link', [LiveKitController::class, 'getInviteLink']);
 
 

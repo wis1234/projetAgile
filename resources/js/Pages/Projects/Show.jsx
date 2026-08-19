@@ -16,6 +16,7 @@ import 'chart.js/auto';
 import Modal from '../../Components/Modal';
 import ZoomMeeting from '../../Components/ZoomMeeting';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
+import ScheduledCallsModal from '@/Components/ScheduledCallsModal';
 
 const getFreshCsrfToken = async () => {
   try {
@@ -347,6 +348,13 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
+  const [showScheduledModal, setShowScheduledModal] = useState(false);
+  const [csrfToken, setCsrfToken] = useState('');
+
+  // Fetch CSRF for the modal early
+  useEffect(() => {
+    getFreshCsrfToken().then(t => setCsrfToken(t));
+  }, []);
   const [callActive, setCallActive] = useState(false);
   const [showCommentStatsModal, setShowCommentStatsModal] = useState(false);
 
@@ -586,31 +594,42 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
                   </p>
                 </div>
               </div>
-              <button
-                onClick={async () => {
-                  setShowLiveKitCall(true);
-                  const csrfToken = await getFreshCsrfToken();
-                  fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
-                    method: 'POST',
-                    headers: {
-                      'X-Requested-With': 'XMLHttpRequest',
-                      'X-CSRF-TOKEN': csrfToken,
-                    },
-                  })
-                    .then(res => res.json())
-                    .then(data => {
-                      setCallActive(true);
-                      if (data.inviteUrl) setInviteLink(data.inviteUrl);
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => setShowScheduledModal(true)}
+                  className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition border border-gray-200 dark:border-gray-700"
+                  title="Appels programmés"
+                >
+                  <FaCalendarAlt />
+                </button>
+                <button
+                  onClick={async () => {
+                    setShowLiveKitCall(true);
+                    const token = csrfToken || await getFreshCsrfToken();
+                    fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
+                      method: 'POST',
+                      headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': token,
+                      },
                     })
-                    .catch(err => console.error('Erreur appel:', err));
-                }}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 text-white text-sm font-medium rounded-lg transition flex-shrink-0 ${
-                  callActive ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {callActive ? <FaDoorOpen className="text-xs" /> : <FaVideo className="text-xs" />}
-                {callActive ? 'Rejoindre' : 'Démarrer un appel'}
-              </button>
+                      .then(res => res.json())
+                      .then(data => {
+                        setCallActive(true);
+                        if (data.inviteUrl) setInviteLink(data.inviteUrl);
+                      })
+                      .catch(err => console.error('Erreur appel:', err));
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 text-white text-sm font-medium rounded-lg transition ${
+                    callActive ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  <FaVideo />
+                  <span className="hidden sm:inline">
+                    {callActive ? 'Rejoindre l\'appel' : 'Démarrer'}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1053,7 +1072,13 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
           <ZoomMeeting project={project} />
         </div>
       </Modal>
-{showLiveKitCall && (
+      <ScheduledCallsModal
+        show={showScheduledModal}
+        onClose={() => setShowScheduledModal(false)}
+        projectId={project.id}
+        csrfToken={csrfToken}
+      />
+      {showLiveKitCall && (
 <LiveKitCallModal
   tokenEndpoint={`/projects/${project.id}/livekit-token`}
   inviteLink={inviteLink}
