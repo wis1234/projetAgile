@@ -18,6 +18,7 @@ class LiveKitCallStarted implements ShouldBroadcastNow
         public int $initiatorId,
         public string $initiatorName,
         public array $memberIds,
+        public string $inviteUrl = '',
     ) {}
 
     public function broadcastOn()
@@ -40,6 +41,7 @@ class LiveKitCallStarted implements ShouldBroadcastNow
             'projectName' => $this->projectName,
             'initiatorId' => $this->initiatorId,
             'initiatorName' => $this->initiatorName,
+            'inviteUrl' => $this->inviteUrl,
         ];
     }
 }

@@ -146,6 +146,7 @@ Route::middleware(['auth'])->group(function () {
    Route::middleware(['auth'])->get('/projects/{project}/livekit-call/status', [LiveKitController::class, 'callStatus']);
    Route::middleware(['auth'])->post('/projects/{project}/livekit-call/join-or-start', [LiveKitController::class, 'joinOrStartCall']);
    Route::middleware(['auth'])->post('/projects/{project}/livekit-call/mute-participant', [LiveKitController::class, 'muteParticipant']);
+   Route::middleware(['auth'])->get('/projects/{project}/livekit-call/invite-link', [LiveKitController::class, 'getInviteLink']);
 
 
     // Routes Zoom
@@ -623,5 +624,9 @@ Route::get('/run-zoom-notifications', function (\Illuminate\Http\Request $reques
 Route::get('storage/files/{filename}', [FileController::class, 'serveFile'])
     ->middleware('auth')
     ->where('filename', '.+');
+
+// Routes publiques ProJA Meet — accès invité externe (sans compte)
+Route::get('/meet/join/{token}', [App\Http\Controllers\LiveKitController::class, 'guestJoinPage'])->name('meet.guest.join');
+Route::post('/meet/join/{token}/token', [App\Http\Controllers\LiveKitController::class, 'guestToken'])->name('meet.guest.token');
 
 require __DIR__.'/auth.php';

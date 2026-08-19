@@ -295,6 +295,7 @@ export default function AdminLayout({ children }) {
         projectId: e.projectId,
         projectName: e.projectName,
         initiatorName: e.initiatorName,
+        inviteUrl: e.inviteUrl,
       });
       playRingtone();
     });
@@ -871,6 +872,7 @@ channel.listen('.livekit.call.ended', () => {
 {showLiveKitCall && liveKitInvite && (
         <LiveKitCallModal
           tokenEndpoint={`/projects/${liveKitInvite.projectId}/livekit-token`}
+          inviteLink={liveKitInvite.inviteUrl || ''}
           title={liveKitInvite.projectName}
           onAnswered={async () => {
             const csrfToken = await getFreshCsrfToken();

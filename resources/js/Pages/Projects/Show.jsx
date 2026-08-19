@@ -346,8 +346,35 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
   const [callActive, setCallActive] = useState(false);
   const [showCommentStatsModal, setShowCommentStatsModal] = useState(false);
+
+  // Auto-join quand redirigé depuis un lien d'invitation (?join-call=1)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('join-call') === '1' && !showLiveKitCall) {
+      (async () => {
+        setShowLiveKitCall(true);
+        const csrfToken = await getFreshCsrfToken();
+        fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+        })
+          .then(res => res.json())
+          .then(data => {
+            setCallActive(true);
+            if (data.inviteUrl) setInviteLink(data.inviteUrl);
+          })
+          .catch(err => console.error('Erreur appel:', err));
+        // Nettoyer l'URL
+        window.history.replaceState({}, '', window.location.pathname);
+      })();
+    }
+  }, []);
 
 
   useEffect(() => {
@@ -571,7 +598,10 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
                     },
                   })
                     .then(res => res.json())
-                    .then(() => setCallActive(true))
+                    .then(data => {
+                      setCallActive(true);
+                      if (data.inviteUrl) setInviteLink(data.inviteUrl);
+                    })
                     .catch(err => console.error('Erreur appel:', err));
                 }}
                 className={`inline-flex items-center gap-1.5 px-3 py-2 text-white text-sm font-medium rounded-lg transition flex-shrink-0 ${
@@ -1026,6 +1056,7 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
 {showLiveKitCall && (
 <LiveKitCallModal
   tokenEndpoint={`/projects/${project.id}/livekit-token`}
+  inviteLink={inviteLink}
   muteEndpoint={`/projects/${project.id}/livekit-call/mute-participant`}
   isHost={isAdmin || isManager}
   skipIncomingScreen={true}
@@ -1043,6 +1074,7 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
     }}
 onClose={async () => {
   setShowLiveKitCall(false);
+  setInviteLink('');
   fetch(`/projects/${project.id}/livekit-call/status`)
     .then(res => res.json())
     .then(data => setCallActive(!!data.active))

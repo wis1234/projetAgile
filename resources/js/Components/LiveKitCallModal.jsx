@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
   FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
-  FaPhone, FaPhoneSlash,
+  FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck,
 } from 'react-icons/fa';
 
 const getFreshCsrfToken = async () => {
@@ -26,7 +26,7 @@ const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '�
 const OUTGOING_RINGTONE_SRC = '/sounds/outgoing-call.mp3'; // tonalité "ça sonne chez l'autre"
 const INCOMING_RINGTONE_SRC = '/sounds/incoming-call.mp3'; // vraie sonnerie d'appel entrant
 
-export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, callerName, onClose, onAnswered, skipIncomingScreen = false }) {
+export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, callerName, onClose, onAnswered, skipIncomingScreen = false, inviteLink = '' }) {
   const [room, setRoom] = useState(null);
   const [livekitLib, setLivekitLib] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -44,6 +44,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   const [callStarted, setCallStarted] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHands, setRaisedHands] = useState({}); // { identity: name }
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // ─── Décroché / pas décroché — état 100% LOCAL à cet utilisateur ───
   // C'est la clé du correctif : l'hôte (celui qui lance l'appel) est
@@ -158,6 +159,41 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     stopRingtone();
     setDeclined(true);
     onClose();
+  };
+
+  // ─── Copier / Partager le lien d'invitation ──────────────────────────
+  const handleCopyLink = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      // Fallback
+      const input = document.createElement('input');
+      input.value = inviteLink;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    }
+  };
+
+  const handleShareLink = async () => {
+    if (!inviteLink) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Rejoindre l'appel ProJA Meet — ${title}`,
+          text: `Rejoignez l'appel en cours sur « ${title} » via ProJA Meet`,
+          url: inviteLink,
+        });
+      } catch { /* User cancelled */ }
+    } else {
+      handleCopyLink();
+    }
   };
 
   // ─── Connexion à la room — ne démarre qu'une fois l'appel décroché ──
@@ -528,6 +564,30 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
           >
             <FaUsers className="w-3.5 h-3.5" /> {totalCount}
           </button>
+          {inviteLink && (
+            <>
+              <button
+                onClick={handleCopyLink}
+                title={linkCopied ? 'Lien copié !' : 'Copier le lien d\'invitation'}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition ${
+                  linkCopied
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
+              >
+                {linkCopied ? <FaCheck className="w-3 h-3" /> : <FaCopy className="w-3 h-3" />}
+                <span className="hidden sm:inline">{linkCopied ? 'Copié !' : 'Copier le lien'}</span>
+              </button>
+              <button
+                onClick={handleShareLink}
+                title="Partager le lien d'invitation"
+                className="flex items-center gap-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition"
+              >
+                <FaShareAlt className="w-3 h-3" />
+                <span className="hidden sm:inline">Partager</span>
+              </button>
+            </>
+          )}
           <button onClick={toggleFullscreen} className="text-white/90 hover:text-white p-1.5">
             {isFullscreen ? <FaCompress className="w-4 h-4" /> : <FaExpand className="w-4 h-4" />}
           </button>
@@ -547,6 +607,27 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
       <div className="flex-1 flex overflow-hidden">
         {showParticipants && (
           <div className="w-64 bg-slate-900 border-r border-slate-800 p-3 overflow-y-auto flex-shrink-0 hidden sm:block">
+            {inviteLink && (
+              <div className="mb-4 p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20">
+                <p className="text-[10px] uppercase tracking-wider text-blue-400 font-bold mb-1.5">Lien d'invitation</p>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    readOnly
+                    value={inviteLink}
+                    className="flex-1 text-[11px] bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-300 truncate focus:outline-none"
+                    onClick={(e) => e.target.select()}
+                  />
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center flex-shrink-0 transition"
+                    title="Copier"
+                  >
+                    {linkCopied ? <FaCheck className="w-3 h-3 text-white" /> : <FaCopy className="w-3 h-3 text-white" />}
+                  </button>
+                </div>
+              </div>
+            )}
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Participants ({totalCount})</h4>
             <div className="space-y-2">
               <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5">
