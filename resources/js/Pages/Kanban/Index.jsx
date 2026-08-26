@@ -43,6 +43,14 @@ function Kanban({ tasks: initialTasks, auth }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
+  // Nouveaux états pour les filtres
+  const [filters, setFilters] = useState({
+    search: '',
+    date_from: '',
+    date_to: '',
+    priority: 'all'
+  });
+  
   //const canModifyTasks = auth?.user?.is_admin || auth?.user?.is_manager;
 
   const sensors = useSensors(
@@ -54,7 +62,7 @@ function Kanban({ tasks: initialTasks, auth }) {
   );
 
   useEffect(() => {
-    fetchTasks();
+    fetchTasks(filters);
   }, []);
 
   useEffect(() => {
@@ -66,11 +74,11 @@ function Kanban({ tasks: initialTasks, auth }) {
     }
   }, [props.flash]);
 
-  const fetchTasks = async () => {
+  const fetchTasks = async (currentFilters = filters) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axios.get(route('kanban.api.tasks'));
+      const response = await axios.get(route('kanban.api.tasks'), { params: currentFilters });
       setTasks(response.data.data || []);
     } catch (err) {
       console.error('Erreur lors du chargement des tâches:', err);
@@ -79,6 +87,16 @@ function Kanban({ tasks: initialTasks, auth }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    fetchTasks(filters);
+  };
+  
+  const resetFilters = () => {
+    const defaultFilters = { search: '', date_from: '', date_to: '', priority: 'all' };
+    setFilters(defaultFilters);
+    fetchTasks(defaultFilters);
   };
 
   const tasksByStatus = useMemo(() => {
@@ -285,6 +303,67 @@ if (!draggedTask?.can_update) {
           </div>
         </div>
 
+        {/* Filters */}
+        <div className="flex-shrink-0 px-6 py-3 bg-gray-50 border-b border-gray-200">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex-1 min-w-[200px]">
+              <input
+                type="text"
+                placeholder="Rechercher une tâche..."
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={filters.date_from}
+                onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
+                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                title="Date de début (création)"
+              />
+              <span className="text-gray-500 text-sm">au</span>
+              <input
+                type="date"
+                value={filters.date_to}
+                onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
+                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                title="Date de fin (création)"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={filters.priority}
+                onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+              >
+                <option value="all">Toutes priorités</option>
+                <option value="high">Élevée</option>
+                <option value="medium">Moyenne</option>
+                <option value="low">Basse</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={applyFilters}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 transition-colors"
+              >
+                Filtrer
+              </button>
+              {(filters.search || filters.date_from || filters.date_to || filters.priority !== 'all') && (
+                <button
+                  onClick={resetFilters}
+                  className="px-4 py-2 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 transition-colors"
+                >
+                  Effacer
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Loading Banner */}
         {isLoading && tasks.length > 0 && (
           <div className="flex-shrink-0 mx-6 mt-4 p-3 bg-blue-50 text-blue-700 rounded-lg flex items-center shadow-sm">
@@ -294,13 +373,13 @@ if (!draggedTask?.can_update) {
         )}
 
         {/* Kanban Board */}
-        <div className={`flex-1 overflow-auto px-0 py-4 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className={`flex-1 overflow-x-auto overflow-y-hidden px-0 py-4 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
           <DndContext 
             sensors={sensors}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div className="flex gap-4 h-full w-max min-w-full px-6">
+            <div className="flex gap-6 h-full min-w-max px-6 items-start pb-4">
               {STATUS_COLUMNS.map((column) => {
                 const columnTasks = tasks.filter((task) => task.status === column.id);
                 return (
@@ -364,7 +443,7 @@ const Column = ({ id, title, tasks, color, headerBg, accentColor, onAddTask, isL
   return (
     <div 
       ref={setNodeRef} 
-      className="flex flex-col w-80 flex-shrink-0 h-full bg-slate-100 rounded-xl mx-0"
+      className="flex flex-col w-80 flex-shrink-0 h-full max-h-full bg-slate-100 rounded-xl shadow-sm border border-slate-200 mx-0"
     >
       {/* Column Header */}
       <div className={`${headerBg} px-4 py-3 rounded-t-xl`}>
@@ -458,17 +537,17 @@ const TaskCard = ({ task, isDragging, accentColor, canModify = true }) => {
       <div className="p-4">
         {/* Header avec titre et menu */}
         <div className="flex items-start justify-between gap-2 mb-2">
-          <h4 className="font-semibold text-gray-900 text-sm leading-snug flex-1">
+          <h4 className="font-semibold text-gray-900 text-sm leading-snug flex-1 break-words">
             {task.title || task.name || 'Sans titre'}
           </h4>
-          <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 rounded">
+          <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 rounded flex-shrink-0">
             <EllipsisVerticalIcon className="h-4 w-4 text-gray-400" />
           </button>
         </div>
 
         {/* Description */}
         {task.description && (
-          <p className="text-sm text-gray-600 mb-3 line-clamp-2 leading-relaxed">
+          <p className="text-sm text-gray-600 mb-3 line-clamp-3 leading-relaxed break-words">
             {task.description}
           </p>
         )}

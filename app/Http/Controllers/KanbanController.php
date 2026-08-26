@@ -210,18 +210,14 @@ public function updateOrder(Request $request)
     /**
      * Récupère les tâches pour l'API
      */
-    public function apiTasks()
+    public function apiTasks(Request $request)
     {
         $this->authorize('viewAny', Task::class);
 
         $user = Auth::user();
         
         // Créer une requête de base avec les relations nécessaires
-        $query = Task::with(['assignedUser', 'project'])
-            ->select('*')
-            ->orderBy('status') // D'abord trier par statut
-            ->orderBy('position', 'asc') // Puis par position
-            ->orderBy('updated_at', 'desc'); // Enfin par date de mise à jour
+        $query = Task::with(['assignedUser', 'project'])->select('*');
 
         // Filtrer par projets auxquels l'utilisateur a accès
         if (!$user->hasRole('admin')) {
@@ -229,12 +225,49 @@ public function updateOrder(Request $request)
             $query->whereIn('project_id', $projectIds);
         }
 
-        // Récupérer les tâches
-        //$tasks = $query->get();
-        $tasks = $query->get()->map(function ($task) use ($user) {
-    $task->can_update = $user->can('update', $task);
-    return $task;
-});
+        // Filtres de recherche et filtres personnalisés
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+        
+        if ($request->filled('priority') && $request->priority !== 'all') {
+            $query->where('priority', $request->priority);
+        }
+
+        // Optimisation majeure : Si on n'a pas de filtre de recherche spécifique, 
+        // on ne charge pas les vieilles tâches terminées (plus de 30 jours) pour éviter de saturer le navigateur.
+        if (!$request->filled('search') && !$request->filled('date_from')) {
+            $query->where(function($q) {
+                $q->where('status', '!=', 'done')
+                  ->orWhere(function($sub) {
+                      $sub->where('status', 'done')
+                          ->where('updated_at', '>=', now()->subDays(30));
+                  });
+            });
+        }
+
+        $query->orderBy('status')
+              ->orderBy('position', 'asc')
+              ->orderBy('updated_at', 'desc');
+
+        // Limite dure pour empêcher le crash du frontend si la bdd grossit (ex: max 500 tâches)
+        $tasks = $query->take(500)->get()->map(function ($task) use ($user) {
+            $task->can_update = $user->can('update', $task);
+            return $task;
+        });
 
         // Journalisation pour le débogage
         \Log::info('Tâches chargées pour le Kanban', [
