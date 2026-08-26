@@ -26,11 +26,15 @@ class Task extends Model
         'amount',
         'payment_status',
         'paid_at',
+        'submitted_at',
+        'deliverable_id',
+        'validator_id',
     ];
 
     protected $dates = [
         'due_date',
         'paid_at',
+        'submitted_at',
         'created_at',
         'updated_at',
         'deleted_at',
@@ -41,6 +45,7 @@ class Task extends Model
         'is_paid' => 'boolean',
         'amount' => 'decimal:2',
         'paid_at' => 'datetime',
+        'submitted_at' => 'datetime',
     ];
 
     // Payment status constants
@@ -119,6 +124,16 @@ class Task extends Model
 
     public function files() {
         return $this->hasMany(File::class);
+    }
+
+    public function deliverable()
+    {
+        return $this->belongsTo(File::class, 'deliverable_id');
+    }
+
+    public function validator()
+    {
+        return $this->belongsTo(User::class, 'validator_id');
     }
 
     public function payments()

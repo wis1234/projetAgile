@@ -120,9 +120,11 @@ const DeadlineCountdown = ({ dueDate, onExpire }) => {
 };
 
 
-const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, t }) => {
+const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, submittedAt, t }) => {
   const calculateTimeLeft = useCallback(() => {
-    const difference = new Date(targetDate) - new Date();
+    // If submitted for validation, freeze the timer at the submission time
+    const referenceDate = submittedAt ? new Date(submittedAt) : new Date();
+    const difference = new Date(targetDate) - referenceDate;
     
     if (difference <= 0) {
       if (onComplete) onComplete();
@@ -351,7 +353,7 @@ const ReactionPicker = ({ commentId, isMe, onReact, onClose }) => {
   );
 };
 
-export default function Show({ task, payments, projectMembers, currentUserRole }) {
+export default function Show({ task, payments, projectMembers, projectManagers = [], currentUserRole }) {
   const { t } = useTranslation();
   const { auth } = usePage().props;
   const [deadlineExpired, setDeadlineExpired] = useState(false);
@@ -424,6 +426,14 @@ export default function Show({ task, payments, projectMembers, currentUserRole }
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [showConfirmDeleteCommentModal, setShowConfirmDeleteCommentModal] = useState(false);
   const [commentToDeleteId, setCommentToDeleteId] = useState(null);
+
+  // ─── Submit for Validation Modal states ───────────────────────────────────
+  const [showSubmitValidationModal, setShowSubmitValidationModal] = useState(false);
+  // step 1: confirm | step 2: select deliverable | step 3: select manager
+  const [submitStep, setSubmitStep] = useState(1);
+  const [selectedDeliverableId, setSelectedDeliverableId] = useState(null);
+  const [selectedManagerId, setSelectedManagerId] = useState(projectManagers[0]?.id || null);
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   // Audio recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -1175,11 +1185,43 @@ const retryComment = async (failedComment) => {
     setShowConfirmDeleteModal(false);
     router.delete(route('tasks.destroy', task.id), {
       onSuccess: () => {
-        // Redirect to tasks index page after successful deletion
         router.visit(route('tasks.index'));
       },
       onError: (errors) => {
         alert('Erreur lors de la suppression de la tâche: ' + (errors.message || 'Erreur inconnue'));
+      },
+    });
+  };
+
+  // ─── Submit for Validation handlers ────────────────────────────────────────
+  const openSubmitValidationModal = () => {
+    setSubmitStep(1);
+    setSelectedDeliverableId(null);
+    setSelectedManagerId(projectManagers[0]?.id || null);
+    setShowSubmitValidationModal(true);
+  };
+
+  const confirmSubmitValidation = () => {
+    if (!selectedDeliverableId) {
+      alert('Veuillez sélectionner un livrable.');
+      return;
+    }
+    if (!selectedManagerId) {
+      alert('Veuillez sélectionner un manager.');
+      return;
+    }
+    setSubmitLoading(true);
+    router.post(route('tasks.submit-validation', task.id), {
+      deliverable_id: selectedDeliverableId,
+      validator_id: selectedManagerId,
+    }, {
+      onSuccess: () => {
+        setShowSubmitValidationModal(false);
+        setSubmitLoading(false);
+      },
+      onError: () => {
+        setSubmitLoading(false);
+        alert('Une erreur est survenue lors de la soumission.');
       },
     });
   };
@@ -2080,7 +2122,20 @@ return () => {
             </div>
 
             <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
-              {(isAssigned || isAdmin) && (
+              {(isAssigned || isAdmin) && task.status !== 'done' && !task.submitted_at && (
+                <button
+                  onClick={openSubmitValidationModal}
+                  className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-3.5 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-all duration-200 text-xs shadow-sm shadow-emerald-500/20 hover:shadow-md hover:shadow-emerald-500/30"
+                >
+                  <FaCheck className="text-xs" /> Marquer comme terminé
+                </button>
+              )}
+              {task.submitted_at && !task.status === 'done' && (
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold">
+                  ⏳ En attente de validation
+                </span>
+              )}
+              {(isAssigned || isAdmin) && !task.submitted_at && (
                 <Link
                   href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
                   className={`${isDeadlinePassed ? 'pointer-events-none opacity-50' : ''} bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-3.5 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-all duration-200 text-xs shadow-sm shadow-purple-500/20 hover:shadow-md hover:shadow-purple-500/30`}
@@ -2346,10 +2401,17 @@ return () => {
                       )}
                     </div>
                     <div className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-3">
+                      {task.submitted_at && (
+                        <div className="flex items-center gap-2 mb-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg">
+                          <span className="text-amber-600 text-xs">⏸</span>
+                          <span className="text-xs text-amber-700 font-medium">Chrono figé — soumis le {new Date(task.submitted_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      )}
                       <CountdownTimer
                         targetDate={task.due_date}
                         taskStatus={task.status}
                         taskUpdatedAt={task.updated_at}
+                        submittedAt={task.submitted_at}
                         t={t}
                         onComplete={() => console.log('Temps écoulé!')}
                       />
@@ -3735,7 +3797,139 @@ onInput={e => {
           </div>
         </Modal>
 
-        {/* Delete Comment Confirmation Modal */}
+        {/* ─── Submit for Validation Modal (3 steps) ─────────────────────── */}
+        <Modal show={showSubmitValidationModal} onClose={() => setShowSubmitValidationModal(false)} maxWidth="lg">
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <FaCheck className="text-emerald-600 text-base" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Soumettre la tâche pour validation</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{task.title}</p>
+              </div>
+            </div>
+
+            {/* Step indicators */}
+            <div className="flex items-center gap-2 mb-6">
+              {[1, 2, 3].map(s => (
+                <div key={s} className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    submitStep > s ? 'bg-emerald-500 text-white' : submitStep === s ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                  }`}>
+                    {submitStep > s ? '✓' : s}
+                  </div>
+                  {s < 3 && <div className={`flex-1 h-0.5 w-8 ${submitStep > s ? 'bg-emerald-400' : 'bg-gray-200 dark:bg-gray-700'}`} />}
+                </div>
+              ))}
+              <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                {submitStep === 1 && 'Confirmation'}
+                {submitStep === 2 && 'Choisir le livrable'}
+                {submitStep === 3 && 'Choisir le manager'}
+              </span>
+            </div>
+
+            {/* STEP 1 — Confirmation */}
+            {submitStep === 1 && (
+              <div>
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4 mb-4">
+                  <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">⚠️ En marquant cette tâche comme terminée :</p>
+                  <ul className="mt-2 space-y-1 text-sm text-amber-700 dark:text-amber-400 list-disc list-inside">
+                    <li>Le chrono de décompte s'arrêtera à l'heure actuelle.</li>
+                    <li>Vous ne pourrez plus téléverser de fichiers sur cette tâche.</li>
+                    <li>Un manager sera notifié pour valider votre travail.</li>
+                    <li>Si le manager valide, vous récupérerez l'accès aux fichiers.</li>
+                  </ul>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Êtes-vous sûr de vouloir marquer cette tâche comme terminée ?</p>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button onClick={() => setShowSubmitValidationModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Annuler</button>
+                  <button onClick={() => setSubmitStep(2)} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">Oui, continuer →</button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2 — Select deliverable */}
+            {submitStep === 2 && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Sélectionnez le fichier livrable</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Parmi les fichiers déjà téléversés sur cette tâche, lequel représente le livrable final ?</p>
+                {task.files && task.files.length > 0 ? (
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {task.files.map(file => (
+                      <label key={file.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        selectedDeliverableId === file.id
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}>
+                        <input type="radio" name="deliverable" value={file.id} checked={selectedDeliverableId === file.id}
+                          onChange={() => setSelectedDeliverableId(file.id)} className="accent-blue-600 w-4 h-4 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{file.name}</p>
+                          <p className="text-xs text-gray-400">{file.size ? `${Math.round(file.size / 1024)} Ko` : ''} · {file.created_at ? new Date(file.created_at).toLocaleDateString('fr-FR') : ''}</p>
+                        </div>
+                        {selectedDeliverableId === file.id && <span className="text-blue-600 text-base flex-shrink-0">✓</span>}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+                    <FaFileUpload className="mx-auto text-3xl text-gray-300 mb-2" />
+                    <p className="text-sm text-gray-500">Aucun fichier téléversé sur cette tâche.</p>
+                    <p className="text-xs text-gray-400 mt-1">Veuillez d'abord téléverser votre livrable via l'onglet "Ressources".</p>
+                  </div>
+                )}
+                <div className="mt-6 flex justify-between">
+                  <button onClick={() => setSubmitStep(1)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">← Retour</button>
+                  <button onClick={() => { if (!selectedDeliverableId) { alert('Veuillez sélectionner un livrable.'); return; } setSubmitStep(3); }}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    disabled={!selectedDeliverableId}>Suivant →</button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3 — Select manager */}
+            {submitStep === 3 && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Choisissez le manager validateur</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Le manager sélectionné recevra un e-mail et une notification pour valider votre tâche.</p>
+                {projectManagers.length > 0 ? (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {projectManagers.map(manager => (
+                      <label key={manager.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        selectedManagerId === manager.id
+                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}>
+                        <input type="radio" name="manager" value={manager.id} checked={selectedManagerId === manager.id}
+                          onChange={() => setSelectedManagerId(manager.id)} className="accent-emerald-600 w-4 h-4 flex-shrink-0" />
+                        <img src={manager.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(manager.name)}&background=0D8ABC&color=fff`}
+                          alt={manager.name} className="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{manager.name}</p>
+                          <p className="text-xs text-gray-400">{manager.email}</p>
+                        </div>
+                        {selectedManagerId === manager.id && <span className="text-emerald-600 text-base flex-shrink-0">✓</span>}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-400 text-sm">Aucun manager disponible.</div>
+                )}
+                <div className="mt-6 flex justify-between">
+                  <button onClick={() => setSubmitStep(2)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">← Retour</button>
+                  <button onClick={confirmSubmitValidation} disabled={submitLoading || !selectedManagerId}
+                    className="px-5 py-2 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2">
+                    {submitLoading ? <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Envoi...</> : <><FaCheck /> Soumettre pour validation</>}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Modal>
+
+
         <Modal show={showConfirmDeleteCommentModal} onClose={() => setShowConfirmDeleteCommentModal(false)} maxWidth="sm">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">

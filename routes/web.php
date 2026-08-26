@@ -285,6 +285,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('project-users', App\Http\Controllers\ProjectUserController::class);
     
     // Routes personnalisées pour les tâches
+    Route::post('/tasks/{task}/submit-validation', [\App\Http\Controllers\TaskController::class, 'submitForValidation'])->name('tasks.submit-validation');
     Route::post('/tasks/{task}/payment', [App\Http\Controllers\TaskController::class, 'savePaymentInfo'])->name('tasks.payment.save');
     
     // Route pour la mise en sourdine des membres du projet

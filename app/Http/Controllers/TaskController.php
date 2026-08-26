@@ -461,10 +461,24 @@ public function store(Request $request)
         // Ajouter le rôle de l'utilisateur actuel pour faciliter la vérification côté frontend
         $currentUserRole = $task->project->users->find($user->id)?->pivot->role;
 
+        // Récupérer les managers du projet pour la soumission de validation
+        $projectManagers = $task->project->users()
+            ->wherePivot('role', 'manager')
+            ->get(['users.id', 'users.name', 'users.email'])
+            ->toArray();
+        // Si aucun manager, inclure les admins
+        if (empty($projectManagers)) {
+            $projectManagers = \App\Models\User::role('admin')
+                ->select('id', 'name', 'email')
+                ->get()
+                ->toArray();
+        }
+
         return Inertia::render('Tasks/Show', [
             'task' => $task,
             'payments' => $payments,
             'projectMembers' => $task->project->users,
+            'projectManagers' => $projectManagers,
             'currentUserRole' => $currentUserRole
         ]);
     }
@@ -769,5 +783,29 @@ public function store(Request $request)
         // Télécharger le PDF avec un nom de fichier personnalisé
         $filename = 'recu-paiement-' . $task->id . '-' . $user->id . '.pdf';
         return $pdf->download($filename);
+    }
+
+    public function submitForValidation(Request $request, Task $task)
+    {
+        $request->validate([
+            'deliverable_id' => 'required|exists:files,id',
+            'validator_id' => 'required|exists:users,id',
+        ]);
+
+        $this->authorize('update', $task);
+
+        $task->update([
+            'submitted_at' => now(),
+            'deliverable_id' => $request->deliverable_id,
+            'validator_id' => $request->validator_id,
+        ]);
+
+        // Envoyer une notification au validateur (manager)
+        $validator = User::find($request->validator_id);
+        if ($validator) {
+            $validator->notify(new \App\Notifications\TaskValidationRequested($task));
+        }
+
+        return back()->with('success', 'La tâche a été soumise pour validation.');
     }
 }
