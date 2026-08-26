@@ -39,13 +39,13 @@ function Kanban({ tasks: initialTasks, auth }) {
   ];
 
   const [tasks, setTasks] = useState(initialTasks || []);
+  const [counts, setCounts] = useState({ todo: 0, in_progress: 0, done: 0 });
   const [activeTask, setActiveTask] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
   // Nouveaux états pour les filtres
   const [filters, setFilters] = useState({
-    search: '',
     date_from: '',
     date_to: '',
     priority: 'all'
@@ -80,6 +80,9 @@ function Kanban({ tasks: initialTasks, auth }) {
     try {
       const response = await axios.get(route('kanban.api.tasks'), { params: currentFilters });
       setTasks(response.data.data || []);
+      if (response.data.counts) {
+        setCounts(response.data.counts);
+      }
     } catch (err) {
       console.error('Erreur lors du chargement des tâches:', err);
       setError('Impossible de charger les tâches. Veuillez réessayer.');
@@ -94,7 +97,7 @@ function Kanban({ tasks: initialTasks, auth }) {
   };
   
   const resetFilters = () => {
-    const defaultFilters = { search: '', date_from: '', date_to: '', priority: 'all' };
+    const defaultFilters = { date_from: '', date_to: '', priority: 'all' };
     setFilters(defaultFilters);
     fetchTasks(defaultFilters);
   };
@@ -306,16 +309,6 @@ if (!draggedTask?.can_update) {
         {/* Filters */}
         <div className="flex-shrink-0 px-6 py-3 bg-gray-50 border-b border-gray-200">
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <input
-                type="text"
-                placeholder="Rechercher une tâche..."
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-              />
-            </div>
             <div className="flex items-center gap-2">
               <input
                 type="date"
@@ -352,7 +345,7 @@ if (!draggedTask?.can_update) {
               >
                 Filtrer
               </button>
-              {(filters.search || filters.date_from || filters.date_to || filters.priority !== 'all') && (
+              {(filters.date_from || filters.date_to || filters.priority !== 'all') && (
                 <button
                   onClick={resetFilters}
                   className="px-4 py-2 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 transition-colors"
@@ -366,14 +359,14 @@ if (!draggedTask?.can_update) {
 
         {/* Loading Banner */}
         {isLoading && tasks.length > 0 && (
-          <div className="flex-shrink-0 mx-6 mt-4 p-3 bg-blue-50 text-blue-700 rounded-lg flex items-center shadow-sm">
-            <ArrowPathIcon className="animate-spin h-5 w-5 mr-2" />
-            <span className="text-sm font-medium">{t('kanban.refreshing')}</span>
-          </div>
+           <div className="flex-shrink-0 mx-6 mt-4 p-3 bg-blue-50 text-blue-700 rounded-lg flex items-center shadow-sm">
+             <ArrowPathIcon className="animate-spin h-5 w-5 mr-2" />
+             <span className="text-sm font-medium">{t('kanban.refreshing')}</span>
+           </div>
         )}
 
         {/* Kanban Board */}
-        <div className={`flex-1 overflow-x-auto overflow-y-hidden px-0 py-4 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className={`flex-1 min-w-0 overflow-x-auto overflow-y-hidden px-0 py-4 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
           <DndContext 
             sensors={sensors}
             onDragStart={handleDragStart}
@@ -382,12 +375,14 @@ if (!draggedTask?.can_update) {
             <div className="flex gap-6 h-full min-w-max px-6 items-start pb-4">
               {STATUS_COLUMNS.map((column) => {
                 const columnTasks = tasks.filter((task) => task.status === column.id);
+                const totalCount = counts[column.id] || 0;
                 return (
                   <Column
                     key={column.id}
                     id={column.id}
                     title={column.title}
                     tasks={columnTasks}
+                    totalCount={totalCount}
                     color={column.color}
                     headerBg={column.headerBg}
                     accentColor={column.accentColor}
@@ -431,7 +426,7 @@ if (!draggedTask?.can_update) {
 
 export default Kanban;
 
-const Column = ({ id, title, tasks, color, headerBg, accentColor, onAddTask, isLoading, canModify = true }) => {
+const Column = ({ id, title, tasks, totalCount, color, headerBg, accentColor, onAddTask, isLoading, canModify = true }) => {
   const { setNodeRef } = useSortable({
     id: id,
     data: {
@@ -450,8 +445,8 @@ const Column = ({ id, title, tasks, color, headerBg, accentColor, onAddTask, isL
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h3 className="text-white font-semibold text-sm">{title}</h3>
-            <span className="bg-white bg-opacity-25 text-white px-2 py-0.5 rounded-full text-xs font-bold">
-              {tasks.length}
+            <span className="bg-white bg-opacity-25 text-white px-2 py-0.5 rounded-full text-xs font-bold" title="Affichés / Total">
+              {tasks.length} / {totalCount}
             </span>
           </div>
           <div className="flex items-center gap-1">

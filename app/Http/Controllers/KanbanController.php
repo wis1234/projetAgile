@@ -259,6 +259,22 @@ public function updateOrder(Request $request)
             });
         }
 
+        // Calculer les totaux par statut avant d'appliquer la limite
+        $countsQuery = clone $query;
+        // On enlève les orderBy pour le count car ils ne sont pas nécessaires et peuvent causer des erreurs avec le groupBy
+        $countsQuery->getQuery()->orders = null; 
+        
+        $statusCounts = $countsQuery->groupBy('status')
+                                    ->select('status', \DB::raw('count(*) as count'))
+                                    ->pluck('count', 'status')
+                                    ->toArray();
+                                    
+        $counts = [
+            'todo' => $statusCounts['todo'] ?? 0,
+            'in_progress' => $statusCounts['in_progress'] ?? 0,
+            'done' => $statusCounts['done'] ?? 0,
+        ];
+
         $query->orderBy('status')
               ->orderBy('position', 'asc')
               ->orderBy('updated_at', 'desc');
@@ -279,6 +295,7 @@ public function updateOrder(Request $request)
         return response()->json([
             'success' => true,
             'data' => $tasks,
+            'counts' => $counts,
         ]);
     }
 }
