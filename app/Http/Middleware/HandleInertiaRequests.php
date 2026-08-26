@@ -11,6 +11,19 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
+
+    public function handle(Request $request, \Closure $next)
+    {
+        $response = parent::handle($request, $next);
+
+        $response->headers->set('Vary', 'X-Inertia');
+        if ($request->header('X-Inertia')) {
+            $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        }
+
+        return $response;
+    }
+
     /**
      * Define the props that are shared by default.
      *
