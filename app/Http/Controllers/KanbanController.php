@@ -247,21 +247,8 @@ public function updateOrder(Request $request)
             $query->where('priority', $request->priority);
         }
 
-        // Optimisation majeure : Si on n'a pas de filtre de recherche spécifique, 
-        // on ne charge pas les vieilles tâches terminées (plus de 30 jours) pour éviter de saturer le navigateur.
-        if (!$request->filled('search') && !$request->filled('date_from')) {
-            $query->where(function($q) {
-                $q->where('status', '!=', 'done')
-                  ->orWhere(function($sub) {
-                      $sub->where('status', 'done')
-                          ->where('updated_at', '>=', now()->subDays(30));
-                  });
-            });
-        }
-
-        // Calculer les totaux par statut avant d'appliquer la limite
+        // Calculer les totaux réels par statut AVANT d'appliquer l'optimisation des 30 jours et la limite
         $countsQuery = clone $query;
-        // On enlève les orderBy pour le count car ils ne sont pas nécessaires et peuvent causer des erreurs avec le groupBy
         $countsQuery->getQuery()->orders = null; 
         
         $statusCounts = $countsQuery->groupBy('status')
@@ -274,6 +261,18 @@ public function updateOrder(Request $request)
             'in_progress' => $statusCounts['in_progress'] ?? 0,
             'done' => $statusCounts['done'] ?? 0,
         ];
+
+        // Optimisation majeure : Si on n'a pas de filtre de recherche spécifique, 
+        // on ne charge pas les vieilles tâches terminées (plus de 30 jours) pour éviter de saturer le navigateur.
+        if (!$request->filled('search') && !$request->filled('date_from')) {
+            $query->where(function($q) {
+                $q->where('status', '!=', 'done')
+                  ->orWhere(function($sub) {
+                      $sub->where('status', 'done')
+                          ->where('updated_at', '>=', now()->subDays(30));
+                  });
+            });
+        }
 
         $query->orderBy('status')
               ->orderBy('position', 'asc')
