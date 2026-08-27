@@ -792,7 +792,7 @@ public function submitForValidation(Request $request, Task $task)
         'validator_id' => 'required|exists:users,id',
     ]);
 
-    $this->authorize('update', $task);
+    //$this->authorize('update', $task);
 
     $task->update([
         'submitted_at' => now(),
