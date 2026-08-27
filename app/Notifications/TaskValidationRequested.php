@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Task;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -34,18 +35,13 @@ class TaskValidationRequested extends Notification
     /**
      * Get the mail representation of the notification.
      */
-    public function toMail(object $notifiable): MailMessage
+    public function toMail(object $notifiable)
     {
-        $deliverableName = $this->task->deliverable ? $this->task->deliverable->name : 'Aucun fichier';
+        $task = $this->task;
 
         return (new MailMessage)
-            ->subject('Demande de validation de tâche : ' . $this->task->title)
-            ->greeting('Bonjour ' . $notifiable->name . ',')
-            ->line('L\'utilisateur ' . $this->task->assignedUser->name . ' demande la validation de sa tâche.')
-            ->line('Tâche : ' . $this->task->title)
-            ->line('Livrable : ' . $deliverableName)
-            ->action('Voir la tâche', route('tasks.show', $this->task->id))
-            ->line('Merci de procéder à la validation dès que possible.');
+            ->subject('Demande de validation de tâche : ' . $task->title)
+            ->view('emails.task-validation-requested', compact('task', 'notifiable'));
     }
 
     /**

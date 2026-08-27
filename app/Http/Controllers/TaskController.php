@@ -785,27 +785,38 @@ public function store(Request $request)
         return $pdf->download($filename);
     }
 
-    public function submitForValidation(Request $request, Task $task)
-    {
-        $request->validate([
-            'deliverable_id' => 'required|exists:files,id',
-            'validator_id' => 'required|exists:users,id',
-        ]);
+public function submitForValidation(Request $request, Task $task)
+{
+    $request->validate([
+        'deliverable_id' => 'required|exists:files,id',
+        'validator_id' => 'required|exists:users,id',
+    ]);
 
-        $this->authorize('update', $task);
+    $this->authorize('update', $task);
 
-        $task->update([
-            'submitted_at' => now(),
-            'deliverable_id' => $request->deliverable_id,
-            'validator_id' => $request->validator_id,
-        ]);
+    $task->update([
+        'submitted_at' => now(),
+        'deliverable_id' => $request->deliverable_id,
+        'validator_id' => $request->validator_id,
+    ]);
 
-        // Envoyer une notification au validateur (manager)
-        $validator = User::find($request->validator_id);
-        if ($validator) {
-            $validator->notify(new \App\Notifications\TaskValidationRequested($task));
-        }
+    // Envoyer une notification au validateur (manager)
+    $validator = User::find($request->validator_id);
+    if ($validator) {
+        // Email + database (déjà existant)
+        $validator->notify(new \App\Notifications\TaskValidationRequested($task));
 
-        return back()->with('success', 'La tâche a été soumise pour validation.');
+        // Notification push (Pusher) + database
+        $validator->notify(
+            new ProjaNotification(
+                'Demande de validation',
+                'La tâche "'.$task->title.'" attend votre validation.',
+                '/tasks/'.$task->id
+            )
+        );
     }
+
+    return back()->with('success', 'La tâche a été soumise pour validation.');
+}
+
 }
