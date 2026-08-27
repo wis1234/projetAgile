@@ -2130,7 +2130,7 @@ return () => {
                   <FaCheck className="text-xs" /> Marquer comme terminé
                 </button>
               )}
-              {task.submitted_at && !task.status === 'done' && (
+              {task.submitted_at && task.status !== 'done' && (
                 <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold">
                   ⏳ En attente de validation
                 </span>
@@ -2769,21 +2769,29 @@ return () => {
         )}
       </h3>
 
-      <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
-        <Link
-          href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
-          className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 text-sm`}
-          title={isDeadlinePassed ? t('deadline_expired') : ''}
-        >
-          <FaFileUpload className="text-xs" /> {t('task_details.add_file')}
-        </Link>
+      {!task.submitted_at && (
+        <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
+          <Link
+            href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
+            className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 text-sm`}
+            title={isDeadlinePassed ? t('deadline_expired') : ''}
+          >
+            <FaFileUpload className="text-xs" /> {t('task_details.add_file')}
+          </Link>
 
-        {isDeadlinePassed && (
-          <div className="absolute -bottom-6 left-0 right-0 text-xs text-red-500 text-center">
-            {t('deadline_expired')}
-          </div>
-        )}
-      </div>
+          {isDeadlinePassed && (
+            <div className="absolute -bottom-6 left-0 right-0 text-xs text-red-500 text-center">
+              {t('deadline_expired')}
+            </div>
+          )}
+        </div>
+      )}
+
+      {task.submitted_at && task.status !== 'done' && (
+        <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-semibold">
+          ⏳ En attente de validation
+        </span>
+      )}
     </div>
 
     {/* FILES */}

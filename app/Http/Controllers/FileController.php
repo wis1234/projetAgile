@@ -226,6 +226,21 @@ public function store(Request $request)
         if (!$currentUser->hasRole('admin') && !$project->users()->where('user_id', $currentUser->id)->exists()) {
             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
         }
+
+        if ($request->filled('task_id')) {
+            $relatedTask = \App\Models\Task::find($request->task_id);
+            if ($relatedTask && $relatedTask->submitted_at && $relatedTask->status !== 'done') {
+                $message = 'Impossible d\'ajouter un fichier : cette tâche est en attente de validation.';
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $message,
+                    ], 403);
+                }
+                return back()->withInput()->with('error', $message);
+            }
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'file' => 'required|file|max:102400', // 100 Mo max

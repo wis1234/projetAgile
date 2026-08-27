@@ -787,6 +787,10 @@ public function store(Request $request)
 
 public function submitForValidation(Request $request, Task $task)
 {
+    if ($task->submitted_at && $task->status !== 'done') {
+        return back()->with('error', 'Cette tâche a déjà été soumise pour validation.');
+    }
+
     $request->validate([
         'deliverable_id' => 'required|exists:files,id',
         'validator_id' => 'required|exists:users,id',
