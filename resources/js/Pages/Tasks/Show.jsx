@@ -155,34 +155,17 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, sub
     return () => clearInterval(timer);
   }, [calculateTimeLeft]);
 
-  // If task is done, check if it was completed before or at the deadline
+  // Si la tâche est validée, on affiche directement le verdict (délai respecté ou dépassé)
   if (taskStatus === 'done') {
-    const updatedAt = new Date(taskUpdatedAt);
+    const completionDate = new Date(taskUpdatedAt);
     const dueDate = new Date(targetDate);
-    const now = new Date();
-    
-    // If current time is before deadline, show countdown
-    if (now < dueDate) {
-      return (
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center justify-end gap-1">
-            {timeLeft.days > 0 && formatTimeUnit(timeLeft.days, 'J')}
-            {formatTimeUnit(timeLeft.hours, 'H')}
-            {formatTimeUnit(timeLeft.minutes, 'M')}
-            {formatTimeUnit(timeLeft.seconds, 'S')}
-          </div>
-          <span className="text-xs text-gray-500 dark:text-gray-400">{t('time_remaining')}</span>
-        </div>
-      );
-    }
-    
-    // After deadline, show if completed on time or late
-    const completedOnTime = updatedAt <= dueDate;
+    const completedOnTime = completionDate <= dueDate;
+
     return (
       <div className="flex items-center justify-end gap-2">
-        <FaClock className={completedOnTime ? 'text-blue-500' : 'text-red-500 animate-pulse'} />
-        <span className={completedOnTime ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}>
-          {completedOnTime ? t('deadline_met') : t('deadline_exceeded')}
+        <FaClock className={completedOnTime ? 'text-emerald-500' : 'text-red-500'} />
+        <span className={`font-semibold ${completedOnTime ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+          {completedOnTime ? t('deadline_met', 'Délai respecté') : t('deadline_exceeded', 'En retard')}
         </span>
       </div>
     );
@@ -2135,7 +2118,7 @@ return () => {
                   ⏳ En attente de validation
                 </span>
               )}
-              {(isAssigned || isAdmin) && !task.submitted_at && (
+              {(isAssigned || isAdmin) && (!task.submitted_at || task.status === 'done') && (
                 <Link
                   href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
                   className={`${isDeadlinePassed ? 'pointer-events-none opacity-50' : ''} bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-3.5 py-2 rounded-lg font-semibold flex items-center gap-1.5 transition-all duration-200 text-xs shadow-sm shadow-purple-500/20 hover:shadow-md hover:shadow-purple-500/30`}
@@ -2401,10 +2384,10 @@ return () => {
                       )}
                     </div>
                     <div className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-3">
-                      {task.submitted_at && (
+                      {task.submitted_at && task.status !== 'done' && (
                         <div className="flex items-center gap-2 mb-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg">
                           <span className="text-amber-600 text-xs">⏸</span>
-                          <span className="text-xs text-amber-700 font-medium">Chrono figé — soumis le {new Date(task.submitted_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="text-xs text-amber-700 font-medium">Chrono arrêté; soumis le {new Date(task.submitted_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       )}
                       <CountdownTimer
@@ -2769,7 +2752,7 @@ return () => {
         )}
       </h3>
 
-      {!task.submitted_at && (
+      {(!task.submitted_at || task.status === 'done') && (
         <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
           <Link
             href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
