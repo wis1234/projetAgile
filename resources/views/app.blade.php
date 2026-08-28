@@ -7,7 +7,9 @@
         <meta name="vapid-public-key" content="{{ config('webpush.vapid.public_key') }}">
 
         <title inertia>{{ config('app.name', 'Proja') }}</title>
-        <link rel="icon" href="data:,">
+        <link rel="icon" type="image/png" href="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png">
+        <link rel="apple-touch-icon" href="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png">
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
