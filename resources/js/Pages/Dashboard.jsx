@@ -1,7 +1,7 @@
 import React from 'react';
 import AdminLayout from '../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
-import { Line, Bar, Pie } from 'react-chartjs-2';
+import { Line, Pie } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload, FaUserPlus } from 'react-icons/fa';
 import RecruitmentCard from '@/Components/RecruitmentCard';
@@ -10,46 +10,38 @@ import { useTranslation } from 'react-i18next';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler);
 
-const Widget = ({ title, count, color, link, icon }) => {
+// ── Widget stat (même forme que SummaryCard de la page Projets) ─────────────
+
+const Widget = ({ title, count, color, link, icon: Icon }) => {
   const { t } = useTranslation();
 
   const content = (
-    <motion.div
-      whileHover={{ y: -5, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
-      whileTap={{ scale: 0.98 }}
-      className={`${color} rounded-xl p-3.5 sm:p-6 shadow-md transition-all duration-300 ${link ? 'cursor-pointer' : ''} group h-full`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[11px] sm:text-sm font-medium text-gray-600 dark:text-gray-300 truncate">{title}</p>
-          <p className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">{count ?? '0'}</p>
-        </div>
-        <div className="p-2 sm:p-3 rounded-lg bg-white bg-opacity-20 dark:bg-opacity-10 flex-shrink-0">
-          {React.cloneElement(icon, { className: 'text-lg sm:text-2xl' })}
-        </div>
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-100 dark:border-gray-700 flex items-center gap-3 sm:gap-4 shadow-sm hover:shadow-md active:scale-[0.98] transition-all min-w-0">
+      <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+        <Icon className="text-lg sm:text-xl text-white" />
       </div>
-      {link && (
-        <span className="mt-2 sm:mt-3 inline-flex items-center text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 group-hover:text-blue-800 dark:group-hover:text-blue-300">
-          {t('view_more')}
-          <FaChevronRight className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
-        </span>
-      )}
-    </motion.div>
+      <div className="min-w-0">
+        <p className="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white leading-tight">{count ?? 0}</p>
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5 truncate">{title}</p>
+      </div>
+    </div>
   );
 
   return link ? (
-    <Link href={link} className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 h-full">
+    <Link href={link} className="block rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 h-full min-w-0">
       {content}
     </Link>
   ) : content;
 };
 
+// ── Accès rapide ──────────────────────────────────────────────────────────────
+
 const QuickAccess = () => {
   const { t } = useTranslation();
   return (
-    <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl overflow-hidden">
-      <div className="p-4 sm:p-6 text-white">
-        <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
+    <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-sm overflow-hidden">
+      <div className="p-4 sm:p-5 text-white">
+        <h2 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 flex items-center gap-2">
           <FaChartLine /> {t('quick_access')}
         </h2>
         <div className="space-y-2 sm:space-y-3">
@@ -63,10 +55,10 @@ const QuickAccess = () => {
             <Link
               key={index}
               href={item.link}
-              className="flex items-center p-2.5 sm:p-3 rounded-lg bg-white bg-opacity-10 hover:bg-opacity-20 transition-all"
+              className="flex items-center p-2.5 sm:p-3 rounded-xl bg-white bg-opacity-10 hover:bg-opacity-20 active:scale-[0.98] transition-all min-w-0"
             >
               <span className="mr-3 flex-shrink-0">{item.icon}</span>
-              <span className="font-medium text-sm sm:text-base truncate">{item.label}</span>
+              <span className="font-medium text-sm sm:text-base truncate min-w-0">{item.label}</span>
               <FaChevronRight className="ml-auto h-3 w-3 opacity-70 flex-shrink-0" />
             </Link>
           ))}
@@ -75,6 +67,8 @@ const QuickAccess = () => {
     </div>
   );
 };
+
+// ── Badge statut (répartition des tâches) ───────────────────────────────────
 
 const StatusBadge = ({ status, count }) => {
   const { t } = useTranslation();
@@ -88,90 +82,19 @@ const StatusBadge = ({ status, count }) => {
   const config = statusConfig[status] || { label: status, color: 'bg-gray-100 text-gray-800' };
 
   return (
-    <div className="flex items-center justify-between gap-2 py-2">
+    <div className="flex items-center justify-between gap-2 py-2 min-w-0">
       <span className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${config.color}`}>
         {config.label}
       </span>
-      <span className="font-medium text-sm">{count}</span>
-    </div>
-  );
-}
-
-const RecentActivityItem = ({ activity }) => {
-  const { t } = useTranslation();
-  const getActivityIcon = (type) => {
-    const icons = {
-      task: <FaTasks className="text-blue-500" />,
-      project: <FaProjectDiagram className="text-green-500" />,
-      file: <FaFileAlt className="text-amber-500" />,
-      user: <FaUsers className="text-purple-500" />,
-    };
-    return icons[type] || <FaFileAlt className="text-gray-500" />;
-  };
-
-  return (
-    <div className="flex items-start py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
-      <div className="flex-shrink-0 mr-3 mt-0.5">
-        {getActivityIcon(activity.type)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-white break-words">
-          {activity.description}
-        </p>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
-          <span>{new Date(activity.created_at).toLocaleString('fr-FR')}</span>
-          {activity.user && (
-            <span className="flex items-center">
-              <span className="w-1 h-1 rounded-full bg-gray-400 mr-2"></span>
-              {activity.user.name}
-            </span>
-          )}
-        </div>
-      </div>
+      <span className="font-medium text-sm flex-shrink-0">{count}</span>
     </div>
   );
 };
 
-const ProjectCard = ({ project }) => {
-  const { t } = useTranslation();
-  const progress = project.progress || 0;
-
-  return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-2 mb-3 flex-wrap">
-        <h3 className="font-medium text-gray-900 dark:text-white line-clamp-2 min-w-0">
-          {project.name}
-        </h3>
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-nowrap">
-          {project.status}
-        </span>
-      </div>
-
-      <div className="mb-3">
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-          <span>Progression</span>
-          <span>{Math.round(progress)}%</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-          <div
-            className="bg-blue-600 h-2 rounded-full"
-            style={{ width: `${progress}%` }}
-          ></div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
-        <span>{t('deadline')}: {new Date(project.deadline).toLocaleDateString('fr-FR')}</span>
-        <span>{project.task_count} {t('tasks')}</span>
-      </div>
-    </div>
-  );
-}
-
 export default function Dashboard({ auth, stats = {}, activityByDay = [], recentActivities = [], topUsers = [], recentProjects = [], recentFiles = [] }) {
   const { t } = useTranslation();
   const isAdmin = auth?.user?.roles?.includes('admin');
-  // Initialisation des valeurs par défaut pour les tâches par statut
+
   const tasksByStatus = stats.tasksByStatus || {
     todo: 0,
     in_progress: 0,
@@ -179,50 +102,47 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
     en_attente: 0
   };
 
-  // Données pour les widgets statistiques
   const statsData = [
     {
       title: t('tasks'),
       count: stats.tasks || 0,
-      color: 'bg-gradient-to-r from-blue-500 to-blue-600 text-white',
+      color: 'bg-indigo-500',
       link: '/tasks',
-      icon: <FaTasks className="text-3xl opacity-80" />,
+      icon: FaTasks,
       show: true
     },
     {
       title: t('projects'),
       count: stats.projects || 0,
-      color: 'bg-gradient-to-r from-green-500 to-green-600 text-white',
+      color: 'bg-blue-500',
       link: '/projects',
-      icon: <FaProjectDiagram className="text-3xl opacity-80" />,
+      icon: FaProjectDiagram,
       show: true
     },
     {
       title: t('team_members'),
       count: stats.members || 0,
-      color: 'bg-gradient-to-r from-purple-500 to-purple-600 text-white',
+      color: 'bg-purple-500',
       link: '/users',
-      icon: <FaUsers className="text-3xl opacity-80" />,
-      show: isAdmin // Only show users widget to admins
+      icon: FaUsers,
+      show: isAdmin
     },
     {
       title: t('files'),
       count: stats.files || 0,
-      color: 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white',
+      color: 'bg-amber-500',
       link: '/files',
-      icon: <FaFileAlt className="text-3xl opacity-80" />,
+      icon: FaFileAlt,
       show: true
     },
   ];
 
-  // Filter out widgets based on visibility rules and count
   const visibleWidgets = statsData.filter(widget =>
-    widget.show !== false && // Respect the show flag
+    widget.show !== false &&
     (widget.count > 0 || widget.count === 0) &&
     widget.link
   );
 
-  // Données pour le graphique d'activité
   const activityChartData = {
     labels: activityByDay.map(a => new Date(a.day).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })),
     datasets: [
@@ -237,7 +157,6 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
     ],
   };
 
-  // Données pour le graphique des tâches par statut
   const tasksByStatusData = {
     labels: ['À faire', 'En cours', 'Terminées', 'En attente'],
     datasets: [
@@ -260,30 +179,26 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 overflow-x-hidden">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-        {/* En-tête */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-5 sm:mb-8"
-        >
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white break-words">{t('dashboard').toUpperCase()}</h1>
-              <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 mt-0.5">
-                {t('dashboard_subtitle')}
-              </p>
-            </div>
-            <div className="w-full lg:w-64 flex-shrink-0">
-              <RecruitmentCard />
-            </div>
-          </div>
-        </motion.div>
+    <div className="w-full min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-        {/* Grille des widgets */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5 mb-5 sm:mb-8">
+        {/* En-tête — même structure que la page Projets */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight break-words">
+              {t('dashboard').toUpperCase()}
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {t('dashboard_subtitle')}
+            </p>
+          </div>
+          <div className="w-full sm:w-64 flex-shrink-0 min-w-0">
+            <RecruitmentCard />
+          </div>
+        </div>
+
+        {/* Grille des widgets — même grille/gap que les SummaryCard de Projets */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {visibleWidgets.map((widget, index) => (
             <Widget
               key={index}
@@ -296,9 +211,9 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           ))}
         </div>
 
-        {/* Graphique d'activité et utilisateurs actifs */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-5 sm:mb-8">
-          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-md p-4 sm:p-6">
+        {/* Graphique d'activité et membres actifs */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
             <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-4 sm:mb-6">{t('recent_activity')}</h2>
             <div className="h-52 sm:h-64">
               <Line
@@ -340,12 +255,12 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-4 sm:p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
             <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-4 sm:mb-6">{t('active_team_members')}</h2>
             <div className="space-y-4">
               {topUsers && topUsers.length > 0 ? (
                 topUsers.map((user, index) => (
-                  <div key={user.id} className="flex items-center justify-between gap-2">
+                  <div key={user.id} className="flex items-center justify-between gap-2 min-w-0">
                     <div className="flex items-center space-x-3 min-w-0">
                       <div className="relative flex-shrink-0">
                         {user.avatar ? (
@@ -382,16 +297,11 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
           </div>
         </div>
 
-        {/* Section Répartition des tâches */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden p-4 sm:p-6 mb-5 sm:mb-8"
-        >
+        {/* Répartition des tâches */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
           <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-4 sm:mb-6">Répartition des tâches</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div className="h-52 sm:h-64">
+            <div className="h-52 sm:h-64 min-w-0">
               <Pie
                 data={tasksByStatusData}
                 options={{
@@ -413,22 +323,17 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                 }}
               />
             </div>
-            <div className="mt-2 md:mt-6 space-y-1 sm:space-y-2">
+            <div className="mt-2 md:mt-6 space-y-1 sm:space-y-2 min-w-0">
               <StatusBadge status="todo" count={tasksByStatus.todo || 0} />
               <StatusBadge status="in_progress" count={tasksByStatus.in_progress || 0} />
               <StatusBadge status="done" count={tasksByStatus.done || 0} />
               <StatusBadge status="en_attente" count={tasksByStatus.en_attente || 0} />
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        {/* Section Projets récents */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden p-4 sm:p-6 mb-5 sm:mb-8"
-        >
+        {/* Projets récents */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6 flex-wrap">
             <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">{t('recent_projects')}</h2>
             <Link
@@ -445,11 +350,11 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                 <Link
                   key={project.id}
                   href={`/projects/${project.id}`}
-                  className="group border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="group border border-gray-100 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 active:scale-[0.98] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-0"
                 >
-                  <div className="p-4">
+                  <div className="p-4 min-w-0">
                     <div className="flex justify-between items-start gap-2 mb-2 flex-wrap">
-                      <h3 className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors min-w-0">
+                      <h3 className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors min-w-0 truncate">
                         {project.name}
                       </h3>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-nowrap flex-shrink-0">
@@ -494,15 +399,10 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
               </div>
             )}
           </div>
-        </motion.div>
+        </div>
 
-        {/* Section Fichiers récents */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden p-4 sm:p-6 mb-5 sm:mb-8"
-        >
+        {/* Fichiers récents */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6 flex-wrap">
             <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">{t('recent_files')}</h2>
             <Link
@@ -519,7 +419,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
                 <Link
                   key={file.id}
                   href={`/files/${file.id}`}
-                  className="group flex items-center justify-between gap-2 p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="group flex items-center justify-between gap-2 p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.99] rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-0"
                 >
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
                     <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
@@ -552,15 +452,10 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
               </p>
             )}
           </div>
-        </motion.div>
+        </div>
 
-        {/* Section Activités récentes */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden p-4 sm:p-6 mb-5 sm:mb-8"
-        >
+        {/* Activités récentes */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6 flex-wrap">
             <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">{t('recent_activities')}</h2>
             <Link
@@ -576,8 +471,8 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
               recentActivities.map((activity) => {
                 const ActivityWrapper = activity.url ? Link : 'div';
                 const wrapperProps = activity.url
-                  ? { href: activity.url, className: 'group flex items-start space-x-3 p-2 -mx-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400' }
-                  : { className: 'flex items-start space-x-3 p-2 -mx-2' };
+                  ? { href: activity.url, className: 'group flex items-start space-x-3 p-2 -mx-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-[0.99] transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-0' }
+                  : { className: 'flex items-start space-x-3 p-2 -mx-2 min-w-0' };
 
                 return (
                   <ActivityWrapper key={activity.id} {...wrapperProps}>
@@ -614,7 +509,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
               </p>
             )}
           </div>
-        </motion.div>
+        </div>
 
       </div>
     </div>
