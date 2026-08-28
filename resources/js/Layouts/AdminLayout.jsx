@@ -145,45 +145,40 @@ export default function AdminLayout({ children }) {
   const [joinToast, setJoinToast] = useState(null); // { projectName, userName }
   const ringtoneRef = useRef(null);
 
-  const playRingtone = () => {
-    if (ringtoneRef.current) return;
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
+const INCOMING_CALL_SOUND =
+  'https://proja.kemtcenter.org/storage/public/files/incoming-call_old.mp3';
 
-    const audioCtx = new AudioCtx();
-    audioCtx.resume?.().catch(() => {});
+const playRingtone = () => {
+  if (ringtoneRef.current) return;
 
-    const playTone = () => {
-      const now = audioCtx.currentTime;
-      [880, 1108].forEach((freq, i) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0, now + i * 0.15);
-        gain.gain.linearRampToValueAtTime(0.18, now + 0.05 + i * 0.15);
-        gain.gain.linearRampToValueAtTime(0, now + 0.35 + i * 0.15);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now + i * 0.15);
-        osc.stop(now + 0.5 + i * 0.15);
-      });
-    };
+  const audio = new Audio(INCOMING_CALL_SOUND);
+  audio.loop = true;
+  audio.volume = 0.85;
+  audio.preload = 'auto';
 
-    playTone();
-    const interval = setInterval(playTone, 1800);
-    ringtoneRef.current = { audioCtx, interval };
+  ringtoneRef.current = audio;
 
-    if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
-  };
+  audio.play().catch((error) => {
+    console.warn('Lecture de la sonnerie d’appel bloquée:', error);
+  });
 
-  const stopRingtone = () => {
-    if (!ringtoneRef.current) return;
-    clearInterval(ringtoneRef.current.interval);
-    ringtoneRef.current.audioCtx.close().catch(() => {});
+  if (navigator.vibrate) {
+    navigator.vibrate([400, 200, 400, 200, 400]);
+  }
+};
+
+const stopRingtone = () => {
+  if (ringtoneRef.current) {
+    ringtoneRef.current.pause();
+    ringtoneRef.current.currentTime = 0;
     ringtoneRef.current = null;
-    if (navigator.vibrate) navigator.vibrate(0);
-  };
+  }
+
+  if (navigator.vibrate) {
+    navigator.vibrate(0);
+  }
+};
+
 
   useEffect(() => stopRingtone, []);
 
