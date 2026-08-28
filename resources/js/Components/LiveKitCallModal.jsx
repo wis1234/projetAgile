@@ -24,7 +24,7 @@ const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '�
 // Si le fichier est introuvable / bloqué, on retombe automatiquement
 // sur une tonalité synthétisée (WebAudio) pour ne jamais casser le flux.
 const OUTGOING_RINGTONE_SRC = '/sounds/outgoing-call.mp3'; // tonalité "ça sonne chez l'autre"
-const INCOMING_RINGTONE_SRC = '/sounds/incoming-call.mp3'; // vraie sonnerie d'appel entrant
+const INCOMING_RINGTONE_SRC = 'https://proja.kemtcenter.org/storage/public/files/incoming-call_old.mp3'; // vraie sonnerie d'appel entrant
 
 export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, callerName, onClose, onAnswered, skipIncomingScreen = false, inviteLink = '' }) {
   const [room, setRoom] = useState(null);
