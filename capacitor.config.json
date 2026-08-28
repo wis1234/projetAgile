@@ -1,0 +1,13 @@
+{
+  "appId": "org.kemtcenter.proja",
+  "appName": "ProJA",
+  "webDir": "build",
+  "server": {
+    "url": "https://proja.kemtcenter.org",
+    "cleartext": false,
+    "allowNavigation": [
+      "proja.kemtcenter.org",
+      "*.kemtcenter.org"
+    ]
+  }
+}

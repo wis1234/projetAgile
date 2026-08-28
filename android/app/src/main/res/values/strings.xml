@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ProJA</string>
+    <string name="title_activity_main">ProJA</string>
+    <string name="package_name">org.kemtcenter.proja</string>
+    <string name="custom_url_scheme">org.kemtcenter.proja</string>
+</resources>

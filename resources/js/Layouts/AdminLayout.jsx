@@ -5,6 +5,7 @@ import { router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import GlobalFooter from '@/Components/GlobalFooter';
 import PushNotificationManager from '@/Components/PushNotificationManager';
+import ErrorBoundary from '@/Components/ErrorBoundary';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import GlobalSearch from '@/Components/GlobalSearch';
 const getFreshCsrfToken = async () => {
@@ -113,7 +114,6 @@ export default function AdminLayout({ children }) {
   const { auth, flash = {}, appName } = usePage().props;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
-    // Vérifie si l'utilisateur a une préférence enregistrée, sinon utilise la préférence système
     if (typeof window !== 'undefined') {
       const savedMode = localStorage.getItem('darkMode');
       if (savedMode !== null) {
@@ -137,10 +137,9 @@ export default function AdminLayout({ children }) {
   const [isChangingLanguage, setIsChangingLanguage] = useState(false);
   const { t, i18n } = useTranslation();
 
-  // ─── Appel ProJA (LiveKit) — état global, actif peu importe la page ───
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
-  const [liveKitInvite, setLiveKitInvite] = useState(null); // { projectId, projectName, initiatorName }
-  const [joinToast, setJoinToast] = useState(null); // { projectName, userName }
+  const [liveKitInvite, setLiveKitInvite] = useState(null);
+  const [joinToast, setJoinToast] = useState(null);
   const ringtoneRef = useRef(null);
 
   const playRingtone = () => {
@@ -185,7 +184,6 @@ export default function AdminLayout({ children }) {
 
   useEffect(() => stopRingtone, []);
   
-  // Available languages with their display names and flag codes
   const languages = [
     { code: 'fr', name: 'Français', flag: 'fr' },
     { code: 'en', name: 'English', flag: 'gb' },
@@ -194,12 +192,11 @@ export default function AdminLayout({ children }) {
   ];
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est admin via différentes méthodes
     const userIsAdmin = 
-      auth.user?.email === 'ronaldoagbohou@gmail.com' || // Email spécifique
-      auth.user?.role === 'admin' ||                    // Colonne 'role' de la table users
-      (Array.isArray(auth.user?.roles) && auth.user.roles.includes('admin')) || // Tableau de rôles
-      auth.user?.is_admin === true;                     // Colonne 'is_admin' si elle existe
+      auth.user?.email === 'ronaldoagbohou@gmail.com' ||
+      auth.user?.role === 'admin' ||
+      (Array.isArray(auth.user?.roles) && auth.user.roles.includes('admin')) ||
+      auth.user?.is_admin === true;
       
     setIsAdmin(userIsAdmin);
   }, [auth.user]);
@@ -215,14 +212,12 @@ export default function AdminLayout({ children }) {
     localStorage.setItem('darkMode', darkMode);
   }, [darkMode]);
 
-  // Écouter les changements de préférence système
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const handleChange = (e) => {
-      // Ne mettre à jour que si l'utilisateur n'a pas de préférence enregistrée
       if (localStorage.getItem('darkMode') === null) {
         setDarkMode(e.matches);
       }
@@ -247,12 +242,10 @@ export default function AdminLayout({ children }) {
 
   useEffect(() => {
     fetchNotifications();
-    // Filet de sécurité en cas de coupure websocket
     const interval = setInterval(fetchNotifications, 90000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
-  // ─── Temps réel : nouvelle activité poussée immédiatement ───
   useEffect(() => {
     if (!window.Echo || !userId) return;
 
@@ -284,7 +277,6 @@ export default function AdminLayout({ children }) {
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
   };
 
-  // ─── Écoute globale des appels ProJA (LiveKit), peu importe la page ───
   useEffect(() => {
     if (!window.Echo || !auth?.user?.id) return;
 
@@ -306,12 +298,9 @@ channel.listen('.livekit.call.ended', () => {
     });
 
     channel.listen('.livekit.call.answered', () => {
-      stopRingtone(); // quelqu'un a répondu : plus la peine de continuer à sonner
+      stopRingtone();
     });
 
-    // ─── Signal discret : un membre rejoint un appel déjà en cours ───
-    // Contrairement à `.livekit.call.started`, ceci ne sonne pas et n'ouvre
-    // pas l'écran "appel entrant" : c'est juste une notification passagère.
     channel.listen('.livekit.participant.joined', (e) => {
       setJoinToast({ projectName: e.projectName, userName: e.userName });
       setTimeout(() => setJoinToast(null), 4000);
@@ -341,17 +330,11 @@ channel.listen('.livekit.call.ended', () => {
     const onFinish = () => setGlobalLoading(false);
     const onError = () => setGlobalLoading(false);
     
-    // Ajouter les écouteurs d'événements
     router.on('start', onStart);
     router.on('finish', onFinish);
     router.on('error', onError);
     
-    return () => {
-      // Supprimer les écouteurs d'événements en utilisant la méthode appropriée
-      // Note: Dans les versions récentes d'Inertia, il n'est pas nécessaire de supprimer manuellement les écouteurs
-      // car ils sont automatiquement nettoyés lors du démontage du composant
-      // Nous laissons cette partie vide pour éviter l'erreur
-    };
+    return () => {};
   }, []);
 
   useEffect(() => {
@@ -370,14 +353,12 @@ channel.listen('.livekit.call.ended', () => {
     };
   }, []);
 
-  // Load language preference from localStorage on component mount
   useEffect(() => {
     const savedLanguage = localStorage.getItem('i18nextLng') || 'fr';
     setCurrentLanguage(savedLanguage);
     i18n.changeLanguage(savedLanguage);
   }, [i18n]);
 
-  // Update current language when i18n language changes
   useEffect(() => {
     const handleLanguageChanged = (lng) => {
       setCurrentLanguage(lng);
@@ -389,7 +370,6 @@ channel.listen('.livekit.call.ended', () => {
     };
   }, [i18n]);
 
-  // Function to change language
   const changeLanguage = async (lng) => {
     if (currentLanguage === lng || isChangingLanguage) return;
     
@@ -400,13 +380,11 @@ channel.listen('.livekit.call.ended', () => {
       localStorage.setItem('i18nextLng', lng);
       document.documentElement.lang = lng;
       
-      // Show success notification
       const selectedLang = languages.find(lang => lang.code === lng);
       if (flash?.success) {
         flash.success(t('language_changed', { language: selectedLang?.name || lng }));
       }
       
-      // Close the language dropdown after a short delay
       setTimeout(() => {
         setLanguageOpen(false);
         setIsChangingLanguage(false);
@@ -414,7 +392,6 @@ channel.listen('.livekit.call.ended', () => {
       
     } catch (error) {
       console.error('Error changing language:', error);
-      // Show error notification to user
       if (flash?.error) {
         flash.error(t('error_changing_language'));
       }
@@ -422,22 +399,21 @@ channel.listen('.livekit.call.ended', () => {
     }
   };
 
-  // Get user data from auth object (handles both auth.user and direct auth properties)
   const user = auth?.user || auth;
   const userName = user?.name || 'Utilisateur';
   const avatarUrl = user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0D8ABC&color=fff`;
   
-  // Debug log to check user data
   console.log('Auth data:', auth);
   console.log('User data:', user);
 
   return (
     <div className="flex min-h-screen bg-white dark:bg-gray-900">
-        <PushNotificationManager />
+        <ErrorBoundary>
+          <PushNotificationManager />
+        </ErrorBoundary>
       {globalLoading && <Loader />}
       {/* Sidebar */}
       <aside className={`fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}>
-        {/* Logo */}
         <div className="flex items-center justify-between h-20 px-6">
           <div className="flex items-center space-x-3">
             <svg className="w-8 h-8 text-white dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -452,7 +428,6 @@ channel.listen('.livekit.call.ended', () => {
           </button>
         </div>
 
-        {/* Menu */}
         <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide space-y-1.5">
           {navLinks.map((link, index) => (
             <Link
@@ -479,23 +454,16 @@ channel.listen('.livekit.call.ended', () => {
           ))}
         </nav>
 
-        {/* Version */}
         <div className="p-4 border-t border-white/10 dark:border-gray-700 text-center">
           <div className="text-sm font-medium text-white/60 dark:text-gray-400">
             ProJA v2.3.1
           </div>
         </div>
       </aside>
-      {/* Overlay for mobile */}
       {sidebarOpen && <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
-        {/* ═══════════════════════════════════════════════════════════
-            HEADER — Entièrement responsive (mobile / tablet / desktop)
-        ═══════════════════════════════════════════════════════════ */}
         <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300">
 
-          {/* ── Gauche : burger + logo ── */}
           <div className="flex items-center gap-3 min-w-0">
             <button
               className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
@@ -507,7 +475,6 @@ channel.listen('.livekit.call.ended', () => {
               </svg>
             </button>
 
-            {/* Logo — visible uniquement sur mobile (caché sur md+ car la sidebar prend le relais) */}
             <div className="flex items-center gap-2 md:hidden">
               <svg className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -517,17 +484,14 @@ channel.listen('.livekit.call.ended', () => {
 
             </div>
 
-          {/* ── Centre : barre de recherche globale ── */}
           <div className="flex-1 flex justify-center px-2 sm:px-4 min-w-0">
             <div className="w-full max-w-xs sm:max-w-sm md:max-w-md">
               <GlobalSearch />
             </div>
           </div>
 
-          {/* ── Droite : actions ── */}
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
 
-            {/* ─── Sélecteur de langue ─── */}
             <div className="relative" ref={useRef(null)}>
               <button
                 className={`flex items-center justify-center gap-1.5 h-10 px-2 sm:px-3 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isChangingLanguage ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -565,7 +529,6 @@ channel.listen('.livekit.call.ended', () => {
                 )}
               </button>
 
-              {/* Dropdown langue */}
               {languageOpen && (
                 <div
                   className="absolute right-0 mt-2 w-44 bg-white dark:bg-gray-800 rounded-xl shadow-xl py-1 z-[9999] border border-gray-100 dark:border-gray-700 ring-1 ring-black/5"
@@ -603,7 +566,6 @@ channel.listen('.livekit.call.ended', () => {
               )}
             </div>
 
-            {/* ─── Cloche notifications ─── */}
             <div className="relative" ref={notifRef}>
               <button
                 className="relative flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -627,7 +589,6 @@ channel.listen('.livekit.call.ended', () => {
                 )}
               </button>
 
-              {/* Dropdown notifications */}
               {notifDropdown && (
                 <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-gray-700 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30">
@@ -675,7 +636,6 @@ channel.listen('.livekit.call.ended', () => {
                 </div>
               )}
 
-              {/* Modal détail notification */}
               {selectedNotif && (
                 <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedNotif(null)}>
                   <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 relative" onClick={e => e.stopPropagation()}>
@@ -708,7 +668,6 @@ channel.listen('.livekit.call.ended', () => {
               )}
             </div>
 
-            {/* ─── Toggle Dark / Light ─── */}
             <button
               className="flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               onClick={() => setDarkMode(dm => !dm)}
@@ -726,7 +685,6 @@ channel.listen('.livekit.call.ended', () => {
               )}
             </button>
 
-            {/* ─── Profil utilisateur ─── */}
             <div className="relative" ref={profileRef}>
               <button
                 className="flex items-center gap-2 h-10 pl-1 pr-2 sm:pr-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
@@ -739,10 +697,8 @@ channel.listen('.livekit.call.ended', () => {
                     alt={userName}
                     className="w-8 h-8 rounded-full border-2 border-blue-400 object-cover shadow-sm"
                   />
-                  {/* Point "en ligne" */}
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 border-2 border-white dark:border-gray-800 rounded-full"></span>
                 </div>
-                {/* Nom uniquement sur sm+ */}
                 <div className="hidden sm:flex flex-col items-start leading-tight max-w-[120px]">
                   <span className="text-xs font-semibold text-gray-800 dark:text-gray-100 truncate w-full">{userName}</span>
                   <span className="text-[10px] text-gray-400 dark:text-gray-500 capitalize">{isAdmin ? 'Admin' : 'Membre'}</span>
@@ -752,10 +708,8 @@ channel.listen('.livekit.call.ended', () => {
                 </svg>
               </button>
 
-              {/* Dropdown profil */}
               {profileDropdown && (
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-gray-700 overflow-hidden">
-                  {/* Header du menu */}
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
                     <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{userName}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{isAdmin ? '👑 Administrateur' : '👤 Membre'}</p>
@@ -816,11 +770,9 @@ channel.listen('.livekit.call.ended', () => {
             </div>
           </div>
         </header>
-        {/* Notification globale */}
         <Notification message={flash.success} type="success" />
         <Notification message={flash.error} type="error" />
         <Notification message={flash.info} type="info" />
-        {/* Page content */}
 <main className="flex-1 w-full h-full min-w-0 transition-colors pt-16 bg-white dark:bg-gray-900 flex flex-col">
           <div className="flex-1 min-w-0">
             {children}
@@ -831,7 +783,6 @@ channel.listen('.livekit.call.ended', () => {
         </main>
       </div>
 
-      {/* ─── Toast discret : quelqu'un a rejoint un appel déjà en cours ─── */}
       {joinToast && (
         <div className="fixed bottom-6 right-6 z-[9998] bg-gray-900 dark:bg-gray-700 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
@@ -847,7 +798,6 @@ channel.listen('.livekit.call.ended', () => {
         </div>
       )}
 
-      {/* ─── Bannière d'appel ProJA entrant (visible sur toute page) ─── */}
       {liveKitInvite && !showLiveKitCall && (
         <div className="fixed bottom-6 right-6 z-[9999] bg-emerald-600 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3 animate-pulse">
           <span className="text-sm font-medium">
@@ -868,7 +818,6 @@ channel.listen('.livekit.call.ended', () => {
         </div>
       )}
 
-      {/* ─── Modal d'appel ProJA (LiveKit) ─── */}
 {showLiveKitCall && liveKitInvite && (
         <LiveKitCallModal
           tokenEndpoint={`/projects/${liveKitInvite.projectId}/livekit-token`}

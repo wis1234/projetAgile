@@ -2387,7 +2387,7 @@ return () => {
                       {task.submitted_at && task.status !== 'done' && (
                         <div className="flex items-center gap-2 mb-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg">
                           <span className="text-amber-600 text-xs">⏸</span>
-                          <span className="text-xs text-amber-700 font-medium">Chrono arrêté; soumis le {new Date(task.submitted_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="text-xs text-amber-700 font-medium">Chrono arrêté: soumis le {new Date(task.submitted_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       )}
                       <CountdownTimer
