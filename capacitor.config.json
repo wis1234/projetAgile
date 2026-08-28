@@ -5,9 +5,12 @@
   "server": {
     "url": "https://proja.kemtcenter.org",
     "cleartext": false,
-    "allowNavigation": [
-      "proja.kemtcenter.org",
-      "*.kemtcenter.org"
-    ]
+    "allowNavigation": ["proja.kemtcenter.org", "*.kemtcenter.org"]
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "DEFAULT"
+    }
   }
 }

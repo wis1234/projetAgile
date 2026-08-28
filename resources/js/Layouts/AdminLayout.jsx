@@ -8,6 +8,9 @@ import PushNotificationManager from '@/Components/PushNotificationManager';
 import ErrorBoundary from '@/Components/ErrorBoundary';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import GlobalSearch from '@/Components/GlobalSearch';
+import MobileBottomNav from '@/Components/MobileBottomNav';
+import LanguageSwitcherSidebar from '@/Components/LanguageSwitcherSidebar';
+
 const getFreshCsrfToken = async () => {
   try {
     const res = await fetch('/csrf-token', { credentials: 'include' });
@@ -19,7 +22,6 @@ const getFreshCsrfToken = async () => {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   }
 };
-
 
 const navLinks = [
   { href: '/dashboard', label: 'dashboard', icon: (
@@ -68,12 +70,12 @@ const navLinks = [
 
 const Loader = () => {
   const letters = ['P', 'r', 'o', 'J', 'A'];
-  
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
       <div className="flex space-x-1 mb-8">
         {letters.map((letter, index) => (
-          <span 
+          <span
             key={index}
             className="text-4xl font-bold text-blue-600 dark:text-blue-400 inline-block"
             style={{
@@ -86,19 +88,19 @@ const Loader = () => {
           </span>
         ))}
       </div>
-      
+
       <p className="text-sm text-gray-500 dark:text-gray-400">
         Chargement...
       </p>
-      
+
       <style dangerouslySetInnerHTML={{
         __html: `
           @keyframes bounce {
-            0%, 100% { 
+            0%, 100% {
               transform: translateY(0) scale(1);
               color: #2563eb;
             }
-            50% { 
+            50% {
               transform: translateY(-15px) scale(1.2);
               color: #1d4ed8;
               text-shadow: 0 5px 10px rgba(37, 99, 235, 0.3);
@@ -113,6 +115,7 @@ const Loader = () => {
 export default function AdminLayout({ children }) {
   const { auth, flash = {}, appName } = usePage().props;
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const savedMode = localStorage.getItem('darkMode');
@@ -124,7 +127,6 @@ export default function AdminLayout({ children }) {
     return false;
   });
   const [notifDropdown, setNotifDropdown] = useState(false);
-  const [languageOpen, setLanguageOpen] = useState(false);
   const [profileDropdown, setProfileDropdown] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notifCount, setNotifCount] = useState(0);
@@ -137,9 +139,10 @@ export default function AdminLayout({ children }) {
   const [isChangingLanguage, setIsChangingLanguage] = useState(false);
   const { t, i18n } = useTranslation();
 
+  // ─── Appel ProJA (LiveKit) — état global, actif peu importe la page ───
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
-  const [liveKitInvite, setLiveKitInvite] = useState(null);
-  const [joinToast, setJoinToast] = useState(null);
+  const [liveKitInvite, setLiveKitInvite] = useState(null); // { projectId, projectName, initiatorName }
+  const [joinToast, setJoinToast] = useState(null); // { projectName, userName }
   const ringtoneRef = useRef(null);
 
   const playRingtone = () => {
@@ -183,21 +186,14 @@ export default function AdminLayout({ children }) {
   };
 
   useEffect(() => stopRingtone, []);
-  
-  const languages = [
-    { code: 'fr', name: 'Français', flag: 'fr' },
-    { code: 'en', name: 'English', flag: 'gb' },
-    { code: 'fon', name: 'Fɔngbè', flag: 'bj' },
-    { code: 'yo', name: 'Yorùbá', flag: 'ng' }
-  ];
 
   useEffect(() => {
-    const userIsAdmin = 
+    const userIsAdmin =
       auth.user?.email === 'ronaldoagbohou@gmail.com' ||
       auth.user?.role === 'admin' ||
       (Array.isArray(auth.user?.roles) && auth.user.roles.includes('admin')) ||
       auth.user?.is_admin === true;
-      
+
     setIsAdmin(userIsAdmin);
   }, [auth.user]);
 
@@ -212,17 +208,18 @@ export default function AdminLayout({ children }) {
     localStorage.setItem('darkMode', darkMode);
   }, [darkMode]);
 
+  // Écouter les changements de préférence système
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
+
     const handleChange = (e) => {
       if (localStorage.getItem('darkMode') === null) {
         setDarkMode(e.matches);
       }
     };
-    
+
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
@@ -246,6 +243,7 @@ export default function AdminLayout({ children }) {
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
+  // ─── Temps réel : nouvelle activité poussée immédiatement ───
   useEffect(() => {
     if (!window.Echo || !userId) return;
 
@@ -277,6 +275,7 @@ export default function AdminLayout({ children }) {
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
   };
 
+  // ─── Écoute globale des appels ProJA (LiveKit), peu importe la page ───
   useEffect(() => {
     if (!window.Echo || !auth?.user?.id) return;
 
@@ -292,7 +291,7 @@ export default function AdminLayout({ children }) {
       playRingtone();
     });
 
-channel.listen('.livekit.call.ended', () => {
+    channel.listen('.livekit.call.ended', () => {
       setLiveKitInvite(null);
       stopRingtone();
     });
@@ -311,7 +310,6 @@ channel.listen('.livekit.call.ended', () => {
     };
   }, [auth?.user?.id]);
 
-
   useEffect(() => {
     function handleClickOutside(event) {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
@@ -329,11 +327,11 @@ channel.listen('.livekit.call.ended', () => {
     const onStart = () => setGlobalLoading(true);
     const onFinish = () => setGlobalLoading(false);
     const onError = () => setGlobalLoading(false);
-    
+
     router.on('start', onStart);
     router.on('finish', onFinish);
     router.on('error', onError);
-    
+
     return () => {};
   }, []);
 
@@ -353,43 +351,44 @@ channel.listen('.livekit.call.ended', () => {
     };
   }, []);
 
+  // Load language preference from localStorage on component mount
   useEffect(() => {
     const savedLanguage = localStorage.getItem('i18nextLng') || 'fr';
     setCurrentLanguage(savedLanguage);
     i18n.changeLanguage(savedLanguage);
   }, [i18n]);
 
+  // Update current language when i18n language changes
   useEffect(() => {
     const handleLanguageChanged = (lng) => {
       setCurrentLanguage(lng);
     };
-    
+
     i18n.on('languageChanged', handleLanguageChanged);
     return () => {
       i18n.off('languageChanged', handleLanguageChanged);
     };
   }, [i18n]);
 
+  // Function to change language
   const changeLanguage = async (lng) => {
     if (currentLanguage === lng || isChangingLanguage) return;
-    
+
     try {
       setIsChangingLanguage(true);
       await i18n.changeLanguage(lng);
       setCurrentLanguage(lng);
       localStorage.setItem('i18nextLng', lng);
       document.documentElement.lang = lng;
-      
-      const selectedLang = languages.find(lang => lang.code === lng);
+
       if (flash?.success) {
-        flash.success(t('language_changed', { language: selectedLang?.name || lng }));
+        flash.success(t('language_changed', { language: lng }));
       }
-      
+
       setTimeout(() => {
-        setLanguageOpen(false);
         setIsChangingLanguage(false);
       }, 300);
-      
+
     } catch (error) {
       console.error('Error changing language:', error);
       if (flash?.error) {
@@ -402,38 +401,45 @@ channel.listen('.livekit.call.ended', () => {
   const user = auth?.user || auth;
   const userName = user?.name || 'Utilisateur';
   const avatarUrl = user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0D8ABC&color=fff`;
-  
-  console.log('Auth data:', auth);
-  console.log('User data:', user);
 
   return (
     <div className="flex min-h-screen bg-white dark:bg-gray-900">
-        <ErrorBoundary>
-          <PushNotificationManager />
-        </ErrorBoundary>
+      <ErrorBoundary>
+        <PushNotificationManager />
+      </ErrorBoundary>
       {globalLoading && <Loader />}
-      {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}>
-        <div className="flex items-center justify-between h-20 px-6">
+
+      {/* ═══════════════════ SIDEBAR / DRAWER ═══════════════════ */}
+      <aside
+        className={`fixed top-0 left-0 h-screen w-72 md:w-64 bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
+        {/* Logo */}
+        <div className="flex items-center justify-between h-20 px-6 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <svg className="w-8 h-8 text-white dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
             <span className="text-xl font-bold text-white dark:text-blue-400">ProJA</span>
           </div>
-          <button className="md:hidden text-white/70 hover:text-white dark:hover:text-blue-300 transition-colors" onClick={() => setSidebarOpen(false)}>
+          <button
+            className="md:hidden text-white/70 hover:text-white active:scale-90 transition-all"
+            onClick={() => setSidebarOpen(false)}
+          >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
+        {/* Menu */}
         <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide space-y-1.5">
-          {navLinks.map((link, index) => (
+          {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={`flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 ${
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 active:scale-[0.98] ${
                 route().current(link.href.replace(/^\//, ''))
                   ? 'bg-white/10 dark:bg-blue-900/50 text-white dark:text-blue-100 shadow-lg'
                   : 'text-white/80 hover:bg-white/5 dark:hover:bg-blue-900/30 hover:text-white dark:hover:text-blue-100'
@@ -454,19 +460,51 @@ channel.listen('.livekit.call.ended', () => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-white/10 dark:border-gray-700 text-center">
+        {/* Sélecteur de langue */}
+        <div className="flex-shrink-0 border-t border-white/10 dark:border-gray-700 pt-3">
+          <LanguageSwitcherSidebar
+            currentLanguage={currentLanguage}
+            isChangingLanguage={isChangingLanguage}
+            onChangeLanguage={changeLanguage}
+            t={t}
+          />
+        </div>
+
+        {/* Version */}
+        <div
+          className="p-4 border-t border-white/10 dark:border-gray-700 text-center flex-shrink-0"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 1rem)' }}
+        >
           <div className="text-sm font-medium text-white/60 dark:text-gray-400">
             ProJA v2.3.1
           </div>
         </div>
       </aside>
-      {sidebarOpen && <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
-      <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
-        <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300">
 
+      {/* Overlay for mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+      )}
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
+        {/* ═══════════════════════════════════════════════════════════
+            HEADER — allégé sur mobile (pattern app native)
+        ═══════════════════════════════════════════════════════════ */}
+        <header
+          className="fixed top-0 left-0 md:left-64 right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300"
+          style={{
+            height: 'calc(4rem + env(safe-area-inset-top, 0px))',
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+          }}
+        >
+          {/* ── Gauche : burger + logo ── */}
           <div className="flex items-center gap-3 min-w-0">
             <button
-              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all flex-shrink-0"
               onClick={() => setSidebarOpen(true)}
               aria-label="Ouvrir le menu"
             >
@@ -475,106 +513,45 @@ channel.listen('.livekit.call.ended', () => {
               </svg>
             </button>
 
+            {/* Logo — visible uniquement sur mobile */}
             <div className="flex items-center gap-2 md:hidden">
               <svg className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
               <span className="text-lg font-bold text-gray-800 dark:text-white tracking-wide">ProJA</span>
             </div>
+          </div>
 
-            </div>
-
-          <div className="flex-1 flex justify-center px-2 sm:px-4 min-w-0">
-            <div className="w-full max-w-xs sm:max-w-sm md:max-w-md">
+          {/* ── Centre : barre de recherche (desktop uniquement) ── */}
+          <div className="hidden md:flex flex-1 justify-center px-4 min-w-0">
+            <div className="w-full max-w-md">
               <GlobalSearch />
             </div>
           </div>
 
+          {/* ── Droite : actions ── */}
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
 
-            <div className="relative" ref={useRef(null)}>
-              <button
-                className={`flex items-center justify-center gap-1.5 h-10 px-2 sm:px-3 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isChangingLanguage ? 'opacity-60 cursor-not-allowed' : ''}`}
-                onClick={() => !isChangingLanguage && setLanguageOpen(prev => !prev)}
-                aria-haspopup="true"
-                aria-expanded={languageOpen}
-                aria-label={t('change_language')}
-                disabled={isChangingLanguage}
-                title={t('change_language')}
-              >
-                {isChangingLanguage ? (
-                  <svg className="animate-spin h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                ) : (
-                  <>
-                    <span
-                      style={{
-                        backgroundImage: `url(https://flagcdn.com/24x18/${languages.find(l => l.code === currentLanguage)?.flag || 'gb'}.png)`,
-                        width: '20px', height: '15px',
-                        backgroundSize: 'cover', display: 'inline-block',
-                        borderRadius: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-                        flexShrink: 0,
-                      }}
-                      aria-hidden="true"
-                    />
-                    <span className="hidden sm:inline text-xs font-semibold">
-                      {languages.find(l => l.code === currentLanguage)?.code?.toUpperCase() || 'FR'}
-                    </span>
-                    <svg className={`w-3 h-3 transition-transform hidden sm:block ${languageOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </>
-                )}
-              </button>
+            {/* Icône recherche — mobile uniquement, ouvre un overlay plein écran */}
+            <button
+              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
+              onClick={() => setMobileSearchOpen(true)}
+              aria-label="Rechercher"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
 
-              {languageOpen && (
-                <div
-                  className="absolute right-0 mt-2 w-44 bg-white dark:bg-gray-800 rounded-xl shadow-xl py-1 z-[9999] border border-gray-100 dark:border-gray-700 ring-1 ring-black/5"
-                  role="menu"
-                  onMouseLeave={() => setLanguageOpen(false)}
-                >
-                  {languages.map(lang => (
-                    <button
-                      key={lang.code}
-                      onClick={() => changeLanguage(lang.code)}
-                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${
-                        currentLanguage === lang.code
-                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
-                          : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                      role="menuitemradio"
-                      aria-checked={currentLanguage === lang.code}
-                      disabled={isChangingLanguage}
-                    >
-                      <span style={{
-                        backgroundImage: `url(https://flagcdn.com/24x18/${lang.flag}.png)`,
-                        width: '20px', height: '15px', backgroundSize: 'cover',
-                        display: 'inline-block', borderRadius: '2px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)', flexShrink: 0,
-                      }} aria-hidden="true" />
-                      <span className="flex-1">{lang.name}</span>
-                      {currentLanguage === lang.code && (
-                        <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
+            {/* ─── Cloche notifications ─── */}
             <div className="relative" ref={notifRef}>
               <button
-                className="relative flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="relative flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
                 title="Notifications"
                 onClick={() => {
                   const opening = !notifDropdown;
                   setNotifDropdown(opening);
                   setProfileDropdown(false);
-                  setLanguageOpen(false);
                   if (opening) markNotificationsRead();
                 }}
                 aria-label="Notifications"
@@ -589,6 +566,7 @@ channel.listen('.livekit.call.ended', () => {
                 )}
               </button>
 
+              {/* Dropdown notifications */}
               {notifDropdown && (
                 <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-gray-700 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30">
@@ -636,6 +614,7 @@ channel.listen('.livekit.call.ended', () => {
                 </div>
               )}
 
+              {/* Modal détail notification */}
               {selectedNotif && (
                 <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedNotif(null)}>
                   <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 relative" onClick={e => e.stopPropagation()}>
@@ -668,8 +647,9 @@ channel.listen('.livekit.call.ended', () => {
               )}
             </div>
 
+            {/* ─── Toggle Dark / Light — desktop uniquement, déplacé dans le profil sur mobile ─── */}
             <button
-              className="flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="hidden md:flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
               onClick={() => setDarkMode(dm => !dm)}
               aria-label={darkMode ? 'Désactiver le mode sombre' : 'Activer le mode sombre'}
               title={darkMode ? 'Désactiver le mode sombre' : 'Activer le mode sombre'}
@@ -685,10 +665,11 @@ channel.listen('.livekit.call.ended', () => {
               )}
             </button>
 
+            {/* ─── Profil utilisateur ─── */}
             <div className="relative" ref={profileRef}>
               <button
-                className="flex items-center gap-2 h-10 pl-1 pr-2 sm:pr-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-                onClick={() => { setProfileDropdown(d => !d); setNotifDropdown(false); setLanguageOpen(false); }}
+                className="flex items-center gap-2 h-10 pl-1 pr-2 sm:pr-3 rounded-xl active:scale-95 active:bg-gray-100 dark:active:bg-gray-700 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                onClick={() => { setProfileDropdown(d => !d); setNotifDropdown(false); }}
                 aria-label="Menu profil"
               >
                 <div className="relative flex-shrink-0">
@@ -708,6 +689,7 @@ channel.listen('.livekit.call.ended', () => {
                 </svg>
               </button>
 
+              {/* Dropdown profil */}
               {profileDropdown && (
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-gray-700 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
@@ -722,6 +704,24 @@ channel.listen('.livekit.call.ended', () => {
                       </svg>
                       Mon profil
                     </Link>
+
+                    {/* Toggle dark mode — visible uniquement sur mobile ici */}
+                    <button
+                      onClick={() => setDarkMode(dm => !dm)}
+                      className="md:hidden w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                    >
+                      {darkMode ? (
+                        <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m8.66-13.66l-.71.71M4.05 19.95l-.71.71M21 12h-1M4 12H3m16.66 5.66l-.71-.71M4.05 4.05l-.71-.71M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                      )}
+                      {darkMode ? 'Mode clair' : 'Mode sombre'}
+                    </button>
+
                     <Link href="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
                       <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -770,10 +770,43 @@ channel.listen('.livekit.call.ended', () => {
             </div>
           </div>
         </header>
+
+        {/* ═══════════════════ OVERLAY RECHERCHE MOBILE ═══════════════════ */}
+        {mobileSearchOpen && (
+          <div
+            className="md:hidden fixed inset-0 z-50 bg-white dark:bg-gray-900"
+            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+          >
+            <div className="flex items-center gap-2 px-3 h-16 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex-1">
+                <GlobalSearch />
+              </div>
+              <button
+                onClick={() => setMobileSearchOpen(false)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all flex-shrink-0"
+                aria-label="Fermer la recherche"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Notification globale */}
         <Notification message={flash.success} type="success" />
         <Notification message={flash.error} type="error" />
         <Notification message={flash.info} type="info" />
-<main className="flex-1 w-full h-full min-w-0 transition-colors pt-16 bg-white dark:bg-gray-900 flex flex-col">
+
+        {/* Page content */}
+        <main
+          className="flex-1 w-full h-full min-w-0 transition-colors bg-white dark:bg-gray-900 flex flex-col"
+          style={{
+            paddingTop: 'calc(4rem + env(safe-area-inset-top, 0px))',
+            paddingBottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px))',
+          }}
+        >
           <div className="flex-1 min-w-0">
             {children}
           </div>
@@ -783,8 +816,15 @@ channel.listen('.livekit.call.ended', () => {
         </main>
       </div>
 
+      {/* ═══════════════════ BOTTOM NAVIGATION — mobile uniquement ═══════════════════ */}
+      <MobileBottomNav onMoreClick={() => setSidebarOpen(true)} />
+
+      {/* ─── Toast discret : quelqu'un a rejoint un appel déjà en cours ─── */}
       {joinToast && (
-        <div className="fixed bottom-6 right-6 z-[9998] bg-gray-900 dark:bg-gray-700 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div
+          className="fixed right-6 z-[9998] bg-gray-900 dark:bg-gray-700 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
+          style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
           <span className="text-sm">
             <strong>{joinToast.userName}</strong> a rejoint l'appel — {joinToast.projectName}
@@ -798,14 +838,18 @@ channel.listen('.livekit.call.ended', () => {
         </div>
       )}
 
+      {/* ─── Bannière d'appel ProJA entrant (visible sur toute page) ─── */}
       {liveKitInvite && !showLiveKitCall && (
-        <div className="fixed bottom-6 right-6 z-[9999] bg-emerald-600 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3 animate-pulse">
+        <div
+          className="fixed right-6 z-[9999] bg-emerald-600 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3 animate-pulse"
+          style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           <span className="text-sm font-medium">
-            {liveKitInvite.initiatorName} démarre un un appel — {liveKitInvite.projectName}
+            {liveKitInvite.initiatorName} démarre un appel — {liveKitInvite.projectName}
           </span>
           <button
             onClick={() => { setShowLiveKitCall(true); stopRingtone(); }}
-            className="bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-emerald-50"
+            className="bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-emerald-50 active:scale-95 transition-all"
           >
             Rejoindre
           </button>
@@ -818,7 +862,8 @@ channel.listen('.livekit.call.ended', () => {
         </div>
       )}
 
-{showLiveKitCall && liveKitInvite && (
+      {/* ─── Modal d'appel ProJA (LiveKit) ─── */}
+      {showLiveKitCall && liveKitInvite && (
         <LiveKitCallModal
           tokenEndpoint={`/projects/${liveKitInvite.projectId}/livekit-token`}
           inviteLink={liveKitInvite.inviteUrl || ''}

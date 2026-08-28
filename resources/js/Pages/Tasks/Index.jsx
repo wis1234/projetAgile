@@ -29,7 +29,7 @@ const PRIORITY_CONFIG = {
 const StatusBadge = ({ status }) => {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.todo;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.color}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${cfg.color}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
       {cfg.label}
     </span>
@@ -39,7 +39,7 @@ const StatusBadge = ({ status }) => {
 const PriorityBadge = ({ priority }) => {
   const cfg = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.low;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.color}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${cfg.color}`}>
       {cfg.label}
     </span>
   );
@@ -50,9 +50,9 @@ const PriorityBadge = ({ priority }) => {
 const Avatar = ({ name = '', url = '', size = 'sm' }) => {
   const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const sz = size === 'lg' ? 'w-10 h-10 text-sm' : 'w-7 h-7 text-xs';
-  if (url) return <img src={url} alt={name} className={`${sz} rounded-full object-cover ring-2 ring-white dark:ring-gray-800`} />;
+  if (url) return <img src={url} alt={name} className={`${sz} rounded-full object-cover ring-2 ring-white dark:ring-gray-800 flex-shrink-0`} />;
   return (
-    <div className={`${sz} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold ring-2 ring-white dark:ring-gray-800`}>
+    <div className={`${sz} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold ring-2 ring-white dark:ring-gray-800 flex-shrink-0`}>
       {initials}
     </div>
   );
@@ -75,14 +75,14 @@ const SummaryCard = ({ label, value, icon: Icon, color, sub }) => (
 
 // ── Mini stat (compact, utilisé à l'intérieur d'une carte parente, sans bordure propre) ──
 const MiniStat = ({ label, value, icon: Icon, color, sub }) => (
-  <div className="rounded-xl bg-gray-50 dark:bg-gray-700/40 p-3.5 flex items-center gap-3">
-    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
-      <Icon className="text-sm text-white" />
+  <div className="rounded-xl bg-gray-50 dark:bg-gray-700/40 p-2.5 sm:p-3.5 flex items-center gap-2.5 sm:gap-3">
+    <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
+      <Icon className="text-xs sm:text-sm text-white" />
     </div>
     <div className="min-w-0">
-      <p className="text-lg font-extrabold text-gray-900 dark:text-white leading-tight">{value ?? 0}</p>
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">{label}</p>
-      {sub && <p className="text-[11px] text-red-500 font-semibold mt-0.5">{sub}</p>}
+      <p className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white leading-tight">{value ?? 0}</p>
+      <p className="text-[11px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 truncate">{label}</p>
+      {sub && <p className="text-[10px] sm:text-[11px] text-red-500 font-semibold mt-0.5 truncate">{sub}</p>}
     </div>
   </div>
 );
@@ -99,10 +99,10 @@ const PanelToggleButton = ({ icon: Icon, label, openLabel, open, onClick, count,
     <button
       onClick={onClick}
       aria-expanded={open}
-      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap ${toneClasses}`}
+      className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${toneClasses}`}
     >
       <Icon />
-      {open ? (openLabel || label) : label}
+      <span>{open ? (openLabel || label) : label}</span>
       {typeof count === 'number' && count > 0 && (
         <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-0.5 font-bold">
           {count}
@@ -127,7 +127,7 @@ const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, o
       <select
         value={filters[field] || ''}
         onChange={e => set(field, e.target.value)}
-        className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+        className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-full"
       >
         <option value="">{placeholder}</option>
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -136,7 +136,7 @@ const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, o
   );
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 animate-[fadeIn_0.15s_ease-out]">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 animate-[fadeIn_0.15s_ease-out]">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {/* Search */}
         <div className="flex flex-col gap-1 sm:col-span-2 xl:col-span-1">
@@ -203,7 +203,7 @@ const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, o
             type="date"
             value={filters.due_from || ''}
             onChange={e => set('due_from', e.target.value)}
-            className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none w-full"
           />
         </div>
 
@@ -213,7 +213,7 @@ const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, o
             type="date"
             value={filters.due_to || ''}
             onChange={e => set('due_to', e.target.value)}
-            className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none w-full"
           />
         </div>
       </div>
@@ -240,7 +240,7 @@ const SortHeader = ({ label, field, current, dir, onSort }) => {
   return (
     <button
       onClick={() => onSort(field)}
-      className="flex items-center gap-1 font-semibold text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
+      className="flex items-center gap-1 font-semibold text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group whitespace-nowrap"
     >
       {label}
       <span className="ml-1 opacity-50 group-hover:opacity-100">
@@ -260,25 +260,25 @@ const UserStatCard = ({ stat, rank }) => {
   const rankBg     = rankColors[rank] || 'from-blue-400 to-blue-500';
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 group">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 group">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {rank < 3 ? (
-            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${rankBg} flex items-center justify-center text-white text-xs font-extrabold shadow-sm`}>
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${rankBg} flex items-center justify-center text-white text-xs font-extrabold shadow-sm flex-shrink-0`}>
               {rank === 0 ? '🥇' : rank === 1 ? '🥈' : '🥉'}
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 text-xs font-bold">
+            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 text-xs font-bold flex-shrink-0">
               #{rank + 1}
             </div>
           )}
           <Avatar name={stat.user?.name || ''} url={stat.user?.profile_photo_url || ''} size="lg" />
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight">{stat.user?.name || 'Inconnu'}</p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight truncate">{stat.user?.name || 'Inconnu'}</p>
               {stat.is_current_user && (
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 flex-shrink-0">
                   Moi
                 </span>
               )}
@@ -286,8 +286,8 @@ const UserStatCard = ({ stat, rank }) => {
             <p className="text-xs text-gray-400">{stat.total} tâche{stat.total !== 1 ? 's' : ''}</p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">{completion}%</p>
+        <div className="text-right flex-shrink-0">
+          <p className="text-xl sm:text-2xl font-extrabold text-blue-600 dark:text-blue-400">{completion}%</p>
           <p className="text-xs text-gray-400">Complété</p>
         </div>
       </div>
@@ -301,15 +301,15 @@ const UserStatCard = ({ stat, rank }) => {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-3 gap-2 mt-3">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-3">
         {[
           { label: 'À faire', val: stat.todo, color: 'text-gray-500 dark:text-gray-400' },
           { label: 'En cours', val: stat.in_progress, color: 'text-blue-600 dark:text-blue-400' },
           { label: 'Terminé', val: stat.done, color: 'text-emerald-600 dark:text-emerald-400' },
         ].map(s => (
           <div key={s.label} className="text-center bg-gray-50 dark:bg-gray-700/50 rounded-xl py-2 px-1">
-            <p className={`text-base font-extrabold ${s.color}`}>{s.val}</p>
-            <p className="text-xs text-gray-400">{s.label}</p>
+            <p className={`text-sm sm:text-base font-extrabold ${s.color}`}>{s.val}</p>
+            <p className="text-[10px] sm:text-xs text-gray-400">{s.label}</p>
           </div>
         ))}
       </div>
@@ -339,6 +339,62 @@ const UserStatCard = ({ stat, rank }) => {
   );
 };
 
+// ── Task card (extraite pour être réutilisée en vue Cartes ET en repli mobile de la vue Tableau) ──
+
+const TaskCard = ({ task, onOpen }) => {
+  const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date();
+  return (
+    <div
+      className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group ${task.is_locked ? 'ring-1 ring-amber-200 opacity-80' : ''}`}
+      onClick={() => onOpen(task.id)}
+    >
+      <div className={`w-full h-1 rounded-full mb-3 sm:mb-4 ${PRIORITY_CONFIG[task.priority]?.bar || 'bg-gray-300'}`} />
+
+      <div className="flex items-start justify-between gap-2 mb-3 flex-wrap">
+        <h3 className="font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 text-sm leading-snug min-w-0 flex-1">
+          {task.is_locked && <FaLock className="inline-block mr-1.5 text-amber-500 text-xs mb-0.5" />}
+          {task.title}
+        </h3>
+        <StatusBadge status={task.status} />
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <PriorityBadge priority={task.priority} />
+        {task.project && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2 py-1 min-w-0">
+            <FaProjectDiagram className="text-blue-400 flex-shrink-0" />
+            <span className="truncate max-w-[140px]">{task.project.name}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 flex-wrap">
+        {task.assigned_user || task.assignedUser ? (
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Avatar
+              name={task.assigned_user?.name || task.assignedUser?.name || ''}
+              url={task.assigned_user?.profile_photo_url || ''}
+            />
+            <span className="text-xs text-gray-600 dark:text-gray-400 font-medium truncate max-w-[100px]">
+              {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ')[0]}
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-300 dark:text-gray-600 italic">Non assigné</span>
+        )}
+
+        {task.due_date && (
+          <span className={`flex items-center gap-1 text-xs whitespace-nowrap ${isOverdue ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+            {isOverdue && <FaExclamationTriangle />}
+            <FaCalendarAlt className="flex-shrink-0" />
+            {new Date(task.due_date).toLocaleDateString('fr-FR')}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ── Main Index component ──────────────────────────────────────────────────────
 
 const Index = ({
@@ -353,7 +409,22 @@ const Index = ({
 }) => {
   const { t } = useTranslation();
   const { flash = {} } = usePage().props;
-  const [viewMode, setViewMode]   = useState('table');
+
+  // ─── Détection mobile : force la vue Cartes (le tableau n'est pas exploitable sous 768px) ───
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const [viewMode, setViewMode] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'));
+
+  useEffect(() => {
+    if (isMobile && viewMode !== 'cards') setViewMode('cards');
+  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [searchTerm, setSearchTerm] = useState(initialFilters.search || '');
   const [filters, setFilters]     = useState({ ...initialFilters, search: initialFilters.search || '' });
   const [isAlertDismissed, setIsAlertDismissed] = useState(false);
@@ -370,6 +441,7 @@ const Index = ({
 
   const showLockedAlert = lockedSprints.length > 0 && !isAlertDismissed;
 
+  const openTask = useCallback((id) => router.visit(`/tasks/${id}`), []);
 
   const handleSort = useCallback((field) => {
     const newDir = filters.sort_by === field && filters.sort_dir === 'asc' ? 'desc' : 'asc';
@@ -419,57 +491,57 @@ const Index = ({
   const activeFilterCount = Object.values(filters).filter(v => v !== '' && v !== undefined && v !== null).length;
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="w-full min-h-screen bg-gray-50 dark:bg-gray-950 overflow-x-hidden">
+      <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
 
         {/* ── Flash notification ── */}
         {flash.success && (
-          <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 px-5 py-3 rounded-2xl shadow-sm">
+          <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 px-4 sm:px-5 py-3 rounded-2xl shadow-sm">
             <FaCheck className="flex-shrink-0" />
             <span className="font-medium text-sm">{flash.success}</span>
           </div>
         )}
         {flash.error && (
-          <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 px-5 py-3 rounded-2xl shadow-sm">
+          <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 px-4 sm:px-5 py-3 rounded-2xl shadow-sm">
             <FaExclamationTriangle className="flex-shrink-0" />
             <span className="font-medium text-sm">{flash.error}</span>
           </div>
         )}
 
         {/* ── Page header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
               Gestion des tâches
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
               {summary.total ?? 0} tâche{(summary.total ?? 0) !== 1 ? 's' : ''} au total
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/kanban"
-              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:border-blue-400 hover:text-blue-600 transition-all shadow-sm"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-xs sm:text-sm hover:border-blue-400 hover:text-blue-600 transition-all shadow-sm"
             >
-              <HiOutlineViewGrid className="text-lg" /> Kanban
+              <HiOutlineViewGrid className="text-base sm:text-lg" /> Kanban
             </Link>
             <Link
               href="/tasks/create"
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm hover:shadow-md"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs sm:text-sm transition-colors shadow-sm hover:shadow-md"
             >
-              <FaPlus /> Nouvelle tâche
+              <FaPlus /> <span className="whitespace-nowrap">Nouvelle tâche</span>
             </Link>
           </div>
         </div>
 
         {/* ── Enhanced Multi-Sprint Lock Alert ── */}
         {showLockedAlert && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-5 rounded-r-2xl shadow-sm relative animate-[fadeIn_0.3s_ease-out]">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 sm:p-5 rounded-r-2xl shadow-sm relative animate-[fadeIn_0.3s_ease-out]">
             <div className="flex items-start">
               <div className="flex-shrink-0 mt-0.5">
                 <FaLock className="h-5 w-5 text-amber-500" />
               </div>
-              <div className="ml-4 pr-8">
+              <div className="ml-3 sm:ml-4 pr-7 sm:pr-8 min-w-0">
                 <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
                   Attention
                 </h3>
@@ -506,14 +578,14 @@ const Index = ({
         )}
 
         {/* ── Vue d'ensemble : global + mes tâches, côte à côte (empilés sur mobile) ── */}
-        <div className={`grid grid-cols-1 ${myTasksSummary ? 'lg:grid-cols-2' : ''} gap-6`}>
+        <div className={`grid grid-cols-1 ${myTasksSummary ? 'lg:grid-cols-2' : ''} gap-4 sm:gap-6`}>
 
           {/* Carte gauche : vue d'ensemble globale */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
-            <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5">
+            <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3 sm:mb-4">
               Vue d'ensemble
             </h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
               <MiniStat label="Total"    value={summary.total}       icon={FaTasks} color="bg-blue-500" />
               <MiniStat label="À faire"  value={summary.todo}        icon={FaClock} color="bg-slate-400" />
               <MiniStat label="En cours" value={summary.in_progress} icon={FaFire}  color="bg-amber-500" />
@@ -526,11 +598,11 @@ const Index = ({
 
           {/* Carte droite : mes propres tâches */}
           {myTasksSummary && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
-              <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5">
+              <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3 sm:mb-4">
                 Mes propres tâches
               </h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 <MiniStat label="Total"    value={myTasksSummary.total}       icon={FaTasks} color="bg-indigo-500" />
                 <MiniStat label="À faire"  value={myTasksSummary.todo}        icon={FaClock} color="bg-slate-400" />
                 <MiniStat label="En cours" value={myTasksSummary.in_progress} icon={FaFire}  color="bg-amber-500" />
@@ -544,8 +616,8 @@ const Index = ({
         </div>
 
         {/* ── Controls row : panneaux à gauche, compteur + vue à droite ── */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-3.5 sm:p-4 lg:p-5 flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {userStats.length > 0 && (
               <PanelToggleButton
                 icon={FaChartBar}
@@ -567,34 +639,42 @@ const Index = ({
             />
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+          <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {pagination?.total !== undefined
                 ? `${pagination.from ?? 0}–${pagination.to ?? 0} sur ${pagination.total} résultats`
                 : `${tasks.length} résultats`}
             </p>
-            <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-xl p-1">
-              <button
-                onClick={() => setViewMode('table')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  viewMode === 'table'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
-                }`}
-              >
-                <HiOutlineViewList /> Tableau
-              </button>
-              <button
-                onClick={() => setViewMode('cards')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  viewMode === 'cards'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
-                }`}
-              >
-                <HiOutlineViewGrid /> Cartes
-              </button>
-            </div>
+
+            {/* Le choix Tableau/Cartes n'a de sens qu'à partir de la tablette : le tableau est illisible sur mobile */}
+            {!isMobile ? (
+              <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-xl p-1">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    viewMode === 'table'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
+                  }`}
+                >
+                  <HiOutlineViewList /> Tableau
+                </button>
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    viewMode === 'cards'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-blue-600'
+                  }`}
+                >
+                  <HiOutlineViewGrid /> Cartes
+                </button>
+              </div>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-400 dark:text-gray-500">
+                <HiOutlineViewGrid /> Vue cartes
+              </span>
+            )}
           </div>
         </div>
 
@@ -614,35 +694,35 @@ const Index = ({
         {/* ── Progression des membres ── */}
         {showStats && userStats.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden animate-[fadeIn_0.15s_ease-out]">
-            <div className="w-full flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <FaChartBar className="text-white" />
+            <div className="w-full flex items-center justify-between gap-2 px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <FaChartBar className="text-white text-sm sm:text-base" />
                 </div>
-                <div className="text-left">
-                  <p className="font-bold text-gray-900 dark:text-white">Progression des membres</p>
+                <div className="text-left min-w-0">
+                  <p className="font-bold text-gray-900 dark:text-white text-sm sm:text-base truncate">Progression des membres</p>
                   <p className="text-xs text-gray-400">{filteredUserStats.length} membre{filteredUserStats.length !== 1 ? 's' : ''} actif{filteredUserStats.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowStats(false)}
                 title="Masquer"
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors flex-shrink-0"
               >
                 <FaTimes />
               </button>
             </div>
 
-            <div className="px-6 pb-6">
+            <div className="px-4 sm:px-6 pb-5 sm:pb-6">
               {paginatedUserStats.length > 0 ? (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-4 sm:mt-5">
                     {paginatedUserStats.map((stat, index) => (
                       <UserStatCard key={stat.user?.id ?? index} stat={stat} rank={index} />
                     ))}
                   </div>
                   {hasMoreUsers && (
-                    <div className="mt-6 text-center">
+                    <div className="mt-5 sm:mt-6 text-center">
                       <button
                         onClick={() => setDisplayedUserCount(prev => prev + 20)}
                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -661,10 +741,8 @@ const Index = ({
           </div>
         )}
 
-         
-
-        {/* ── TABLE view ── */}
-        {viewMode === 'table' && (
+        {/* ── TABLE view (desktop / tablette uniquement) ── */}
+        {viewMode === 'table' && !isMobile && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm divide-y divide-gray-100 dark:divide-gray-700">
@@ -704,7 +782,7 @@ const Index = ({
                       <tr
                         key={task.id}
                         className={`border-b border-gray-100 dark:border-gray-700/70 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md ${task.is_locked ? 'opacity-75 bg-gray-50/50' : ''}`}
-                        onClick={() => router.visit(`/tasks/${task.id}`)}
+                        onClick={() => openTask(task.id)}
                       >
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2">
@@ -755,76 +833,32 @@ const Index = ({
           </div>
         )}
 
-        {/* ── CARDS view ── */}
-        {viewMode === 'cards' && (
+        {/* ── CARDS view (par défaut sur mobile, ou choisie manuellement) ── */}
+        {(viewMode === 'cards' || isMobile) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3">
             {tasks.length === 0 ? (
-              <div className="col-span-full py-16 text-center">
+              <div className="col-span-full py-14 sm:py-16 text-center">
                 <FaTasks className="mx-auto text-5xl text-gray-300 dark:text-gray-600 mb-4" />
                 <p className="text-gray-400 dark:text-gray-500 font-medium">Aucune tâche trouvée</p>
+                <Link href="/tasks/create" className="mt-3 inline-flex items-center gap-2 text-blue-600 hover:underline text-sm font-semibold">
+                  <FaPlus className="text-xs" /> Créer une tâche
+                </Link>
               </div>
-            ) : tasks.map(task => {
-              const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date();
-              return (
-                <div
-                  key={task.id}
-                  className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group ${task.is_locked ? 'ring-1 ring-amber-200 opacity-80' : ''}`}
-                  onClick={() => router.visit(`/tasks/${task.id}`)}
-                >
-                  <div className={`w-full h-1 rounded-full mb-4 ${PRIORITY_CONFIG[task.priority]?.bar || 'bg-gray-300'}`} />
-
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <h3 className="font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 text-sm leading-snug">
-                      {task.is_locked && <FaLock className="inline-block mr-1.5 text-amber-500 text-xs mb-0.5" />}
-                      {task.title}
-                    </h3>
-                    <StatusBadge status={task.status} />
-                  </div>
-
-                  {task.project && (
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2 py-1.5">
-                      <FaProjectDiagram className="text-blue-400 flex-shrink-0" />
-                      <span className="truncate">{task.project.name}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    {task.assigned_user || task.assignedUser ? (
-                      <div className="flex items-center gap-1.5">
-                        <Avatar
-                          name={task.assigned_user?.name || task.assignedUser?.name || ''}
-                          url={task.assigned_user?.profile_photo_url || ''}
-                        />
-                        <span className="text-xs text-gray-600 dark:text-gray-400 font-medium truncate max-w-[80px]">
-                          {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ')[0]}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-300 dark:text-gray-600 italic">Non assigné</span>
-                    )}
-
-                    {task.due_date && (
-                      <span className={`flex items-center gap-1 text-xs ${isOverdue ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
-                        {isOverdue && <FaExclamationTriangle />}
-                        {new Date(task.due_date).toLocaleDateString('fr-FR')}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            ) : tasks.map(task => (
+              <TaskCard key={task.id} task={task} onOpen={openTask} />
+            ))}
           </div>
         )}
 
         {/* ── Pagination ── */}
         {pagination?.links && pagination.links.length > 3 && (
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
             {pagination.links.map((link, i) => (
               <button
                 key={i}
                 disabled={!link.url}
                 onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                className={`min-w-[36px] px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`min-w-[32px] sm:min-w-[36px] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                   link.active
                     ? 'bg-blue-600 text-white shadow-sm'
                     : !link.url
