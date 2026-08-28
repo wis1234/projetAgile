@@ -3,7 +3,6 @@ import Checkbox from '@/Components/Checkbox';
 import InputError from '@/Components/InputError';
 import TextInput from '@/Components/TextInput';
 import { FaEnvelope, FaLock, FaSignInAlt, FaExclamationTriangle, FaEye, FaEyeSlash } from 'react-icons/fa';
-import ApplicationLogo from '@/Components/ApplicationLogo';
 import { useEffect, useState } from 'react';
 import GlobalFooter from '@/Components/GlobalFooter';
 
@@ -59,16 +58,20 @@ export default function Login({ status, canResetPassword }) {
 
                     {/* Left Panel: Branding — desktop uniquement */}
                     <div className="hidden md:flex flex-col justify-center items-center w-full md:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-white text-center">
-                        <ApplicationLogo className="text-6xl mb-4" />
-                        <h1 className="text-3xl font-bold mb-2">Bienvenue sur ProjA</h1>
+                        <img
+                            src="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png"
+                            alt="ProJA"
+                            className="w-20 h-20 object-contain mb-4 drop-shadow-lg"
+                        />
+                        <h1 className="text-3xl font-bold mb-2">Bienvenue sur ProJA</h1>
                         <p className="text-blue-200 mb-8">Votre solution de gestion de projet moderne.</p>
                         <div className="mt-8">
-                            <p className="text-blue-200">Pas encore de compte ?</p>
+                            <p className="text-blue-200">Pas compte ?</p>
                             <Link
                                 href={route('register')}
                                 className="mt-2 inline-flex items-center px-6 py-2 border border-transparent text-base font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                             >
-                                Créer un compte
+                                S'inscrire
                             </Link>
                         </div>
                     </div>
@@ -78,10 +81,13 @@ export default function Login({ status, canResetPassword }) {
 
                         {/* ── En-tête mobile : logo compact + titre ── */}
                         <div className="md:hidden flex flex-col items-center text-center mb-8">
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 shadow-lg shadow-blue-600/30 flex items-center justify-center mb-4">
-                                <ApplicationLogo className="h-9 w-auto text-white" />
+                            <div className="w-16 h-16 rounded-2xl bg-white dark:bg-gray-800 shadow-lg shadow-blue-600/20 ring-1 ring-black/5 dark:ring-white/10 flex items-center justify-center mb-4 p-2.5">
+                                <img
+                                    src="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png"
+                                    alt="ProJA"
+                                    className="w-full h-full object-contain"
+                                />
                             </div>
-                            <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">ProjA</h1>
                             <p className="text-gray-500 dark:text-gray-400 text-sm">Votre solution de gestion de projet</p>
                         </div>
 
