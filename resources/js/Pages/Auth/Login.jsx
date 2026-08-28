@@ -2,9 +2,9 @@ import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import Checkbox from '@/Components/Checkbox';
 import InputError from '@/Components/InputError';
 import TextInput from '@/Components/TextInput';
-import { FaEnvelope, FaLock, FaSignInAlt, FaExclamationTriangle } from 'react-icons/fa';
+import { FaEnvelope, FaLock, FaSignInAlt, FaExclamationTriangle, FaEye, FaEyeSlash } from 'react-icons/fa';
 import ApplicationLogo from '@/Components/ApplicationLogo';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import GlobalFooter from '@/Components/GlobalFooter';
 
 export default function Login({ status, canResetPassword }) {
@@ -17,12 +17,12 @@ export default function Login({ status, canResetPassword }) {
     const { props } = usePage();
     const errorMessage = props.message || '';
     const errorStatus = props.status || '';
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         // Effacer le message d'erreur après 10 secondes
         if (errorMessage) {
             const timer = setTimeout(() => {
-                // Effacer le message
                 window.history.replaceState({}, document.title, window.location.pathname);
             }, 10000);
             return () => clearTimeout(timer);
@@ -37,159 +37,193 @@ export default function Login({ status, canResetPassword }) {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 font-sans p-4 sm:p-6">
+        <div
+            className="min-h-screen flex flex-col bg-gradient-to-b from-blue-50 via-white to-white dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 font-sans overflow-x-hidden"
+            style={{
+                paddingTop: 'env(safe-area-inset-top, 0px)',
+                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            }}
+        >
             <Head title="Connexion" />
 
-            <div className="flex-1 flex flex-col justify-center w-full max-w-4xl mx-auto">
-                <div className="flex flex-col md:flex-row w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-                {/* Left Panel: Branding */}
-                <div className="hidden md:flex flex-col justify-center items-center w-full md:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-white text-center">
-                    <ApplicationLogo className="text-6xl mb-4" />
-                    <h1 className="text-3xl font-bold mb-2">Bienvenue sur ProjA</h1>
-                    <p className="text-blue-200 mb-8">Votre solution de gestion de projet moderne.</p>
-                    <div className="mt-8">
-                        <p className="text-blue-200">Pas encore de compte ?</p>
-                        <Link 
-                            href={route('register')} 
-                            className="mt-2 inline-flex items-center px-6 py-2 border border-transparent text-base font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                            Créer un compte
-                        </Link>
-                    </div>
-                </div>
+            {/* ═══════════════════ Décor d'arrière-plan (mobile) ═══════════════════ */}
+            <div className="md:hidden pointer-events-none absolute inset-x-0 top-0 h-72 overflow-hidden -z-0">
+                <div className="absolute -top-24 -left-16 w-64 h-64 bg-blue-400/20 dark:bg-blue-500/10 rounded-full blur-3xl" />
+                <div className="absolute -top-10 -right-10 w-56 h-56 bg-indigo-400/20 dark:bg-indigo-500/10 rounded-full blur-3xl" />
+            </div>
 
-                {/* Right Panel: Form */}
-                <div className="w-full md:w-1/2 p-8 sm:p-10 flex flex-col justify-center">
-                    <div className="md:hidden text-center mb-6">
-                        <div className="flex justify-center mb-4">
-                            <ApplicationLogo className="h-16 w-auto text-blue-600" />
-                        </div>
-                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">Bienvenue sur ProjA</h1>
-                        <p className="text-gray-600 dark:text-gray-300 text-sm">Votre solution de gestion de projet</p>
-                    </div>
+            <div className="flex-1 flex flex-col justify-center w-full max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-10 relative z-10">
 
-                    <div className="text-center mb-6 sm:mb-8">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-blue-800 dark:text-blue-200 mb-2">
-                            Connexion
-                        </h2>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
-                            Heureux de vous revoir !
-                        </p>
-                    </div>
+                {/* ═══════════════════ Carte mobile : logo + titre au-dessus, pas de split ═══════════════════ */}
+                <div className="flex flex-col md:flex-row w-full bg-white dark:bg-gray-800 rounded-3xl md:rounded-2xl shadow-xl md:shadow-2xl overflow-hidden">
 
-                    {/* Message de statut */}
-                    {status && (
-                        <div className="mb-6 p-4 bg-green-50 border-l-4 border-green-500 text-green-700 dark:bg-green-900/20 dark:border-green-500 dark:text-green-200">
-                            <p className="font-medium">{status}</p>
-                        </div>
-                    )}
-
-                    {/* Message d'erreur 401 */}
-                    {errorStatus === 401 && errorMessage && (
-                        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 dark:bg-red-900/20 dark:border-red-500 dark:text-red-200">
-                            <div className="flex items-center">
-                                <FaExclamationTriangle className="mr-2 flex-shrink-0" />
-                                <p className="font-medium">{errorMessage}</p>
-                            </div>
-                        </div>
-                    )}
-
-                    <form onSubmit={submit} className="space-y-5 sm:space-y-6">
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Adresse email
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FaEnvelope className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                                </div>
-                                <TextInput
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    value={data.email}
-                                    className="pl-10 w-full"
-                                    autoComplete="email"
-                                    isFocused={true}
-                                    onChange={(e) => setData('email', e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <InputError message={errors.email} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Mot de passe
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FaLock className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                                </div>
-                                <TextInput
-                                    id="password"
-                                    type="password"
-                                    name="password"
-                                    value={data.password}
-                                    className="pl-10 w-full"
-                                    autoComplete="current-password"
-                                    onChange={(e) => setData('password', e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <InputError message={errors.password} className="mt-1" />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <Checkbox
-                                    name="remember"
-                                    checked={data.remember}
-                                    onChange={(e) => setData('remember', e.target.checked)}
-                                />
-                                <label htmlFor="remember" className="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                                    Se souvenir de moi
-                                </label>
-                            </div>
-
-                            {canResetPassword && (
-                                <Link
-                                    href={route('password.request')}
-                                    className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-                                >
-                                    Mot de passe oublié ?
-                                </Link>
-                            )}
-                        </div>
-
-                        <div>
-                            <button
-                                type="submit"
-                                disabled={processing}
-                                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base sm:text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                    {/* Left Panel: Branding — desktop uniquement */}
+                    <div className="hidden md:flex flex-col justify-center items-center w-full md:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-white text-center">
+                        <ApplicationLogo className="text-6xl mb-4" />
+                        <h1 className="text-3xl font-bold mb-2">Bienvenue sur ProjA</h1>
+                        <p className="text-blue-200 mb-8">Votre solution de gestion de projet moderne.</p>
+                        <div className="mt-8">
+                            <p className="text-blue-200">Pas encore de compte ?</p>
+                            <Link
+                                href={route('register')}
+                                className="mt-2 inline-flex items-center px-6 py-2 border border-transparent text-base font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                             >
-                                <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                                    <FaSignInAlt className="h-5 w-5 text-blue-300 group-hover:text-blue-200" />
-                                </span>
-                                {processing ? 'Connexion en cours...' : 'Se connecter'}
-                            </button>
-                        </div>
-                    </form>
-
-                    <div className="mt-6 text-center md:hidden">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Pas encore de compte ?{' '}
-                            <Link href={route('register')} className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
                                 Créer un compte
                             </Link>
-                        </p>
+                        </div>
+                    </div>
+
+                    {/* Right Panel: Form */}
+                    <div className="w-full md:w-1/2 px-6 py-8 sm:p-10 flex flex-col justify-center">
+
+                        {/* ── En-tête mobile : logo compact + titre ── */}
+                        <div className="md:hidden flex flex-col items-center text-center mb-8">
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 shadow-lg shadow-blue-600/30 flex items-center justify-center mb-4">
+                                <ApplicationLogo className="h-9 w-auto text-white" />
+                            </div>
+                            <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">ProjA</h1>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm">Votre solution de gestion de projet</p>
+                        </div>
+
+                        <div className="text-center mb-6 sm:mb-8">
+                            <h2 className="text-2xl sm:text-3xl font-bold text-blue-800 dark:text-blue-200 mb-1.5">
+                                Connexion
+                            </h2>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
+                                Heureux de vous revoir !
+                            </p>
+                        </div>
+
+                        {/* Message de statut */}
+                        {status && (
+                            <div className="mb-5 sm:mb-6 flex items-start gap-2.5 rounded-xl px-4 py-3 bg-green-50 border border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200">
+                                <p className="text-sm font-medium leading-snug">{status}</p>
+                            </div>
+                        )}
+
+                        {/* Message d'erreur 401 */}
+                        {errorStatus === 401 && errorMessage && (
+                            <div className="mb-5 sm:mb-6 flex items-start gap-2.5 rounded-xl px-4 py-3 bg-red-50 border border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200">
+                                <FaExclamationTriangle className="mt-0.5 flex-shrink-0 text-red-500" />
+                                <p className="text-sm font-medium leading-snug">{errorMessage}</p>
+                            </div>
+                        )}
+
+                        <form onSubmit={submit} className="space-y-4 sm:space-y-6">
+                            <div>
+                                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                    Adresse email
+                                </label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                        <FaEnvelope className="h-4.5 w-4.5 text-gray-400 flex-shrink-0" />
+                                    </div>
+                                    <TextInput
+                                        id="email"
+                                        type="email"
+                                        name="email"
+                                        value={data.email}
+                                        className="pl-11 w-full h-12 sm:h-11 rounded-xl text-base sm:text-sm"
+                                        autoComplete="email"
+                                        isFocused={true}
+                                        onChange={(e) => setData('email', e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                <InputError message={errors.email} className="mt-1.5" />
+                            </div>
+
+                            <div>
+                                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                    Mot de passe
+                                </label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                        <FaLock className="h-4.5 w-4.5 text-gray-400 flex-shrink-0" />
+                                    </div>
+                                    <TextInput
+                                        id="password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        name="password"
+                                        value={data.password}
+                                        className="pl-11 pr-11 w-full h-12 sm:h-11 rounded-xl text-base sm:text-sm"
+                                        autoComplete="current-password"
+                                        onChange={(e) => setData('password', e.target.value)}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword((v) => !v)}
+                                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 active:scale-90 transition-all"
+                                        aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <FaEyeSlash className="h-4.5 w-4.5" /> : <FaEye className="h-4.5 w-4.5" />}
+                                    </button>
+                                </div>
+                                <InputError message={errors.password} className="mt-1.5" />
+                            </div>
+
+                            <div className="flex items-center justify-between flex-wrap gap-y-2">
+                                <div className="flex items-center">
+                                    <Checkbox
+                                        name="remember"
+                                        checked={data.remember}
+                                        onChange={(e) => setData('remember', e.target.checked)}
+                                    />
+                                    <label htmlFor="remember" className="ml-2 text-sm text-gray-600 dark:text-gray-400">
+                                        Se souvenir de moi
+                                    </label>
+                                </div>
+
+                                {canResetPassword && (
+                                    <Link
+                                        href={route('password.request')}
+                                        className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                                    >
+                                        Mot de passe oublié ?
+                                    </Link>
+                                )}
+                            </div>
+
+                            <div>
+                                <button
+                                    type="submit"
+                                    disabled={processing}
+                                    className="group relative w-full flex items-center justify-center gap-2 h-12 sm:h-11 px-4 rounded-xl text-base sm:text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 disabled:opacity-70 disabled:active:scale-100 shadow-lg shadow-blue-600/25"
+                                >
+                                    {processing ? (
+                                        <>
+                                            <svg className="animate-spin h-4.5 w-4.5" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg>
+                                            Connexion en cours...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FaSignInAlt className="h-4.5 w-4.5" />
+                                            Se connecter
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+
+                        <div className="mt-6 text-center md:hidden">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Pas encore de compte ?{' '}
+                                <Link href={route('register')} className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+                                    Créer un compte
+                                </Link>
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </div>
             </div>
 
             {/* Footer */}
-            <div className="mt-8 mb-2 w-full text-center">
+            <div className="mb-4 sm:mb-6 w-full text-center px-4">
                 <GlobalFooter />
             </div>
         </div>
