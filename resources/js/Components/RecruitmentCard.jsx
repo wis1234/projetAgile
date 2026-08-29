@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from '@inertiajs/react';
-import { FaUserPlus, FaChevronRight } from 'react-icons/fa';
+import { FaChevronRight } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 
 const RecruitmentCard = () => {
@@ -21,42 +21,48 @@ const RecruitmentCard = () => {
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-xl shadow-lg h-36 group">
+    // w-full + min-w-0 : empêche la carte de s'étirer selon son contenu
+    // dans un contexte flex/grid (cause du scroll horizontal sur mobile).
+    <div className="relative overflow-hidden rounded-2xl shadow-sm hover:shadow-md transition-shadow w-full min-w-0 h-32 sm:h-36 group">
       {/* Images d'arrière-plan */}
-      <div className="absolute inset-0 transition-opacity duration-1000">
+      <div className="absolute inset-0">
         {backgrounds.map((bg, index) => (
-          <div 
+          <div
             key={index}
             className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${index === currentBg ? 'opacity-100' : 'opacity-0'}`}
             style={{
-              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url(${bg})`,
+              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.65)), url(${bg})`,
             }}
           />
         ))}
       </div>
-      
+
       {/* Contenu de la carte */}
-      <div className="relative z-10 h-full flex flex-col justify-between p-4 text-white">
-        <div>
-          <h3 className="text-xl font-bold mb-1">{t('job_offers.title')}</h3>
-          <p className="text-sm opacity-90">{t ('job_offers.subtitle')}</p>
+      <div className="relative z-10 h-full flex flex-col justify-between p-3.5 sm:p-4 text-white min-w-0">
+        <div className="min-w-0">
+          <h3 className="text-base sm:text-xl font-bold mb-0.5 sm:mb-1 truncate">
+            {t('job_offers.title')}
+          </h3>
+          <p className="text-xs sm:text-sm opacity-90 line-clamp-2 sm:line-clamp-1">
+            {t('job_offers.subtitle')}
+          </p>
         </div>
-        
-        <Link 
+
+        <Link
           href="/recruitment"
-          className="inline-flex items-center justify-between px-4 py-2 bg-white bg-opacity-20 backdrop-blur-sm rounded-lg hover:bg-opacity-30 transition-all group-hover:translate-x-1"
+          className="inline-flex items-center gap-2 self-start max-w-full px-3 sm:px-4 py-1.5 sm:py-2 bg-white bg-opacity-20 backdrop-blur-sm rounded-lg hover:bg-opacity-30 active:scale-95 transition-all"
         >
-          <span className="font-medium">{t('job_offers.cta')}</span>
-          <FaChevronRight className="ml-2 h-3 w-3 opacity-70 group-hover:translate-x-1 transition-transform" />
+          <span className="font-medium text-xs sm:text-sm truncate">{t('job_offers.cta')}</span>
+          <FaChevronRight className="h-3 w-3 opacity-70 flex-shrink-0 transition-transform group-hover:translate-x-1" />
         </Link>
       </div>
-      
+
       {/* Indicateurs de diapositive */}
-      <div className="absolute bottom-3 right-3 flex space-x-1">
+      <div className="absolute bottom-3 right-3 flex space-x-1 z-10">
         {backgrounds.map((_, index) => (
-          <span 
+          <span
             key={index}
-            className={`block w-1.5 h-1.5 rounded-full transition-all ${index === currentBg ? 'bg-white w-6' : 'bg-white bg-opacity-50'}`}
+            className={`block h-1.5 rounded-full transition-all ${index === currentBg ? 'bg-white w-5 sm:w-6' : 'bg-white bg-opacity-50 w-1.5'}`}
           />
         ))}
       </div>
