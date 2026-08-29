@@ -135,6 +135,12 @@ Route::middleware(['auth'])->group(function () {
         ->name('activities.notifications.markRead');
 });
     
+
+Route::middleware('auth')->group(function () {
+    Route::post('/device-tokens', [DeviceTokenController::class, 'store']);
+    Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
+});
+
     //LiveKit Routes
     Route::middleware(['auth'])->post('/tasks/{task}/livekit-token', [LiveKitController::class, 'livekitToken']);
     Route::middleware(['auth'])->post('/projects/{project}/livekit-token', [LiveKitController::class, 'livekitTokenForProject']);

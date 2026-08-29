@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { router } from '@inertiajs/react';
 
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -41,15 +43,64 @@ async function saveSubscription(subscription) {
     return response.json().catch(() => null);
 }
 
+// ── Native (Capacitor/FCM) : enregistre le token d'appareil côté Laravel ──
+async function saveDeviceToken(token, platform) {
+    const csrfToken = await getFreshCsrfToken();
+    const response = await fetch('/device-tokens', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            token,
+            platform,
+            device_name: navigator.userAgent?.slice(0, 255) || null,
+        }),
+    });
+
+    if (response.status === 419) {
+        console.warn('[Push] Session expirée (419)');
+        window.location.reload();
+        return null;
+    }
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`[Push] Échec enregistrement token natif (${response.status}) ${text}`);
+    }
+    return response.json().catch(() => null);
+}
+
+async function deleteDeviceToken(token) {
+    try {
+        const csrfToken = await getFreshCsrfToken();
+        await fetch('/device-tokens', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ token }),
+        });
+    } catch (error) {
+        console.warn('[Push] Échec suppression token natif:', error);
+    }
+}
+
 export default function PushNotificationManager() {
     const [status, setStatus] = useState('idle');
 
     useEffect(() => {
         try {
-            // ── App mobile native (Capacitor) : le Web Push standard ne s'applique pas.
-            // À gérer séparément avec @capacitor/push-notifications.
+            // ── App mobile native (Capacitor) : FCM via @capacitor/push-notifications ──
             if (Capacitor.isNativePlatform()) {
-                setStatus('unsupported');
+                initNativePush();
                 return;
             }
 
@@ -78,6 +129,64 @@ export default function PushNotificationManager() {
         }
     }, []);
 
+    // ─────────────────────────── Branche native (Android/iOS) ───────────────────────────
+    async function initNativePush() {
+        try {
+            let permStatus = await PushNotifications.checkPermissions();
+
+            if (permStatus.receive === 'prompt') {
+                permStatus = await PushNotifications.requestPermissions();
+            }
+
+            if (permStatus.receive !== 'granted') {
+                setStatus('denied');
+                return;
+            }
+
+            await PushNotifications.register();
+
+            // Token FCM reçu après register() → on l'envoie à Laravel
+            PushNotifications.addListener('registration', async (token) => {
+                try {
+                    const platform = Capacitor.getPlatform(); // 'android' | 'ios'
+                    await saveDeviceToken(token.value, platform);
+                    localStorage.setItem('fcm_device_token', token.value);
+                    setStatus('subscribed');
+                } catch (error) {
+                    console.error('[Push] Échec enregistrement token FCM:', error);
+                }
+            });
+
+            PushNotifications.addListener('registrationError', (error) => {
+                console.error('[Push] Erreur enregistrement FCM:', error);
+                setStatus('unsupported');
+            });
+
+            // L'utilisateur tape sur une notification classique (pas un appel,
+            // celles-là sont gérées nativement par IncomingCallActivity) :
+            // on navigue vers l'URL cible sans recharger toute l'app.
+            PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+                const url = action?.notification?.data?.url;
+                if (url) {
+                    router.visit(url);
+                }
+            });
+
+            // Message reçu alors que l'app est déjà ouverte au premier plan :
+            // FCM ne montre pas de notification système dans ce cas, donc on
+            // laisse le composant lui-même décider (ex: rafraîchir la cloche).
+            PushNotifications.addListener('pushNotificationReceived', (notification) => {
+                window.dispatchEvent(
+                    new CustomEvent('proja:fcm-foreground', { detail: notification })
+                );
+            });
+        } catch (error) {
+            console.error('[Push] Erreur init native:', error);
+            setStatus('unsupported');
+        }
+    }
+
+    // ─────────────────────────── Branche Web (existant, inchangé) ───────────────────────────
     async function registerAndSubscribe() {
         try {
             const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
@@ -128,6 +237,12 @@ export default function PushNotificationManager() {
         return null;
     }
 
+    // Sur natif, on ne montre jamais le bandeau web (le prompt système
+    // s'affiche déjà via PushNotifications.requestPermissions()).
+    if (Capacitor.isNativePlatform()) {
+        return null;
+    }
+
     // Accès protégé : ne jamais lire Notification.permission hors du bloc sécurisé ci-dessus
     let permission = 'default';
     try {
@@ -172,4 +287,15 @@ export default function PushNotificationManager() {
     }
 
     return null;
+}
+
+// Exporté pour être appelé explicitement au logout (ex: dans le handler
+// du bouton "Déconnexion" de AdminLayout.jsx), afin de ne plus recevoir
+// de push sur un appareil dont l'utilisateur vient de se déconnecter.
+export async function unregisterDeviceToken() {
+    const token = localStorage.getItem('fcm_device_token');
+    if (token) {
+        await deleteDeviceToken(token);
+        localStorage.removeItem('fcm_device_token');
+    }
 }

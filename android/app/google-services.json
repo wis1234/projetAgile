@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "856801783599",
+    "project_id": "proja-mobile",
+    "storage_bucket": "proja-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:856801783599:android:88fe2422404a037db07bda",
+        "android_client_info": {
+          "package_name": "org.kemtcenter.proja"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTxjyXzySdz4-E1bIBg6u-MdzPeDaO3h0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

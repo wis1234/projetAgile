@@ -10,6 +10,7 @@ import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import GlobalSearch from '@/Components/GlobalSearch';
 import MobileBottomNav from '@/Components/MobileBottomNav';
 import LanguageSwitcherSidebar from '@/Components/LanguageSwitcherSidebar';
+import PushNotificationManager, { unregisterDeviceToken } from '@/Components/PushNotificationManager';
 
 const getFreshCsrfToken = async () => {
   try {
@@ -219,6 +220,15 @@ const stopRingtone = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
+    const handleLogout = async () => {
+    try {
+      await unregisterDeviceToken();
+    } catch {
+      // Ne bloque jamais la déconnexion si le nettoyage du token échoue
+    }
+    router.post('/logout');
+  };
+
   const userId = auth?.user?.id || auth?.id;
 
   const fetchNotifications = React.useCallback(() => {
@@ -256,6 +266,17 @@ const stopRingtone = () => {
       window.Echo.leave(`user.${userId}`);
     };
   }, [userId]);
+
+
+    // ─── Rafraîchissement instantané quand un push FCM arrive au premier plan (natif) ───
+  useEffect(() => {
+    const handleFcmForeground = () => {
+      fetchNotifications();
+    };
+    window.addEventListener('proja:fcm-foreground', handleFcmForeground);
+    return () => window.removeEventListener('proja:fcm-foreground', handleFcmForeground);
+  }, [fetchNotifications]);
+
 
   const markNotificationsRead = () => {
     if (notifCount === 0) return;
@@ -748,17 +769,15 @@ const stopRingtone = () => {
                   </div>
 
                   <div className="border-t border-gray-100 dark:border-gray-700">
-                    <Link
-                      href="/logout"
-                      method="post"
-                      as="button"
+                    <button
+                      onClick={handleLogout}
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                       </svg>
                       Déconnexion
-                    </Link>
+                    </button>
                   </div>
                 </div>
               )}

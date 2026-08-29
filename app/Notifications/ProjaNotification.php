@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Channels\ProjaWebPushChannel;
+use App\Notifications\Channels\ProjaFcmChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -31,20 +32,15 @@ class ProjaNotification extends Notification implements ShouldQueue
         $this->tag = $tag;
     }
 
-    /**
-     * Canaux utilisés.
-     */
     public function via($notifiable)
     {
         return [
             'database',
             ProjaWebPushChannel::class,
+            ProjaFcmChannel::class,
         ];
     }
 
-    /**
-     * Notification enregistrée en base.
-     */
     public function toDatabase($notifiable)
     {
         return [
@@ -56,9 +52,6 @@ class ProjaNotification extends Notification implements ShouldQueue
         ];
     }
 
-    /**
-     * Payload envoyé au Service Worker (format attendu par WebPushService::sendToUser).
-     */
     public function toWebPush($notifiable, $notification)
     {
         return [
@@ -67,6 +60,18 @@ class ProjaNotification extends Notification implements ShouldQueue
             'url'   => $this->url ?? '/dashboard',
             'icon'  => $this->icon ?? '/logo-proja.png',
             'tag'   => $this->tag ?? 'proja',
+        ];
+    }
+
+    /**
+     * Payload envoyé à ProjaFcmChannel → FcmService (push natif Android/iOS).
+     */
+    public function toFcm($notifiable)
+    {
+        return [
+            'title' => $this->title,
+            'body'  => $this->message,
+            'url'   => $this->url ?? '/dashboard',
         ];
     }
 }

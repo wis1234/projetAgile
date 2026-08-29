@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -20,6 +21,15 @@
             </intent-filter>
         </activity>
 
+        <!-- Écran plein écran d'appel entrant, façon WhatsApp -->
+        <activity
+            android:name=".IncomingCallActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:showOnLockScreen="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/AppTheme.NoActionBarLaunch" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -27,6 +37,36 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!--
+          Remplace le FirebaseMessagingService fourni par le plugin
+          @capacitor/push-notifications par notre service custom, pour
+          distinguer les appels entrants (data-only) des notifications
+          classiques. Le "tools:node=replace" nécessite que le name matche
+          EXACTEMENT celui déclaré dans le manifest du plugin.
+          Vérifie le nom exact via :
+            android/app/build/intermediates/merged_manifests/.../AndroidManifest.xml
+          après un premier `npx cap sync android`, si le remplacement échoue au build.
+        -->
+        <service
+            android:name=".MyFirebaseMessagingService"
+            android:exported="false"
+            tools:node="replace">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Firebase Cloud Messaging : icône, couleur et canal par défaut -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@android:color/holo_blue_dark" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="default_channel" />
     </application>
 
     <!-- Permissions -->
@@ -36,4 +76,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Nécessaires pour un comportement "appel entrant" façon WhatsApp -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 </manifest>
