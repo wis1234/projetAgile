@@ -4,7 +4,6 @@ import Notification from '../Components/Notification';
 import { router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import GlobalFooter from '@/Components/GlobalFooter';
-import PushNotificationManager from '@/Components/PushNotificationManager';
 import ErrorBoundary from '@/Components/ErrorBoundary';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import GlobalSearch from '@/Components/GlobalSearch';
