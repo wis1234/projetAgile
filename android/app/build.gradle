@@ -40,6 +40,12 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+
+    // Firebase Cloud Messaging — nécessaire pour que MyFirebaseMessagingService
+    // (extends FirebaseMessagingService) compile. Le BoM fixe des versions
+    // cohérentes entre tous les artefacts Firebase utilisés.
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation 'com.google.firebase:firebase-messaging'
 }
 
 apply from: 'capacitor.build.gradle'

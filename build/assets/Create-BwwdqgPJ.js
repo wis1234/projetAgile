@@ -1,0 +1,1 @@
+import{j as r}from"./app-DihdQjEV.js";import t from"./Form-ccKB-2h6.js";import"./AdminLayout-Ix8ImJ2Q.js";import"./GlobalFooter-BqzKkX_x.js";import"./LiveKitCallModal-b_2PIWf0.js";import"./useTranslation-DDocgIiL.js";import"./PushNotificationManager-3nkuwVmM.js";import"./index-B2sD1CtW.js";function u(){return r.jsx(t,{})}export{u as default};

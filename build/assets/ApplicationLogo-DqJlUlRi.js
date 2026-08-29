@@ -1,0 +1,1 @@
+import{D as s,j as a}from"./app-DihdQjEV.js";function o(t){const{appName:e}=s().props;return a.jsx("span",{...t,className:"font-extrabold text-3xl md:text-4xl tracking-tight text-blue-700 select-none font-sans "+(t.className||""),style:{letterSpacing:"0.05em",...t.style},children:e||"ProJA"})}export{o as A};

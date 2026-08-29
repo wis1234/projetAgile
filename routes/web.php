@@ -16,7 +16,7 @@ use App\Http\Controllers\TaskCommentReactionController;
 use App\Models\User;
 use App\Notifications\ProjaNotification;
 use App\Http\Controllers\LiveKitController;
-
+use App\Http\Controllers\DeviceTokenController;
 
 
 Route::get('/', function () {
