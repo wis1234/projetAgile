@@ -93,21 +93,28 @@ const setLastSeen = (taskId) => {
 export default function Index() {
   const { t } = useTranslation();
   const [discussions, setDiscussions] = useState([]);
+  const [availableProjects, setAvailableProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [projectFilter, setProjectFilter] = useState('all');
   const [openedTaskIds, setOpenedTaskIds] = useState(() => new Set());
 
+  // ─── Discussions : filtrage (search + project_id) fait côté serveur, comme prévu par le contrôleur ───
   const loadDiscussions = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const res = await fetch('/api/discussions', {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set('search', search.trim());
+      if (projectFilter !== 'all') params.set('project_id', projectFilter);
+
+      const res = await fetch(`/api/discussions?${params.toString()}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
       });
       if (!res.ok) throw new Error('Erreur lors du chargement des discussions');
-      const data = await res.json();
-      setDiscussions(Array.isArray(data) ? data : []);
+      const json = await res.json();
+      // Le contrôleur renvoie une réponse paginée : { data, current_page, last_page, total }
+      setDiscussions(Array.isArray(json?.data) ? json.data : []);
       setError('');
     } catch (err) {
       console.error(err);
@@ -115,10 +122,31 @@ export default function Index() {
     } finally {
       setLoading(false);
     }
+  }, [search, projectFilter]);
+
+  // ─── Liste des projets pour le filtre : endpoint dédié, indépendant de la pagination ───
+  const loadProjects = useCallback(async () => {
+    try {
+      const res = await fetch('/api/discussions/projects', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setAvailableProjects(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    }
   }, []);
 
+  useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  // ─── Recharge à chaque changement de filtre (léger debounce sur la recherche texte) ───
   useEffect(() => {
-    loadDiscussions();
+    const timeout = setTimeout(() => loadDiscussions(), search ? 300 : 0);
+    return () => clearTimeout(timeout);
+  }, [loadDiscussions, search, projectFilter]);
+
+  useEffect(() => {
     const interval = setInterval(() => loadDiscussions(true), 15000);
     return () => clearInterval(interval);
   }, [loadDiscussions]);
@@ -141,37 +169,15 @@ export default function Index() {
     });
   }, [discussions, openedTaskIds]);
 
-  const projects = useMemo(() => {
-    const map = new Map();
-    discussions.forEach((d) => {
-      if (d.project_id && !map.has(d.project_id)) {
-        map.set(d.project_id, d.project_name || `Projet #${d.project_id}`);
-      }
-    });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [discussions]);
-
+  // ─── Tri d'affichage : non lus en premier (le filtrage search/projet est déjà fait côté serveur) ───
   const filtered = useMemo(() => {
-    let list = enriched;
-    if (projectFilter !== 'all') {
-      list = list.filter((d) => String(d.project_id) === String(projectFilter));
-    }
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(
-        (d) =>
-          d.task_title?.toLowerCase().includes(q) ||
-          d.project_name?.toLowerCase().includes(q)
-      );
-    }
-    return [...list].sort((a, b) => {
-      // Non lus en premier, puis les plus récents
+    return [...enriched].sort((a, b) => {
       if (a._isUnread !== b._isUnread) return a._isUnread ? -1 : 1;
       const dateA = a.last_message?.created_at ? new Date(a.last_message.created_at) : 0;
       const dateB = b.last_message?.created_at ? new Date(b.last_message.created_at) : 0;
       return dateB - dateA;
     });
-  }, [enriched, search, projectFilter]);
+  }, [enriched]);
 
   const totalUnread = enriched.filter((d) => d._isUnread).length;
 
@@ -221,7 +227,7 @@ export default function Index() {
             />
           </div>
 
-          {projects.length > 0 && (
+          {availableProjects.length > 0 && (
             <div className="relative flex-shrink-0 w-full sm:w-56">
               <FaFilter className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none" />
               <select
@@ -230,7 +236,7 @@ export default function Index() {
                 className="w-full pl-9 pr-4 py-2.5 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 dark:text-gray-100 appearance-none cursor-pointer transition-colors"
               >
                 <option value="all">{t('discussions.all_projects', 'Tous les projets')}</option>
-                {projects.map((p) => (
+                {availableProjects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
