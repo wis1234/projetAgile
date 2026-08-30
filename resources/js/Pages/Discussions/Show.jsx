@@ -6,7 +6,7 @@ import Modal from '@/Components/Modal';
 import {
   FaCommentDots, FaMicrophone, FaStop, FaReply, FaPaperPlane, FaEnvelope,
   FaPaperclip, FaSmile, FaSmileBeam, FaSave, FaTimes, FaCopy, FaCheck,
-  FaEdit, FaTrash, FaInfoCircle, FaArrowLeft,
+  FaEdit, FaTrash, FaInfoCircle, FaArrowLeft, FaExternalLinkAlt,
 } from 'react-icons/fa';
 
 // ─── Constantes Réactions & Stickers ────────────────────────────────────────
@@ -926,10 +926,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
 
   return (
     <>
-      <div
-        className="flex flex-col bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-xl"
-        style={{ height: 'calc(100dvh - 8.5rem)', maxHeight: '900px' }}
-      >
+      <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
         {/* ─── HEADER STYLE WHATSAPP ─── */}
         <div className="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-800 text-white flex-shrink-0 shadow-md">
           <div className="flex items-center gap-3 min-w-0">
@@ -958,6 +955,15 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => router.visit(`/tasks/${task.id}`)}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white/90 hover:bg-white/15 transition-colors flex-shrink-0"
+              title={t('task_details.view_task', 'Voir la tâche')}
+            >
+              <FaExternalLinkAlt className="w-4 h-4" />
+            </button>
+
             <OnlineAvatarStack users={onlineUsers} />
 
             <label

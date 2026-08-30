@@ -99,22 +99,29 @@ export default function Index() {
   const [search, setSearch] = useState('');
   const [projectFilter, setProjectFilter] = useState('all');
   const [openedTaskIds, setOpenedTaskIds] = useState(() => new Set());
+  const [page, setPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   // ─── Discussions : filtrage (search + project_id) fait côté serveur, comme prévu par le contrôleur ───
-  const loadDiscussions = useCallback(async (silent = false) => {
+   const loadDiscussions = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
       const params = new URLSearchParams();
       if (search.trim()) params.set('search', search.trim());
       if (projectFilter !== 'all') params.set('project_id', projectFilter);
+      if (page > 1) params.set('page', page);
 
       const res = await fetch(`/api/discussions?${params.toString()}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
       });
       if (!res.ok) throw new Error('Erreur lors du chargement des discussions');
       const json = await res.json();
-      // Le contrôleur renvoie une réponse paginée : { data, current_page, last_page, total }
       setDiscussions(Array.isArray(json?.data) ? json.data : []);
+      setCurrentPage(json.current_page || 1);
+      setLastPage(json.last_page || 1);
+      setTotal(json.total || 0);
       setError('');
     } catch (err) {
       console.error(err);
@@ -122,7 +129,7 @@ export default function Index() {
     } finally {
       setLoading(false);
     }
-  }, [search, projectFilter]);
+  }, [search, projectFilter, page]);
 
   // ─── Liste des projets pour le filtre : endpoint dédié, indépendant de la pagination ───
   const loadProjects = useCallback(async () => {
@@ -271,71 +278,91 @@ export default function Index() {
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-              {filtered.map((d) => {
-                const preview = getMessagePreview(d.last_message);
-                const initials = getInitials(d.task_title);
-                const gradient = getAvatarGradient(`${d.task_id}-${d.task_title}`);
+            <>
+              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                {filtered.map((d) => {
+                  const preview = getMessagePreview(d.last_message);
+                  const initials = getInitials(d.task_title);
+                  const gradient = getAvatarGradient(`${d.task_id}-${d.task_title}`);
 
-                return (
-                  <li key={d.task_id}>
-                    <button
-                      type="button"
-                      onClick={() => openDiscussion(d.task_id)}
-                      className={`w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${
-                        d._isUnread ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-                      }`}
-                    >
-                      {/* Avatar "groupe" */}
-                      <div
-                        className={`flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-sm shadow-sm`}
+                  return (
+                    <li key={d.task_id}>
+                      <button
+                        type="button"
+                        onClick={() => openDiscussion(d.task_id)}
+                        className={`w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${
+                          d._isUnread ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                        }`}
                       >
-                        {initials}
-                      </div>
-
-                      {/* Contenu central */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={`text-sm truncate ${d._isUnread ? 'font-bold text-gray-900 dark:text-white' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
-                            {d.task_title}
-                          </p>
-                          <span className={`flex-shrink-0 text-[11px] ${d._isUnread ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-400 dark:text-gray-500'}`}>
-                            {formatRelativeTime(d.last_message?.created_at)}
-                          </span>
+                        <div
+                          className={`flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-sm shadow-sm`}
+                        >
+                          {initials}
                         </div>
 
-                        {/* Badge projet */}
-                        <div className="flex items-center gap-1 mt-0.5 mb-1">
-                          <FaProjectDiagram className="text-[10px] text-indigo-400 flex-shrink-0" />
-                          <span className="text-[11px] text-indigo-500 dark:text-indigo-400 font-medium truncate">
-                            {d.project_name || 'Sans projet'}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={`flex items-center gap-1.5 text-xs truncate ${d._isUnread ? 'text-gray-700 dark:text-gray-200 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {d.last_message?.is_me && (
-                              <FaCheckDouble className="w-3 h-3 text-blue-400 flex-shrink-0" />
-                            )}
-                            {preview.icon}
-                            {d.last_message && !d.last_message.is_me && d.last_message.user_name && (
-                              <span className="font-semibold text-gray-600 dark:text-gray-300">{d.last_message.user_name.split(' ')[0]}:</span>
-                            )}
-                            <span className="truncate">{preview.text}</span>
-                          </p>
-
-                          {d._isUnread && (
-                            <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-emerald-500 text-white text-[11px] font-bold rounded-full">
-                              {t('discussions.new', 'Nouveau')}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`text-sm truncate ${d._isUnread ? 'font-bold text-gray-900 dark:text-white' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
+                              {d.task_title}
+                            </p>
+                            <span className={`flex-shrink-0 text-[11px] ${d._isUnread ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-400 dark:text-gray-500'}`}>
+                              {formatRelativeTime(d.last_message?.created_at)}
                             </span>
-                          )}
+                          </div>
+
+                          <div className="flex items-center gap-1 mt-0.5 mb-1">
+                            <FaProjectDiagram className="text-[10px] text-indigo-400 flex-shrink-0" />
+                            <span className="text-[11px] text-indigo-500 dark:text-indigo-400 font-medium truncate">
+                              {d.project_name || 'Sans projet'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`flex items-center gap-1.5 text-xs truncate ${d._isUnread ? 'text-gray-700 dark:text-gray-200 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                              {d.last_message?.is_me && (
+                                <FaCheckDouble className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                              )}
+                              {preview.icon}
+                              {d.last_message && !d.last_message.is_me && d.last_message.user_name && (
+                                <span className="font-semibold text-gray-600 dark:text-gray-300">{d.last_message.user_name.split(' ')[0]}:</span>
+                              )}
+                              <span className="truncate">{preview.text}</span>
+                            </p>
+
+                            {d._isUnread && (
+                              <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-emerald-500 text-white text-[11px] font-bold rounded-full">
+                                {t('discussions.new', 'Nouveau')}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {lastPage > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 text-sm rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Précédent
+                  </button>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Page {currentPage} sur {lastPage} ({total} discussions)
+                  </span>
+                  <button
+                    onClick={() => setPage(p => Math.min(lastPage, p + 1))}
+                    disabled={currentPage === lastPage}
+                    className="px-3 py-1 text-sm rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
