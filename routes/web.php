@@ -19,6 +19,7 @@ use App\Http\Controllers\LiveKitController;
 use App\Http\Controllers\DeviceTokenController;
 use App\Http\Controllers\DiscussionController;
 
+
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
@@ -38,11 +39,25 @@ Route::get('/guide', function () { return Inertia::render('Guide'); })->name('gu
 Route::middleware(['auth'])->get('/api/search', [\App\Http\Controllers\SearchController::class, 'search']);
 
 // Disucssions route
-// Discussions
-Route::middleware('auth')->get('/discussions', function () {
-    return \Inertia\Inertia::render('Discussions/Index');
+
+// ─── Discussions ───
+Route::middleware('auth')->group(function () {
+ 
+    // Page liste des discussions (façon WhatsApp)
+    Route::get('/discussions', function () {
+        return Inertia::render('Discussions/Index');
+    });
+ 
+    // Données JSON paginées consommées par Discussions/Index.jsx
+    Route::get('/api/discussions', [DiscussionController::class, 'index']);
+ 
+    // Liste des projets pour le filtre (indépendante de la pagination)
+    Route::get('/api/discussions/projects', [DiscussionController::class, 'projects']);
+ 
+    // Page dédiée : la discussion d'UNE tâche, isolée de la fiche complète
+    Route::get('/tasks/{task}/discussion', [TaskController::class, 'discussion'])
+        ->name('tasks.discussion');
 });
-Route::middleware('auth')->get('/api/discussions', [DiscussionController::class, 'index']);
 
 
 Route::get('/about', function () { return Inertia::render('About'); })->name('about');

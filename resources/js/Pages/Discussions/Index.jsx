@@ -90,7 +90,7 @@ const setLastSeen = (taskId) => {
   localStorage.setItem(`${SEEN_KEY_PREFIX}${taskId}`, new Date().toISOString());
 };
 
-export default function DiscussionsIndex() {
+export default function Index() {
   const { t } = useTranslation();
   const [discussions, setDiscussions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -175,13 +175,11 @@ export default function DiscussionsIndex() {
 
   const totalUnread = enriched.filter((d) => d._isUnread).length;
 
+  // ─── Ouvre le fil de discussion de la tâche (Discussions/Show, route tasks.discussion) ───
   const openDiscussion = (taskId) => {
     setLastSeen(taskId);
     setOpenedTaskIds((prev) => new Set(prev).add(taskId));
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('taskActiveTab', 'comments');
-    }
-    router.visit(`/tasks/${taskId}`);
+    router.visit(`/tasks/${taskId}/discussion`);
   };
 
   return (
@@ -339,4 +337,4 @@ export default function DiscussionsIndex() {
   );
 }
 
-DiscussionsIndex.layout = (page) => <AdminLayout children={page} />;
+Index.layout = (page) => <AdminLayout children={page} />;

@@ -823,4 +823,35 @@ public function submitForValidation(Request $request, Task $task)
     return back()->with('success', 'La tâche a été soumise pour validation.');
 }
 
+
+/**
+ * Page dédiée à la discussion d'une tâche (isolée de la fiche complète).
+ * ⚠️ Reprends ici EXACTEMENT la même vérification d'accès que ta méthode show()
+ *    (abort(403) si l'utilisateur n'a pas le droit de voir cette tâche).
+ */
+public function discussion(Request $request, Task $task)
+{
+    $user = $request->user();
+ 
+    // TODO: coller ici la même vérification d'autorisation que dans show()
+    // Exemple probable, à ajuster à ton code réel :
+    //
+    // $isAdmin = $user->is_admin;
+    // $isProjectMember = $task->project?->users?->contains($user->id);
+    // $isAssigned = $task->assigned_to === $user->id;
+    // abort_unless($isAdmin || $isProjectMember || $isAssigned, 403);
+ 
+    $task->load(['project:id,name', 'assignedUser:id,name,profile_photo_url']);
+ 
+    $projectMembers = $task->project
+        ? $task->project->users()->select('users.id', 'users.name', 'users.profile_photo_url')->get()
+        : collect();
+ 
+    return Inertia::render('Tasks/Discussion', [
+        'task'           => $task,
+        'projectMembers' => $projectMembers,
+    ]);
+}
+ 
+
 }
