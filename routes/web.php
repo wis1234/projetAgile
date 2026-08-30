@@ -17,7 +17,7 @@ use App\Models\User;
 use App\Notifications\ProjaNotification;
 use App\Http\Controllers\LiveKitController;
 use App\Http\Controllers\DeviceTokenController;
-
+use App\Http\Controllers\DiscussionController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -37,6 +37,12 @@ Route::get('/guide', function () { return Inertia::render('Guide'); })->name('gu
 //global search route
 Route::middleware(['auth'])->get('/api/search', [\App\Http\Controllers\SearchController::class, 'search']);
 
+// Disucssions route
+// Discussions
+Route::middleware('auth')->get('/discussions', function () {
+    return \Inertia\Inertia::render('Discussions/Index');
+});
+Route::middleware('auth')->get('/api/discussions', [DiscussionController::class, 'index']);
 
 
 Route::get('/about', function () { return Inertia::render('About'); })->name('about');

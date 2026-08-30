@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
+use App\Models\TaskComment;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
 
 class Task extends Model
 {
@@ -119,7 +122,7 @@ class Task extends Model
     }
 
     public function comments() {
-        return $this->hasMany(\App\Models\TaskComment::class);
+        return $this->hasMany(TaskComment::class);
     }
 
     public function files() {
@@ -148,4 +151,14 @@ class Task extends Model
     {
         return $this->belongsTo(User::class, 'assigned_to')->withDefault();
     }
+
+/**
+ * Dernier message posté dans la tâche (commentaire racine OU réponse),
+ * utilisé pour l'aperçu dans la liste des discussions.
+ */
+public function latestComment(): HasOne
+{
+    return $this->hasOne(TaskComment::class)->latestOfMany();
+}
+
 }
