@@ -10,6 +10,8 @@ import i18n from './i18n';
 import './lib/axios';
 import './lib/globalErrorHandler';
 import './echo';
+import { isNativeApp } from './lib/platform';
+
 
 const appName = import.meta.env.VITE_APP_NAME || 'Proja';
 
@@ -40,13 +42,28 @@ const createInertiaApp = (options) => {
     });
 };
 
+const webPages = import.meta.glob('./Pages/**/*.jsx');
+const mobilePages = import.meta.glob('./Pages/Mobile/**/*.jsx');
+
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
-    resolve: (name) =>
-        resolvePageComponent(
-            `./Pages/${name}.jsx`,
-            import.meta.glob('./Pages/**/*.jsx'),
-        ),
+    resolve: async (name) => {
+        // Les pages déjà situées sous Pages/Mobile/... ne repassent pas par le switch.
+        if (name.startsWith('Mobile/')) {
+            return (await resolvePageComponent(`./Pages/${name}.jsx`, webPages)).default;
+        }
+
+        // Dans l'APK Capacitor : bascule automatique vers la version Mobile UI si elle existe.
+        if (isNativeApp()) {
+            const mobileKey = `./Pages/Mobile/${name}.jsx`;
+            if (mobilePages[mobileKey]) {
+                return (await mobilePages[mobileKey]()).default;
+            }
+        }
+
+        // Navigateur, ou pas de version Mobile dédiée : page web habituelle.
+        return (await resolvePageComponent(`./Pages/${name}.jsx`, webPages)).default;
+    },
     progress: {
         color: '#4B5563',
     },

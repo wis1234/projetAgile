@@ -40,6 +40,7 @@ Route::get('/guide', function () { return Inertia::render('Guide'); })->name('gu
 Route::middleware(['auth'])->get('/api/search', [\App\Http\Controllers\SearchController::class, 'search']);
 
 
+
 // ─── Discussions ───
 Route::middleware('auth')->group(function () {
  
@@ -57,8 +58,13 @@ Route::middleware('auth')->group(function () {
     // Page dédiée : la discussion d'UNE tâche, isolée de la fiche complète
     Route::get('/tasks/{task}/discussion', [TaskController::class, 'discussion'])
         ->name('tasks.discussion');
+ 
+    // Menu "Plus" de la barre de navigation mobile (n'existe qu'en version Mobile UI)
+    Route::get('/more', function () {
+        return Inertia::render('Mobile/More/Index');
+    });
 });
-
+ 
 
 Route::get('/about', function () { return Inertia::render('About'); })->name('about');
 Route::get('/contact', function () { return Inertia::render('Contact'); })->name('contact');
