@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { router } from '@inertiajs/react';
 
 function urlBase64ToUint8Array(base64String) {
@@ -143,6 +144,11 @@ export default function PushNotificationManager() {
                 return;
             }
 
+            const localPermission = await LocalNotifications.checkPermissions();
+            if (localPermission.display === 'prompt') {
+                await LocalNotifications.requestPermissions();
+            }
+
             await PushNotifications.register();
 
             // Token FCM reçu après register() → on l'envoie à Laravel
@@ -179,6 +185,19 @@ export default function PushNotificationManager() {
                 window.dispatchEvent(
                     new CustomEvent('proja:fcm-foreground', { detail: notification })
                 );
+                LocalNotifications.schedule({
+                    notifications: [{
+                        id: Math.floor(Date.now() / 1000),
+                        title: notification.title || 'ProJA',
+                        body: notification.body || 'Nouvelle notification',
+                        extra: notification.data || {},
+                    }],
+                }).catch((error) => console.warn('[Push] Notification locale indisponible:', error));
+            });
+
+            LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+                const url = action?.notification?.extra?.url;
+                if (url) router.visit(url);
             });
         } catch (error) {
             console.error('[Push] Erreur init native:', error);

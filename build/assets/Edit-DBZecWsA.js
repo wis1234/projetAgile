@@ -1,1 +1,0 @@
-import{j as t}from"./app-DihdQjEV.js";import o from"./Form-ccKB-2h6.js";import"./AdminLayout-Ix8ImJ2Q.js";import"./GlobalFooter-BqzKkX_x.js";import"./LiveKitCallModal-b_2PIWf0.js";import"./useTranslation-DDocgIiL.js";import"./PushNotificationManager-3nkuwVmM.js";import"./index-B2sD1CtW.js";function f({plan:r}){return t.jsx(o,{plan:r})}export{f as default};

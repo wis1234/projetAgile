@@ -141,29 +141,29 @@ export default function MobileRegister() {
 
     return (
         <div
-            className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900"
+            className="min-h-[100dvh] flex flex-col bg-slate-950 dark:bg-black"
             style={{
                 paddingTop: 'env(safe-area-inset-top, 0px)',
                 paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             }}
         >
             {/* ─── Barre de navigation native : retour vers le login ─── */}
-            <div className="flex items-center gap-1 px-2 py-3 sticky top-0 bg-gray-50/90 dark:bg-gray-900/90 backdrop-blur z-10">
+            <div className="flex items-center gap-1 px-3 py-3 sticky top-0 bg-slate-950/90 dark:bg-black/90 backdrop-blur z-10">
                 <Link
                     href={route('login')}
                     className="w-10 h-10 flex items-center justify-center rounded-full active:bg-gray-200 dark:active:bg-gray-800 transition-colors"
                     aria-label="Retour à la connexion"
                 >
-                    <FaChevronLeft className="h-4 w-4 text-gray-700 dark:text-gray-200" />
+                    <FaChevronLeft className="h-4 w-4 text-white" />
                 </Link>
-                <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">Connexion</span>
+                <span className="text-sm font-semibold text-white">Connexion</span>
             </div>
 
             <div className="flex-1 px-4 pb-8 relative z-0">
 
                 <div className="text-center mb-6 mt-2">
-                    <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-1">Créer un compte</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Moins de 2 minutes, sans carte bancaire.</p>
+                    <h1 className="text-2xl font-extrabold text-white mb-1">Créer un compte</h1>
+                    <p className="text-sm text-slate-400">Moins de 2 minutes, sans carte bancaire.</p>
                 </div>
 
                 {formError && (
@@ -172,7 +172,7 @@ export default function MobileRegister() {
                     </div>
                 )}
 
-                <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-5">
                     <form onSubmit={submit} className="space-y-4" noValidate>
                         <div>
                             <label htmlFor="name" className={fieldLabelClasses}>Nom complet</label>

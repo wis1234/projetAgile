@@ -10,7 +10,22 @@
   "plugins": {
     "StatusBar": {
       "overlaysWebView": false,
-      "style": "DEFAULT"
+      "style": "DEFAULT",
+      "backgroundColor": "#ffffff"
+    },
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "launchShowDuration": 0,
+      "backgroundColor": "#ffffff",
+      "showSpinner": false
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "DARK"
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#2563eb"
     }
   }
 }

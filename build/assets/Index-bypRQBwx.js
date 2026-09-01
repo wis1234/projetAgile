@@ -1,0 +1,1 @@
+import{j as o}from"./app-Cdj-kAtB.js";import t from"./Index-KrObb-sJ.js";import{M as r}from"./MobileSectionAdapter-28bpQv69.js";import"./index-DG8brq1P.js";function i(e){return o.jsx(r,{PageComponent:t,pageName:"Messages/Index",...e})}export{i as default};

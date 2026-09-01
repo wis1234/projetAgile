@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
+import { nativeFeedback } from '@/lib/platform';
 
 const primaryItems = [
   { href: '/dashboard', label: 'dashboard', icon: (active) => (
@@ -41,6 +42,7 @@ export default function MobileBottomNav({ onMoreClick }) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={() => nativeFeedback.tap()}
             className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl min-w-[56px] transition-all active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 ${
               active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
             }`}
@@ -55,7 +57,7 @@ export default function MobileBottomNav({ onMoreClick }) {
 
       {/* Bouton "Plus" ouvre le drawer complet pour le reste du menu */}
       <button
-        onClick={onMoreClick}
+        onClick={async () => { await nativeFeedback.tap(); onMoreClick(); }}
         className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl min-w-[56px] text-gray-400 dark:text-gray-500 transition-all active:scale-90 active:bg-gray-100 dark:active:bg-gray-700"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">

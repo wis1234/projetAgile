@@ -4,6 +4,7 @@
 // ============================================================
 
 const CACHE_NAME = 'proja-v1';
+const STATIC_CACHE = 'proja-static-v1';
 
 // ─── Installation du Service Worker ─────────────────────────
 self.addEventListener('install', (event) => {
@@ -14,7 +15,33 @@ self.addEventListener('install', (event) => {
 // ─── Activation ─────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
     console.log('[SW] Activé');
-    event.waitUntil(clients.claim()); // Prendre le contrôle immédiatement
+    event.waitUntil(
+        caches.keys().then((keys) => Promise.all(
+            keys.filter((key) => key !== CACHE_NAME && key !== STATIC_CACHE)
+                .map((key) => caches.delete(key))
+        )).then(() => clients.claim())
+    );
+});
+
+// Les données Laravel restent toujours réseau-first. Seules les ressources
+// statiques sont conservées pour accélérer le démarrage et le retour offline.
+self.addEventListener('fetch', (event) => {
+    const request = event.request;
+    if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
+
+    const isStatic = /\.(?:js|css|png|jpg|jpeg|webp|svg|woff2?)$/i.test(new URL(request.url).pathname);
+    if (!isStatic) return;
+
+    event.respondWith(
+        caches.open(STATIC_CACHE).then(async (cache) => {
+            const cached = await cache.match(request);
+            const network = fetch(request).then((response) => {
+                if (response.ok) cache.put(request, response.clone());
+                return response;
+            }).catch(() => cached);
+            return cached || network;
+        })
+    );
 });
 
 // ─── Réception d'un message Push ────────────────────────────

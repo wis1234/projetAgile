@@ -10,12 +10,42 @@ import i18n from './i18n';
 import './lib/axios';
 import './lib/globalErrorHandler';
 import './echo';
-import { isNativeApp } from './lib/platform';
+import { isNativeApp, initializeNativeApp } from './lib/platform';
+import MobilePageFallback from '@/Components/MobilePageFallback';
+import { useEffect } from 'react';
 
 
 const appName = import.meta.env.VITE_APP_NAME || 'Proja';
 
 function AppWithCsrfErrorModal({ children }) {
+    useEffect(() => {
+        document.documentElement.classList.toggle('native-mobile-app', isNativeApp());
+        let cleanup;
+        initializeNativeApp().then((removeListeners) => {
+            cleanup = removeListeners;
+        }).catch((error) => {
+            console.warn('[Native] Initialisation indisponible:', error);
+        });
+
+        return () => {
+            document.documentElement.classList.remove('native-mobile-app');
+            cleanup?.();
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleDeepLink = (event) => {
+            try {
+                const url = new URL(event.detail?.url);
+                if (url.origin === window.location.origin) router.visit(`${url.pathname}${url.search}`);
+            } catch {
+                // Ignore malformed or external deep links.
+            }
+        };
+        window.addEventListener('proja:deep-link', handleDeepLink);
+        return () => window.removeEventListener('proja:deep-link', handleDeepLink);
+    }, []);
+
     return (
         <>
             {children}
@@ -45,6 +75,15 @@ const createInertiaApp = (options) => {
 const webPages = import.meta.glob('./Pages/**/*.jsx');
 const mobilePages = import.meta.glob('./Pages/Mobile/**/*.jsx');
 
+const mobilePageCandidates = (name) => {
+    const parts = name.split('/').filter(Boolean);
+    const leaf = parts[parts.length - 1];
+    return [
+        `./Pages/Mobile/${name}.jsx`,
+        `./Pages/Mobile/${name}/${leaf}.jsx`,
+    ];
+};
+
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: async (name) => {
@@ -55,13 +94,20 @@ createInertiaApp({
 
         // Dans l'APK Capacitor : bascule automatique vers la version Mobile UI si elle existe.
         if (isNativeApp()) {
-            const mobileKey = `./Pages/Mobile/${name}.jsx`;
-            if (mobilePages[mobileKey]) {
+            const mobileKey = mobilePageCandidates(name).find((candidate) => mobilePages[candidate]);
+            if (mobileKey) {
                 return (await mobilePages[mobileKey]()).default;
             }
+
+            // Toute page sans version dédiée reste dans un shell mobile :
+            // aucune page desktop ne doit être montée comme layout racine dans Capacitor.
+            const page = await resolvePageComponent(`./Pages/${name}.jsx`, webPages);
+            return (props) => (
+                <MobilePageFallback PageComponent={page.default} pageName={name} {...props} />
+            );
         }
 
-        // Navigateur, ou pas de version Mobile dédiée : page web habituelle.
+        // Navigateur : page web habituelle.
         return (await resolvePageComponent(`./Pages/${name}.jsx`, webPages)).default;
     },
     progress: {

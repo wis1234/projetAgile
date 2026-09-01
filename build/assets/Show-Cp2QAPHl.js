@@ -1,0 +1,1 @@
+import{j as r}from"./app-Cdj-kAtB.js";import t from"./Show-CX8rorvY.js";import{M as e}from"./MobileSectionAdapter-28bpQv69.js";import"./AdminLayout-BbjvtPNW.js";import"./GlobalFooter-up05Rz3H.js";import"./LiveKitCallModal-B_iab740.js";import"./proxy-BHcJ1Dex.js";function u(o){return r.jsx(e,{PageComponent:t,pageName:"Users/Show",...o})}export{u as default};

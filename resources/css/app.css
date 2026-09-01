@@ -21,6 +21,117 @@
 body {
   @apply bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors;
 }
+
+/* Shared constraints for pages rendered inside the native mobile shell. */
+.mobile-page-shell {
+  min-height: calc(100dvh - 8rem - var(--safe-top) - var(--safe-bottom));
+  overflow-wrap: anywhere;
+}
+
+.mobile-page-enter {
+  animation: mobile-page-enter 180ms ease-out both;
+}
+
+@keyframes mobile-page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mobile-page-shell img,
+.mobile-page-shell video,
+.mobile-page-shell canvas {
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .mobile-page-shell table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-page-shell button,
+  .mobile-page-shell a {
+    touch-action: manipulation;
+  }
+}
+
+/* Native presentation layer shared by every Capacitor route. */
+.native-mobile-app {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+.native-mobile-app .mobile-native-content {
+  color: #0f172a;
+}
+
+.dark.native-mobile-app .mobile-native-content {
+  color: #f8fafc;
+}
+
+@media (max-width: 767px) {
+  .native-mobile-app .mobile-native-content > * {
+    max-width: 100% !important;
+  }
+
+  .native-mobile-app .mobile-native-content .max-w-screen-2xl,
+  .native-mobile-app .mobile-native-content .max-w-7xl,
+  .native-mobile-app .mobile-native-content .max-w-6xl,
+  .native-mobile-app .mobile-native-content .max-w-5xl,
+  .native-mobile-app .mobile-native-content .max-w-4xl {
+    width: 100%;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+
+  .native-mobile-app .mobile-native-content table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .native-mobile-app .mobile-native-content input,
+  .native-mobile-app .mobile-native-content select,
+  .native-mobile-app .mobile-native-content textarea {
+    min-height: 3rem;
+    max-width: 100%;
+    font-size: 1rem;
+  }
+
+  .native-mobile-app .mobile-native-content button,
+  .native-mobile-app .mobile-native-content a[role='button'],
+  .native-mobile-app .mobile-native-content .btn {
+    min-height: 2.75rem;
+  }
+
+  .native-mobile-app .mobile-native-content [role='dialog'] {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .native-mobile-app .mobile-native-content [role='dialog'] > * {
+    width: 100%;
+    max-width: none;
+    min-height: 100dvh;
+    border-radius: 0;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+  }
+
+  .native-mobile-app .mobile-native-content .grid-cols-4,
+  .native-mobile-app .mobile-native-content .grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .native-mobile-app .mobile-native-content .flex-row {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+}
 input, select, textarea {
   @apply rounded border-gray-300 dark:border-gray-700 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:bg-gray-800 dark:text-gray-100;
 }

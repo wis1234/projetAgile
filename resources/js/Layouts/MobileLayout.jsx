@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePage, router } from '@inertiajs/react';
 import MobileBottomNav from '@/Components/MobileBottomNav';
 import PushNotificationManager from '@/Components/PushNotificationManager';
 import ErrorBoundary from '@/Components/ErrorBoundary';
 import Notification from '@/Components/Notification';
+import { nativeFeedback } from '@/lib/platform';
+import MobileHeader from '@/Components/MobileHeader';
+import MobilePageContainer from '@/Components/MobilePageContainer';
 
 /**
  * Shell natif pour l'app Capacitor : header léger + contenu + barre basse.
@@ -31,6 +34,33 @@ export default function MobileLayout({
   onMoreClick,
 }) {
   const { flash = {} } = usePage().props;
+  const touchStartY = useRef(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const handleTouchStart = (event) => {
+      if (window.scrollY === 0) touchStartY.current = event.touches[0].clientY;
+    };
+    const handleTouchEnd = async (event) => {
+      if (touchStartY.current === null || refreshing) return;
+      const distance = event.changedTouches[0].clientY - touchStartY.current;
+      touchStartY.current = null;
+      if (distance < 72 || window.scrollY !== 0) return;
+
+      setRefreshing(true);
+      await nativeFeedback.tap();
+      router.reload({
+        onFinish: () => setRefreshing(false),
+      });
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [refreshing]);
 
   const handleBack = () => {
     if (onBack) return onBack();
@@ -40,63 +70,28 @@ export default function MobileLayout({
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900">
+    <div className="flex min-h-[100dvh] flex-col overflow-x-hidden bg-white overscroll-none dark:bg-gray-900">
       <ErrorBoundary>
         <PushNotificationManager />
       </ErrorBoundary>
 
-      {!hideHeader && (
-        <header
-          className="fixed top-0 left-0 right-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 flex items-center gap-2 px-2"
-          style={{
-            height: 'calc(3.5rem + env(safe-area-inset-top, 0px))',
-            paddingTop: 'env(safe-area-inset-top, 0px)',
-          }}
-        >
-          {(onBack || backHref) ? (
-            <button
-              onClick={handleBack}
-              className="w-10 h-10 flex items-center justify-center rounded-full text-gray-600 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-800 transition-all flex-shrink-0"
-              aria-label="Retour"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          ) : (
-            <div className="w-10 h-10 flex-shrink-0" />
-          )}
-
-          <div className="flex-1 min-w-0">
-            {title && (
-              <h1 className="text-base font-bold text-gray-900 dark:text-white truncate leading-tight">
-                {title}
-              </h1>
-            )}
-            {subtitle && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight">
-                {subtitle}
-              </p>
-            )}
-          </div>
-
-          {headerRight && <div className="flex-shrink-0 pr-1">{headerRight}</div>}
-        </header>
-      )}
+      {!hideHeader && <MobileHeader title={title} subtitle={subtitle} onBack={(onBack || backHref) ? handleBack : null} headerRight={headerRight} />}
 
       <Notification message={flash.success} type="success" />
       <Notification message={flash.error} type="error" />
       <Notification message={flash.info} type="info" />
 
-      <main
-        className={`flex-1 w-full min-w-0 flex flex-col ${fullBleed ? '' : 'px-4'}`}
-        style={{
-          paddingTop: hideHeader ? 'env(safe-area-inset-top, 0px)' : 'calc(3.5rem + env(safe-area-inset-top, 0px))',
-          paddingBottom: hideBottomNav ? 'env(safe-area-inset-bottom, 0px)' : 'calc(4.5rem + env(safe-area-inset-bottom, 0px))',
-        }}
-      >
+      {refreshing && (
+        <div className="fixed top-[calc(3.5rem+env(safe-area-inset-top,0px))] left-0 right-0 z-30 flex justify-center pointer-events-none">
+          <div className="mt-2 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-lg animate-pulse">
+            Actualisation...
+          </div>
+        </div>
+      )}
+
+      <MobilePageContainer fullBleed={fullBleed} hideHeader={hideHeader} hideBottomNav={hideBottomNav}>
         {children}
-      </main>
+      </MobilePageContainer>
 
       {!hideBottomNav && (
         <MobileBottomNav onMoreClick={onMoreClick || (() => router.visit('/more'))} />

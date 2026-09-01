@@ -1,4 +1,7 @@
 ext {
+    // Version commune compatible avec les bibliotheques AndroidX 1.17.x.
+    // Elle evite que chaque plugin Capacitor choisisse une version differente.
+    kotlin_version = '2.1.0'
     minSdkVersion = 24
     compileSdkVersion = 36
     targetSdkVersion = 36

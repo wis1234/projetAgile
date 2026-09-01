@@ -36,7 +36,7 @@ export default function MobileLogin({ status, canResetPassword }) {
 
     return (
         <div
-            className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900"
+            className="min-h-[100dvh] flex flex-col bg-slate-950 dark:bg-black"
             style={{
                 paddingTop: 'env(safe-area-inset-top, 0px)',
                 paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -44,25 +44,19 @@ export default function MobileLogin({ status, canResetPassword }) {
         >
             <Head title="Connexion" />
 
-            {/* ─── Décor doux en fond, dans l'esprit du dashboard ─── */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-72 overflow-hidden -z-0">
-                <div className="absolute -top-24 -left-16 w-64 h-64 bg-blue-400/20 dark:bg-blue-500/10 rounded-full blur-3xl" />
-                <div className="absolute -top-10 -right-10 w-56 h-56 bg-indigo-400/20 dark:bg-indigo-500/10 rounded-full blur-3xl" />
-            </div>
-
-            <div className="flex-1 flex flex-col justify-center px-4 py-8 relative z-10">
+            <div className="flex-1 flex flex-col justify-center px-5 py-8 relative z-10 max-w-md w-full mx-auto">
 
                 {/* ─── En-tête : logo + titre, façon écran d'accueil natif ─── */}
-                <div className="flex flex-col items-center text-center mb-8">
-                    <div className="w-16 h-16 rounded-2xl bg-white dark:bg-gray-800 shadow-lg shadow-blue-600/20 ring-1 ring-black/5 dark:ring-white/10 flex items-center justify-center mb-4 p-2.5">
+                <div className="flex flex-col items-center text-center mb-8 text-white">
+                    <div className="w-16 h-16 rounded-2xl bg-white shadow-lg shadow-blue-600/20 flex items-center justify-center mb-4 p-2.5">
                         <img
-                            src="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png"
+                            src="/logo-proja.png"
                             alt="ProJA"
                             className="w-full h-full object-contain"
                         />
                     </div>
-                    <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-1">Connexion</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Heureux de vous revoir !</p>
+                    <h1 className="text-2xl font-extrabold mb-1">Connexion</h1>
+                    <p className="text-sm text-slate-400">Heureux de vous revoir !</p>
                 </div>
 
                 {/* ─── Messages de statut ─── */}
@@ -80,7 +74,7 @@ export default function MobileLogin({ status, canResetPassword }) {
                 )}
 
                 {/* ─── Carte formulaire ─── */}
-                <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-5">
                     <form onSubmit={submit} className="space-y-4">
                         <div>
                             <label htmlFor="email" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
@@ -95,7 +89,7 @@ export default function MobileLogin({ status, canResetPassword }) {
                                     type="email"
                                     name="email"
                                     value={data.email}
-                                    className="pl-11 w-full h-12 rounded-2xl text-base bg-gray-50 dark:bg-gray-900/40 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-gray-900"
+                                    className="pl-11 w-full h-12 rounded-xl text-base bg-slate-100 dark:bg-slate-800 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-950"
                                     autoComplete="email"
                                     isFocused={true}
                                     onChange={(e) => setData('email', e.target.value)}
@@ -118,7 +112,7 @@ export default function MobileLogin({ status, canResetPassword }) {
                                     type={showPassword ? 'text' : 'password'}
                                     name="password"
                                     value={data.password}
-                                    className="pl-11 pr-11 w-full h-12 rounded-2xl text-base bg-gray-50 dark:bg-gray-900/40 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-gray-900"
+                                    className="pl-11 pr-11 w-full h-12 rounded-xl text-base bg-slate-100 dark:bg-slate-800 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-950"
                                     autoComplete="current-password"
                                     onChange={(e) => setData('password', e.target.value)}
                                     required
@@ -183,7 +177,7 @@ export default function MobileLogin({ status, canResetPassword }) {
 
                 {/* ─── Lien inscription ─── */}
                 <div className="mt-6 text-center">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                            <p className="text-sm text-slate-400">
                         Pas de compte ?{' '}
                         <Link href={route('register')} className="font-semibold text-blue-600 dark:text-blue-400">
                             S'inscrire

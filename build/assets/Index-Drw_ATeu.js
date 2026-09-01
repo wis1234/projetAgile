@@ -1,0 +1,1 @@
+import{j as t}from"./app-Cdj-kAtB.js";import r from"./Index-DO7Zr8Aa.js";import{M as e}from"./MobileSectionAdapter-28bpQv69.js";import"./AdminLayout-BbjvtPNW.js";import"./GlobalFooter-up05Rz3H.js";import"./LiveKitCallModal-B_iab740.js";import"./proxy-BHcJ1Dex.js";function d(o){return t.jsx(e,{PageComponent:r,pageName:"Sprints/Index",...o})}export{d as default};
