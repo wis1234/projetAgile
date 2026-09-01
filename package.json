@@ -92,7 +92,7 @@
         "i18next-browser-languagedetector": "^8.2.0",
         "jszip": "^3.10.1",
         "laravel-echo": "^2.1.6",
-        "livekit-client": "^2.7.5",
+        "livekit-client": "^2.22.2",
         "lowlight": "^3.3.0",
         "mammoth": "^1.8.0",
         "pusher-js": "^8.4.0",
