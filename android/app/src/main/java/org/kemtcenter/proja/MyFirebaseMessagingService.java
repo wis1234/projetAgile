@@ -5,6 +5,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -26,7 +27,9 @@ import java.util.Map;
  */
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
-    private static final String CALL_CHANNEL_ID = "calls_channel";
+    // Android conserve les reglages d'un canal deja cree : versionner le canal
+    // garantit l'activation de la sonnerie apres une ancienne installation.
+    private static final String CALL_CHANNEL_ID = "calls_channel_v2";
     private static final String DEFAULT_CHANNEL_ID = "default_channel";
 
     @Override
@@ -76,12 +79,15 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        Uri ringtone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CALL_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.sym_call_incoming)
                 .setContentTitle(data.get("initiatorName") + " vous appelle")
                 .setContentText(data.get("projectName"))
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setSound(ringtone)
+                .setVibrate(new long[]{0, 400, 200, 400, 200, 400})
                 .setFullScreenIntent(fullScreenPendingIntent, true)
                 .setAutoCancel(true)
                 .setOngoing(true);
@@ -134,6 +140,13 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 NotificationManager.IMPORTANCE_HIGH
         );
         callChannel.setDescription("Notifications d'appel ProJA (LiveKit)");
+        callChannel.setSound(
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
+            new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        );
         callChannel.enableVibration(true);
         callChannel.setVibrationPattern(new long[]{0, 400, 200, 400, 200, 400});
         manager.createNotificationChannel(callChannel);

@@ -77,7 +77,16 @@ body {
 .native-mobile-app {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: auto;
+  overflow: hidden;
+}
+
+.native-mobile-app .mobile-app-shell {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .native-mobile-app body,
@@ -85,7 +94,7 @@ body {
   min-height: 100dvh;
   height: auto;
   overflow-x: hidden;
-  overflow-y: visible;
+  overflow-y: hidden;
 }
 
 .native-mobile-app .mobile-native-content {

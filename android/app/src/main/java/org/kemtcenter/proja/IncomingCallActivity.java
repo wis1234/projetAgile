@@ -58,6 +58,12 @@ public class IncomingCallActivity extends AppCompatActivity {
         startRingtoneAndVibration();
     }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+    }
+
     /**
      * Layout construit en code pour éviter d'ajouter un fichier XML séparé.
      * Remplace par un layout XML custom si tu veux un design plus élaboré.

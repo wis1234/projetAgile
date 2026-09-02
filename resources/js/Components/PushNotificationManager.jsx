@@ -149,9 +149,8 @@ export default function PushNotificationManager() {
                 await LocalNotifications.requestPermissions();
             }
 
-            await PushNotifications.register();
-
-            // Token FCM reçu après register() → on l'envoie à Laravel
+            // Installer les listeners avant register() : Android peut emettre
+            // le token immediatement, avant le retour de register().
             PushNotifications.addListener('registration', async (token) => {
                 try {
                     const platform = Capacitor.getPlatform(); // 'android' | 'ios'
@@ -199,6 +198,8 @@ export default function PushNotificationManager() {
                 const url = action?.notification?.extra?.url;
                 if (url) router.visit(url);
             });
+
+            await PushNotifications.register();
         } catch (error) {
             console.error('[Push] Erreur init native:', error);
             setStatus('unsupported');
