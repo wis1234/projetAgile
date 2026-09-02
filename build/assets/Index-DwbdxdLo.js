@@ -1,1 +1,0 @@
-import{j as o}from"./app-Bnagd8yV.js";import t from"./Index-Bz_mVlKw.js";import{M as r}from"./MobileSectionAdapter-BqBHesCb.js";import"./AdminLayout-DbfpdXLk.js";import"./GlobalFooter-C5gz7WaT.js";import"./LiveKitCallModal-D_R8GNlU.js";function x(e){return o.jsx(r,{PageComponent:t,pageName:"Files/Index",...e})}export{x as default};

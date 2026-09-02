@@ -26,6 +26,7 @@ Thumbs.db
 
 # Vite
 /public/build
+/build/
 
 # Composer
 composer.phar

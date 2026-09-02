@@ -1,1 +1,0 @@
-import{j as t}from"./app-Bnagd8yV.js";import r from"./Show-CaDh2Uw9.js";import{M as i}from"./MobileSectionAdapter-BqBHesCb.js";import"./AdminLayout-DbfpdXLk.js";import"./GlobalFooter-C5gz7WaT.js";import"./LiveKitCallModal-D_R8GNlU.js";function S(o){return t.jsx(i,{PageComponent:r,pageName:"Sprints/Show",...o})}export{S as default};
