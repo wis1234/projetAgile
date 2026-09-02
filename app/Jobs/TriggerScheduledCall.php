@@ -9,6 +9,7 @@ use App\Models\ScheduledCall;
 use App\Models\CallSession;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\ScheduledCallMail;
+use App\Services\FcmService;
 
 class TriggerScheduledCall implements ShouldQueue {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -40,6 +41,17 @@ class TriggerScheduledCall implements ShouldQueue {
         event(new \App\Events\LiveKitCallStarted(
             $project->id, $project->name, $initiator->id, $initiator->name, $memberIds, $session->getInviteUrl()
         ));
+
+        $call = [
+            'projectId' => $project->id,
+            'projectName' => $project->name,
+            'initiatorName' => $initiator->name,
+            'inviteUrl' => $session->getInviteUrl(),
+        ];
+        $fcm = app(FcmService::class);
+        $project->users
+            ->where('id', '!=', $initiator->id)
+            ->each(fn ($member) => $fcm->sendCallNotification($member, $call));
 
         // Mark as started
         $schedule->update(['status' => 'started']);

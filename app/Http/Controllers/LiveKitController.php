@@ -72,6 +72,7 @@ class LiveKitController extends Controller
             'url'   => config('services.livekit.url'),
         ]);
     }
+    use App\Services\FcmService;
 
     public function notifyCallStarted(Request $request, \App\Models\Project $project)
     {
@@ -88,6 +89,8 @@ class LiveKitController extends Controller
         event(new \App\Events\LiveKitCallStarted(
             $project->id, $project->name, $user->id, $user->name, $memberIds, $inviteUrl
         ));
+
+        $this->sendNativeCallNotifications($project, $user, $inviteUrl);
 
         activity_log('call_started', "Appel ProJA démarré sur « {$project->name} »", $project);
 
@@ -121,6 +124,21 @@ class LiveKitController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
+
+    private function sendNativeCallNotifications(\App\Models\Project $project, $initiator, string $inviteUrl): void
+    {
+        $call = [
+            'projectId' => $project->id,
+            'projectName' => $project->name,
+            'initiatorName' => $initiator->name,
+            'inviteUrl' => $inviteUrl,
+        ];
+
+        $project->users()
+            ->where('users.id', '!=', $initiator->id)
+            ->get()
+            ->each(fn ($member) => app(FcmService::class)->sendCallNotification($member, $call));
+    }
 
     private function getRoomService()
     {
@@ -180,6 +198,8 @@ class LiveKitController extends Controller
             event(new \App\Events\LiveKitCallStarted(
                 $project->id, $project->name, $user->id, $user->name, $memberIds, $session->getInviteUrl()
             ));
+
+                $this->sendNativeCallNotifications($project, $user, $session->getInviteUrl());
         } else {
             // L'appel existe déjà : ce membre le rejoint simplement, en retard.
             // Les autres reçoivent une notification discrète, sans sonnerie
