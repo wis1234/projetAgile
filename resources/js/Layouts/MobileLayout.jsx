@@ -42,7 +42,7 @@ export default function MobileLayout({
   };
 
   return (
-    <div className="flex min-h-[100dvh] flex-col overflow-x-hidden bg-white overscroll-none dark:bg-gray-900">
+    <div className="min-h-[100dvh] overflow-x-hidden bg-white dark:bg-gray-900">
       <ErrorBoundary>
         <PushNotificationManager />
       </ErrorBoundary>

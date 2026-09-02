@@ -12,6 +12,22 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+html {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 /* Hide scrollbar for IE, Edge and Firefox */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE and Edge */
@@ -60,7 +76,16 @@ body {
 /* Native presentation layer shared by every Capacitor route. */
 .native-mobile-app {
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: auto;
+  overflow-y: auto;
+}
+
+.native-mobile-app body,
+.native-mobile-app #app {
+  min-height: 100dvh;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .native-mobile-app .mobile-native-content {
@@ -130,6 +155,21 @@ body {
   .native-mobile-app .mobile-native-content .flex-row {
     min-width: 0;
     flex-wrap: wrap;
+  }
+
+  /* Les pages web héritées peuvent embarquer h-screen/overflow-hidden. */
+  .native-mobile-app .mobile-native-content > .h-screen {
+    height: auto !important;
+    min-height: calc(100dvh - 8rem);
+  }
+
+  .native-mobile-app .mobile-native-content > .overflow-hidden {
+    overflow: visible;
+  }
+
+  .native-mobile-app .mobile-native-content > .overflow-x-hidden {
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 }
 input, select, textarea {
