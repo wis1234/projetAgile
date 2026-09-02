@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
 import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginHandle;
 
 public class MainActivity extends BridgeActivity {
 
@@ -95,9 +96,12 @@ public class MainActivity extends BridgeActivity {
         String inviteUrl = intent.getStringExtra("answeredCallInviteUrl");
 
         if (projectId != null || inviteUrl != null) {
-            Plugin plugin = this.bridge.getPluginInstance("CallBridge");
-            if (plugin instanceof CallBridgePlugin) {
-                ((CallBridgePlugin) plugin).notifyCallAnswered(projectId, inviteUrl);
+            PluginHandle handle = this.bridge.getPlugin("CallBridge");
+            if (handle != null) {
+                Plugin plugin = handle.getInstance();
+                if (plugin instanceof CallBridgePlugin) {
+                    ((CallBridgePlugin) plugin).notifyCallAnswered(projectId, inviteUrl);
+                }
             }
         }
     }

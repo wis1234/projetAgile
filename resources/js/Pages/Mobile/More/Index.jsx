@@ -5,18 +5,19 @@ import MobileLayout from '@/Layouts/MobileLayout';
 import { unregisterDeviceToken } from '@/Components/PushNotificationManager';
 
 const menuLinks = [
-  { href: '/dashboard', label: 'dashboard' },
-  { href: '/projects', label: 'projects' },
-  { href: '/project-users', label: 'members' },
-  { href: '/sprints', label: 'sprints' },
-  { href: '/tasks', label: 'tasks' },
-  { href: '/kanban', label: 'task_tracking' },
-  { href: '/files', label: 'files' },
-  { href: '/users', label: 'users' },
-  { href: '/activities', label: 'activity_log' },
-  { href: '/recruitment', label: 'recruitment' },
-  { href: '/subscription/plans', label: 'my_subscription' },
-  { href: '/remunerations/dashboard', label: 'remunerations' },
+  { href: '/discussions', label: 'discussions', icon: '💬' },
+  { href: '/dashboard', label: 'dashboard', icon: '🏠' },
+  { href: '/projects', label: 'projects', icon: '📁' },
+  { href: '/project-users', label: 'members', icon: '👥' },
+  { href: '/sprints', label: 'sprints', icon: '⚡' },
+  { href: '/tasks', label: 'tasks', icon: '✅' },
+  { href: '/kanban', label: 'task_tracking', icon: '📋' },
+  { href: '/files', label: 'files', icon: '📄' },
+  { href: '/users', label: 'users', icon: '👤' },
+  { href: '/activities', label: 'activity_log', icon: '📊' },
+  { href: '/recruitment', label: 'recruitment', icon: '🎯' },
+  { href: '/subscription/plans', label: 'my_subscription', icon: '💳' },
+  { href: '/remunerations/dashboard', label: 'remunerations', icon: '💰' },
 ];
 
 export default function MobileMoreIndex() {
@@ -67,9 +68,10 @@ export default function MobileMoreIndex() {
             <Link
               key={link.href}
               href={link.href}
-              className="flex items-center justify-between px-4 py-3.5 text-sm font-medium text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700/50 transition-colors"
+              className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700/50 transition-colors"
             >
-              <span>{t(link.label)}</span>
+              <span className="text-lg w-6 text-center flex-shrink-0">{link.icon}</span>
+              <span className="flex-1">{t(link.label)}</span>
               <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
@@ -81,15 +83,17 @@ export default function MobileMoreIndex() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden divide-y divide-gray-100 dark:divide-gray-700">
           <button
             onClick={toggleDarkMode}
-            className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-medium text-gray-700 dark:text-gray-200"
+            className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-gray-700 dark:text-gray-200"
           >
-            <span>{darkMode ? 'Mode clair' : 'Mode sombre'}</span>
-            <span className={`relative w-10 h-5.5 rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-gray-300'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-transform ${darkMode ? 'translate-x-4.5' : ''}`} />
+            <span className="text-lg w-6 text-center flex-shrink-0">{darkMode ? '☀️' : '🌙'}</span>
+            <span className="flex-1 text-left">{darkMode ? 'Mode clair' : 'Mode sombre'}</span>
+            <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 ${darkMode ? 'bg-blue-600' : 'bg-gray-300'}`}>
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${darkMode ? 'translate-x-4' : 'translate-x-1'}`} />
             </span>
           </button>
-          <Link href="/profile" className="flex items-center justify-between px-4 py-3.5 text-sm font-medium text-gray-700 dark:text-gray-200">
-            <span>Paramètres</span>
+          <Link href="/profile" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700/50">
+            <span className="text-lg w-6 text-center flex-shrink-0">⚙️</span>
+            <span className="flex-1">Paramètres</span>
             <svg className="w-4 h-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -99,9 +103,9 @@ export default function MobileMoreIndex() {
         {/* Déconnexion */}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-semibold text-sm"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-semibold text-sm active:scale-[0.99] transition-transform"
         >
-          Déconnexion
+          <span>🚪</span> Déconnexion
         </button>
 
         <p className="text-center text-xs text-gray-400 dark:text-gray-500">ProJA v2.3.1</p>

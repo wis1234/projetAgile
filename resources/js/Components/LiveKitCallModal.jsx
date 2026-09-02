@@ -55,6 +55,9 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   // de participants distants, mais uniquement de sa propre action).
   const [hasAnswered, setHasAnswered] = useState(!!isHost || !!skipIncomingScreen);
   const [declined, setDeclined] = useState(false);
+  // Compteur de tentatives de connexion (fix mobile : retry automatique si Capacitor suspend le WS)
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const localVideoRef = useRef(null);
   const screenVideoRef = useRef(null);
@@ -150,8 +153,21 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     return () => stopRingtone();
   }, [isHost, hasAnswered, declined]);
 
-  const handleAnswer = () => {
+  const handleAnswer = async () => {
     stopRingtone();
+    // ── Fix mobile : débloquer l'AudioContext avant de rejoindre ──────────
+    // Sur iOS/Android l'AudioContext est suspendu jusqu'à un geste utilisateur.
+    // Le clic "Répondre" EST le geste utilisateur : on en profite pour le reprendre.
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        await ctx.resume().catch(() => {});
+        // On ferme immédiatement — on voulait juste débloquer le contexte audio du navigateur.
+        ctx.close().catch(() => {});
+      }
+    } catch { /* Ignore, non bloquant */ }
+    setRetryCount(0);
     setHasAnswered(true);
   };
 
@@ -197,12 +213,22 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   };
 
   // ─── Connexion à la room — ne démarre qu'une fois l'appel décroché ──
+  // Fix mobile : retry automatique (max 3 tentatives) + listener Capacitor App.resume
+  // pour reconnecter si Android/iOS met l'app en arrière-plan pendant la connexion.
+  const connectRetryRef = useRef(false);
+
   useEffect(() => {
     if (!hasAnswered) return;
     let activeRoom;
+    let cancelled = false;
 
-    const connect = async () => {
+    const connectOnce = async (attempt = 1) => {
+      if (cancelled) return;
       try {
+        setIsRetrying(attempt > 1);
+        setConnecting(true);
+        setError('');
+
         let livekit = window.LivekitClient;
         if (!livekit) {
           try {
@@ -230,7 +256,12 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
         if (!res.ok) throw new Error('Impossible de récupérer le token ProJA');
         const { token, url } = await res.json();
 
-        activeRoom = new Room({ adaptiveStream: true, dynacast: true });
+        activeRoom = new Room({
+          adaptiveStream: true,
+          dynacast: true,
+          // Fix mobile : reconnexion automatique de LiveKit si le réseau coupe
+          reconnectPolicy: { maxRetryDelay: 7000, minReconnectDelay: 2000, retries: 5 },
+        });
         setRoom(activeRoom);
 
         activeRoom.on(RoomEvent.TrackSubscribed, () => {
@@ -282,26 +313,67 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
         const initialParticipants = [...activeRoom.remoteParticipants.values()];
         setParticipants(initialParticipants);
         setConnecting(false);
+        setIsRetrying(false);
+        setRetryCount(0);
+        connectRetryRef.current = false;
 
         if (initialParticipants.length > 0 && !answeredNotifiedRef.current) {
           answeredNotifiedRef.current = true;
           onAnswered?.();
         }
       } catch (err) {
-        console.error('Erreur connexion ProJA:', err);
-        setError(err.message || 'Impossible de rejoindre l’appel');
-        setConnecting(false);
+        if (cancelled) return;
+        console.error(`Erreur connexion ProJA (tentative ${attempt}):`, err);
+
+        const MAX_RETRIES = 3;
+        if (attempt < MAX_RETRIES) {
+          // Backoff exponentiel : 1.5s, 3s, 6s
+          const delay = 1500 * Math.pow(2, attempt - 1);
+          setRetryCount(attempt);
+          console.info(`Reconnexion dans ${delay}ms…`);
+          setTimeout(() => { if (!cancelled) connectOnce(attempt + 1); }, delay);
+        } else {
+          // Toutes les tentatives épuisées — afficher le bouton "Réessayer"
+          setError(err.message || "Impossible de rejoindre l'appel. Vérifiez votre connexion.");
+          setConnecting(false);
+          setIsRetrying(false);
+          connectRetryRef.current = false;
+        }
       }
     };
 
-    connect();
+    connectOnce(1);
+
+    // ── Fix Capacitor : si l'app reprend après avoir été en arrière-plan ───
+    // Sur Android, le WebSocket LiveKit peut être fermé silencieusement.
+    // On tente une reconnexion douce dès que l'app repasse au premier plan.
+    let appResumePlugin;
+    (async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        appResumePlugin = await App.addListener('resume', () => {
+          if (cancelled || connectRetryRef.current) return;
+          if (activeRoom && activeRoom.state !== 'connected') {
+            console.info('[Capacitor] App reprise — reconnexion LiveKit…');
+            connectRetryRef.current = true;
+            connectOnce(1);
+          }
+        });
+      } catch {
+        // @capacitor/app non disponible en web — pas grave
+      }
+    })();
 
     return () => {
+      cancelled = true;
       clearInterval(timerIntervalRef.current);
       stopRingtone();
       activeRoom?.disconnect();
+      appResumePlugin?.remove?.().catch(() => {});
     };
   }, [tokenEndpoint, hasAnswered]);
+
+
 
   // ─── Passage "en attente" → "appel démarré" (côté appelant) ─────────
   // Ne concerne que l'appelant (hôte) : tant que personne n'a rejoint,
