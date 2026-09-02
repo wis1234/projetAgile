@@ -77,7 +77,7 @@ export default function MobileLogin({ status, canResetPassword }) {
                 <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-5">
                     <form onSubmit={submit} className="space-y-4">
                         <div>
-                            <label htmlFor="email" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
+                            <label htmlFor="email" className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5 uppercase tracking-wide">
                                 Adresse email
                             </label>
                             <div className="relative">
@@ -89,7 +89,7 @@ export default function MobileLogin({ status, canResetPassword }) {
                                     type="email"
                                     name="email"
                                     value={data.email}
-                                    className="pl-11 w-full h-12 rounded-xl text-base bg-slate-100 dark:bg-slate-800 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-950"
+                                    className="pl-11 w-full h-12 rounded-xl text-base text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-950"
                                     autoComplete="email"
                                     isFocused={true}
                                     onChange={(e) => setData('email', e.target.value)}
@@ -100,7 +100,7 @@ export default function MobileLogin({ status, canResetPassword }) {
                         </div>
 
                         <div>
-                            <label htmlFor="password" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
+                            <label htmlFor="password" className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5 uppercase tracking-wide">
                                 Mot de passe
                             </label>
                             <div className="relative">
@@ -112,7 +112,7 @@ export default function MobileLogin({ status, canResetPassword }) {
                                     type={showPassword ? 'text' : 'password'}
                                     name="password"
                                     value={data.password}
-                                    className="pl-11 pr-11 w-full h-12 rounded-xl text-base bg-slate-100 dark:bg-slate-800 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-950"
+                                    className="pl-11 pr-11 w-full h-12 rounded-xl text-base text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-950"
                                     autoComplete="current-password"
                                     onChange={(e) => setData('password', e.target.value)}
                                     required
@@ -137,7 +137,7 @@ export default function MobileLogin({ status, canResetPassword }) {
                                     checked={data.remember}
                                     onChange={(e) => setData('remember', e.target.checked)}
                                 />
-                                <label htmlFor="remember" className="ml-2 text-xs text-gray-600 dark:text-gray-400">
+                                <label htmlFor="remember" className="ml-2 text-xs text-slate-600 dark:text-slate-300">
                                     Se souvenir de moi
                                 </label>
                             </div>

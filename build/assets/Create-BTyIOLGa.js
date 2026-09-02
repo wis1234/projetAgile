@@ -1,0 +1,1 @@
+import{j as t}from"./app-Bnagd8yV.js";import o from"./Create-BoB3J-6I.js";import{M as r}from"./MobileSectionAdapter-BqBHesCb.js";import"./index-BwILFOOT.js";function p(e){return t.jsx(r,{PageComponent:o,pageName:"Messages/Create",...e})}export{p as default};

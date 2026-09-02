@@ -1,0 +1,1 @@
+import{j as t}from"./app-Bnagd8yV.js";import o from"./Edit-DHqmKhl9.js";import{M as i}from"./MobileSectionAdapter-BqBHesCb.js";import"./index-BwILFOOT.js";function p(e){return t.jsx(i,{PageComponent:o,pageName:"Messages/Edit",...e})}export{p as default};

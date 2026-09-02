@@ -1,1 +1,0 @@
-import{j as r}from"./app-Cdj-kAtB.js";import t from"./Create-DDz8T22p.js";import{M as o}from"./MobileSectionAdapter-28bpQv69.js";import"./AdminLayout-BbjvtPNW.js";import"./GlobalFooter-up05Rz3H.js";import"./LiveKitCallModal-B_iab740.js";function f(e){return r.jsx(o,{PageComponent:t,pageName:"Users/Create",...e})}export{f as default};

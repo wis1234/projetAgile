@@ -1,0 +1,1 @@
+import{j as o}from"./app-Bnagd8yV.js";import i from"./Edit-BeJ83uv2.js";import{M as r}from"./MobileSectionAdapter-BqBHesCb.js";import"./index-BwILFOOT.js";import"./AdminLayout-DbfpdXLk.js";import"./GlobalFooter-C5gz7WaT.js";import"./LiveKitCallModal-D_R8GNlU.js";function f(t){return o.jsx(r,{PageComponent:i,pageName:"Files/Edit",...t})}export{f as default};

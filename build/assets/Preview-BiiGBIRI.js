@@ -1,0 +1,1 @@
+import{j as o}from"./app-Bnagd8yV.js";import r from"./Preview-BC7u7uDp.js";import{M as i}from"./MobileSectionAdapter-BqBHesCb.js";import"./fileUtils-BTQrpEGS.js";function s(e){return o.jsx(i,{PageComponent:r,pageName:"Files/Preview",...e})}export{s as default};

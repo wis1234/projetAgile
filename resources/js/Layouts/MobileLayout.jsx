@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { usePage, router } from '@inertiajs/react';
 import MobileBottomNav from '@/Components/MobileBottomNav';
 import PushNotificationManager from '@/Components/PushNotificationManager';
 import ErrorBoundary from '@/Components/ErrorBoundary';
 import Notification from '@/Components/Notification';
-import { nativeFeedback } from '@/lib/platform';
 import MobileHeader from '@/Components/MobileHeader';
 import MobilePageContainer from '@/Components/MobilePageContainer';
 
@@ -34,33 +33,6 @@ export default function MobileLayout({
   onMoreClick,
 }) {
   const { flash = {} } = usePage().props;
-  const touchStartY = useRef(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    const handleTouchStart = (event) => {
-      if (window.scrollY === 0) touchStartY.current = event.touches[0].clientY;
-    };
-    const handleTouchEnd = async (event) => {
-      if (touchStartY.current === null || refreshing) return;
-      const distance = event.changedTouches[0].clientY - touchStartY.current;
-      touchStartY.current = null;
-      if (distance < 72 || window.scrollY !== 0) return;
-
-      setRefreshing(true);
-      await nativeFeedback.tap();
-      router.reload({
-        onFinish: () => setRefreshing(false),
-      });
-    };
-
-    document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchend', handleTouchEnd, { passive: true });
-    return () => {
-      document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [refreshing]);
 
   const handleBack = () => {
     if (onBack) return onBack();
@@ -80,14 +52,6 @@ export default function MobileLayout({
       <Notification message={flash.success} type="success" />
       <Notification message={flash.error} type="error" />
       <Notification message={flash.info} type="info" />
-
-      {refreshing && (
-        <div className="fixed top-[calc(3.5rem+env(safe-area-inset-top,0px))] left-0 right-0 z-30 flex justify-center pointer-events-none">
-          <div className="mt-2 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-lg animate-pulse">
-            Actualisation...
-          </div>
-        </div>
-      )}
 
       <MobilePageContainer fullBleed={fullBleed} hideHeader={hideHeader} hideBottomNav={hideBottomNav}>
         {children}

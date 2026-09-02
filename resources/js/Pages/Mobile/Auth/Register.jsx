@@ -23,7 +23,7 @@ function passwordStrength(password) {
 }
 
 const fieldClasses =
-    'w-full h-12 rounded-2xl text-base bg-gray-50 dark:bg-gray-900/40 border-transparent ' +
+    'w-full h-12 rounded-2xl text-base text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 border-transparent ' +
     'focus:border-blue-500 focus:bg-white dark:focus:bg-gray-900 px-4';
 
 const fieldLabelClasses =

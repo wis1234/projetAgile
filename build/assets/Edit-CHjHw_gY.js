@@ -1,0 +1,1 @@
+import{j as o}from"./app-Bnagd8yV.js";import i from"./Edit-DOWM3Gni.js";import{M as r}from"./MobileSectionAdapter-BqBHesCb.js";import"./AdminLayout-DbfpdXLk.js";import"./GlobalFooter-C5gz7WaT.js";import"./LiveKitCallModal-D_R8GNlU.js";function d(t){return o.jsx(r,{PageComponent:i,pageName:"Tasks/Edit",...t})}export{d as default};

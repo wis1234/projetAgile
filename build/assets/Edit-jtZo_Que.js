@@ -1,1 +1,0 @@
-import{j as t}from"./app-Cdj-kAtB.js";import o from"./Edit-BJoLsTsd.js";import{M as i}from"./MobileSectionAdapter-28bpQv69.js";import"./index-DG8brq1P.js";function p(e){return t.jsx(i,{PageComponent:o,pageName:"Messages/Edit",...e})}export{p as default};

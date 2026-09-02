@@ -1,0 +1,1 @@
+import{j as e}from"./app-Bnagd8yV.js";import s from"./Show-DN9-xyTC.js";import{M as t}from"./MobileSectionAdapter-BqBHesCb.js";function i(o){return e.jsx(t,{PageComponent:s,pageName:"Messages/Show",...o})}export{i as default};

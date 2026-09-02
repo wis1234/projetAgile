@@ -1,0 +1,1 @@
+import{j as e}from"./app-Bnagd8yV.js";import i from"./Index-UvNK2kVQ.js";import{M as o}from"./MobileSectionAdapter-BqBHesCb.js";import"./AdminLayout-DbfpdXLk.js";import"./GlobalFooter-C5gz7WaT.js";import"./LiveKitCallModal-D_R8GNlU.js";function x(t){return e.jsx(o,{PageComponent:i,pageName:"Activities/Index",...t})}export{x as default};
