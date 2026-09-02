@@ -565,35 +565,65 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   // ─── Écran d'appel entrant (invité n'ayant pas encore décroché) ─────
   if (!isHost && !hasAnswered) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center text-white px-6">
-        <style>{`
-          @keyframes pulseRing {
-            0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.55); }
-            70% { box-shadow: 0 0 0 24px rgba(59,130,246,0); }
-            100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
-          }
-          .incoming-avatar { animation: pulseRing 1.8s ease-out infinite; }
-        `}</style>
-        <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-3xl font-bold incoming-avatar mb-6">
-          {(callerName || title || 'ProJA').slice(0, 2).toUpperCase()}
+      <div className="fixed inset-0 z-50 flex flex-col justify-between text-white overflow-hidden bg-slate-900">
+        {/* Arrière-plan flouté avec l'avatar (ou dégradé sombre) */}
+        <div className="absolute inset-0 z-0 opacity-40">
+          <div className="w-full h-full bg-gradient-to-b from-blue-900/40 to-slate-950 backdrop-blur-3xl" />
         </div>
-        <p className="text-sm text-blue-300 uppercase tracking-wide mb-1">Appel entrant — ProJA Meet</p>
-        <h2 className="text-2xl font-semibold mb-10 text-center">{callerName || title}</h2>
-        <div className="flex items-center gap-10">
-          <button
-            onClick={handleDecline}
-            title="Refuser"
-            className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition"
-          >
-            <FaPhoneSlash className="w-6 h-6" />
-          </button>
-          <button
-            onClick={handleAnswer}
-            title="Répondre"
-            className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center transition animate-bounce"
-          >
-            <FaPhone className="w-6 h-6" />
-          </button>
+        
+        {/* Effet d'ondes autour de l'avatar */}
+        <style>{`
+          @keyframes callPulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255,255,255,0.2); }
+            70% { transform: scale(1); box-shadow: 0 0 0 40px rgba(255,255,255,0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+          }
+          .incoming-avatar-pulse { animation: callPulse 2s infinite ease-in-out; }
+          .slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+          @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        `}</style>
+        
+        <div className="relative z-10 flex flex-col items-center pt-24 slide-up">
+          <p className="text-sm font-medium tracking-widest uppercase text-white/70 mb-8">
+            Appel ProJA Meet
+          </p>
+          
+          <div className="relative">
+            <div className="w-36 h-36 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-5xl font-bold incoming-avatar-pulse shadow-2xl border-4 border-white/20">
+              {(callerName || title || 'ProJA').slice(0, 2).toUpperCase()}
+            </div>
+          </div>
+          
+          <h2 className="text-3xl font-semibold mt-8 text-center text-white drop-shadow-md px-6">
+            {callerName || title}
+          </h2>
+          <p className="text-lg text-white/80 mt-2">Appel entrant...</p>
+        </div>
+
+        <div className="relative z-10 flex justify-between items-center px-12 pb-20 slide-up w-full max-w-md mx-auto">
+          {/* Bouton Refuser */}
+          <div className="flex flex-col items-center gap-3">
+            <button
+              onClick={handleDecline}
+              title="Refuser"
+              className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-lg active:scale-90 transition-transform hover:bg-red-600"
+            >
+              <FaPhoneSlash className="w-7 h-7 text-white" />
+            </button>
+            <span className="text-sm font-medium text-white/80">Refuser</span>
+          </div>
+
+          {/* Bouton Répondre */}
+          <div className="flex flex-col items-center gap-3">
+            <button
+              onClick={handleAnswer}
+              title="Répondre"
+              className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg active:scale-90 transition-transform hover:bg-emerald-600 animate-bounce"
+            >
+              <FaPhone className="w-7 h-7 text-white" />
+            </button>
+            <span className="text-sm font-medium text-white/80">Accepter</span>
+          </div>
         </div>
       </div>
     );
