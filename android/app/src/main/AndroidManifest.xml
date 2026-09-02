@@ -26,9 +26,8 @@
             android:name=".IncomingCallActivity"
             android:exported="false"
             android:launchMode="singleTop"
-            android:showOnLockScreen="true"
             android:excludeFromRecents="true"
-            android:theme="@style/AppTheme.NoActionBarLaunch" />
+            android:theme="@style/AppTheme.IncomingCall" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

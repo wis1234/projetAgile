@@ -1,6 +1,7 @@
 package org.kemtcenter.proja;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.webkit.PermissionRequest;
@@ -9,6 +10,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
+import com.getcapacitor.Plugin;
 
 public class MainActivity extends BridgeActivity {
 
@@ -20,6 +22,10 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // IMPORTANT : les plugins Capacitor custom doivent être enregistrés
+        // AVANT l'appel à super.onCreate().
+        registerPlugin(CallBridgePlugin.class);
+
         super.onCreate(savedInstanceState);
 
         // Remplace le WebChromeClient par défaut pour intercepter les
@@ -72,6 +78,28 @@ public class MainActivity extends BridgeActivity {
                 pendingWebViewRequest = null;
             }
         });
+    }
+
+    /**
+     * Reçu quand MainActivity existe déjà (app ouverte ou en arrière-plan)
+     * et qu'on appuie sur "Répondre" dans IncomingCallActivity. Sans cette
+     * méthode, l'intent (et ses extras projectId/inviteUrl) était
+     * simplement perdu et l'app retombait sur sa route par défaut.
+     */
+    @Override
+    public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+
+        String projectId = intent.getStringExtra("answeredCallProjectId");
+        String inviteUrl = intent.getStringExtra("answeredCallInviteUrl");
+
+        if (projectId != null || inviteUrl != null) {
+            Plugin plugin = this.bridge.getPluginInstance("CallBridge");
+            if (plugin instanceof CallBridgePlugin) {
+                ((CallBridgePlugin) plugin).notifyCallAnswered(projectId, inviteUrl);
+            }
+        }
     }
 
     @Override

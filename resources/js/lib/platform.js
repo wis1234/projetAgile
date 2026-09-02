@@ -1,10 +1,18 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
 import { Preferences } from '@capacitor/preferences';
+
+/**
+ * Pont natif -> JS pour transmettre les infos d'un appel LiveKit accepté
+ * depuis IncomingCallActivity (voir CallBridgePlugin.java côté Android).
+ *   - getPendingCall() : cold start, l'app vient d'être lancée par l'appel.
+ *   - 'callAnswered'   : warm start, l'app tournait déjà.
+ */
+const CallBridge = registerPlugin('CallBridge');
 
 /**
  * True uniquement quand l'app tourne dans le conteneur natif Capacitor
@@ -86,6 +94,26 @@ export const requestNativePermissions = async () => {
   return { camera, location };
 };
 
+/**
+ * Construit l'URL interne de la page projet avec le flag join-call=1,
+ * exactement comme le fait guestJoinPage() côté serveur (LiveKitController::guestJoinPage
+ * -> redirect('/projects/' . $project_id . '?join-call=1')). On réutilise
+ * ce même contrat plutôt que d'inventer une route dédiée à l'app native.
+ */
+const buildCallDeepLinkUrl = (projectId) =>
+  `${window.location.origin}/projects/${projectId}?join-call=1`;
+
+/**
+ * Redispatche vers le mécanisme de deep-link déjà en place (écouté dans
+ * app.jsx via 'proja:deep-link'), pour que router.visit() prenne le relais.
+ */
+const dispatchCallDeepLink = (projectId) => {
+  if (!projectId) return;
+  window.dispatchEvent(
+    new CustomEvent('proja:deep-link', { detail: { url: buildCallDeepLinkUrl(projectId) } })
+  );
+};
+
 export const initializeNativeApp = async () => {
   if (!isNativeApp()) return () => {};
 
@@ -102,9 +130,24 @@ export const initializeNativeApp = async () => {
     window.dispatchEvent(new CustomEvent('proja:deep-link', { detail: { url } }));
   });
 
+  // Cold start : MainActivity vient d'être créée directement par
+  // IncomingCallActivity suite à "Répondre" (app pas en mémoire).
+  try {
+    const { projectId } = await CallBridge.getPendingCall();
+    dispatchCallDeepLink(projectId);
+  } catch (error) {
+    console.warn('[Native] CallBridge.getPendingCall indisponible:', error);
+  }
+
+  // Warm start : l'app tournait déjà quand on a appuyé sur "Répondre".
+  const callAnswered = await CallBridge.addListener('callAnswered', ({ projectId }) => {
+    dispatchCallDeepLink(projectId);
+  });
+
   return () => {
     backButton.remove();
     appState.remove();
     deepLink.remove();
+    callAnswered.remove();
   };
 };
