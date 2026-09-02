@@ -11,6 +11,7 @@ use Agence104\LiveKit\VideoGrant;
 use Agence104\LiveKit\RoomServiceClient;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use App\Services\FcmService;
 
 
 class LiveKitController extends Controller
@@ -72,7 +73,6 @@ class LiveKitController extends Controller
             'url'   => config('services.livekit.url'),
         ]);
     }
-    use App\Services\FcmService;
 
     public function notifyCallStarted(Request $request, \App\Models\Project $project)
     {
