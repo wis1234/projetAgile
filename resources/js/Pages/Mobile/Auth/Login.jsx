@@ -164,22 +164,30 @@ export default function MobileLogin({ status, canResetPassword }) {
                     <button
                         type="submit"
                         disabled={processing}
-                        className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl text-[15px] font-bold text-white bg-slate-900 active:scale-[0.98] transition-transform disabled:opacity-60 disabled:active:scale-100 shadow-lg shadow-slate-900/10 mt-2"
+                        className="relative w-full h-14 rounded-2xl text-[15px] font-bold text-white bg-gradient-to-b from-blue-500 to-blue-600 active:scale-[0.98] active:from-blue-600 active:to-blue-700 transition-transform disabled:active:scale-100 shadow-lg shadow-blue-600/25 mt-2 overflow-hidden"
                     >
-                        {processing ? (
-                            <>
-                                <svg className="animate-spin h-4.5 w-4.5" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                                Connexion en cours...
-                            </>
-                        ) : (
-                            <>
-                                Se connecter
-                                <FaArrowRight className="h-3.5 w-3.5" />
-                            </>
-                        )}
+                        {/* État normal */}
+                        <span
+                            className={`absolute inset-0 flex items-center justify-center gap-2 transition-all duration-300 ${
+                                processing ? 'opacity-0 -translate-y-1' : 'opacity-100 translate-y-0'
+                            }`}
+                        >
+                            Se connecter
+                            <FaArrowRight className="h-3.5 w-3.5" />
+                        </span>
+
+                        {/* État chargement (preloader) */}
+                        <span
+                            className={`absolute inset-0 flex items-center justify-center gap-2.5 transition-all duration-300 ${
+                                processing ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'
+                            }`}
+                        >
+                            <span className="relative h-5 w-5 flex-shrink-0">
+                                <span className="absolute inset-0 rounded-full border-2 border-white/25" />
+                                <span className="absolute inset-0 rounded-full border-2 border-transparent border-t-white animate-spin" />
+                            </span>
+                            <span className="tracking-wide">Connexion...</span>
+                        </span>
                     </button>
                 </form>
 
