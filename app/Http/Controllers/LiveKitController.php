@@ -151,12 +151,20 @@ class LiveKitController extends Controller
 
     public function callStatus(Request $request, \App\Models\Project $project)
     {
-        $roomName = 'project-' . $project->id;
-        try {
-            $participants = $this->getRoomService()->listParticipants($roomName);
-            $active = count($participants) > 0;
-        } catch (\Exception $e) {
-            $active = false;
+        $session = CallSession::where('project_id', $project->id)
+            ->active()
+            ->where('started_at', '>=', now()->subHours(4))
+            ->first();
+
+        $active = (bool) $session;
+        if (!$active) {
+            $roomName = 'project-' . $project->id;
+            try {
+                $participants = $this->getRoomService()->listParticipants($roomName);
+                $active = count($participants) > 0;
+            } catch (\Exception $e) {
+                $active = false;
+            }
         }
         return response()->json(['active' => $active]);
     }
@@ -166,21 +174,23 @@ class LiveKitController extends Controller
         $user = $request->user();
         $roomName = 'project-' . $project->id;
 
-        try {
-            $participants = $this->getRoomService()->listParticipants($roomName);
-            $alreadyActive = count($participants) > 0;
-        } catch (\Exception $e) {
-            $alreadyActive = false;
-        }
+        // Nettoyer les sessions expirées (+ de 4 heures)
+        CallSession::where('project_id', $project->id)
+            ->active()
+            ->where('started_at', '<', now()->subHours(4))
+            ->each(fn($s) => $s->expire());
 
-        $memberIds = $project->users()->pluck('users.id')->toArray();
-
-        // Récupérer ou créer une session d'appel
+        // Récupérer la session d'appel active existante
         $session = CallSession::where('project_id', $project->id)
             ->active()
+            ->latest('started_at')
             ->first();
 
+        $memberIds = $project->users()->pluck('users.id')->toArray();
+        $isNewCall = false;
+
         if (!$session) {
+            // C'est un nouveau démarrage d'appel par cet utilisateur
             $session = CallSession::create([
                 'project_id'   => $project->id,
                 'initiator_id' => $user->id,
@@ -190,29 +200,35 @@ class LiveKitController extends Controller
                 'status'       => 'active',
                 'started_at'   => now(),
             ]);
+            $isNewCall = true;
         }
 
-        if (!$alreadyActive) {
-            // Personne n'est encore dans l'appel : c'est un vrai démarrage,
-            // les autres membres reçoivent l'invite avec sonnerie.
+        if ($isNewCall) {
+            // Uniquement pour le vrai créateur de l'appel au tout début
             event(new \App\Events\LiveKitCallStarted(
                 $project->id, $project->name, $user->id, $user->name, $memberIds, $session->getInviteUrl()
             ));
 
-                $this->sendNativeCallNotifications($project, $user, $session->getInviteUrl());
+            $this->sendNativeCallNotifications($project, $user, $session->getInviteUrl());
+            activity_log('call_started', "{$user->name} a démarré un appel ProJA Meet sur « {$project->name} »", $project);
         } else {
-            // L'appel existe déjà : ce membre le rejoint simplement, en retard.
-            // Les autres reçoivent une notification discrète, sans sonnerie
-            // ni écran "appel entrant".
-            event(new \App\Events\LiveKitParticipantJoined(
-                $project->id, $project->name, $user->id, $user->name, $memberIds
-            ));
+            // L'appel existe déjà : ce membre le rejoint (décrochage ou intégration en retard)
+            // On signale que l'appel a été décroché (pour stopper la sonnerie d'attente de l'appelant)
+            event(new \App\Events\LiveKitCallAnswered($project->id, $memberIds));
+
+            // On notifie les autres participants que quelqu'un a rejoint
+            if ($session->initiator_id !== $user->id) {
+                event(new \App\Events\LiveKitParticipantJoined(
+                    $project->id, $project->name, $user->id, $user->name, $memberIds
+                ));
+            }
+
+            activity_log('call_answered', "{$user->name} a rejoint l'appel ProJA Meet sur « {$project->name} »", $project);
         }
 
-        activity_log('call_answered', "{$user->name} a rejoint l'appel ProJA Meet sur « {$project->name} »", $project);
-
         return response()->json([
-            'alreadyActive' => $alreadyActive,
+            'alreadyActive' => !$isNewCall,
+            'isInitiator'   => $session->initiator_id === $user->id,
             'inviteUrl'     => $session->getInviteUrl(),
             'inviteCode'    => $session->invite_code,
         ]);

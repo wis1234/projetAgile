@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import Modal from '@/Components/Modal';
+import AudioPlayer from '@/Components/AudioPlayer';
 import {
   FaCommentDots, FaMicrophone, FaStop, FaReply, FaPaperPlane, FaEnvelope,
   FaPaperclip, FaSmile, FaSmileBeam, FaSave, FaTimes, FaCopy, FaCheck,
@@ -1095,7 +1096,7 @@ export default function TaskDiscussionPanel({ task, projectMembers = [], headerL
 
                           {comment.audio_path && (
                             <div className="mt-1.5 max-w-full overflow-hidden">
-                              <VoiceMessagePlayer src={`/storage/public/${comment.audio_path}`} />
+                              <AudioPlayer src={comment.audio_path} isMe={isMe} />
                             </div>
                           )}
 
@@ -1202,7 +1203,7 @@ export default function TaskDiscussionPanel({ task, projectMembers = [], headerL
                               <p className="whitespace-pre-wrap break-words leading-relaxed" dangerouslySetInnerHTML={{ __html: linkifyText(reply.content, isReplyMe) }} />
                               {reply.audio_path && (
                                 <div className="mt-1 max-w-full overflow-hidden">
-                                  <VoiceMessagePlayer src={`/storage/public/${reply.audio_path}`} />
+                                  <AudioPlayer src={reply.audio_path} isMe={isReplyMe} />
                                 </div>
                               )}
                               <div className={`flex items-center gap-1 mt-0.5 justify-end tick ${isReplyMe ? 'text-white/70' : 'text-gray-400'}`}>

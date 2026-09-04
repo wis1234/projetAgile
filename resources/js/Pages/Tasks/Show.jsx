@@ -9,6 +9,7 @@ import i18n from 'i18next';
 // Ajout de FaSave à la liste des icônes importées
 import { FaSave, FaTimes, FaExpand, FaCompress, FaCopy, FaPause, FaCheck } from 'react-icons/fa';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
+import AudioPlayer from '@/Components/AudioPlayer';
 
 // Composant de compte à rebours réutilisable
 const formatTimeUnit = (value, label) => (
@@ -194,16 +195,9 @@ return (
   );
 };
 
-// ─── VoiceMessagePlayer (lecteur natif du navigateur) ────────────────────────
+// ─── VoiceMessagePlayer (lecteur universel) ──────────────────────────────────
 const VoiceMessagePlayer = ({ src, isMe }) => {
-  return (
-    <audio
-      controls
-      preload="metadata"
-      src={src}
-      className="h-9 w-full min-w-[200px] max-w-[240px]"
-    />
-  );
+  return <AudioPlayer src={src} isMe={isMe} />;
 };
 
 // ─── Constantes pour Réactions & Stickers ────────────────────────────────────

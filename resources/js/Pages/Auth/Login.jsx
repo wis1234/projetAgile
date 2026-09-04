@@ -10,13 +10,29 @@ export default function Login({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
-        remember: false,
+        remember: true,
     });
 
     const { props } = usePage();
     const errorMessage = props.message || '';
     const errorStatus = props.status || '';
     const [showPassword, setShowPassword] = useState(false);
+
+    useEffect(() => {
+        try {
+            const savedEmail = localStorage.getItem('proja_saved_email');
+            const savedRemember = localStorage.getItem('proja_remember_login');
+            if (savedEmail) {
+                setData(prev => ({
+                    ...prev,
+                    email: savedEmail,
+                    remember: savedRemember !== 'false',
+                }));
+            }
+        } catch {
+            // Ignore
+        }
+    }, []);
 
     useEffect(() => {
         // Effacer le message d'erreur après 10 secondes
@@ -31,6 +47,19 @@ export default function Login({ status, canResetPassword }) {
     const submit = (e) => {
         e.preventDefault();
         post(route('login'), {
+            onSuccess: () => {
+                try {
+                    if (data.remember) {
+                        localStorage.setItem('proja_saved_email', data.email);
+                        localStorage.setItem('proja_remember_login', 'true');
+                    } else {
+                        localStorage.removeItem('proja_saved_email');
+                        localStorage.removeItem('proja_remember_login');
+                    }
+                } catch {
+                    // Ignore
+                }
+            },
             onFinish: () => reset('password'),
         });
     };

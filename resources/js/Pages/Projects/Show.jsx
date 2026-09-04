@@ -358,6 +358,8 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
   const [callActive, setCallActive] = useState(false);
   const [showCommentStatsModal, setShowCommentStatsModal] = useState(false);
 
+  const [isCallInitiator, setIsCallInitiator] = useState(false);
+
   // Auto-join quand redirigé depuis un lien d'invitation (?join-call=1)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -375,9 +377,20 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
           .then(res => res.json())
           .then(data => {
             setCallActive(true);
+            setIsCallInitiator(!!data.isInitiator);
             if (data.inviteUrl) setInviteLink(data.inviteUrl);
           })
           .catch(err => console.error('Erreur appel:', err));
+
+        // Signaler immédiatement au serveur que l'appel est décroché
+        fetch(`/projects/${project.id}/livekit-call/answered`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+        }).catch(() => {});
+
         // Nettoyer l'URL
         window.history.replaceState({}, '', window.location.pathname);
       })();
@@ -616,6 +629,7 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
                       .then(res => res.json())
                       .then(data => {
                         setCallActive(true);
+                        setIsCallInitiator(!!data.isInitiator);
                         if (data.inviteUrl) setInviteLink(data.inviteUrl);
                       })
                       .catch(err => console.error('Erreur appel:', err));
@@ -1083,38 +1097,39 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
   tokenEndpoint={`/projects/${project.id}/livekit-token`}
   inviteLink={inviteLink}
   muteEndpoint={`/projects/${project.id}/livekit-call/mute-participant`}
-  isHost={isAdmin || isManager}
+  isHost={isCallInitiator || isAdmin || isManager}
   skipIncomingScreen={true}
   title={project.name}
 
-    onAnswered={async () => {
+  onAnswered={async () => {
+    const csrfToken = await getFreshCsrfToken();
+    fetch(`/projects/${project.id}/livekit-call/answered`, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': csrfToken,
+      },
+    }).catch(() => {});
+  }}
+  onClose={async () => {
+    setShowLiveKitCall(false);
+    setInviteLink('');
+    fetch(`/projects/${project.id}/livekit-call/status`)
+      .then(res => res.json())
+      .then(data => setCallActive(!!data.active))
+      .catch(() => {});
+    if (isCallInitiator) {
       const csrfToken = await getFreshCsrfToken();
-      fetch(`/projects/${project.id}/livekit-call/answered`, {
+      fetch(`/projects/${project.id}/livekit-call/end`, {
         method: 'POST',
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
           'X-CSRF-TOKEN': csrfToken,
         },
       }).catch(() => {});
-    }}
-onClose={async () => {
-  setShowLiveKitCall(false);
-  setInviteLink('');
-  fetch(`/projects/${project.id}/livekit-call/status`)
-    .then(res => res.json())
-    .then(data => setCallActive(!!data.active))
-    .catch(() => {});
-  const csrfToken = await getFreshCsrfToken();
-  fetch(`/projects/${project.id}/livekit-call/end`, {
-    method: 'POST',
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-      'X-CSRF-TOKEN': csrfToken,
-    },
-  }).catch(() => {});
-}}
-
-        />
+    }
+  }}
+/>
       )}
     </div>
   );

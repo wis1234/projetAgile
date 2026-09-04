@@ -300,10 +300,13 @@ const stopRingtone = () => {
     const channel = window.Echo.private(`user.${auth.user.id}`);
 
     channel.listen('.livekit.call.started', (e) => {
+      // Ne pas sonner chez l'initiateur lui-même
+      if (String(e.initiatorId) === String(auth?.user?.id)) return;
       setLiveKitInvite({
         projectId: e.projectId,
         projectName: e.projectName,
         initiatorName: e.initiatorName,
+        initiatorId: e.initiatorId,
         inviteUrl: e.inviteUrl,
       });
       playRingtone();
@@ -884,6 +887,10 @@ const stopRingtone = () => {
           tokenEndpoint={`/projects/${liveKitInvite.projectId}/livekit-token`}
           inviteLink={liveKitInvite.inviteUrl || ''}
           title={liveKitInvite.projectName}
+          callerName={liveKitInvite.initiatorName}
+          isHost={false}
+          skipIncomingScreen={true}
+          muteEndpoint={`/projects/${liveKitInvite.projectId}/livekit-call/mute-participant`}
           onAnswered={async () => {
             const csrfToken = await getFreshCsrfToken();
             fetch(`/projects/${liveKitInvite.projectId}/livekit-call/answered`, {
@@ -894,17 +901,9 @@ const stopRingtone = () => {
               },
             }).catch(() => {});
           }}
-          onClose={async () => {
+          onClose={() => {
             setShowLiveKitCall(false);
             setLiveKitInvite(null);
-            const csrfToken = await getFreshCsrfToken();
-            fetch(`/projects/${liveKitInvite.projectId}/livekit-call/end`, {
-              method: 'POST',
-              headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': csrfToken,
-              },
-            }).catch(() => {});
           }}
         />
       )}

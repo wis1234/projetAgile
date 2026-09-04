@@ -55,6 +55,13 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   // de participants distants, mais uniquement de sa propre action).
   const [hasAnswered, setHasAnswered] = useState(!!isHost || !!skipIncomingScreen);
   const [declined, setDeclined] = useState(false);
+
+  useEffect(() => {
+    if (isHost || skipIncomingScreen) {
+      setHasAnswered(true);
+    }
+  }, [isHost, skipIncomingScreen]);
+
   // Compteur de tentatives de connexion (fix mobile : retry automatique si Capacitor suspend le WS)
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);

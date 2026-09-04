@@ -5,18 +5,38 @@ import InputError from '@/Components/InputError';
 import TextInput from '@/Components/TextInput';
 import { FaEnvelope, FaLock, FaExclamationTriangle, FaEye, FaEyeSlash, FaArrowRight } from 'react-icons/fa';
 import { useEffect, useState } from 'react';
+import { nativeStorage } from '@/lib/platform';
 
 export default function MobileLogin({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
-        remember: false,
+        remember: true,
     });
 
     const { props } = usePage();
     const errorMessage = props.message || '';
     const errorStatus = props.status || '';
     const [showPassword, setShowPassword] = useState(false);
+
+    // Charger l'email mémorisé au montage
+    useEffect(() => {
+        (async () => {
+            try {
+                const savedEmail = await nativeStorage.get('proja_saved_email', localStorage.getItem('proja_saved_email') || '');
+                const savedRemember = await nativeStorage.get('proja_remember_login', localStorage.getItem('proja_remember_login') !== 'false');
+                if (savedEmail) {
+                    setData(prev => ({
+                        ...prev,
+                        email: savedEmail,
+                        remember: savedRemember !== false,
+                    }));
+                }
+            } catch {
+                // Ignore
+            }
+        })();
+    }, []);
 
     useEffect(() => {
         if (errorMessage) {
@@ -30,6 +50,23 @@ export default function MobileLogin({ status, canResetPassword }) {
     const submit = (e) => {
         e.preventDefault();
         post(route('login'), {
+            onSuccess: async () => {
+                try {
+                    if (data.remember) {
+                        await nativeStorage.set('proja_saved_email', data.email);
+                        await nativeStorage.set('proja_remember_login', true);
+                        localStorage.setItem('proja_saved_email', data.email);
+                        localStorage.setItem('proja_remember_login', 'true');
+                    } else {
+                        await nativeStorage.remove('proja_saved_email');
+                        await nativeStorage.remove('proja_remember_login');
+                        localStorage.removeItem('proja_saved_email');
+                        localStorage.removeItem('proja_remember_login');
+                    }
+                } catch {
+                    // Ignore
+                }
+            },
             onFinish: () => reset('password'),
         });
     };
@@ -151,12 +188,13 @@ export default function MobileLogin({ status, canResetPassword }) {
                     {/* Compartiment Se souvenir */}
                     <div className="flex items-center">
                         <Checkbox
+                            id="remember"
                             name="remember"
                             checked={data.remember}
                             onChange={(e) => setData('remember', e.target.checked)}
                         />
-                        <label htmlFor="remember" className="ml-2.5 text-[13px] text-slate-600">
-                            Rester connecté
+                        <label htmlFor="remember" className="ml-2.5 text-[13px] text-slate-700 font-medium cursor-pointer">
+                            Mémoriser mes identifiants (rester connecté)
                         </label>
                     </div>
 

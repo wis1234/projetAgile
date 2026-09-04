@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { usePage } from '@inertiajs/react';
 import MobileLayout from '@/Layouts/MobileLayout';
 import { nativeFeedback } from '@/lib/platform';
+import AudioPlayer from '@/Components/AudioPlayer';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const getCsrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -33,10 +34,6 @@ const formatGroupDate = (d) => {
 };
 
 const isSameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
-
-const VoicePlayer = ({ src }) => (
-  <audio controls preload="metadata" src={src} className="h-8 max-w-[200px]" style={{ colorScheme: 'light' }} />
-);
 
 const TypingIndicator = () => (
   <div className="flex items-end gap-2 px-4 py-1">
@@ -120,7 +117,7 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, auth }
           )}
           {/* Vocal */}
           {comment.audio_path && (
-            <VoicePlayer src={comment.audio_path} />
+            <AudioPlayer src={comment.audio_path} isMe={isMe} />
           )}
           {/* Image */}
           {comment.image_path && (
@@ -538,7 +535,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
         {/* Aperçu audio enregistré */}
         {audioBlob && !isRecording && (
           <div className="flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-            <audio controls src={audioUrl} className="h-8 flex-1" />
+            <AudioPlayer src={audioUrl} className="flex-1" />
             <button
               onClick={() => { setAudioBlob(null); setAudioUrl(null); }}
               className="w-7 h-7 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 text-red-500"
