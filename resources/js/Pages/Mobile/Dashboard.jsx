@@ -1,326 +1,348 @@
+// resources/js/Pages/Mobile/Dashboard.jsx
 import React from 'react';
-import { Link } from '@inertiajs/react';
-import { Line, Pie } from 'react-chartjs-2';
-import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
-import { FaTasks, FaUsers, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload, FaUserPlus, FaFire, FaClock, FaCheck } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
-import { usePage } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import MobileLayout from '@/Layouts/MobileLayout';
-import RecruitmentCard from '@/Components/RecruitmentCard';
+import {
+  FaArrowRight, FaCheck, FaClock, FaFileAlt, FaFire, FaProjectDiagram,
+  FaTasks, FaUsers, FaChevronRight, FaDownload, FaUserPlus,
+} from 'react-icons/fa';
 
-Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler);
+const initials = (name = '') =>
+  name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'P';
 
-// ─── Carte stat compacte pour le scroll horizontal ──────────────────────────
-const StatChip = ({ title, count, color, link, icon: Icon }) => {
-  const content = (
-    <div className="flex flex-col justify-between w-[128px] h-[104px] flex-shrink-0 bg-white dark:bg-gray-800 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-700 shadow-sm active:scale-[0.97] transition-transform snap-start">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color}`}>
-        <Icon className="text-sm text-white" />
-      </div>
-      <div>
-        <p className="text-xl font-extrabold text-gray-900 dark:text-white leading-tight">{count ?? 0}</p>
-        <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 truncate">{title}</p>
-      </div>
-    </div>
-  );
-  return link ? <Link href={link}>{content}</Link> : content;
-};
-
-// ─── Raccourci d'accès rapide (icône + libellé, en colonne) ─────────────────
-const QuickAction = ({ icon, label, link }) => (
-  <Link href={link} className="flex flex-col items-center gap-1.5 w-[72px] flex-shrink-0 snap-start active:scale-95 transition-transform">
-    <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg shadow-sm">
-      {icon}
-    </div>
-    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 text-center leading-tight line-clamp-2">{label}</span>
-  </Link>
-);
-
-const StatusBadge = ({ status, count, t }) => {
-  const statusConfig = {
-    todo: { label: t('status_todo'), color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-    in_progress: { label: t('status_in_progress'), color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-    done: { label: t('status_done'), color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-    en_attente: { label: t('status_pending'), color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' },
-  };
-  const config = statusConfig[status] || { label: status, color: 'bg-gray-100 text-gray-800' };
+// ─── Petite pastille de statut avec barre de progression ────────────────────
+const StatusRow = ({ label, count, total, color }) => {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5">
-      <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${config.color}`}>{config.label}</span>
-      <span className="font-semibold text-sm text-gray-700 dark:text-gray-200 flex-shrink-0">{count}</span>
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[13px] font-medium text-slate-600">{label}</span>
+        <span className="text-[13px] font-bold text-slate-900">{count}</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 };
 
-const SectionCard = ({ title, action, children }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4">
-    <div className="flex items-center justify-between gap-2 mb-3.5">
-      <h2 className="text-sm font-bold text-gray-800 dark:text-white">{title}</h2>
+// ─── Carte de section réutilisable ──────────────────────────────────────────
+const SectionCard = ({ title, action, children, className = '' }) => (
+  <div className={`bg-white rounded-3xl border border-slate-100 shadow-sm p-[18px] ${className}`}>
+    <div className="flex items-center justify-between gap-2 mb-4">
+      <h3 className="text-[15px] font-bold text-slate-900">{title}</h3>
       {action}
     </div>
     {children}
   </div>
 );
 
-export default function MobileDashboard({ auth: authProp, stats = {}, activityByDay = [], recentActivities = [], topUsers = [], recentProjects = [], recentFiles = [] }) {
-  const { t } = useTranslation();
-  const { auth: authShared } = usePage().props;
-  const auth = authProp || authShared;
-  const isAdmin = auth?.user?.roles?.includes('admin');
-  const firstName = (auth?.user?.name || '').split(' ')[0];
+const SeeAllLink = ({ href, label = 'Tout voir' }) => (
+  <Link href={href} className="text-xs font-semibold text-blue-600 inline-flex items-center gap-0.5 active:opacity-60">
+    {label} <FaChevronRight className="h-2.5 w-2.5" />
+  </Link>
+);
+
+export default function MobileDashboard({
+  auth: authProp,
+  stats = {},
+  recentActivities = [],
+  recentProjects = [],
+  recentFiles = [],
+  topUsers = [],
+}) {
+  const auth = authProp || {};
+  const user = auth.user || auth;
+  const firstName = user?.name?.split(' ')[0] || 'vous';
+  const isAdmin = user?.roles?.includes?.('admin');
 
   const tasksByStatus = stats.tasksByStatus || { todo: 0, in_progress: 0, done: 0, en_attente: 0 };
+  const totalTasks = tasksByStatus.todo + tasksByStatus.in_progress + tasksByStatus.done + tasksByStatus.en_attente;
 
-  const statsData = [
-    { title: t('tasks'), count: stats.tasks || 0, color: 'bg-indigo-500', link: '/tasks', icon: FaTasks, show: true },
-    { title: t('projects'), count: stats.projects || 0, color: 'bg-blue-500', link: '/projects', icon: FaProjectDiagram, show: true },
-    { title: t('team_members'), count: stats.members || 0, color: 'bg-purple-500', link: '/users', icon: FaUsers, show: isAdmin },
-    { title: t('files'), count: stats.files || 0, color: 'bg-amber-500', link: '/files', icon: FaFileAlt, show: true },
-  ].filter(w => w.show !== false);
+  const statItems = [
+    { key: 'tasks', label: 'Tâches', icon: FaTasks, tone: 'bg-blue-600', href: '/tasks', show: true },
+    { key: 'projects', label: 'Projets', icon: FaProjectDiagram, tone: 'bg-emerald-600', href: '/projects', show: true },
+    { key: 'members', label: 'Équipe', icon: FaUsers, tone: 'bg-orange-500', href: '/users', show: isAdmin },
+    { key: 'files', label: 'Fichiers', icon: FaFileAlt, tone: 'bg-violet-600', href: '/files', show: true },
+  ].filter((s) => s.show !== false);
 
   const quickActions = [
-    { icon: <FaTasks />, label: t('new_task'), link: '/tasks/create' },
-    { icon: <FaProjectDiagram />, label: t('new_project'), link: '/projects/create' },
-    { icon: <FaUsers />, label: t('add_member'), link: '/users/create' },
-    { icon: <FaFileAlt />, label: t('import_file'), link: '/files/upload' },
-    { icon: <FaUserPlus />, label: t('recruitment_offers'), link: '/recruitment' },
-  ];
-
-  const activityChartData = {
-    labels: activityByDay.map(a => new Date(a.day).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })),
-    datasets: [{
-      label: 'Activités',
-      data: activityByDay.map(a => a.count),
-      borderColor: 'rgba(99, 102, 241, 0.8)',
-      backgroundColor: 'rgba(99, 102, 241, 0.1)',
-      tension: 0.3,
-      fill: true,
-    }],
-  };
-
-  const tasksByStatusData = {
-    labels: ['À faire', 'En cours', 'Terminées', 'En attente'],
-    datasets: [{
-      data: [tasksByStatus.todo || 0, tasksByStatus.in_progress || 0, tasksByStatus.done || 0, tasksByStatus.en_attente || 0],
-      backgroundColor: ['rgba(59, 130, 246, 0.8)', 'rgba(245, 158, 11, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(156, 163, 175, 0.8)'],
-      borderWidth: 0,
-    }],
-  };
+    { icon: FaTasks, label: 'Nouvelle tâche', href: '/tasks/create' },
+    { icon: FaProjectDiagram, label: 'Nouveau projet', href: '/projects/create' },
+    { icon: FaUserPlus, label: 'Ajouter un membre', href: '/users/create', show: isAdmin },
+    { icon: FaFileAlt, label: 'Importer', href: '/files/upload' },
+  ].filter((a) => a.show !== false);
 
   return (
-    <MobileLayout title={t('dashboard')} subtitle={firstName ? `Bonjour, ${firstName}` : null} fullBleed>
-      <div className="space-y-4 pb-4">
+    <MobileLayout title="Accueil" subtitle={`Bonjour ${firstName}`} fullBleed>
+      <Head title="Accueil" />
 
-        {/* ─── Bannière recrutement ─── */}
-        <div className="px-4 pt-3">
-          <RecruitmentCard />
-        </div>
+      <div className="min-h-full bg-slate-50 pb-6">
 
-        {/* ─── Stats en scroll horizontal ─── */}
-        <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pl-4 pr-4 pb-0.5 scrollbar-hide">
-          {statsData.map((w, i) => (
-            <StatChip key={i} title={w.title} count={w.count} color={w.color} link={w.link} icon={w.icon} />
-          ))}
-        </div>
-
-        {/* ─── Accès rapide en scroll horizontal ─── */}
-        <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pl-4 pr-4 scrollbar-hide">
-          {quickActions.map((a, i) => (
-            <QuickAction key={i} icon={a.icon} label={a.label} link={a.link} />
-          ))}
-        </div>
-
-        <div className="px-4 space-y-4">
-
-          {/* ─── Activité récente ─── */}
-          <SectionCard title={t('recent_activity')}>
-            <div className="h-44">
-              <Line
-                data={activityChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
-                  scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { stepSize: 1, font: { size: 9 } } },
-                    x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 5 } },
-                  },
-                }}
-              />
+        {/* ─── Hero : header avec salutation et stat principale ─── */}
+        <section className="bg-gradient-to-b from-slate-950 to-slate-900 px-5 pb-7 pt-5 text-white rounded-b-[28px]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Votre espace
+              </p>
+              <h2 className="mt-1 text-[22px] font-extrabold tracking-tight leading-tight">
+                Bon retour, {firstName}
+              </h2>
             </div>
-          </SectionCard>
-
-          {/* ─── Répartition des tâches ─── */}
-          <SectionCard title="Répartition des tâches">
-            <div className="h-40 mb-2">
-              <Pie
-                data={tasksByStatusData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
-                }}
-              />
-            </div>
-            <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
-              <StatusBadge status="todo" count={tasksByStatus.todo || 0} t={t} />
-              <StatusBadge status="in_progress" count={tasksByStatus.in_progress || 0} t={t} />
-              <StatusBadge status="done" count={tasksByStatus.done || 0} t={t} />
-              <StatusBadge status="en_attente" count={tasksByStatus.en_attente || 0} t={t} />
-            </div>
-          </SectionCard>
-
-          {/* ─── Membres actifs ─── */}
-          <SectionCard title={t('active_team_members')}>
-            {topUsers?.length > 0 ? (
-              <div className="space-y-3.5">
-                {topUsers.map((user, index) => (
-                  <div key={user.id} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="relative flex-shrink-0">
-                        {user.avatar ? (
-                          <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                            <span className="text-gray-500 dark:text-gray-400 text-xs font-medium">{user.name.charAt(0).toUpperCase()}</span>
-                          </div>
-                        )}
-                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-800" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{user.count} activités</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">#{index + 1}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">{t('no_recent_user_activity')}</p>
-            )}
-          </SectionCard>
-        </div>
-
-        {/* ─── Projets récents — carrousel horizontal ─── */}
-        <div>
-          <div className="flex items-center justify-between gap-2 px-4 mb-3">
-            <h2 className="text-sm font-bold text-gray-800 dark:text-white">{t('recent_projects')}</h2>
-            <Link href="/projects" className="text-xs font-medium text-blue-600 dark:text-blue-400 inline-flex items-center gap-0.5">
-              {t('view_all_projects')} <FaChevronRight className="h-2.5 w-2.5" />
+            <Link
+              href="/profile"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-sm font-bold ring-4 ring-white/10 active:scale-95 transition-transform"
+            >
+              {initials(user?.name)}
             </Link>
           </div>
 
-          {recentProjects?.length > 0 ? (
-            <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pl-4 pr-4 pb-1 scrollbar-hide">
-              {recentProjects.map((project) => (
-                <Link
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  className="w-[240px] flex-shrink-0 snap-start bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm active:scale-[0.98] transition-transform"
-                >
-                  <div className="p-3.5">
-                    <div className="flex justify-between items-start gap-2 mb-2">
-                      <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate min-w-0">{project.name}</h3>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-nowrap flex-shrink-0">
-                        {project.status}
+          <div className="mt-7 flex items-end justify-between">
+            <div>
+              <p className="text-[13px] text-slate-400">Tâches terminées</p>
+              <p className="mt-1 text-[40px] font-extrabold leading-none tracking-tight">
+                {tasksByStatus.done || 0}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3.5 py-2 text-xs font-semibold text-emerald-300">
+              <FaFire className="h-3 w-3" /> Votre rythme
+            </div>
+          </div>
+        </section>
+
+        <main className="space-y-5 px-4 pt-5">
+
+          {/* ─── Accès rapide ─── */}
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+            {quickActions.map(({ icon: Icon, label, href }, i) => (
+              <Link
+                key={i}
+                href={href}
+                className="flex flex-col items-center gap-2 w-[76px] flex-shrink-0 active:scale-95 transition-transform"
+              >
+                <div className="w-[52px] h-[52px] rounded-2xl bg-white border border-slate-100 shadow-sm text-blue-600 flex items-center justify-center text-base">
+                  <Icon />
+                </div>
+                <span className="text-[10.5px] font-medium text-slate-600 text-center leading-tight line-clamp-2">
+                  {label}
+                </span>
+              </Link>
+            ))}
+          </div>
+
+          {/* ─── Grille de stats ─── */}
+          <div className="grid grid-cols-2 gap-3">
+            {statItems.map(({ key, label, icon: Icon, tone, href }) => (
+              <Link
+                key={key}
+                href={href}
+                className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm active:scale-[.98] transition-transform"
+              >
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-white ${tone}`}>
+                  <Icon className="text-sm" />
+                </div>
+                <p className="mt-3.5 text-2xl font-extrabold text-slate-950">{stats[key] || 0}</p>
+                <p className="mt-0.5 text-xs font-medium text-slate-500">{label}</p>
+              </Link>
+            ))}
+          </div>
+
+          {/* ─── Répartition des tâches ─── */}
+          {totalTasks > 0 && (
+            <SectionCard title="Répartition des tâches">
+              <div className="space-y-3.5">
+                <StatusRow label="À faire" count={tasksByStatus.todo} total={totalTasks} color="bg-blue-500" />
+                <StatusRow label="En cours" count={tasksByStatus.in_progress} total={totalTasks} color="bg-amber-500" />
+                <StatusRow label="Terminées" count={tasksByStatus.done} total={totalTasks} color="bg-emerald-500" />
+                <StatusRow label="En attente" count={tasksByStatus.en_attente} total={totalTasks} color="bg-slate-400" />
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ─── Projets récents ─── */}
+          <div>
+            <div className="mb-3 flex items-center justify-between px-1">
+              <h3 className="text-[15px] font-bold text-slate-900">Projets récents</h3>
+              <SeeAllLink href="/projects" label="Ouvrir" />
+            </div>
+
+            {recentProjects.length > 0 ? (
+              <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+                {recentProjects.map((project) => (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    className="w-[230px] flex-shrink-0 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm active:scale-[.98] transition-transform"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2.5">
+                      <h4 className="font-bold text-sm text-slate-900 truncate min-w-0">{project.name}</h4>
+                      {project.status && (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 whitespace-nowrap flex-shrink-0">
+                          {project.status}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mb-3.5 line-clamp-2 leading-relaxed">
+                      {project.description || 'Aucune description'}
+                    </p>
+                    <div className="flex items-center justify-between text-xs pt-3 border-t border-slate-50">
+                      {project.manager ? (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {project.manager.avatar ? (
+                            <img src={project.manager.avatar} alt={project.manager.name} className="w-5 h-5 rounded-full flex-shrink-0" />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                              <span className="text-[9px] text-slate-500 font-semibold">{initials(project.manager.name)}</span>
+                            </div>
+                          )}
+                          <span className="text-slate-600 truncate font-medium">{project.manager.name}</span>
+                        </div>
+                      ) : <span />}
+                      <span className="text-slate-400 font-medium whitespace-nowrap flex-shrink-0">
+                        {project.task_count || 0} tâches
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{project.description || 'Aucune description'}</p>
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center min-w-0">
-                        {project.manager.avatar ? (
-                          <img src={project.manager.avatar} alt={project.manager.name} className="w-5 h-5 rounded-full mr-1.5 flex-shrink-0" />
-                        ) : (
-                          <div className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-1.5 flex-shrink-0">
-                            <span className="text-[9px] text-gray-500 dark:text-gray-400">{project.manager.name.charAt(0).toUpperCase()}</span>
-                          </div>
-                        )}
-                        <span className="text-gray-600 dark:text-gray-300 truncate">{project.manager.name}</span>
-                      </div>
-                      <span className="text-gray-400 whitespace-nowrap flex-shrink-0">{project.task_count} {t('tasks')}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400 text-center py-6">{t('no_recent_projects')}</p>
-          )}
-        </div>
-
-        <div className="px-4 space-y-4">
-
-          {/* ─── Fichiers récents ─── */}
-          <SectionCard
-            title={t('recent_files')}
-            action={<Link href="/files" className="text-xs font-medium text-blue-600 dark:text-blue-400 inline-flex items-center gap-0.5">{t('view_all_files')} <FaChevronRight className="h-2.5 w-2.5" /></Link>}
-          >
-            {recentFiles?.length > 0 ? (
-              <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
-                {recentFiles.map((file) => (
-                  <Link key={file.id} href={`/files/${file.id}`} className="flex items-center gap-3 py-2.5 active:bg-gray-50 dark:active:bg-gray-700/40 -mx-1 px-1 rounded-lg transition-colors">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
-                      <FaFileAlt className="text-blue-500 dark:text-blue-400 text-sm" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{file.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{file.size} • {file.created_at}</p>
-                    </div>
-                    <a
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-blue-600 dark:text-blue-400 p-2 flex-shrink-0"
-                      title="Télécharger"
-                    >
-                      <FaDownload className="text-sm" />
-                    </a>
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">{t('no_recent_files')}</p>
+              <p className="rounded-2xl bg-white border border-slate-100 p-6 text-center text-sm text-slate-400">
+                Aucun projet récent
+              </p>
             )}
-          </SectionCard>
+          </div>
 
-          {/* ─── Activités récentes ─── */}
-          <SectionCard
-            title={t('recent_activities')}
-            action={<Link href="/activities" className="text-xs font-medium text-blue-600 dark:text-blue-400 inline-flex items-center gap-0.5">{t('view_all_activities')} <FaChevronRight className="h-2.5 w-2.5" /></Link>}
-          >
-            {recentActivities?.length > 0 ? (
-              <div className="space-y-3.5">
+          {/* ─── Membres actifs ─── */}
+          {topUsers.length > 0 && (
+            <SectionCard title="Membres actifs">
+              <div className="space-y-4">
+                {topUsers.map((u, index) => (
+                  <div key={u.id} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative flex-shrink-0">
+                        {u.avatar ? (
+                          <img src={u.avatar} alt={u.name} className="w-9 h-9 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
+                            <span className="text-slate-500 text-xs font-bold">{initials(u.name)}</span>
+                          </div>
+                        )}
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{u.name}</p>
+                        <p className="text-xs text-slate-500">{u.count} activités</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 flex-shrink-0">#{index + 1}</span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ─── Bannière CTA ─── */}
+          <section className="rounded-3xl bg-gradient-to-b from-blue-500 to-blue-600 p-5 text-white shadow-lg shadow-blue-600/25">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 flex-shrink-0">
+                <FaClock />
+              </div>
+              <div>
+                <p className="text-[15px] font-bold">Restez organisé</p>
+                <p className="mt-0.5 text-xs text-blue-100">Consultez vos tâches du jour.</p>
+              </div>
+            </div>
+            <Link
+              href="/tasks"
+              className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl bg-white text-[14px] font-bold text-blue-700 active:scale-[.98] transition-transform"
+            >
+              Voir mes tâches <FaArrowRight className="text-xs" />
+            </Link>
+          </section>
+
+          {/* ─── Fichiers récents ─── */}
+{/* ─── Fichiers récents ─── */}
+{recentFiles.length > 0 && (
+    <SectionCard title="Fichiers récents" action={<SeeAllLink href="/files" />}>
+        <div className="divide-y divide-slate-50">
+            {recentFiles.map((file) => (
+                <div
+                    key={file.id}
+                    className="flex items-center gap-3 py-3 -mx-1.5 px-1.5 rounded-xl"
+                >
+                    <Link
+                        href={`/files/${file.id}`}
+                        className="flex items-center gap-3 min-w-0 flex-1 active:bg-slate-50 transition-colors"
+                    >
+                        <div className="p-2.5 bg-blue-50 rounded-xl flex-shrink-0">
+                            <FaFileAlt className="text-blue-500 text-sm" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-900 truncate">
+                                {file.name}
+                            </p>
+
+                            <p className="text-xs text-slate-500 truncate">
+                                {file.size} · {file.created_at}
+                            </p>
+                        </div>
+                    </Link>
+
+                    {file.url && (
+                        <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-blue-600 p-2 flex-shrink-0 active:scale-90 transition-transform"
+                            title="Télécharger"
+                        >
+                            <FaDownload className="text-sm" />
+                        </a>
+                    )}
+                </div>
+            ))}
+        </div>
+    </SectionCard>
+)}
+
+          {/* ─── Activité récente ─── */}
+          {recentActivities.length > 0 && (
+            <SectionCard title="Activité récente" action={<SeeAllLink href="/activities" />}>
+              <div className="space-y-4">
                 {recentActivities.map((activity) => {
                   const Wrapper = activity.url ? Link : 'div';
                   const wrapperProps = activity.url ? { href: activity.url } : {};
                   return (
-                    <Wrapper key={activity.id} {...wrapperProps} className="flex items-start gap-2.5">
-                      <div className="flex-shrink-0">
+                    <Wrapper key={activity.id} {...wrapperProps} className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
                         {activity.user?.avatar ? (
-                          <img src={activity.user.avatar} alt={activity.user.name} className="w-7 h-7 rounded-full" />
+                          <img src={activity.user.avatar} alt={activity.user.name} className="w-7 h-7 rounded-full object-cover" />
                         ) : (
-                          <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                            <span className="text-gray-500 dark:text-gray-400 text-[10px] font-medium">{activity.user?.name?.charAt(0)?.toUpperCase() || '?'}</span>
-                          </div>
+                          <FaCheck className="text-[10px]" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-800 dark:text-gray-200 break-words">
-                          <span className="font-medium">{activity.user?.name || t('unknown_user')}</span> {activity.description}
+                        <p className="text-sm text-slate-700 leading-snug break-words">
+                          <span className="font-semibold text-slate-900">
+                            {activity.user?.name || 'Utilisateur'}
+                          </span>{' '}
+                          {activity.description}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{activity.created_at}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{activity.created_at}</p>
                       </div>
                     </Wrapper>
                   );
                 })}
               </div>
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">{t('no_recent_activity')}</p>
-            )}
-          </SectionCard>
-        </div>
+            </SectionCard>
+          )}
+        </main>
       </div>
     </MobileLayout>
   );
