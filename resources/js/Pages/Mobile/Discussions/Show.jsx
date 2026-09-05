@@ -42,6 +42,68 @@ const resolveImageSrc = (imagePath) => {
   return `/storage/public/${imagePath}`;
 };
 
+// ─── Pastille "en ligne" façon WhatsApp/Messenger (liste déroulante) ────────
+const OnlineAvatarStackMobile = ({ users = [], meId }) => {
+  const [showAll, setShowAll] = useState(false);
+  const others = users.filter(u => String(u.id) !== String(meId));
+  if (others.length === 0) return null;
+  const visible = others.slice(0, 3);
+  const overflow = others.length - 3;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setShowAll(v => !v)}
+        className="flex items-center gap-1.5 px-1.5 py-1 rounded-full active:bg-gray-100 dark:active:bg-gray-800 transition-colors"
+        title="Voir qui est en ligne"
+      >
+        <div className="flex -space-x-1.5">
+          {visible.map(u => (
+            <div key={u.id} className="relative w-6 h-6 flex-shrink-0">
+              <img
+                src={u.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || '')}&size=24`}
+                alt={u.name}
+                className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-900 object-cover"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-white dark:border-gray-900" />
+            </div>
+          ))}
+          {overflow > 0 && (
+            <div className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-900 bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-[8px] font-bold text-gray-700 dark:text-gray-200 flex-shrink-0">
+              +{overflow}
+            </div>
+          )}
+        </div>
+      </button>
+
+      {showAll && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setShowAll(false)} />
+          <div className="absolute top-full right-0 mt-2 z-40 w-56 max-h-72 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-2">
+            <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide px-2 py-1.5">
+              {others.length} en ligne
+            </p>
+            {others.map(u => (
+              <div key={u.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                <div className="relative flex-shrink-0">
+                  <img
+                    src={u.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || '')}&size=28`}
+                    alt={u.name}
+                    className="w-7 h-7 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                  />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border-2 border-white dark:border-gray-800" />
+                </div>
+                <span className="text-sm text-gray-800 dark:text-gray-100 truncate">{u.name}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const TypingIndicator = () => (
   <div className="flex items-end gap-2 px-4 py-1">
     <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
@@ -63,7 +125,7 @@ const TypingIndicator = () => (
 const SWIPE_REPLY_THRESHOLD = 56; // px à parcourir pour déclencher la réponse
 const SWIPE_MAX = 72; // limite visuelle du glissement
 
-const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImageClick, auth }) => {
+const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImageClick, onJumpToMessage, isHighlighted, auth }) => {
   const longPressTimer = useRef(null);
   const touchStartRef = useRef({ x: 0, y: 0 });
   const isSwipingRef = useRef(false);
@@ -125,7 +187,10 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
   const resolvedImageSrc = resolveImageSrc(comment.image_path);
 
   return (
-    <div className={`relative flex items-end gap-2 px-4 my-0.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div
+      id={`msg-${comment.id || comment._tempId}`}
+      className={`relative flex items-end gap-2 px-4 my-0.5 transition-colors duration-700 ${isHighlighted ? 'bg-amber-200/40 dark:bg-amber-500/10 rounded-2xl' : ''} ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+    >
       {/* Icône de réponse révélée pendant le glissement */}
       <div
         className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 rounded-full bg-gray-300/70 dark:bg-gray-600/70 transition-opacity pointer-events-none"
@@ -165,14 +230,18 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
 
         {/* Réponse citée */}
         {comment.parent_id && comment.parent && (
-          <div className={`mb-1 px-2.5 py-1.5 rounded-xl text-xs border-l-4 max-w-full ${
-            isMe
-              ? 'bg-blue-500/40 border-white/60 text-blue-100'
-              : 'bg-gray-100 dark:bg-gray-700/60 border-blue-400 text-gray-500 dark:text-gray-400'
-          }`}>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onJumpToMessage?.(comment.parent_id); }}
+            className={`mb-1 px-2.5 py-1.5 rounded-xl text-xs border-l-4 max-w-full text-left active:opacity-70 transition-opacity ${
+              isMe
+                ? 'bg-blue-500/40 border-white/60 text-blue-100'
+                : 'bg-gray-100 dark:bg-gray-700/60 border-blue-400 text-gray-500 dark:text-gray-400'
+            }`}
+          >
             <p className="font-semibold truncate">{comment.parent.user?.name || 'Message'}</p>
             <p className="truncate">{comment.parent.content || '…'}</p>
-          </div>
+          </button>
         )}
 
         <div
@@ -257,12 +326,26 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   const typingTimeoutsRef = useRef({});
   const imageInputRef = useRef(null);
 
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+
   const scrollToBottom = useCallback((smooth = false) => {
     const el = scrollRef.current;
     if (!el) return;
     requestAnimationFrame(() => {
       el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
     });
+  }, []);
+
+  // ─── Fait défiler jusqu'à un message et le met en surbrillance ───
+  const scrollToMessage = useCallback((targetId) => {
+    if (!targetId) return;
+    const el = document.getElementById(`msg-${targetId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedMessageId(targetId);
+    setTimeout(() => {
+      setHighlightedMessageId(prev => (prev === targetId ? null : prev));
+    }, 1600);
   }, []);
 
   // ─── Chargement des commentaires ─────────────────────────────────────────
@@ -574,6 +657,8 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
           onReply={() => { setReplyTo(comment); setTimeout(() => inputRef.current?.focus(), 100); }}
           onLongPress={handleLongPress}
           onImageClick={(src) => setImageLightbox(src)}
+          onJumpToMessage={scrollToMessage}
+          isHighlighted={String(comment.id || comment._tempId) === String(highlightedMessageId)}
           auth={auth}
         />
       );
@@ -587,26 +672,8 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     return items;
   };
 
-  // ─── Header custom avec infos de la tâche ───────────────────────────────
-  const headerRight = onlineOthers.length > 0 ? (
-    <div className="flex -space-x-1.5">
-      {onlineOthers.slice(0, 3).map(u => (
-        <div key={u.id} className="relative">
-          <img
-            src={u.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || '')}&size=28`}
-            className="w-7 h-7 rounded-full border-2 border-white dark:border-gray-900 object-cover"
-            alt={u.name}
-          />
-          <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-white" />
-        </div>
-      ))}
-      {onlineOthers.length > 3 && (
-        <div className="w-7 h-7 rounded-full border-2 border-white dark:border-gray-900 bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[9px] font-bold text-gray-600 dark:text-gray-300">
-          +{onlineOthers.length - 3}
-        </div>
-      )}
-    </div>
-  ) : null;
+  // ─── Header custom avec infos de la tâche : qui est en ligne ────────────
+  const headerRight = <OnlineAvatarStackMobile users={onlineUsers} meId={me?.id} />;
 
   return (
     <MobileLayout
