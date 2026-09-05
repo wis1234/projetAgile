@@ -141,10 +141,11 @@ export default function MobileRegister() {
 
     return (
         <div
-            className="min-h-[100dvh] flex flex-col bg-white"
+            className="h-[100dvh] overflow-y-auto overscroll-contain flex flex-col bg-white"
             style={{
                 paddingTop: 'env(safe-area-inset-top, 0px)',
                 paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                WebkitOverflowScrolling: 'touch',
             }}
         >
             {/* ─── Barre de navigation native : retour vers le login ─── */}

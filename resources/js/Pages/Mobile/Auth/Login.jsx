@@ -73,10 +73,11 @@ export default function MobileLogin({ status, canResetPassword }) {
 
     return (
         <div
-            className="min-h-[100dvh] flex flex-col bg-white"
+            className="h-[100dvh] overflow-y-auto overscroll-contain flex flex-col bg-white"
             style={{
                 paddingTop: 'env(safe-area-inset-top, 0px)',
                 paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                WebkitOverflowScrolling: 'touch',
             }}
         >
             <Head title="Connexion" />
