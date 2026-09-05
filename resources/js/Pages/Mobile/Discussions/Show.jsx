@@ -35,6 +35,13 @@ const formatGroupDate = (d) => {
 
 const isSameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
 
+// ─── Résout le chemin d'affichage d'une image (blob local, URL absolue, ou chemin serveur) ───
+const resolveImageSrc = (imagePath) => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('blob:') || imagePath.startsWith('http')) return imagePath;
+  return `/storage/public/${imagePath}`;
+};
+
 const TypingIndicator = () => (
   <div className="flex items-end gap-2 px-4 py-1">
     <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
@@ -56,7 +63,7 @@ const TypingIndicator = () => (
 const SWIPE_REPLY_THRESHOLD = 56; // px à parcourir pour déclencher la réponse
 const SWIPE_MAX = 72; // limite visuelle du glissement
 
-const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, auth }) => {
+const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImageClick, auth }) => {
   const longPressTimer = useRef(null);
   const touchStartRef = useRef({ x: 0, y: 0 });
   const isSwipingRef = useRef(false);
@@ -114,6 +121,8 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, auth }
   const bubbleClass = isMe
     ? 'bg-blue-600 text-white rounded-2xl rounded-br-sm ml-auto'
     : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl rounded-bl-sm border border-gray-100 dark:border-gray-700 shadow-sm';
+
+  const resolvedImageSrc = resolveImageSrc(comment.image_path);
 
   return (
     <div className={`relative flex items-end gap-2 px-4 my-0.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -179,12 +188,13 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, auth }
             <AudioPlayer src={comment.audio_path} isMe={isMe} />
           )}
           {/* Image */}
-          {comment.image_path && (
+          {resolvedImageSrc && (
             <img
-              src={comment.image_path}
+              src={resolvedImageSrc}
               alt="Photo"
-              className="max-w-full rounded-xl mt-1 max-h-64 object-cover"
+              className="max-w-full rounded-xl mt-1 max-h-64 object-cover cursor-pointer"
               loading="lazy"
+              onClick={() => onImageClick?.(resolvedImageSrc)}
             />
           )}
           {/* Horodatage */}
@@ -233,6 +243,10 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   const [audioUrl, setAudioUrl] = useState(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+  const [imageError, setImageError] = useState('');
+  const [imageLightbox, setImageLightbox] = useState(null);
 
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
@@ -241,6 +255,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   const presenceChannelRef = useRef(null);
   const lastTypingSentRef = useRef(0);
   const typingTimeoutsRef = useRef({});
+  const imageInputRef = useRef(null);
 
   const scrollToBottom = useCallback((smooth = false) => {
     const el = scrollRef.current;
@@ -271,6 +286,18 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
 
   useEffect(() => { loadComments(); }, [loadComments]);
   useEffect(() => { if (!loading) scrollToBottom(); }, [loading, scrollToBottom]);
+
+  // ─── Fermer le lightbox avec Échap + bloquer le scroll ───
+  useEffect(() => {
+    if (!imageLightbox) return;
+    const handleKeyDown = (e) => { if (e.key === 'Escape') setImageLightbox(null); };
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [imageLightbox]);
 
   // ─── Temps réel ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -324,6 +351,44 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     };
   }, [task?.id, me?.id]);
 
+  // ─── Partage de photos ────────────────────────────────────────────────────
+  const setSelectedImage = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setImageError('Seules les photos peuvent être partagées ici.');
+      return;
+    }
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setImageError('');
+  };
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    setSelectedImage(file);
+    e.target.value = '';
+  };
+
+  const handlePasteImage = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) setSelectedImage(file);
+        break;
+      }
+    }
+  };
+
+  const removeSelectedImage = () => {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageFile(null);
+    setImagePreviewUrl(null);
+  };
+
   // ─── Envoi de message ────────────────────────────────────────────────────
   const emitStopTyping = useCallback(() => {
     presenceChannelRef.current?.whisper('stop-typing', { userId: me?.id });
@@ -345,14 +410,15 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
 
   const sendMessage = async () => {
     const content = text.trim();
-    if (!content && !audioBlob) return;
+    if (!content && !audioBlob && !imageFile) return;
     nativeFeedback.tap();
 
     const tempId = `temp_${Date.now()}`;
     const optimistic = {
       _tempId: tempId, id: null, _pending: true, _failed: false,
-      content: content || (audioBlob ? '🎙 Message vocal' : ''),
+      content: content || (audioBlob ? '🎙 Message vocal' : (imageFile ? 'Photo partagée' : '')),
       audio_path: audioBlob ? audioUrl : null,
+      image_path: imageFile ? imagePreviewUrl : null,
       created_at: new Date().toISOString(),
       user: { id: me?.id, name: me?.name, profile_photo_url: me?.profile_photo_url },
       parent_id: replyTo?.id || null,
@@ -361,9 +427,12 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     };
 
     setComments(prev => [...prev, optimistic]);
+    const savedImageFile = imageFile;
     setText('');
     setAudioBlob(null);
     setAudioUrl(null);
+    setImageFile(null);
+    setImagePreviewUrl(null);
     setReplyTo(null);
     emitStopTyping();
     if (inputRef.current) { inputRef.current.style.height = 'auto'; }
@@ -372,8 +441,9 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     try {
       setSending(true);
       const fd = new FormData();
-      fd.append('content', content || (audioBlob ? 'Message vocal' : ''));
+      fd.append('content', content || (audioBlob ? 'Message vocal' : (savedImageFile ? 'Photo partagée' : '')));
       if (audioBlob) fd.append('audio', audioBlob, 'voice_message.webm');
+      if (savedImageFile) fd.append('image', savedImageFile);
       if (replyTo?.id) fd.append('parent_id', replyTo.id);
 
       const res = await fetch(`/api/tasks/${task.id}/comments`, {
@@ -503,6 +573,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
           showAvatar={showAvatar}
           onReply={() => { setReplyTo(comment); setTimeout(() => inputRef.current?.focus(), 100); }}
           onLongPress={handleLongPress}
+          onImageClick={(src) => setImageLightbox(src)}
           auth={auth}
         />
       );
@@ -606,6 +677,34 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
           </div>
         )}
 
+        {/* Erreur photo */}
+        {imageError && (
+          <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-xs text-red-600 dark:text-red-300 flex items-center gap-2">
+            <span className="flex-1">{imageError}</span>
+            <button onClick={() => setImageError('')} className="text-red-400">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Aperçu photo sélectionnée */}
+        {imagePreviewUrl && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+            <img src={imagePreviewUrl} alt="Aperçu" className="h-14 w-14 rounded-lg object-cover flex-shrink-0" />
+            <span className="text-xs text-gray-500 dark:text-gray-400 flex-1 truncate">{imageFile?.name}</span>
+            <button
+              onClick={removeSelectedImage}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 text-red-500"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Barre de saisie */}
         <div
           className="flex-shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-2 py-2 flex items-end gap-2"
@@ -635,6 +734,20 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
             </div>
           ) : (
             <>
+              {/* Bouton photo */}
+              <input type="file" ref={imageInputRef} onChange={handleImageSelect} accept="image/*" className="hidden" />
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 active:scale-90 active:bg-gray-100 dark:active:bg-gray-800 transition-transform"
+                title="Partager une photo"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 14l4.5-6 3.5 4.5 2.5-3L19 17H5z" />
+                  <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+                </svg>
+              </button>
+
               {/* Textarea */}
               <div className="flex-1 flex items-end bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-1.5 min-h-[40px]">
                 <textarea
@@ -642,6 +755,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
                   value={text}
                   onChange={handleTextChange}
                   onKeyDown={handleKeyDown}
+                  onPaste={handlePasteImage}
                   placeholder="Message…"
                   rows={1}
                   className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none outline-none leading-relaxed self-center"
@@ -650,7 +764,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
               </div>
 
               {/* Bouton micro ou envoyer */}
-              {text.trim() || audioBlob ? (
+              {text.trim() || audioBlob || imageFile ? (
                 <button
                   onClick={sendMessage}
                   disabled={sending}
@@ -715,6 +829,31 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
             </button>
           </div>
         </>
+      )}
+
+      {/* Lightbox : aperçu plein écran d'une photo partagée */}
+      {imageLightbox && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={() => setImageLightbox(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setImageLightbox(null)}
+            className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center backdrop-blur-md transition-colors"
+            title="Fermer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img
+            src={imageLightbox}
+            alt="Aperçu de la photo"
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-[92vw] max-h-[88vh] object-contain rounded-lg shadow-2xl select-none"
+          />
+        </div>
       )}
     </MobileLayout>
   );
