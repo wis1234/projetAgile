@@ -393,6 +393,19 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
     const tempId = generateTempId();
     const now = new Date().toISOString();
 
+    // ─── Résout le commentaire parent (pour l'aperçu cité), où qu'il soit ───
+    const findCommentById = (commentsList, id) => {
+      for (const c of commentsList) {
+        if (String(c.id || c._tempId) === String(id)) return c;
+        if (c.replies?.length) {
+          const found = findCommentById(c.replies, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const parentComment = replyingTo ? findCommentById(comments, replyingTo) : null;
+
     const optimisticComment = {
       _tempId: tempId,
       id: null,
@@ -410,20 +423,12 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
         role: auth.user.role,
       },
       parent_id: replyingTo || null,
+      parent: parentComment ? { id: parentComment.id || parentComment._tempId, content: parentComment.content } : null,
       replies: [],
     };
 
-    const insertCommentRecursively = (commentsList, incoming) => {
-      const parentId = incoming.parent_id ? String(incoming.parent_id) : null;
-      if (!parentId) return [incoming, ...commentsList];
-      return commentsList.map(c => {
-        if (String(c.id || c._tempId) === parentId) return { ...c, replies: [incoming, ...(c.replies || [])] };
-        if (c.replies?.length > 0) return { ...c, replies: insertCommentRecursively(c.replies, incoming) };
-        return c;
-      });
-    };
-
-    setComments(prev => insertCommentRecursively(prev, optimisticComment));
+    // ─── Toujours ajouté en bas (racine), comme un message normal ───
+    setComments(prev => [optimisticComment, ...prev]);
 
     const savedContent = textToSend;
     const savedAudioBlob = audioBlob;
@@ -760,15 +765,11 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
 
       const insertRealtimeComment = (list, inc) => {
         const incId = String(inc.id);
-        const parentId = inc.parent_id ? String(inc.parent_id) : null;
-        const exists = list.some(c => String(c.id) === incId || (c.replies && c.replies.some(r => String(r.id) === incId)));
-        if (exists) return list;
-        if (!parentId) return [inc, ...list];
-        return list.map(c => {
-          if (String(c.id) === parentId) return { ...c, replies: [inc, ...(c.replies || [])] };
-          if (c.replies?.length > 0) return { ...c, replies: insertRealtimeComment(c.replies, inc) };
-          return c;
-        });
+        const existsRec = (l) => l.some(c => String(c.id) === incId || (c.replies?.length && existsRec(c.replies)));
+        if (existsRec(list)) return list;
+
+        // Toujours ajouté en bas (racine), comme un message normal
+        return [inc, ...list];
       };
 
       setComments(prev => insertRealtimeComment(prev, withMeta));
