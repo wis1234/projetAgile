@@ -52,24 +52,81 @@ const TypingIndicator = () => (
   </div>
 );
 
-// ─── Bulle de message ─────────────────────────────────────────────────────────
+// ─── Bulle de message (avec glissement latéral pour répondre) ────────────────
+const SWIPE_REPLY_THRESHOLD = 56; // px à parcourir pour déclencher la réponse
+const SWIPE_MAX = 72; // limite visuelle du glissement
+
 const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, auth }) => {
   const longPressTimer = useRef(null);
+  const touchStartRef = useRef({ x: 0, y: 0 });
+  const isSwipingRef = useRef(false);
+  const [swipeX, setSwipeX] = useState(0);
+  const [swipeTriggered, setSwipeTriggered] = useState(false);
 
-  const handleTouchStart = () => {
+  const clearLongPress = () => clearTimeout(longPressTimer.current);
+
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    isSwipingRef.current = false;
+    setSwipeTriggered(false);
+
     longPressTimer.current = setTimeout(() => {
       nativeFeedback.tap();
       onLongPress?.(comment);
     }, 500);
   };
-  const handleTouchEnd = () => clearTimeout(longPressTimer.current);
+
+  const handleTouchMove = (e) => {
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+
+    // Si le geste est surtout vertical (scroll), on ne fait rien
+    if (!isSwipingRef.current && Math.abs(deltaY) > Math.abs(deltaX)) return;
+
+    // Un glissement horizontal démarre : on annule le long-press
+    if (Math.abs(deltaX) > 8) {
+      isSwipingRef.current = true;
+      clearLongPress();
+    }
+    if (!isSwipingRef.current) return;
+
+    // WhatsApp : on glisse toujours vers la droite pour répondre, quel que soit l'expéditeur
+    const clamped = Math.max(0, Math.min(deltaX, SWIPE_MAX));
+    setSwipeX(clamped);
+    if (!swipeTriggered && clamped >= SWIPE_REPLY_THRESHOLD) {
+      setSwipeTriggered(true);
+      nativeFeedback.tap();
+    }
+  };
+
+  const handleTouchEnd = () => {
+    clearLongPress();
+    if (isSwipingRef.current && swipeX >= SWIPE_REPLY_THRESHOLD) {
+      onReply?.(comment);
+    }
+    isSwipingRef.current = false;
+    setSwipeX(0);
+    setSwipeTriggered(false);
+  };
 
   const bubbleClass = isMe
     ? 'bg-blue-600 text-white rounded-2xl rounded-br-sm ml-auto'
     : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl rounded-bl-sm border border-gray-100 dark:border-gray-700 shadow-sm';
 
   return (
-    <div className={`flex items-end gap-2 px-4 my-0.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div className={`relative flex items-end gap-2 px-4 my-0.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+      {/* Icône de réponse révélée pendant le glissement */}
+      <div
+        className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 rounded-full bg-gray-300/70 dark:bg-gray-600/70 transition-opacity pointer-events-none"
+        style={{ opacity: swipeX > 8 ? Math.min(swipeX / SWIPE_REPLY_THRESHOLD, 1) : 0 }}
+      >
+        <svg className={`w-4 h-4 ${swipeTriggered ? 'text-blue-600 dark:text-blue-300' : 'text-gray-500 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l-7 7 7 7M2 12h15a5 5 0 005-5" />
+        </svg>
+      </div>
+
       {/* Avatar (uniquement le dernier message d'un groupe) */}
       <div className="w-7 flex-shrink-0">
         {!isMe && showAvatar ? (
@@ -83,8 +140,10 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, auth }
 
       {/* Bulle */}
       <div
-        className={`max-w-[78%] relative ${isMe ? 'items-end' : 'items-start'} flex flex-col`}
+        className={`max-w-[78%] relative ${isMe ? 'items-end' : 'items-start'} flex flex-col transition-transform`}
+        style={{ transform: `translateX(${swipeX}px)`, transitionDuration: isSwipingRef.current ? '0ms' : '200ms' }}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onContextMenu={(e) => { e.preventDefault(); onLongPress?.(comment); }}
       >
