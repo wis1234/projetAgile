@@ -373,6 +373,20 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     }, 1600);
   }, []);
 
+  // ─── Aplatit la structure imbriquée (commentaires + leurs replies nichées) ───
+  const flattenComments = (raw) => {
+    const flat = [];
+    const walk = (list) => {
+      (list || []).forEach(c => {
+        const { replies, ...rest } = c;
+        flat.push(rest);
+        if (replies && replies.length) walk(replies);
+      });
+    };
+    walk(raw);
+    return flat;
+  };
+
   // ─── Chargement des commentaires ─────────────────────────────────────────
   const loadComments = useCallback(async () => {
     try {
@@ -381,7 +395,8 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
       });
       if (!res.ok) throw new Error();
       const raw = await res.json();
-      const sorted = [...raw].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const flat = flattenComments(raw);
+      const sorted = [...flat].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       setComments(sorted);
       // Marque comme vue
       localStorage.setItem(`discussion_seen_${task.id}`, new Date().toISOString());
