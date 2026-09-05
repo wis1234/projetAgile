@@ -415,10 +415,26 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     chan.listen('.comment.posted', (e) => {
       const c = e.comment;
       if (!c) return;
+
       setComments(prev => {
+        // Le message existe déjà avec son vrai id (ex: réponse HTTP déjà reçue) → on ignore.
         if (prev.some(x => String(x.id) === String(c.id))) return prev;
+
+        // Si c'est mon propre message et qu'il existe encore une bulle optimiste
+        // (envoyée par ce même appareil, en attente de confirmation), on la met à jour
+        // au lieu d'ajouter une deuxième bulle — évite le doublon côté expéditeur.
+        if (String(c.user?.id) === String(me?.id)) {
+          const pendingIdx = prev.findIndex(x => x._pending && String(x.user?.id) === String(me?.id));
+          if (pendingIdx !== -1) {
+            const next = [...prev];
+            next[pendingIdx] = { ...next[pendingIdx], ...c, _pending: false, _failed: false, replies: c.replies || [] };
+            return next;
+          }
+        }
+
         return [...prev, { ...c, replies: c.replies || [] }];
       });
+
       setTimeout(() => scrollToBottom(true), 100);
     });
 
