@@ -1206,7 +1206,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                       {[...comment.replies].reverse().map(reply => {
                         const isReplyMe = reply.user?.id === auth.user.id;
                         return (
-                          <div key={reply.id} className={`flex items-end gap-1.5 max-w-[75%] min-w-0 ${isReplyMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                          <div key={reply.id} className={`flex items-end gap-1.5 max-w-[75%] ${isReplyMe ? 'flex-row-reverse' : 'flex-row'}`}>
                             {!isReplyMe && (
                               <img
                                 src={reply.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user?.name || '')}&background=1D9E75&color=fff`}
@@ -1215,7 +1215,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                                 className="w-5 h-5 rounded-full flex-shrink-0 mb-0.5 object-cover"
                               />
                             )}
-                            <div className={`px-3 py-1.5 shadow-xs text-sm ${reply.audio_path ? 'min-w-[220px]' : 'min-w-0'} ${
+                            <div className={`px-3 py-1.5 shadow-xs text-sm ${reply.audio_path ? 'min-w-[220px]' : 'min-w-[100px]'} ${
                               isReplyMe ? 'bg-blue-500 dark:bg-blue-700 text-white bubble-right' : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-600 bubble-left'
                             }`}>
                               <p className="whitespace-pre-wrap break-words leading-relaxed" dangerouslySetInnerHTML={{ __html: linkifyText(reply.content, isReplyMe) }} />
