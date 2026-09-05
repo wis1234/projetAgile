@@ -759,7 +759,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
 
     channel.listen('.comment.posted', (e) => {
       const incoming = e.comment;
-      if (!incoming || incoming.user.id === auth.user.id) return;
+      if (!incoming) return;
 
       const withMeta = { ...incoming, formatted_date: formatDate(incoming.created_at), replies: incoming.replies || [] };
 

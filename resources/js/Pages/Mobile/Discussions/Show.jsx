@@ -35,6 +35,15 @@ const formatGroupDate = (d) => {
 
 const isSameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
 
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+const COMMON_EMOJIS = [
+  '😀','😁','😂','🤣','😍','🥰','😎','🤔','😅','🙏','😊','😭',
+  '😏','🤝','💪','👏','👍','❤️','🔥','🎉','💯','✅','⚡','🚀',
+  '🌟','💎','🎯','✨','😴','🤗','😇','🥳','🤩','😜','👋','🙌',
+];
+
+
 // ─── Résout le chemin d'affichage d'une image (blob local, URL absolue, ou chemin serveur) ───
 const resolveImageSrc = (imagePath) => {
   if (!imagePath) return null;
@@ -125,7 +134,7 @@ const TypingIndicator = () => (
 const SWIPE_REPLY_THRESHOLD = 56; // px à parcourir pour déclencher la réponse
 const SWIPE_MAX = 72; // limite visuelle du glissement
 
-const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImageClick, onJumpToMessage, isHighlighted, auth }) => {
+const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImageClick, onJumpToMessage, isHighlighted, auth, onReact, meId }) => {
   const longPressTimer = useRef(null);
   const touchStartRef = useRef({ x: 0, y: 0 });
   const isSwipingRef = useRef(false);
@@ -283,11 +292,24 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
         {/* Réactions */}
         {comment.reactions_summary && Object.keys(comment.reactions_summary).length > 0 && (
           <div className={`flex flex-wrap gap-1 mt-0.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
-            {Object.entries(comment.reactions_summary).map(([emoji, data]) => (
-              <span key={emoji} className="text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full px-1.5 py-0.5 shadow-sm">
-                {emoji} {data.count || (data.user_ids?.length ?? 0)}
-              </span>
-            ))}
+            {Object.entries(comment.reactions_summary).map(([emoji, data]) => {
+              const userIds = data.user_ids || [];
+              const hasReacted = userIds.some(id => String(id) === String(meId));
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onReact?.(comment.id, emoji)}
+                  className={`text-xs rounded-full px-1.5 py-0.5 shadow-sm border transition-colors ${
+                    hasReacted
+                      ? 'bg-blue-100 dark:bg-blue-900/50 border-blue-400 text-blue-700 dark:text-blue-300 font-semibold'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  {emoji} {data.count ?? userIds.length}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -316,6 +338,8 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [imageError, setImageError] = useState('');
   const [imageLightbox, setImageLightbox] = useState(null);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
@@ -389,7 +413,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
 
     chan.listen('.comment.posted', (e) => {
       const c = e.comment;
-      if (!c || c.user?.id === me?.id) return;
+      if (!c) return;
       setComments(prev => {
         if (prev.some(x => String(x.id) === String(c.id))) return prev;
         return [...prev, { ...c, replies: c.replies || [] }];
@@ -425,6 +449,24 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
       })
       .listenForWhisper('stop-typing', (e) => {
         setTypingUsers(prev => { const c = { ...prev }; delete c[e.userId]; return c; });
+      })
+      .listenForWhisper('reaction', (e) => {
+        if (!e?.commentId || !e?.emoji) return;
+        setComments(prev => prev.map(c => {
+          if (c.id !== e.commentId) return c;
+          const next = { ...(c.reactions_summary || {}) };
+          const entry = next[e.emoji] || { user_ids: [] };
+          const userIds = [...(entry.user_ids || [])];
+          const idx = userIds.findIndex(id => String(id) === String(e.userId));
+          if (idx >= 0) userIds.splice(idx, 1); else userIds.push(e.userId);
+          if (userIds.length === 0) delete next[e.emoji];
+          else next[e.emoji] = { user_ids: userIds, count: userIds.length };
+          return { ...c, reactions_summary: next };
+        }));
+      })
+      .listen('.comment.reaction.updated', (e) => {
+        if (!e?.commentId || !e?.reactions) return;
+        setComments(prev => prev.map(c => c.id === e.commentId ? { ...c, reactions_summary: e.reactions } : c));
       });
 
     presenceChannelRef.current = ch;
@@ -471,6 +513,38 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     setImageFile(null);
     setImagePreviewUrl(null);
   };
+
+    // ─── Réactions ────────────────────────────────────────────────────────────
+  const handleReaction = useCallback((commentId, emoji) => {
+    if (!commentId) return;
+
+    const toggle = (summary, userId) => {
+      const next = { ...(summary || {}) };
+      const entry = next[emoji] || { user_ids: [] };
+      const userIds = [...(entry.user_ids || [])];
+      const idx = userIds.findIndex(id => String(id) === String(userId));
+      if (idx >= 0) userIds.splice(idx, 1); else userIds.push(userId);
+      if (userIds.length === 0) delete next[emoji];
+      else next[emoji] = { user_ids: userIds, count: userIds.length };
+      return next;
+    };
+
+    setComments(prev => prev.map(c => c.id === commentId
+      ? { ...c, reactions_summary: toggle(c.reactions_summary, me?.id) }
+      : c));
+
+    fetch(`/api/tasks/${task.id}/comments/${commentId}/reactions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': getCsrf(),
+      },
+      body: JSON.stringify({ emoji }),
+    }).catch(err => console.error('Erreur réseau réaction:', err));
+
+    presenceChannelRef.current?.whisper('reaction', { commentId, emoji, userId: me?.id });
+  }, [me?.id, task.id]);
 
   // ─── Envoi de message ────────────────────────────────────────────────────
   const emitStopTyping = useCallback(() => {
@@ -660,6 +734,8 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
           onJumpToMessage={scrollToMessage}
           isHighlighted={String(comment.id || comment._tempId) === String(highlightedMessageId)}
           auth={auth}
+          onReact={handleReaction}
+          meId={me?.id}
         />
       );
     });
@@ -772,6 +848,24 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
           </div>
         )}
 
+        {/* Panneau émojis */}
+        {showEmojiPicker && (
+          <div className="flex-shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-3 py-2 max-h-40 overflow-y-auto">
+            <div className="grid grid-cols-8 gap-1">
+              {COMMON_EMOJIS.map((emoji, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setText(prev => prev + emoji)}
+                  className="text-xl p-1.5 rounded-lg active:bg-gray-100 dark:active:bg-gray-800 flex items-center justify-center"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Barre de saisie */}
         <div
           className="flex-shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-2 py-2 flex items-end gap-2"
@@ -801,19 +895,56 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
             </div>
           ) : (
             <>
-              {/* Bouton photo */}
-              <input type="file" ref={imageInputRef} onChange={handleImageSelect} accept="image/*" className="hidden" />
+              {/* Bouton émojis */}
               <button
                 type="button"
-                onClick={() => imageInputRef.current?.click()}
-                className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 active:scale-90 active:bg-gray-100 dark:active:bg-gray-800 transition-transform"
-                title="Partager une photo"
+                onClick={() => setShowEmojiPicker(v => !v)}
+                className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-transform active:scale-90 ${
+                  showEmojiPicker ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/30' : 'text-gray-500 dark:text-gray-400 active:bg-gray-100 dark:active:bg-gray-800'
+                }`}
+                title="Émojis"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 14l4.5-6 3.5 4.5 2.5-3L19 17H5z" />
-                  <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
-                </svg>
+                <span className="text-xl">😊</span>
               </button>
+
+              {/* Bouton photo : appareil photo ou galerie */}
+              <div className="relative flex-shrink-0">
+                <input type="file" ref={imageInputRef} onChange={handleImageSelect} accept="image/*" className="hidden" />
+                <input type="file" ref={cameraInputRef} onChange={handleImageSelect} accept="image/*" capture="environment" className="hidden" />
+                <button
+                  type="button"
+                  onClick={() => setShowAttachMenu(v => !v)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 active:scale-90 active:bg-gray-100 dark:active:bg-gray-800 transition-transform"
+                  title="Partager une photo"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 14l4.5-6 3.5 4.5 2.5-3L19 17H5z" />
+                    <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+                  </svg>
+                </button>
+
+                {showAttachMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowAttachMenu(false)} />
+                    <div className="absolute bottom-full left-0 mb-2 z-40 w-52 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => { setShowAttachMenu(false); cameraInputRef.current?.click(); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 dark:text-gray-100 active:bg-gray-100 dark:active:bg-gray-700"
+                      >
+                        <span className="text-lg">📷</span> Prendre une photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowAttachMenu(false); imageInputRef.current?.click(); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 dark:text-gray-100 active:bg-gray-100 dark:active:bg-gray-700 border-t border-gray-100 dark:border-gray-700"
+                      >
+                        <span className="text-lg">🖼️</span> Choisir depuis la galerie
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
 
               {/* Textarea */}
               <div className="flex-1 flex items-end bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-1.5 min-h-[40px]">
@@ -866,6 +997,21 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
           />
           <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 rounded-t-3xl shadow-2xl p-2 pb-safe">
             <div className="w-10 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mb-4 mt-2" />
+
+            {/* Bande de réactions rapides, façon WhatsApp/Messenger */}
+            <div className="flex items-center justify-around px-2 pb-3 mb-1 border-b border-gray-100 dark:border-gray-800">
+              {REACTION_EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => { handleReaction(actionSheet.comment.id, emoji); setActionSheet(null); }}
+                  className="text-2xl p-1 active:scale-125 transition-transform"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
             {[
               {
                 icon: '↩️', label: 'Répondre',
