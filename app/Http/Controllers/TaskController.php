@@ -218,6 +218,14 @@ class TaskController extends Controller
             $q->whereIn('projects.id', $visibleProjectIds);
         })->select('id', 'name')->orderBy('name')->distinct()->get();
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'tasks' => $tasks,
+                'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to', 'overdue']),
+                'summary' => $summary,
+            ]);
+        }
+
         return Inertia::render('Tasks/Index', [
             'tasks' => $tasks,
             'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to', 'overdue']),
