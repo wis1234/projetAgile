@@ -349,6 +349,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   const lastTypingSentRef = useRef(0);
   const typingTimeoutsRef = useRef({});
   const imageInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
 
