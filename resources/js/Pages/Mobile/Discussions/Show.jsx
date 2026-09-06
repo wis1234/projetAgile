@@ -345,7 +345,19 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
 
   // ─── Ajout : état et fonction pour le partage par email ─────────────
   const [shareDiscussionEmail, setShareDiscussionEmail] = useState(me?.share_discussions_by_email ?? true);
+  const [toast, setToast] = useState(null); // { type: 'success' | 'error', message } | null
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = useCallback((type, message) => {
+    clearTimeout(toastTimeoutRef.current);
+    setToast({ type, message });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 2600);
+  }, []);
+
+  useEffect(() => () => clearTimeout(toastTimeoutRef.current), []);
+
   const toggleDiscussionEmail = async () => {
+    nativeFeedback.tap();
     try {
       const res = await fetch('/user/discussion-email-sharing', {
         method: 'PATCH',
@@ -357,8 +369,10 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setShareDiscussionEmail(data.enabled);
+      showToast('success', data.enabled ? 'Notifications par email activées' : 'Notifications par email désactivées');
     } catch (e) {
       console.error('Erreur toggle email:', e);
+      showToast('error', "Impossible de mettre à jour le partage par email");
     }
   };
 
@@ -964,59 +978,21 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
             </div>
           ) : (
             <>
-              {/* Bouton émojis */}
-              <button
-                type="button"
-                onClick={() => setShowEmojiPicker(v => !v)}
-                className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-transform active:scale-90 ${
-                  showEmojiPicker ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/30' : 'text-gray-500 dark:text-gray-400 active:bg-gray-100 dark:active:bg-gray-800'
-                }`}
-                title="Émojis"
-              >
-                <span className="text-xl">😊</span>
-              </button>
-
-              {/* Bouton photo : appareil photo ou galerie */}
-              <div className="relative flex-shrink-0">
-                <input type="file" ref={imageInputRef} onChange={handleImageSelect} accept="image/*" className="hidden" />
-                <input type="file" ref={cameraInputRef} onChange={handleImageSelect} accept="image/*" capture="environment" className="hidden" />
+              {/* Pilule de saisie : émoji + textarea + trombone, façon WhatsApp/Messenger */}
+              <div className="flex-1 flex items-end gap-1 bg-gray-100 dark:bg-gray-800 rounded-3xl pl-1.5 pr-1 py-1 min-h-[42px]">
+                {/* Bouton émojis (intégré à gauche de la pilule) */}
                 <button
                   type="button"
-                  onClick={() => setShowAttachMenu(v => !v)}
-                  className="w-10 h-10 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 active:scale-90 active:bg-gray-100 dark:active:bg-gray-800 transition-transform"
-                  title="Partager une photo"
+                  onClick={() => setShowEmojiPicker(v => !v)}
+                  className={`w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full transition-transform active:scale-90 mb-0.5 ${
+                    showEmojiPicker ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'
+                  }`}
+                  title="Émojis"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 14l4.5-6 3.5 4.5 2.5-3L19 17H5z" />
-                    <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
-                  </svg>
+                  <span className="text-xl">😊</span>
                 </button>
 
-                {showAttachMenu && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setShowAttachMenu(false)} />
-                    <div className="absolute bottom-full left-0 mb-2 z-40 w-52 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => { setShowAttachMenu(false); cameraInputRef.current?.click(); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 dark:text-gray-100 active:bg-gray-100 dark:active:bg-gray-700"
-                      >
-                        <span className="text-lg">📷</span> Prendre une photo
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setShowAttachMenu(false); imageInputRef.current?.click(); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 dark:text-gray-100 active:bg-gray-100 dark:active:bg-gray-700 border-t border-gray-100 dark:border-gray-700"
-                      >
-                        <span className="text-lg">🖼️</span> Choisir depuis la galerie
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Textarea */}
-              <div className="flex-1 flex items-end bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-1.5 min-h-[40px]">
+                {/* Textarea */}
                 <textarea
                   ref={inputRef}
                   value={text}
@@ -1025,12 +1001,51 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
                   onPaste={handlePasteImage}
                   placeholder="Message…"
                   rows={1}
-                  className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none outline-none leading-relaxed self-center"
+                  className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none outline-none leading-relaxed py-1.5"
                   style={{ maxHeight: '120px', overflowY: 'auto' }}
                 />
+
+                {/* Bouton photo : appareil photo ou galerie (intégré à droite de la pilule) */}
+                <div className="relative flex-shrink-0">
+                  <input type="file" ref={imageInputRef} onChange={handleImageSelect} accept="image/*" className="hidden" />
+                  <input type="file" ref={cameraInputRef} onChange={handleImageSelect} accept="image/*" capture="environment" className="hidden" />
+                  <button
+                    type="button"
+                    onClick={() => setShowAttachMenu(v => !v)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 active:scale-90 transition-transform mb-0.5"
+                    title="Partager une photo"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 14l4.5-6 3.5 4.5 2.5-3L19 17H5z" />
+                      <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+                    </svg>
+                  </button>
+
+                  {showAttachMenu && (
+                    <>
+                      <div className="fixed inset-0 z-30" onClick={() => setShowAttachMenu(false)} />
+                      <div className="absolute bottom-full right-0 mb-2 z-40 w-52 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => { setShowAttachMenu(false); cameraInputRef.current?.click(); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 dark:text-gray-100 active:bg-gray-100 dark:active:bg-gray-700"
+                        >
+                          <span className="text-lg">📷</span> Prendre une photo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowAttachMenu(false); imageInputRef.current?.click(); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 dark:text-gray-100 active:bg-gray-100 dark:active:bg-gray-700 border-t border-gray-100 dark:border-gray-700"
+                        >
+                          <span className="text-lg">🖼️</span> Choisir depuis la galerie
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* Bouton micro ou envoyer */}
+              {/* Bouton micro ou envoyer (cercle séparé, comme WhatsApp) */}
               {text.trim() || audioBlob || imageFile ? (
                 <button
                   onClick={sendMessage}
@@ -1111,6 +1126,32 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
             </button>
           </div>
         </>
+      )}
+
+      {/* Toast de retour (succès/erreur), style notification mobile */}
+      {toast && (
+        <div className="fixed top-3 left-3 right-3 z-[70] flex justify-center pointer-events-none animate-in fade-in slide-in-from-top-2 duration-300">
+          <div
+            className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl backdrop-blur-md max-w-sm w-full ${
+              toast.type === 'success'
+                ? 'bg-emerald-600/95 text-white'
+                : 'bg-red-600/95 text-white'
+            }`}
+          >
+            <span className="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full bg-white/20">
+              {toast.type === 'success' ? (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+            </span>
+            <span className="text-sm font-medium flex-1">{toast.message}</span>
+          </div>
+        </div>
       )}
 
       {/* Lightbox : aperçu plein écran d'une photo partagée */}
