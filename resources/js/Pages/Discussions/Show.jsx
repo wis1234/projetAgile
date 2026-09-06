@@ -763,16 +763,33 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
 
       const withMeta = { ...incoming, formatted_date: formatDate(incoming.created_at), replies: incoming.replies || [] };
 
-      const insertRealtimeComment = (list, inc) => {
-        const incId = String(inc.id);
+      setComments(prev => {
+        const incId = String(withMeta.id);
         const existsRec = (l) => l.some(c => String(c.id) === incId || (c.replies?.length && existsRec(c.replies)));
-        if (existsRec(list)) return list;
+        if (existsRec(prev)) return prev;
 
-        // Toujours ajouté en bas (racine), comme un message normal
-        return [inc, ...list];
-      };
+        // Si c'est mon propre message et qu'une bulle optimiste (envoyée par ce même
+        // appareil, encore en attente de confirmation) existe déjà, on la met à jour
+        // au lieu d'ajouter une deuxième bulle — évite le doublon côté expéditeur.
+        if (String(withMeta.user?.id) === String(auth.user.id)) {
+          const pendingIdx = prev.findIndex(c => c._pending && String(c.user?.id) === String(auth.user.id));
+          if (pendingIdx !== -1) {
+            const next = [...prev];
+            next[pendingIdx] = {
+              ...next[pendingIdx],
+              ...withMeta,
+              _pending: false,
+              _failed: false,
+              _tempId: next[pendingIdx]._tempId,
+              replies: next[pendingIdx].replies || [],
+            };
+            return next;
+          }
+        }
 
-      setComments(prev => insertRealtimeComment(prev, withMeta));
+        // Toujours ajouté en haut (racine), comme un message normal
+        return [withMeta, ...prev];
+      });
 
       setTimeout(() => {
         const container = document.getElementById('chat-messages-container');
@@ -860,7 +877,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
         });
       })
       .listenForWhisper('reaction', (e) => {
-        if (!e?.commentId || !e?.emoji || e.userId === auth.user.id) return;
+        if (!e?.commentId || !e?.emoji) return;
         setReactions(prev => {
           const commentReactions = { ...(prev[e.commentId] || {}) };
           const userIds = [...(commentReactions[e.emoji] || [])];
