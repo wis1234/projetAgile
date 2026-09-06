@@ -3,6 +3,8 @@ import { usePage } from '@inertiajs/react';
 import MobileLayout from '@/Layouts/MobileLayout';
 import { nativeFeedback } from '@/lib/platform';
 import AudioPlayer from '@/Components/AudioPlayer';
+// Ajout de l'icône email
+import { FaEnvelope } from 'react-icons/fa';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const getCsrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -340,6 +342,25 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   const [imageLightbox, setImageLightbox] = useState(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // ─── Ajout : état et fonction pour le partage par email ─────────────
+  const [shareDiscussionEmail, setShareDiscussionEmail] = useState(me?.share_discussions_by_email ?? true);
+  const toggleDiscussionEmail = async () => {
+    try {
+      const res = await fetch('/user/discussion-email-sharing', {
+        method: 'PATCH',
+        headers: {
+          'X-CSRF-TOKEN': getCsrf(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setShareDiscussionEmail(data.enabled);
+    } catch (e) {
+      console.error('Erreur toggle email:', e);
+    }
+  };
 
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
@@ -781,7 +802,23 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   };
 
   // ─── Header custom avec infos de la tâche : qui est en ligne ────────────
-  const headerRight = <OnlineAvatarStackMobile users={onlineUsers} meId={me?.id} />;
+  const headerRight = (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={toggleDiscussionEmail}
+        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+          shareDiscussionEmail
+            ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
+            : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+        }`}
+        title={shareDiscussionEmail ? 'Partage par email activé' : 'Partage par email désactivé'}
+      >
+        <FaEnvelope className="w-4 h-4" />
+      </button>
+      <OnlineAvatarStackMobile users={onlineUsers} meId={me?.id} />
+    </div>
+  );
 
   return (
     <MobileLayout
