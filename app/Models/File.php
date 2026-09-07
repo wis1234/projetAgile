@@ -15,7 +15,7 @@ class File extends Model
        'dropbox_path', 'last_modified_by', 
        'password_hash', 'is_password_protected',
            'locked_by',
-    'locked_by_role',];
+    'locked_by_role','yjs_state'];
 
 
 

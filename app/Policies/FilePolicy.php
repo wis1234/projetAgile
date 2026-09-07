@@ -125,6 +125,16 @@ public function view(User $user, File $file): bool
         return $file->canUser($user, 'admin');
     }
 
+public function updateYjsState(Request $request, File $file)
+{
+    $this->authorize('update_colab', $file); // même source que accessFor()/canUser() utilisée par Pusher
+
+    $request->validate(['state' => 'required|string']);
+
+    $file->update(['yjs_state' => $request->input('state')]);
+
+    return response()->json(['success' => true]);
+}
 
 
 }

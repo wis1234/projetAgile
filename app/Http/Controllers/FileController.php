@@ -815,6 +815,17 @@ $oldVersionIds = $file->versions()
     return response()->json(['success' => true, 'message' => 'Le contenu a été sauvegardé avec succès.']);
 }
 
+public function updateYjsState(Request $request, File $file)
+{
+    $this->authorize('update', $file); // même policy que updateContent
+
+    $request->validate(['state' => 'required|string']);
+
+    $file->update(['yjs_state' => $request->input('state')]);
+
+    return response()->json(['success' => true]);
+}
+
     /**
      * Télécharger plusieurs fichiers en ZIP
      */

@@ -313,6 +313,12 @@ Route::middleware('auth')->group(function () {
     Route::resource('files', App\Http\Controllers\FileController::class);
    // Route::post('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])
       //  ->name('files.update-content');
+
+      Route::put('/files/{file}/yjs-state', [App\Http\Controllers\FileController::class, 'updateYjsState'])
+    ->name('files.update-yjs-state');
+
+
+    
     Route::resource('messages', App\Http\Controllers\MessageController::class);
     Route::resource('audit-logs', App\Http\Controllers\AuditLogController::class);
     Route::resource('project-users', App\Http\Controllers\ProjectUserController::class);

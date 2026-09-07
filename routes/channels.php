@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Task;
+use App\Models\File;
+
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('presence-task.{taskId}', function ($user, $taskId) {
@@ -41,4 +43,21 @@ Broadcast::channel('presence-project.{projectId}', function ($user, $projectId) 
 
 Broadcast::channel('user.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
+});
+
+
+// ... modifications comme google Docs ...
+
+Broadcast::channel('presence-document.{fileId}', function ($user, $fileId) {
+    $file = File::find($fileId);
+    if (!$file) return false;
+
+    if (!$file->canUser($user, 'view')) return false; // 'none' exclu automatiquement
+
+    return [
+        'id'                => $user->id,
+        'name'              => $user->name,
+        'color'             => sprintf('#%06X', crc32((string) $user->id) & 0xFFFFFF),
+        'profile_photo_url' => $user->profile_photo_url, // même clé que tes autres canaux + ton composant Avatar
+    ];
 });
