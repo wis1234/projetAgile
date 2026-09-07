@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('files', function (Blueprint $table) {
-            $table->longText('yjs_state')->nullable()->after('content');
+            $table->longText('yjs_state')->nullable();
         });
     }
 
