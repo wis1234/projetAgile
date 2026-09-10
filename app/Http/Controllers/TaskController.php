@@ -339,6 +339,14 @@ public function store(Request $request)
             : 'Non définie';
         $createdAt = now()->locale('fr')->translatedFormat('d F Y à H:i');
 
+        // IMPORTANT : l'interpolation heredoc/chaîne PHP ({$...}) n'accepte que
+        // de l'accès simple (->prop, ['clé']) — ni l'opérateur nullsafe (?->)
+        // ni la coalescence (??) n'y sont autorisés. D'où le ParseError
+        // "unexpected token ??" : ces valeurs doivent être résolues AVANT
+        // le heredoc, dans de simples variables.
+        $assigneeName    = $assignee?->name ?? 'Non assigné';
+        $taskDescription = $task->description ?? 'Aucune description fournie.';
+
         // Document HTML riche — structure Google Docs
         $htmlContent = <<<HTML
 <h1>{$task->title}</h1>
@@ -346,7 +354,7 @@ public function store(Request $request)
 <p><strong>📁 Projet :</strong> {$project->name}<br>
 <strong>👤 Créé par :</strong> {$creator->name}<br>
 <strong>📅 Date de création :</strong> {$createdAt}<br>
-<strong>👥 Assigné à :</strong> {$assignee?->name ?? 'Non assigné'}<br>
+<strong>👥 Assigné à :</strong> {$assigneeName}<br>
 <strong>⚡ Priorité :</strong> {$priority}<br>
 <strong>📊 Statut :</strong> {$status}<br>
 <strong>⏰ Échéance :</strong> {$dueDate}</p>
@@ -354,7 +362,7 @@ public function store(Request $request)
 <hr>
 
 <h2>📋 Description</h2>
-<p>{$task->description ?? 'Aucune description fournie.'}</p>
+<p>{$taskDescription}</p>
 
 <hr>
 
@@ -930,6 +938,6 @@ public function discussion(Request $request, Task $task)
         'projectMembers' => $projectMembers,
     ]);
 }
- 
+
 
 }
