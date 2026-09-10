@@ -308,7 +308,7 @@ public function store(Request $request)
 
     activity_log('create', "Tâche « {$task->title} » créée", $task);
 
-    // Créer un fichier de suivi pour la tâche
+    // Créer un fichier de suivi HTML structuré (style Google Docs) pour la tâche
     $project = Project::find($validated['project_id']);
 
     if ($project) {
@@ -316,31 +316,101 @@ public function store(Request $request)
         $projectPath = 'projects/' . Str::slug($project->name) . '/tasks';
         Storage::disk('public')->makeDirectory($projectPath, 0755, true);
 
-        // Créer le fichier de suivi
-        $fileName = 'Suivi de la tâche ' . Str::slug($task->title) ;
-        $filePath = $projectPath . '/' . $fileName;
+        // Nom lisible du fichier de suivi
+        $fileName = 'Suivi — ' . $task->title;
+        $filePath = $projectPath . '/' . Str::slug($task->title) . '-suivi.html';
 
-        $content = "Ce fichier est destiné au suivi de la tâche " . $task->title . "\n\n";
-        $content .= "Vous pouvez utiliser ce fichier pour noter les mises à jour, les commentaires ou toute information utile concernant cette tâche.\n";
-        $content .= "Tous les membres de l'équipe peuvent collaborer sur ce document.\n";
+        $creator   = auth()->user();
+        $assignee  = $task->assigned_to ? \App\Models\User::find($task->assigned_to) : null;
+        $priority  = match($task->priority) {
+            'high'   => '🔴 Haute',
+            'medium' => '🟡 Moyenne',
+            'low'    => '🟢 Basse',
+            default  => $task->priority,
+        };
+        $status    = match($task->status) {
+            'todo'        => 'À faire',
+            'in_progress' => 'En cours',
+            'done'        => 'Terminée',
+            default       => $task->status,
+        };
+        $dueDate   = $task->due_date
+            ? Carbon::parse($task->due_date)->locale('fr')->translatedFormat('d F Y')
+            : 'Non définie';
+        $createdAt = now()->locale('fr')->translatedFormat('d F Y à H:i');
 
-        Storage::disk('public')->put($filePath, $content);
+        // Document HTML riche — structure Google Docs
+        $htmlContent = <<<HTML
+<h1>{$task->title}</h1>
 
-        // Enregistrer le fichier dans la base de données
+<p><strong>📁 Projet :</strong> {$project->name}<br>
+<strong>👤 Créé par :</strong> {$creator->name}<br>
+<strong>📅 Date de création :</strong> {$createdAt}<br>
+<strong>👥 Assigné à :</strong> {$assignee?->name ?? 'Non assigné'}<br>
+<strong>⚡ Priorité :</strong> {$priority}<br>
+<strong>📊 Statut :</strong> {$status}<br>
+<strong>⏰ Échéance :</strong> {$dueDate}</p>
+
+<hr>
+
+<h2>📋 Description</h2>
+<p>{$task->description ?? 'Aucune description fournie.'}</p>
+
+<hr>
+
+<h2>🎯 Objectifs</h2>
+<ul>
+  <li>Définir les livrables attendus pour cette tâche</li>
+  <li>Identifier les critères d'acceptation</li>
+  <li>Valider avec l'équipe les attentes</li>
+</ul>
+
+<h2>📈 Avancement</h2>
+<p>Utilisez cette section pour noter régulièrement l'avancement de la tâche.</p>
+<ul>
+  <li><strong>[Date]</strong> — Démarrage de la tâche</li>
+</ul>
+
+<h2>🚧 Blocages et risques</h2>
+<p>Notez ici tout blocage rencontré ou risque identifié.</p>
+<ul>
+  <li>Aucun blocage identifié pour l'instant</li>
+</ul>
+
+<h2>💬 Notes et décisions</h2>
+<p>Consignez les décisions importantes, réunions clés ou informations utiles à l'équipe.</p>
+<ul>
+  <li><strong>[Date]</strong> — Création du document de suivi</li>
+</ul>
+
+<h2>✅ Critères de validation</h2>
+<ul>
+  <li>Livrable principal réalisé</li>
+  <li>Revue qualité effectuée</li>
+  <li>Validé par le responsable</li>
+</ul>
+
+<hr>
+<p><em>Ce document est partagé avec tous les membres du projet <strong>{$project->name}</strong>. Toutes les modifications sont enregistrées automatiquement.</em></p>
+HTML;
+
+        Storage::disk('public')->put($filePath, $htmlContent);
+
+        // Enregistrer le fichier dans la base de données avec type HTML
         \App\Models\File::create([
-            'name' => $fileName,
-            'file_path' => $filePath,
-            'type' => 'text/plain',
-            'size' => Storage::disk('public')->size($filePath),
-            'user_id' => auth()->id(),
-            'project_id' => $project->id,
-            'task_id' => $task->id,
-            'description' => 'Fichier de suivi pour la tâche : ' . $task->title,
-            'status' => 'active',
-            'uploaded_by' => auth()->id()
+            'name'        => $fileName,
+            'file_path'   => $filePath,
+            'type'        => 'text/html',
+            'size'        => Storage::disk('public')->size($filePath),
+            'user_id'     => auth()->id(),
+            'project_id'  => $project->id,
+            'task_id'     => $task->id,
+            'description' => 'Document de suivi collaboratif pour la tâche : ' . $task->title,
+            'status'      => 'active',
+            'uploaded_by' => auth()->id(),
         ]);
 
-        // Si la tâche est assignée à quelqu'un, envoyer uniquement la notification personnalisée
+        // Si la tâche est assignée à quelqu'un, envoyer les notifications
         if ($task->assigned_to) {
             $assignedUser = \App\Models\User::find($task->assigned_to);
             if ($assignedUser) {

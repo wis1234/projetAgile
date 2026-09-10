@@ -9,12 +9,14 @@ import {
   FaAngleRight, FaAngleLeft, FaAngleDown, FaUndo,
   FaTag, FaPlus, FaTrash, FaExclamationTriangle, FaClock,
   FaUserSlash, FaShare, FaChevronDown, FaSearch, FaCheck,
-  FaUser, FaMinus
+  FaUser, FaMinus, FaFileAlt, FaGoogleDrive, FaPen,
 } from 'react-icons/fa';
 import { isPdfFile } from '@/utils/fileUtils';
 import MenuBar from '@/Components/Editor/MenuBar';
+import TrackingModal from '@/Components/Editor/TrackingModal';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Heading from '@tiptap/extension-heading';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
@@ -403,19 +405,66 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
   );
 };
 
+/* ── EditableTitle ─────────────────────────────────────────── */
+const EditableTitle = ({ value, onRename, readOnly }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState(value);
+  const inputRef = useRef(null);
+
+  useEffect(() => setDraft(value), [value]);
+  useEffect(() => { if (editing) inputRef.current?.select(); }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onRename?.(trimmed);
+    else setDraft(value);
+  };
+
+  if (readOnly) {
+    return <p className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 truncate leading-tight">{value}</p>;
+  }
+
+  return editing ? (
+    <input
+      ref={inputRef}
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
+      className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 leading-tight bg-[#EEF1FC] dark:bg-slate-700 rounded px-1.5 py-0.5 -mx-1.5 focus:outline-none focus:ring-2 focus:ring-[#3454D1]/30 min-w-0 w-full"
+    />
+  ) : (
+    <button
+      onClick={() => setEditing(true)}
+      className="group flex items-center gap-1.5 min-w-0 text-left"
+      title="Renommer le document"
+    >
+      <p className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 truncate leading-tight">{value}</p>
+      <FaPen className="text-[9px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+    </button>
+  );
+};
+
 /* ══════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════════ */
-const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collaborators = [], recentVersions = [], canManageAccess = false }) => {
+const EditContent = ({
+  file, lastModifiedBy, auth, myPermission = 'edit', collaborators = [], recentVersions = [],
+  canManageAccess = false, project = null, task = null, pendingChanges = [],
+}) => {
   const { flash }     = usePage().props;
   const [isSaving,    setIsSaving]    = useState(false);
   const [isDirty,     setIsDirty]     = useState(false);
   const [lastSaved,   setLastSaved]   = useState(null);
   const [toasts,      setToasts]      = useState([]);
   const [sidePanel,   setSidePanel]   = useState(null); // 'history' | 'access' | null
+  const [trackingOpen, setTrackingOpen] = useState(false);
   const [summary,     setSummary]     = useState('');
   const [showSummary, setShowSummary] = useState(false);
   const [presenceUsers, setPresenceUsers] = useState([]); // connected users (requires Pusher)
+  const [wordCount, setWordCount]     = useState(0);
+  const [docTitle,  setDocTitle]      = useState(file.name);
   const saveRef = useRef();
 
   const isReadOnly = myPermission === 'view' || myPermission === 'none';
@@ -432,7 +481,8 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
   const editor = useEditor({
     editable: !isReadOnly,
     extensions: [
-      StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'code-block' } }, underline: false, link: false }),
+      StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'code-block' } }, underline: false, link: false, heading: false }),
+      Heading.configure({ levels: [1, 2, 3] }),
       TextStyle, FontFamily,
       FontSize.configure({ types: ['textStyle'] }),
       Underline,
@@ -444,7 +494,11 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
       Image.configure({ inline: true, allowBase64: true }),
     ],
     content: '',
-    onUpdate: () => setIsDirty(true),
+    onUpdate: ({ editor }) => {
+      setIsDirty(true);
+      const text = editor.getText().trim();
+      setWordCount(text ? text.split(/\s+/).length : 0);
+    },
   });
 
   /* ── Load initial content ── */
@@ -461,6 +515,13 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
     }
   }, [editor, file]);
 
+  /* ── Word count once content settles ── */
+  useEffect(() => {
+    if (!editor) return;
+    const text = editor.getText().trim();
+    setWordCount(text ? text.split(/\s+/).length : 0);
+  }, [editor, file?.content]);
+
   /* ── Restore from localStorage ── */
   useEffect(() => {
     if (!file?.id || !editor) return;
@@ -472,8 +533,10 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
         editor.commands.setContent(content);
         setIsDirty(true);
       }
-      localStorage.removeItem(`file_autosave_${file.id}`);
     } catch {/* ignore */}
+    finally {
+      localStorage.removeItem(`file_autosave_${file.id}`);
+    }
   }, [file?.id, editor]);
 
   /* ── Save handler ── */
@@ -539,6 +602,27 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
     return () => window.removeEventListener('beforeunload', fn);
   }, [isDirty, isSaving]);
 
+  /* ── Rename document ── */
+  const handleRename = useCallback(async (newName) => {
+    const previous = docTitle;
+    setDocTitle(newName);
+    try {
+      await axios.patch(`/files/${file.id}/rename`, { name: newName }, {
+        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content },
+      });
+      addToast('Document renommé');
+    } catch {
+      setDocTitle(previous);
+      addToast('Impossible de renommer le document', 'error');
+    }
+  }, [docTitle, file.id, addToast]);
+
+  /* ── Tracking modal handlers (à brancher sur l'API de suivi réelle) ── */
+  const [changes, setChanges] = useState(pendingChanges);
+  const handleAcceptChange = useCallback((id) => setChanges(prev => prev.map(c => c.id === id ? { ...c, status: 'accepted' } : c)), []);
+  const handleRejectChange = useCallback((id) => setChanges(prev => prev.map(c => c.id === id ? { ...c, status: 'rejected' } : c)), []);
+  const pendingCount = changes.filter(c => c.status === 'pending').length;
+
   const isPdf = isPdfFile(file.type, file.name);
   if (isPdf) {
     return <AdminLayout><div className="p-8 text-center"><h2 className="text-xl font-semibold">La modification des PDF n'est pas prise en charge.</h2></div></AdminLayout>;
@@ -548,25 +632,46 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
 
   return (
     <AdminLayout>
-      <Head title={`Édition — ${file.name}`} />
+      <Head title={`Édition — ${docTitle}`} />
 
       <div className="flex flex-col h-screen bg-[#F4F5F7] dark:bg-slate-900 overflow-hidden">
 
         {/* ══ TITLE BAR ══ */}
         <div className="flex-shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200/70 dark:border-slate-700 z-40">
+
+          {/* Breadcrumb */}
+          {(project || task) && (
+            <div className="flex items-center gap-1.5 px-5 pt-2 text-[11px] text-slate-400">
+              {project && <span className="hover:text-[#3454D1] transition-colors cursor-default">{project.name}</span>}
+              {project && task && <FaAngleRight className="text-[8px] text-slate-300" />}
+              {task && <span className="hover:text-[#3454D1] transition-colors cursor-default">{task.title ?? task.name}</span>}
+              <FaAngleRight className="text-[8px] text-slate-300" />
+              <span className="text-slate-500 font-medium">Fichier de suivi</span>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 px-5 py-2.5">
             <div className="flex items-center gap-2.5 flex-1 min-w-0">
               <div className="w-8 h-8 bg-[#EEF1FC] dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                <FaCode className="text-[#3454D1] text-[13px]" />
+                <FaFileAlt className="text-[#3454D1] text-[13px]" />
               </div>
-              <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 truncate leading-tight">{file.name}</p>
+              <div className="min-w-0 flex-1">
+                <EditableTitle value={docTitle} onRename={handleRename} readOnly={isReadOnly} />
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                     isSaving ? 'bg-[#3454D1] animate-pulse' : isDirty ? 'bg-amber-400' : 'bg-emerald-400'
                   }`} />
-                  <span className="text-[11px] text-slate-400">
-                    {isSaving ? 'Sauvegarde en cours' : isDirty ? 'Modifications non enregistrées' : lastSaved ? `Enregistré à ${fmtDateShort(lastSaved)}` : 'À jour'}
+                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                    {isSaving
+                      ? 'Enregistrement en cours…'
+                      : isDirty
+                        ? 'Modifications non enregistrées'
+                        : (
+                          <>
+                            <FaGoogleDrive className="text-[10px] text-slate-300" />
+                            {lastSaved ? `Toutes les modifications sont enregistrées à ${fmtDateShort(lastSaved)}` : 'Toutes les modifications sont enregistrées'}
+                          </>
+                        )}
                   </span>
                 </div>
               </div>
@@ -612,6 +717,18 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
                 <FaUsers className="text-[10px]" />
                 <span className="hidden md:inline">Partager</span>
                 {collaborators.length > 0 && <span className="text-[10px] text-slate-400">{collaborators.length}</span>}
+              </button>
+              <button
+                onClick={() => setTrackingOpen(true)}
+                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200 transition-all"
+              >
+                <FaUserEdit className="text-[10px]" />
+                <span className="hidden md:inline">Suivi</span>
+                {pendingCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#3454D1] text-white text-[9px] font-semibold flex items-center justify-center">
+                    {pendingCount}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -689,26 +806,6 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
               {!isReadOnly && editor && (
                 <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-2 mb-6 bg-white/95 dark:bg-slate-800/95 backdrop-blur border border-slate-200/80 dark:border-slate-700 rounded-xl shadow-sm shadow-black/[0.03] overflow-x-auto">
                   <MenuBar editor={editor} />
-                  <div className="w-px h-5 bg-slate-200 dark:bg-slate-600 mx-1 flex-shrink-0" />
-                  {[
-                    { cmd: 'left',    Icon: FaAlignLeft    },
-                    { cmd: 'center',  Icon: FaAlignCenter  },
-                    { cmd: 'right',   Icon: FaAlignRight   },
-                    { cmd: 'justify', Icon: FaAlignJustify },
-                  ].map(({ cmd, Icon }) => (
-                    <button
-                      key={cmd}
-                      onClick={() => editor.chain().focus().setTextAlign(cmd).run()}
-                      className={`p-1.5 rounded-md transition-colors flex-shrink-0
-                        ${editor.isActive({ textAlign: cmd })
-                          ? 'bg-[#EEF1FC] text-[#3454D1]'
-                          : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-                        }`}
-                      title={`Aligner ${cmd}`}
-                    >
-                      <Icon className="text-xs" />
-                    </button>
-                  ))}
                 </div>
               )}
 
@@ -747,9 +844,13 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
         {/* ══ FOOTER ══ */}
         <div className="flex-shrink-0 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700/60 px-5 py-1.5">
           <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <Avatar user={auth.user} size={4} ring={false} />
-              <span>Connecté en tant que <span className="font-medium text-slate-600 dark:text-slate-300">{auth.user.name}</span></span>
+            <span className="flex items-center gap-3">
+              <span className="flex items-center gap-1.5">
+                <Avatar user={auth.user} size={4} ring={false} />
+                <span>Connecté en tant que <span className="font-medium text-slate-600 dark:text-slate-300">{auth.user.name}</span></span>
+              </span>
+              <span className="text-slate-300">·</span>
+              <span>{wordCount} mot{wordCount !== 1 ? 's' : ''}</span>
             </span>
             {lastModifiedBy && (
               <span>
@@ -766,6 +867,16 @@ const EditContent = ({ file, lastModifiedBy, auth, myPermission = 'edit', collab
           <Toast key={t.id} message={t.msg} type={t.type} onClose={() => setToasts(prev => prev.filter(x => x.id !== t.id))} />
         ))}
       </div>
+
+      {/* ══ TRACKING MODAL ══ */}
+      <TrackingModal
+        isOpen={trackingOpen}
+        onClose={() => setTrackingOpen(false)}
+        users={collaborators}
+        changes={changes}
+        onAccept={handleAcceptChange}
+        onReject={handleRejectChange}
+      />
     </AdminLayout>
   );
 };
