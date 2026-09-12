@@ -540,10 +540,8 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   };
 
   const getTrackProcessors = async () => {
-    // Contournement pour que Vite (Rollup) ne bloque pas le "build" si le paquet n'est pas installé sur le serveur.
-    // LiveKit ne met pas les filtres d'arrière-plan dans "livekit-client" (ils sont dans "@livekit/track-processors").
-    const pkgName = '@livekit/track-processors';
-    return await import(/* @vite-ignore */ pkgName);
+    // Import statique : Vite peut maintenant analyser et bundler ce paquet.
+    return await import('@livekit/track-processors');
   };
 
   const toggleBlur = async () => {
