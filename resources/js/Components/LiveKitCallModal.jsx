@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
   FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
-  FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck,
+  FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck, FaImage
 } from 'react-icons/fa';
 
 const getFreshCsrfToken = async () => {
@@ -26,13 +26,14 @@ const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '�
 const OUTGOING_RINGTONE_SRC = '/sounds/outgoing-call.mp3'; // tonalité "ça sonne chez l'autre"
 const INCOMING_RINGTONE_SRC = 'https://proja.kemtcenter.org/storage/public/files/incoming-call_old.mp3'; // vraie sonnerie d'appel entrant
 
-export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, title, callerName, onClose, onAnswered, skipIncomingScreen = false, inviteLink = '' }) {
+export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndpoint, isHost, title, callerName, onClose, onAnswered, skipIncomingScreen = false, inviteLink = '' }) {
   const [room, setRoom] = useState(null);
   const [livekitLib, setLivekitLib] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [micEnabled, setMicEnabled] = useState(true);
   const [camEnabled, setCamEnabled] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
+  const [blurEnabled, setBlurEnabled] = useState(false);
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState('');
   const [showParticipants, setShowParticipants] = useState(false);
@@ -499,6 +500,8 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     }
   }, [activeIdentity, participants, camEnabled, isScreenSharingAnyone, room]);
 
+  const blurProcessorRef = useRef(null);
+
   // ─── Contrôles locaux ────────────────────────────────────────────
   const toggleMic = async () => {
     if (!room) return;
@@ -512,20 +515,58 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     const next = !camEnabled;
     await room.localParticipant.setCameraEnabled(next);
     setCamEnabled(next);
-    // L'attachement visuel est désormais géré par l'effet ci-dessus,
-    // pas ici — évite le bug qui obligeait à cliquer deux fois.
   };
 
   const toggleScreenShare = async () => {
     if (!room) return;
+    if (typeof navigator.mediaDevices === 'undefined' || typeof navigator.mediaDevices.getDisplayMedia === 'undefined') {
+       setError("Le partage d'écran n'est pas supporté sur cet appareil.");
+       return;
+    }
     try {
       const next = !screenSharing;
       await room.localParticipant.setScreenShareEnabled(next, { audio: true });
       setScreenSharing(next);
-      // Idem : l'attachement est géré par l'effet dédié.
     } catch (err) {
       console.error('Erreur partage d’écran:', err);
       setError('Impossible de démarrer le partage d’écran.');
+    }
+  };
+
+  const toggleBlur = async () => {
+    if (!room) return;
+    try {
+      const camPub = [...room.localParticipant.videoTrackPublications.values()]
+        .find(pub => pub.source === (livekitLib?.Track?.Source?.Camera || 'camera') || pub.source === 'camera');
+        
+      if (!camPub || !camPub.track) {
+         setError("Activez d'abord la caméra pour flouter l'arrière-plan.");
+         return;
+      }
+      
+      const next = !blurEnabled;
+      if (next) {
+        try {
+          const { BackgroundBlur } = await import('@livekit/track-processors');
+          if (!blurProcessorRef.current) {
+            blurProcessorRef.current = BackgroundBlur(10, { blurRadius: 10 });
+          }
+          await camPub.track.setProcessor(blurProcessorRef.current);
+        } catch (err) {
+          console.error("Package blur non disponible", err);
+          setError("Fonctionnalité d'arrière-plan non installée (nécessite @livekit/track-processors).");
+          return;
+        }
+      } else {
+        if (blurProcessorRef.current) {
+          await camPub.track.setProcessor(null);
+        }
+      }
+      
+      setBlurEnabled(next);
+    } catch (err) {
+      console.error('Erreur blur:', err);
+      setError("Impossible d'activer le flou d'arrière-plan.");
     }
   };
 
@@ -566,7 +607,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     if (!isHost || !muteEndpoint) return;
     const pub = kind === 'audio'
       ? [...participant.audioTrackPublications.values()][0]
-      : [...participant.videoTrackPublications.values()].find(p => p.source === TrackSourceCamera || p.source === 'camera');
+      : [...participant.videoTrackPublications.values()].find(p => p.source === (livekitLib?.Track?.Source?.Camera || 'camera') || p.source === 'camera');
     if (!pub) return;
 
     try {
@@ -583,6 +624,29 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
     } catch (err) {
       console.error('Erreur mute participant:', err);
     }
+  };
+
+  const kickRemote = async (participant) => {
+    if (!isHost) return;
+    // Tente de bannir côté serveur si le endpoint existe
+    if (kickEndpoint) {
+      try {
+        const csrfToken = await getFreshCsrfToken();
+        await fetch(kickEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+          body: JSON.stringify({ identity: participant.identity }),
+        });
+      } catch (err) {
+        console.error('Erreur kick participant:', err);
+      }
+    }
+    // Retrait local de la room pour action immédiate (si les droits LiveKit le permettent)
+    // livekit-client doesn't expose a straightforward disconnect participant for admin, it's server side.
   };
 
   const handleLeave = () => {
@@ -807,6 +871,13 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
                       >
                         <FaVideoSlash className="w-3 h-3 text-white" />
                       </button>
+                      <button
+                        onClick={() => kickRemote(p)}
+                        title="Bannir de l'appel"
+                        className="w-6 h-6 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center"
+                      >
+                        <FaTimes className="w-3 h-3 text-white" />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -915,6 +986,12 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
                         <button onClick={() => muteRemote(p, 'audio')} title="Couper le micro" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
                           <FaMicrophoneSlash className="w-2.5 h-2.5 text-white" />
                         </button>
+                        <button onClick={() => muteRemote(p, 'video')} title="Couper la caméra" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                          <FaVideoSlash className="w-2.5 h-2.5 text-white" />
+                        </button>
+                        <button onClick={() => kickRemote(p)} title="Bannir de l'appel" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                          <FaTimes className="w-2.5 h-2.5 text-white" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -958,6 +1035,9 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
         </button>
         <button onClick={toggleCam} title={camEnabled ? 'Couper la caméra' : 'Activer la caméra'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${camEnabled ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}>
           {camEnabled ? <FaVideoIcon /> : <FaVideoSlash />}
+        </button>
+        <button onClick={toggleBlur} title={blurEnabled ? 'Désactiver le flou' : 'Activer le flou'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${blurEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+          <FaImage />
         </button>
         <button onClick={toggleScreenShare} title={screenSharing ? 'Arrêter le partage' : 'Partager l’écran'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
           <FaDesktop />
