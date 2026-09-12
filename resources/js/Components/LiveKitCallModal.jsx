@@ -4,6 +4,7 @@ import {
   FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
   FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck, FaImage, FaAdjust
 } from 'react-icons/fa';
+import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';
 
 const getFreshCsrfToken = async () => {
   try {
@@ -500,8 +501,14 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     }
   }, [activeIdentity, participants, camEnabled, isScreenSharingAnyone, room]);
 
-  const blurProcessorRef = useRef(null);
+  const blurProcessorRef = useRef(null); // conservé pour compat, plus vraiment utilisé
   const fileInputRef = useRef(null);
+  const segmenterRef = useRef(null);
+  const vbVideoRef = useRef(null);
+  const vbCanvasRef = useRef(null);
+  const vbAnimRef = useRef(null);
+  const originalCamTrackRef = useRef(null); // piste caméra brute, pour pouvoir revenir en arrière
+  const vbBgImageRef = useRef(null);
 
   // ─── Contrôles locaux ────────────────────────────────────────────
   const toggleMic = async () => {
@@ -539,9 +546,104 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
       .find(pub => pub.source === (livekitLib?.Track?.Source?.Camera || 'camera') || pub.source === 'camera');
   };
 
-  const getTrackProcessors = async () => {
-    // Import statique : Vite peut maintenant analyser et bundler ce paquet.
-    return await import('@livekit/track-processors');
+  // ─── Segmentation "personne / fond" via MediaPipe (remplace @livekit/track-processors) ───
+  const initSegmenter = async () => {
+    if (segmenterRef.current) return segmenterRef.current;
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+    );
+    segmenterRef.current = await ImageSegmenter.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath:
+          'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite',
+        delegate: 'GPU',
+      },
+      runningMode: 'VIDEO',
+      outputCategoryMask: true,
+    });
+    return segmenterRef.current;
+  };
+
+  // Arrête l'effet et restaure la piste caméra brute
+  const stopVirtualBackground = async (camPub) => {
+    if (vbAnimRef.current) {
+      cancelAnimationFrame(vbAnimRef.current);
+      vbAnimRef.current = null;
+    }
+    if (camPub?.track && originalCamTrackRef.current) {
+      await camPub.track.replaceTrack(originalCamTrackRef.current);
+    }
+  };
+
+  // Démarre le flou OU l'image de fond, selon `mode`
+  const startVirtualBackground = async (camPub, mode) => {
+    // Conserve la piste brute la première fois, pour pouvoir revenir en arrière
+    if (!originalCamTrackRef.current) {
+      originalCamTrackRef.current = camPub.track.mediaStreamTrack;
+    }
+
+    const seg = await initSegmenter();
+
+    if (!vbVideoRef.current) {
+      vbVideoRef.current = document.createElement('video');
+      vbVideoRef.current.muted = true;
+      vbVideoRef.current.playsInline = true;
+    }
+    const videoEl = vbVideoRef.current;
+    videoEl.srcObject = new MediaStream([originalCamTrackRef.current]);
+    await videoEl.play();
+
+    const width = videoEl.videoWidth || 640;
+    const height = videoEl.videoHeight || 480;
+
+    if (!vbCanvasRef.current) vbCanvasRef.current = document.createElement('canvas');
+    const canvas = vbCanvasRef.current;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    const bgCanvas = document.createElement('canvas');
+    bgCanvas.width = width;
+    bgCanvas.height = height;
+    const bgCtx = bgCanvas.getContext('2d');
+
+    const personCanvas = document.createElement('canvas');
+    personCanvas.width = width;
+    personCanvas.height = height;
+    const personCtx = personCanvas.getContext('2d');
+
+    const draw = () => {
+      const result = seg.segmentForVideo(videoEl, performance.now());
+      const maskData = result.categoryMask.getAsFloat32Array(); // 1 = personne, 0 = fond
+      result.close?.();
+
+      // 1) Prépare le fond choisi
+      if (mode === 'image' && vbBgImageRef.current) {
+        bgCtx.drawImage(vbBgImageRef.current, 0, 0, width, height);
+      } else {
+        bgCtx.filter = 'blur(12px)';
+        bgCtx.drawImage(videoEl, 0, 0, width, height);
+        bgCtx.filter = 'none';
+      }
+
+      // 2) Découpe la personne via le masque alpha
+      personCtx.drawImage(videoEl, 0, 0, width, height);
+      const personFrame = personCtx.getImageData(0, 0, width, height);
+      for (let i = 0; i < maskData.length; i++) {
+        personFrame.data[i * 4 + 3] = maskData[i] > 0.5 ? 255 : 0; // canal alpha
+      }
+      personCtx.putImageData(personFrame, 0, 0);
+
+      // 3) Compose : fond puis personne par-dessus
+      ctx.drawImage(bgCanvas, 0, 0);
+      ctx.drawImage(personCanvas, 0, 0);
+
+      vbAnimRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+
+    const outTrack = canvas.captureStream(30).getVideoTracks()[0];
+    await camPub.track.replaceTrack(outTrack);
   };
 
   const toggleBlur = async () => {
@@ -549,30 +651,21 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     try {
       const camPub = getCamTrack();
       if (!camPub || !camPub.track) {
-         setError("Activez d'abord la caméra pour modifier l'arrière-plan.");
-         return;
+        setError("Activez d'abord la caméra pour modifier l'arrière-plan.");
+        return;
       }
-      
+
       const nextMode = bgMode === 'blur' ? 'none' : 'blur';
       if (nextMode === 'blur') {
-        try {
-          const { BackgroundBlur } = await getTrackProcessors();
-          if (blurProcessorRef.current) await camPub.track.setProcessor(null);
-          blurProcessorRef.current = BackgroundBlur(10, { blurRadius: 10 });
-          await camPub.track.setProcessor(blurProcessorRef.current);
-        } catch (err) {
-          console.error("Package blur non disponible", err);
-          setError("Paquet non installé. Sur votre serveur, exécutez: npm install @livekit/track-processors");
-          return;
-        }
+        vbBgImageRef.current = null;
+        await startVirtualBackground(camPub, 'blur');
       } else {
-        if (blurProcessorRef.current) await camPub.track.setProcessor(null);
+        await stopVirtualBackground(camPub);
       }
-      
       setBgMode(nextMode);
     } catch (err) {
-      console.error('Erreur blur:', err);
-      setError("Impossible d'activer le flou d'arrière-plan.");
+      console.error('Erreur flou:', err);
+      setError("Impossible d'activer le flou d'arrière-plan. Vérifiez que WebGL/WASM est supporté.");
     }
   };
 
@@ -582,22 +675,21 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     try {
       const camPub = getCamTrack();
       if (!camPub || !camPub.track) {
-         setError("Activez d'abord la caméra pour modifier l'arrière-plan.");
-         return;
-      }
-      
-      try {
-        const { VirtualBackground } = await getTrackProcessors();
-        const imageUrl = URL.createObjectURL(file);
-        if (blurProcessorRef.current) await camPub.track.setProcessor(null);
-        blurProcessorRef.current = VirtualBackground(imageUrl);
-        await camPub.track.setProcessor(blurProcessorRef.current);
-        setBgMode('image');
-      } catch (err) {
-        console.error("Package blur non disponible", err);
-        setError("Paquet non installé. Sur votre serveur, exécutez: npm install @livekit/track-processors");
+        setError("Activez d'abord la caméra pour modifier l'arrière-plan.");
         return;
       }
+
+      const img = new Image();
+      const imageUrl = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+      vbBgImageRef.current = img;
+
+      await startVirtualBackground(camPub, 'image');
+      setBgMode('image');
     } catch (err) {
       console.error('Erreur fond image:', err);
       setError("Impossible d'appliquer l'image de fond.");
