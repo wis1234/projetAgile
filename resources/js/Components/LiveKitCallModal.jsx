@@ -45,6 +45,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHands, setRaisedHands] = useState({}); // { identity: name }
   const [linkCopied, setLinkCopied] = useState(false);
+  const [activeSpeaker, setActiveSpeaker] = useState(null);
 
   // ─── Décroché / pas décroché — état 100% LOCAL à cet utilisateur ───
   // C'est la clé du correctif : l'hôte (celui qui lance l'appel) est
@@ -68,6 +69,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
 
   const localVideoRef = useRef(null);
   const screenVideoRef = useRef(null);
+  const mainVideoRef = useRef(null);
   const remoteVideoRefs = useRef({});
   const containerRef = useRef(null);
   const ringbackRef = useRef(null);
@@ -313,6 +315,12 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
           } catch (e) { /* ignore malformed payload */ }
         });
 
+        activeRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+          if (speakers.length > 0) {
+            setActiveSpeaker(speakers[0].identity);
+          }
+        });
+
         await activeRoom.connect(url, token);
         await activeRoom.localParticipant.setMicrophoneEnabled(true);
         // Caméra désactivée par défaut
@@ -463,6 +471,33 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
       remoteScreenShare.pub.track.attach(screenVideoRef.current);
     }
   }, [remoteScreenShare, screenSharing]);
+
+  // ─── Attacher le Main Speaker (façon Google Meet) ───
+  const activeIdentity = activeSpeaker || (participants.length > 0 ? participants[0].identity : room?.localParticipant?.identity);
+  const isLocalMain = activeIdentity === room?.localParticipant?.identity || (!participants.length);
+
+  useEffect(() => {
+    if (isScreenSharingAnyone || !room) return;
+    
+    let track = null;
+    if (isLocalMain) {
+      if (camEnabled) {
+         const camPub = [...room.localParticipant.videoTrackPublications.values()]
+           .find(pub => pub.source === (livekitLib?.Track?.Source?.Camera || 'camera') || pub.source === 'camera');
+         track = camPub?.track;
+      }
+    } else {
+      const p = participants.find(p => p.identity === activeIdentity);
+      if (p) {
+        const camPub = [...p.videoTrackPublications.values()].find(pub => (pub.source === (livekitLib?.Track?.Source?.Camera || 'camera') || pub.source === 'camera') && pub.track);
+        track = camPub?.track;
+      }
+    }
+
+    if (track && mainVideoRef.current) {
+      track.attach(mainVideoRef.current);
+    }
+  }, [activeIdentity, participants, camEnabled, isScreenSharingAnyone, room]);
 
   // ─── Contrôles locaux ────────────────────────────────────────────
   const toggleMic = async () => {
@@ -832,56 +867,59 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, isHost, 
               </div>
             </div>
           ) : (
-            <div className="h-full p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto content-start">
-              <div className="rounded-2xl overflow-hidden bg-slate-800 border border-slate-800 aspect-video relative flex items-center justify-center">
-                {camEnabled ? (
-                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
-                ) : (
-                  <FaVideoSlash className="text-slate-500 text-3xl" />
-                )}
-                {handRaised && (
-                  <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
-                    <FaHandPaper className="w-3.5 h-3.5 text-amber-900" />
+            <div className="h-full flex flex-col p-3 gap-3">
+              <div className="flex-1 rounded-2xl overflow-hidden bg-black border border-slate-800 relative flex items-center justify-center">
+                <video ref={mainVideoRef} autoPlay playsInline muted={isLocalMain} className="w-full h-full object-contain bg-black" style={isLocalMain ? mirrorStyle : {}} />
+                {!isLocalMain && raisedHands[activeIdentity] && (
+                  <div className="absolute top-2 right-2 w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
+                    <FaHandPaper className="w-4 h-4 text-amber-900" />
                   </div>
                 )}
-                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs font-semibold rounded flex items-center gap-1.5">
-                  Vous {isHost && <FaCrown className="w-3 h-3 text-amber-400" />} {!micEnabled && <FaMicrophoneSlash className="w-3 h-3 text-red-400" />}
+                <div className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/60 text-white text-sm font-semibold rounded-lg flex items-center gap-2">
+                  {isLocalMain ? 'Vous' : (participants.find(p => p.identity === activeIdentity)?.name || activeIdentity)}
+                  {isLocalMain && isHost && <FaCrown className="w-3.5 h-3.5 text-amber-400" />}
                 </div>
               </div>
-              {participants.map(p => (
-                <div key={p.identity} className="rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video relative group">
-                  <video
-                    ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                    autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
-                  />
-                  {raisedHands[p.identity] && (
-                    <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
-                      <FaHandPaper className="w-3.5 h-3.5 text-amber-900" />
+              <div className="flex gap-2 overflow-x-auto flex-shrink-0 pb-1">
+                <div className="w-32 h-20 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex-shrink-0 relative flex items-center justify-center">
+                  {camEnabled ? (
+                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
+                  ) : (
+                    <FaVideoSlash className="text-slate-500 text-lg" />
+                  )}
+                  {handRaised && (
+                    <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
+                      <FaHandPaper className="w-2.5 h-2.5 text-amber-900" />
                     </div>
                   )}
-                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs font-semibold rounded truncate max-w-[70%]">
-                    {p.name || p.identity}
-                  </div>
-                  {isHost && (
-                    <div className="absolute bottom-2 right-2 hidden group-hover:flex items-center gap-1">
-                      <button
-                        onClick={() => muteRemote(p, 'audio')}
-                        title="Couper le micro"
-                        className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center"
-                      >
-                        <FaMicrophoneSlash className="w-3.5 h-3.5 text-white" />
-                      </button>
-                      <button
-                        onClick={() => muteRemote(p, 'video')}
-                        title="Couper la caméra"
-                        className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center"
-                      >
-                        <FaVideoSlash className="w-3.5 h-3.5 text-white" />
-                      </button>
-                    </div>
-                  )}
+                  <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded flex items-center gap-1">
+                    Vous {!micEnabled && <FaMicrophoneSlash className="w-2 h-2 text-red-400" />}
+                  </span>
                 </div>
-              ))}
+                {participants.map(p => (
+                  <div key={p.identity} className="w-32 h-20 rounded-xl overflow-hidden bg-black border border-slate-700 flex-shrink-0 relative group">
+                    <video
+                      ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
+                      autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
+                    />
+                    {raisedHands[p.identity] && (
+                      <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
+                        <FaHandPaper className="w-2.5 h-2.5 text-amber-900" />
+                      </div>
+                    )}
+                    <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
+                      {p.name || p.identity}
+                    </span>
+                    {isHost && (
+                      <div className="absolute top-1 left-1 hidden group-hover:flex items-center gap-1">
+                        <button onClick={() => muteRemote(p, 'audio')} title="Couper le micro" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                          <FaMicrophoneSlash className="w-2.5 h-2.5 text-white" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
