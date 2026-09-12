@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
   FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
-  FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck, FaImage
+  FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck, FaImage, FaAdjust
 } from 'react-icons/fa';
 
 const getFreshCsrfToken = async () => {
@@ -33,7 +33,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   const [micEnabled, setMicEnabled] = useState(true);
   const [camEnabled, setCamEnabled] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
-  const [blurEnabled, setBlurEnabled] = useState(false);
+  const [bgMode, setBgMode] = useState('none'); // 'none', 'blur', 'image'
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState('');
   const [showParticipants, setShowParticipants] = useState(false);
@@ -501,6 +501,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   }, [activeIdentity, participants, camEnabled, isScreenSharingAnyone, room]);
 
   const blurProcessorRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // ─── Contrôles locaux ────────────────────────────────────────────
   const toggleMic = async () => {
@@ -533,41 +534,77 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     }
   };
 
+  const getCamTrack = () => {
+    return [...room.localParticipant.videoTrackPublications.values()]
+      .find(pub => pub.source === (livekitLib?.Track?.Source?.Camera || 'camera') || pub.source === 'camera');
+  };
+
+  const getTrackProcessors = async () => {
+    // Contournement pour que Vite (Rollup) ne bloque pas le "build" si le paquet n'est pas installé sur le serveur.
+    // LiveKit ne met pas les filtres d'arrière-plan dans "livekit-client" (ils sont dans "@livekit/track-processors").
+    const pkgName = '@livekit/track-processors';
+    return await import(/* @vite-ignore */ pkgName);
+  };
+
   const toggleBlur = async () => {
     if (!room) return;
     try {
-      const camPub = [...room.localParticipant.videoTrackPublications.values()]
-        .find(pub => pub.source === (livekitLib?.Track?.Source?.Camera || 'camera') || pub.source === 'camera');
-        
+      const camPub = getCamTrack();
       if (!camPub || !camPub.track) {
-         setError("Activez d'abord la caméra pour flouter l'arrière-plan.");
+         setError("Activez d'abord la caméra pour modifier l'arrière-plan.");
          return;
       }
       
-      const next = !blurEnabled;
-      if (next) {
+      const nextMode = bgMode === 'blur' ? 'none' : 'blur';
+      if (nextMode === 'blur') {
         try {
-          const { BackgroundBlur } = await import('@livekit/track-processors');
-          if (!blurProcessorRef.current) {
-            blurProcessorRef.current = BackgroundBlur(10, { blurRadius: 10 });
-          }
+          const { BackgroundBlur } = await getTrackProcessors();
+          if (blurProcessorRef.current) await camPub.track.setProcessor(null);
+          blurProcessorRef.current = BackgroundBlur(10, { blurRadius: 10 });
           await camPub.track.setProcessor(blurProcessorRef.current);
         } catch (err) {
           console.error("Package blur non disponible", err);
-          setError("Fonctionnalité d'arrière-plan non installée (nécessite @livekit/track-processors).");
+          setError("Paquet non installé. Sur votre serveur, exécutez: npm install @livekit/track-processors");
           return;
         }
       } else {
-        if (blurProcessorRef.current) {
-          await camPub.track.setProcessor(null);
-        }
+        if (blurProcessorRef.current) await camPub.track.setProcessor(null);
       }
       
-      setBlurEnabled(next);
+      setBgMode(nextMode);
     } catch (err) {
       console.error('Erreur blur:', err);
       setError("Impossible d'activer le flou d'arrière-plan.");
     }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !room) return;
+    try {
+      const camPub = getCamTrack();
+      if (!camPub || !camPub.track) {
+         setError("Activez d'abord la caméra pour modifier l'arrière-plan.");
+         return;
+      }
+      
+      try {
+        const { VirtualBackground } = await getTrackProcessors();
+        const imageUrl = URL.createObjectURL(file);
+        if (blurProcessorRef.current) await camPub.track.setProcessor(null);
+        blurProcessorRef.current = VirtualBackground(imageUrl);
+        await camPub.track.setProcessor(blurProcessorRef.current);
+        setBgMode('image');
+      } catch (err) {
+        console.error("Package blur non disponible", err);
+        setError("Paquet non installé. Sur votre serveur, exécutez: npm install @livekit/track-processors");
+        return;
+      }
+    } catch (err) {
+      console.error('Erreur fond image:', err);
+      setError("Impossible d'appliquer l'image de fond.");
+    }
+    e.target.value = ''; // reset input
   };
 
   const sendReaction = (emoji) => {
@@ -1036,9 +1073,13 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
         <button onClick={toggleCam} title={camEnabled ? 'Couper la caméra' : 'Activer la caméra'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${camEnabled ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}>
           {camEnabled ? <FaVideoIcon /> : <FaVideoSlash />}
         </button>
-        <button onClick={toggleBlur} title={blurEnabled ? 'Désactiver le flou' : 'Activer le flou'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${blurEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+        <button onClick={toggleBlur} title={bgMode === 'blur' ? 'Désactiver le flou' : 'Activer le flou'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${bgMode === 'blur' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+          <FaAdjust />
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} title={bgMode === 'image' ? "Changer l'image de fond" : 'Fond visuel (image)'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${bgMode === 'image' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
           <FaImage />
         </button>
+        <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
         <button onClick={toggleScreenShare} title={screenSharing ? 'Arrêter le partage' : 'Partager l’écran'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
           <FaDesktop />
         </button>
