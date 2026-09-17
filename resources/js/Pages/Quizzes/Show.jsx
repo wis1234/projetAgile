@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { FaClock, FaQuestionCircle, FaPlay, FaArrowLeft, FaTrophy, FaRedo, FaCheckCircle, FaLock, FaChartBar, FaShareAlt, FaCopy, FaCheck } from 'react-icons/fa';
+import { FaClock, FaQuestionCircle, FaPlay, FaArrowLeft, FaTrophy, FaRedo, FaCheckCircle, FaLock, FaChartBar, FaShareAlt, FaCopy, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
 
 function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, canManage, cheatingAttemptsCount = 0 }) {
   const [copied, setCopied] = useState(false);
