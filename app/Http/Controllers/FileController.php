@@ -117,7 +117,7 @@ public function index(Request $request)
 
     // ── 8. Pagination (conserve les query strings) ────────────────
     $files = $query->paginate(12)->withQueryString()
-        ->through(function ($file) {
+        ->through(function ($file) use ($user) {
             // Résoudre project_is_muted sur chaque fichier
             $project = $file->project ?? ($file->task?->project ?? null);
 

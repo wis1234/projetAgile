@@ -27,53 +27,59 @@ class Handler extends ExceptionHandler
     {
         /*
         |--------------------------------------------------------------------------
-        | 403 - Forbidden
+        | 401 - Authentication expired
         |--------------------------------------------------------------------------
         */
-        if ($exception instanceof HttpException && $exception->getStatusCode() === 403) {
+        if ($exception instanceof AuthenticationException) {
             if ($request->header('X-Inertia')) {
+                return Inertia::location(route('login'));
+            }
+            return redirect()->guest(route('login'));
+        }
+
+        $response = parent::render($request, $exception);
+        $statusCode = $response->getStatusCode();
+
+        // En mode debug local, conserver l'affichage par défaut de Laravel pour le debug des 500
+        if (config('app.debug') && !in_array($statusCode, [403, 404, 419])) {
+            return $response;
+        }
+
+        // Pour les requêtes Inertia ou requêtes HTML navigables
+        if ($request->header('X-Inertia') || $request->acceptsHtml()) {
+            if ($statusCode === 403) {
                 return Inertia::render('Error403')
                     ->toResponse($request)
                     ->setStatusCode(403);
             }
 
-            return parent::render($request, $exception);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | 401 - Authentication expired
-        |--------------------------------------------------------------------------
-        */
-        if ($exception instanceof AuthenticationException) {
-
-            // Requête Inertia
-            if ($request->header('X-Inertia')) {
-                return Inertia::location(route('login'));
+            if ($statusCode === 404) {
+                return Inertia::render('Error404')
+                    ->toResponse($request)
+                    ->setStatusCode(404);
             }
 
-            // Requête navigateur classique
-            return redirect()->guest(route('login'));
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | 419 - CSRF Token expired
-        |--------------------------------------------------------------------------
-        */
-        if ($exception instanceof TokenMismatchException) {
-
-            // Requête Inertia
-            if ($request->header('X-Inertia')) {
-                return Inertia::location(route('login'));
+            if ($statusCode === 419 || $exception instanceof TokenMismatchException) {
+                return Inertia::render('Error419', [
+                    'status' => 419,
+                    'message' => 'Votre session a expiré. Veuillez vous reconnecter.',
+                ])->toResponse($request)->setStatusCode(419);
             }
 
-            // Requête navigateur classique
-            return redirect()
-                ->guest(route('login'))
-                ->with('error', 'Votre session a expiré. Veuillez vous reconnecter.');
+            if ($statusCode === 500) {
+                return Inertia::render('Error500')
+                    ->toResponse($request)
+                    ->setStatusCode(500);
+            }
+
+            if (in_array($statusCode, [503, 429])) {
+                return Inertia::render('Error', [
+                    'status' => $statusCode,
+                    'message' => $exception->getMessage() ?: null,
+                ])->toResponse($request)->setStatusCode($statusCode);
+            }
         }
 
-        return parent::render($request, $exception);
+        return $response;
     }
 }
