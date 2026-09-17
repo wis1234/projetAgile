@@ -4,7 +4,7 @@ import FileIcon from '../FileIcon';
 import {
   FaEdit, FaDownload, FaTrash, FaShare,
   FaEllipsisH, FaTimes, FaEye, FaFilePdf,
-  FaFileAlt, FaExternalLinkAlt
+  FaFileAlt, FaExternalLinkAlt, FaLock
 } from 'react-icons/fa';
 import { isFileEditable, isPdfFile, isOfficeOrDocFile } from '../../utils/fileUtils';
 import { Menu, Transition } from '@headlessui/react';
@@ -125,12 +125,13 @@ const FileThumbnail = ({ file, fileUrl, onOpenPreview }) => {
 };
 
 // ─── Composant principal ────────────────────────────────────────────────────
-const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownload }) => {
+const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownload, isUnlocked = true }) => {
   const fileUrl = `/storage/${file.file_path}`;
   const isImage = file.type?.startsWith('image/');
   const isEditable = isFileEditable(file.type, file.name);
   const isPdf = isPdfFile(file.type, file.name);
   const [showImageModal, setShowImageModal] = useState(false);
+  const isLocked = file.is_password_protected && !isUnlocked;
 
   const openPreviewTab = useCallback(() => {
     if (isImage) {
@@ -156,12 +157,16 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
 
   const handleDownload = useCallback((e) => {
     e?.preventDefault();
+    if (isLocked) {
+      alert('Ce fichier est verrouillé.');
+      return;
+    }
     if (onDownload) {
       onDownload(e);
     } else {
       window.open(fileUrl, '_blank');
     }
-  }, [fileUrl, onDownload]);
+  }, [fileUrl, onDownload, isLocked]);
 
   const handleDelete = useCallback((e) => {
     e?.preventDefault();
@@ -206,15 +211,17 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
                   </Menu.Item>
 
                   {/* Télécharger */}
-                  <Menu.Item>
-                    {({ active }) => (
-                      <button onClick={handleDownload}
-                        className={`${active ? 'bg-gray-50 dark:bg-gray-700' : 'text-gray-700 dark:text-gray-300'} flex items-center gap-3 w-full px-4 py-2.5 text-sm`}>
-                        <FaDownload className="h-4 w-4 text-gray-400 shrink-0" />
-                        Télécharger
-                      </button>
-                    )}
-                  </Menu.Item>
+                  {!isLocked && (
+                    <Menu.Item>
+                      {({ active }) => (
+                        <button onClick={handleDownload}
+                          className={`${active ? 'bg-gray-50 dark:bg-gray-700' : 'text-gray-700 dark:text-gray-300'} flex items-center gap-3 w-full px-4 py-2.5 text-sm`}>
+                          <FaDownload className="h-4 w-4 text-gray-400 shrink-0" />
+                          Télécharger
+                        </button>
+                      )}
+                    </Menu.Item>
+                  )}
 
                   {/* Partager */}
                   <Menu.Item>
@@ -299,13 +306,24 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
         )}
 
         {/* Télécharger */}
-        <button
-          onClick={handleDownload}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        >
-          <FaDownload className="h-4 w-4 text-gray-500" />
-          Télécharger
-        </button>
+        {isLocked ? (
+          <button
+            disabled
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 text-sm font-medium rounded-lg shadow-sm cursor-not-allowed opacity-60"
+            title="Ce fichier est verrouillé par mot de passe"
+          >
+            <FaLock className="h-4 w-4 text-amber-500" />
+            Verrouillé
+          </button>
+        ) : (
+          <button
+            onClick={handleDownload}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <FaDownload className="h-4 w-4 text-gray-500" />
+            Télécharger
+          </button>
+        )}
 
         {/* Partager */}
         <button
@@ -330,12 +348,14 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700">
               <span className="text-sm font-semibold text-gray-800 dark:text-white truncate max-w-md">{file.name}</span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handleDownload}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
-                >
-                  <FaDownload className="h-3 w-3" /> Télécharger
-                </button>
+                {!isLocked && (
+                  <button
+                    onClick={handleDownload}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    <FaDownload className="h-3 w-3" /> Télécharger
+                  </button>
+                )}
                 <button
                   onClick={() => setShowImageModal(false)}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 hover:text-gray-700 transition-colors"

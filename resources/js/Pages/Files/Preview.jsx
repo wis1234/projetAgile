@@ -37,21 +37,23 @@ const ImageViewer = ({ fileUrl, fileName }) => (
 );
 
 // ─── Fallback générique ────────────────────────────────────────────────────
-const GenericViewer = ({ fileUrl, fileName, downloadUrl }) => (
+const GenericViewer = ({ fileUrl, fileName, downloadUrl, isLocked }) => (
   <div className="w-full flex-1 flex flex-col items-center justify-center gap-6 text-slate-300">
     <FaFileAlt className="text-7xl text-slate-600" />
     <div className="text-center">
       <p className="font-bold text-lg text-white">{fileName}</p>
       <p className="text-sm text-slate-400 mt-1">Aucun aperçu disponible pour ce type de fichier.</p>
     </div>
-    <a
-      href={downloadUrl}
-      download
-      className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow transition-colors"
-    >
-      <FaDownload className="h-4 w-4" />
-      Télécharger pour ouvrir
-    </a>
+    {!isLocked && (
+      <a
+        href={downloadUrl}
+        download
+        className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow transition-colors"
+      >
+        <FaDownload className="h-4 w-4" />
+        Télécharger pour ouvrir
+      </a>
+    )}
   </div>
 );
 
@@ -62,12 +64,13 @@ export default function Preview({ file }) {
   const isImage     = file.type?.startsWith('image/');
   const isPdf       = isPdfFile(file.type, file.name);
   const isOffice    = isOfficeOrDocFile(file.type, file.name);
+  const isLocked    = file.is_password_protected && !file.is_unlocked;
 
   const renderViewer = () => {
     if (isImage)  return <ImageViewer fileUrl={fileUrl} fileName={file.name} />;
     if (isPdf)    return <PdfViewer   fileUrl={fileUrl} fileName={file.name} />;
     if (isOffice) return <GoogleStylePreviewer file={file} fileUrl={fileUrl} className="flex-1 w-full" />;
-    return <GenericViewer fileUrl={fileUrl} fileName={file.name} downloadUrl={downloadUrl} />;
+    return <GenericViewer fileUrl={fileUrl} fileName={file.name} downloadUrl={downloadUrl} isLocked={isLocked} />;
   };
 
   const typeLabel = isImage ? 'Image' : isPdf ? 'PDF' : isOffice ? 'Document' : 'Fichier';
@@ -104,14 +107,16 @@ export default function Preview({ file }) {
 
         {/* Actions droite */}
         <div className="shrink-0 flex items-center gap-2">
-          <a
-            href={downloadUrl}
-            download
-            className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold rounded-lg shadow transition-colors"
-          >
-            <FaDownload className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Télécharger</span>
-          </a>
+          {!isLocked && (
+            <a
+              href={downloadUrl}
+              download
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold rounded-lg shadow transition-colors"
+            >
+              <FaDownload className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Télécharger</span>
+            </a>
+          )}
 
           <button
             onClick={() => window.close()}

@@ -130,6 +130,8 @@ public function index(Request $request)
                 $file->project_is_muted = (bool) ($pivot?->is_muted ?? false);
             }
 
+            $file->is_unlocked = $file->isUnlockedForUser($user);
+
             return $file;
         });
 
@@ -443,6 +445,7 @@ public function show(File $file)
     }
 
     $canBypassLock = $user ? $file->isUnlockedFor($user) : false; // ← remplace l'ancien calcul
+    $isUnlocked = $user ? $file->isUnlockedForUser($user) : false;
 
     return Inertia::render('Files/Show', [
         'file' => $file,
@@ -450,6 +453,7 @@ public function show(File $file)
         'statuses' => $statuses,
         'canManageFile' => $canManageFile,
         'canBypassLock' => $canBypassLock, // ← nouveau prop, remplace isLockOwner
+        'isUnlocked' => $isUnlocked,
     ]);
 }
 
@@ -626,6 +630,16 @@ public function download(File $file)
         abort(403, 'Vous n\'êtes pas autorisé à télécharger ce fichier.');
     }
 
+    if ($file->is_password_protected && !$file->isUnlockedForUser($currentUser)) {
+        activity_log(
+            'download_locked_attempt',
+            "Tentative de téléchargement du fichier verrouillé « {$file->name} » par {$currentUser->name}",
+            $file
+        );
+
+        abort(403, 'Ce fichier est verrouillé. Vous devez le déverrouiller pour pouvoir le télécharger.');
+    }
+
     if (!$file->file_path) {
         abort(404, 'Fichier non trouvé');
     }
@@ -644,6 +658,8 @@ public function download(File $file)
         $filename .= '.' . $extension;
     }
 
+    activity_log('download', "Téléchargement du fichier « {$file->name} »", $file);
+
     return \Storage::disk('public')->download($path, $filename);
 }
 
@@ -659,6 +675,16 @@ public function previewPage(File $file)
         (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())
     ) {
         abort(403, 'Vous n\'êtes pas autorisé à visualiser ce fichier.');
+    }
+
+    if ($file->is_password_protected && !$file->isUnlockedForUser($currentUser)) {
+        activity_log(
+            'download_locked_attempt',
+            "Tentative d'accès à la prévisualisation du fichier verrouillé « {$file->name} » par {$currentUser->name}",
+            $file
+        );
+
+        return redirect()->route('files.show', $file->id)->with('error', 'Ce fichier est verrouillé.');
     }
 
     $file->load(['project:id,name', 'user:id,name', 'task:id,title']);
@@ -839,6 +865,26 @@ public function updateYjsState(Request $request, File $file)
         if ($files->isEmpty()) {
             return abort(404, 'Aucun fichier trouvé');
         }
+
+        $currentUser = auth()->user();
+        $validFiles = [];
+
+        foreach ($files as $file) {
+            if ($file->is_password_protected && !$file->isUnlockedForUser($currentUser)) {
+                activity_log(
+                    'download_locked_attempt',
+                    "Tentative de téléchargement du fichier verrouillé « {$file->name} » dans une archive ZIP par {$currentUser->name}",
+                    $file
+                );
+                continue;
+            }
+            $validFiles[] = $file;
+        }
+
+        if (empty($validFiles)) {
+            abort(403, 'Tous les fichiers sélectionnés sont verrouillés. Veuillez les déverrouiller pour les télécharger.');
+        }
+
         $zip = new ZipArchive();
         $zipFileName = 'fichiers_' . date('Ymd_His') . '.zip';
         $tmpPath = storage_path('app/tmp/' . $zipFileName);
@@ -848,7 +894,7 @@ public function updateYjsState(Request $request, File $file)
         if ($zip->open($tmpPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             return abort(500, 'Impossible de créer l\'archive ZIP');
         }
-        foreach ($files as $file) {
+        foreach ($validFiles as $file) {
             if ($file->file_path && Storage::disk('public')->exists($file->file_path)) {
                 $zip->addFile(storage_path('app/public/' . $file->file_path), $file->name);
             }
@@ -869,18 +915,22 @@ public function unlock(Request $request, File $file)
 
     // ✅ Admin bypass directement
     if (auth()->user()->hasRole('admin')) {
+        session(["unlocked_file_{$file->id}" => true]);
         return response()->json(['message' => 'OK (admin bypass)'], 200);
     }
     
     $request->validate(['password' => 'required|string']);
 
     if (!$file->is_password_protected) {
+        session(["unlocked_file_{$file->id}" => true]);
         return response()->json(['message' => 'Not protected'], 200);
     }
 
     if (!Hash::check($request->password, $file->password_hash)) {
         return response()->json(['message' => 'Mot de passe incorrect'], 422);
     }
+
+    session(["unlocked_file_{$file->id}" => true]);
 
     return response()->json(['message' => 'OK'], 200);
 }
@@ -908,6 +958,16 @@ public function serveFile(Request $request, $filename)
     }
 
     $this->authorize('view', $file);
+
+    $currentUser = auth()->user();
+    if ($file->is_password_protected && !$file->isUnlockedForUser($currentUser)) {
+        activity_log(
+            'download_locked_attempt',
+            "Tentative d'accès au fichier verrouillé « {$file->name} » par {$currentUser->name}",
+            $file
+        );
+        abort(403, 'Ce fichier est verrouillé.');
+    }
 
     // Chemin physique réel
     $physicalPath = public_path('storage/files/' . $decodedFilename);

@@ -163,5 +163,30 @@ public function isUnlockedFor(User $user): bool
     return false;
 }
 
+/**
+ * Détermine si le fichier est déverrouillé pour l'utilisateur (par rôle ou session).
+ */
+public function isUnlockedForUser(?User $user = null): bool
+{
+    if (! $this->is_password_protected) {
+        return true;
+    }
+
+    if (! $user) {
+        $user = auth()->user();
+    }
+
+    if (! $user) {
+        return false;
+    }
+
+    if ($this->isUnlockedFor($user)) {
+        return true;
+    }
+
+    return (bool) session("unlocked_file_{$this->id}", false);
+}
+
 
 }
+

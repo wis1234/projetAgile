@@ -1,9 +1,9 @@
 import { Link } from '@inertiajs/react';
-import { FaTrash, FaDownload, FaArrowLeft, FaEdit } from 'react-icons/fa';
+import { FaTrash, FaDownload, FaArrowLeft, FaEdit, FaLock } from 'react-icons/fa';
 import { useState } from 'react';
 import ConfirmationModal from '../Common/ConfirmationModal';
 
-const FileHeader = ({ file, onDelete, currentUser, children }) => {
+const FileHeader = ({ file, onDelete, currentUser, isUnlocked = true, children }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   // Tous les utilisateurs peuvent voir les boutons
@@ -36,13 +36,24 @@ const FileHeader = ({ file, onDelete, currentUser, children }) => {
         <div className="ml-4 mt-2 flex-shrink-0 flex flex-wrap gap-2">
           {children}
           
-          <a
-            href={route('files.download', file.id)}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <FaDownload className="-ml-1 mr-2 h-4 w-4" />
-            Télécharger
-          </a>
+          {file.is_password_protected && !isUnlocked ? (
+            <button
+              disabled
+              className="inline-flex items-center px-4 py-2 border border-gray-200 shadow-sm text-sm font-medium rounded-md text-gray-400 bg-gray-100 dark:bg-gray-800 dark:border-gray-700 cursor-not-allowed opacity-60"
+              title="Ce fichier est verrouillé par mot de passe"
+            >
+              <FaLock className="-ml-1 mr-2 h-4 w-4 text-amber-500" />
+              Verrouillé
+            </button>
+          ) : (
+            <a
+              href={route('files.download', file.id)}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <FaDownload className="-ml-1 mr-2 h-4 w-4" />
+              Télécharger
+            </a>
+          )}
           
           <Link
             href={route('files.edit', file.id)}

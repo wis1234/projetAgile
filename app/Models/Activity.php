@@ -71,6 +71,8 @@ class Activity extends Model
             'member_role' => 'Rôle membre',
             'status' => 'Changement de statut',
             'assign' => 'Assignation',
+            'download' => 'Téléchargement',
+            'download_locked_attempt' => 'Tentative de téléchargement (verrouillé)',
         ];
     }
 
@@ -110,6 +112,8 @@ class Activity extends Model
             'call_started' => 'Appel ProJA démarré',
             'call_ended' => 'Appel ProJA terminé',
             'call_answered' => 'Appel ProJA accepté',
+            'download' => "Téléchargement : {$subject}",
+            'download_locked_attempt' => "Tentative de téléchargement (fichier verrouillé) : {$subject}",
             default => 'Nouvelle activité',
         };
     }

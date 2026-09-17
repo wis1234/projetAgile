@@ -9,7 +9,7 @@ import {
   FaCheckSquare, FaSquare, FaEllipsisH, FaTrash, FaEye,
   FaChevronDown, FaLayerGroup, FaAngleRight as FaChevRight,
   FaFile, FaCloudUploadAlt, FaCalendarAlt, FaUser, FaCheck,
-  FaExclamationTriangle
+  FaExclamationTriangle, FaLock
 } from 'react-icons/fa';
 
 /* ── helpers ─────────────────────────────────────── */
@@ -167,6 +167,14 @@ export default function Index({ files: filesProp, filters: filtersProp, stats: s
   /* bulk download */
   const handleBulkDownload = async () => {
     if (!selectedFiles.length) return;
+    const lockedSelected = files.data.filter(f => selectedFiles.includes(f.id) && f.is_password_protected && !f.is_unlocked);
+    if (lockedSelected.length > 0) {
+      if (lockedSelected.length === selectedFiles.length) {
+        alert('Impossible de télécharger : tous les fichiers sélectionnés sont verrouillés.');
+        return;
+      }
+      alert(`${lockedSelected.length} fichier(s) verrouillé(s) ne seront pas inclus dans le téléchargement ZIP.`);
+    }
     try {
       const response = await axios.post(route('files.downloadMultiple'), { ids: selectedFiles }, {
         responseType: 'blob', headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -454,6 +462,15 @@ export default function Index({ files: filesProp, filters: filtersProp, stats: s
                     </div>
                   )}
 
+                  {/* Lock badge */}
+                  {file.is_password_protected && !file.is_unlocked && (
+                    <div className="absolute top-3 right-3 z-10">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700">
+                        <FaLock className="text-[9px]" /> Verrouillé
+                      </span>
+                    </div>
+                  )}
+
                   <div className="p-5">
                     {/* Icon */}
                     <div className={`w-11 h-11 ${bg} rounded-xl flex items-center justify-center mb-4 ${color} text-lg`}>
@@ -549,8 +566,13 @@ export default function Index({ files: filesProp, filters: filtersProp, stats: s
                               {icon}
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors inline-flex items-center gap-2">
                                 {file.name}
+                                {file.is_password_protected && !file.is_unlocked && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700" title="Ce fichier est verrouillé par mot de passe">
+                                    <FaLock className="text-[9px]" /> Verrouillé
+                                  </span>
+                                )}
                               </p>
                               <p className="text-[11px] text-slate-400">{file.type?.split('/')[1]?.toUpperCase() || '—'}</p>
                             </div>

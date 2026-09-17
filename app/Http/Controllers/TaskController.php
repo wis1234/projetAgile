@@ -464,15 +464,28 @@ HTML;
         $this->authorize('view', $task);
 
         // Trouver le fichier dans les pièces jointes de la tâche
-        $file = $task->files()->findOrFail($file);
+        $fileModel = $task->files()->findOrFail($file);
+        $currentUser = auth()->user();
+
+        if ($fileModel->is_password_protected && !$fileModel->isUnlockedForUser($currentUser)) {
+            activity_log(
+                'download_locked_attempt',
+                "Tentative de téléchargement du fichier verrouillé « {$fileModel->name} » (tâche « {$task->title} ») par {$currentUser->name}",
+                $fileModel
+            );
+
+            abort(403, 'Ce fichier est verrouillé. Vous devez le déverrouiller pour pouvoir le télécharger.');
+        }
 
         // Vérifier que le fichier existe dans le stockage
-        if (!Storage::disk('public')->exists($file->file_path)) {
+        if (!Storage::disk('public')->exists($fileModel->file_path)) {
             abort(404, 'Le fichier demandé n\'existe plus.');
         }
 
+        activity_log('download', "Téléchargement du fichier « {$fileModel->name} » (tâche « {$task->title} »)", $fileModel);
+
         // Télécharger le fichier
-        return Storage::disk('public')->download($file->file_path, $file->name);
+        return Storage::disk('public')->download($fileModel->file_path, $fileModel->name);
     }
 
     /**

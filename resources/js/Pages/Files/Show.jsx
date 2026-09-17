@@ -425,7 +425,7 @@ const PasswordManagerModal = ({ isOpen, onClose, file, onSaved }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Show component
 // ─────────────────────────────────────────────────────────────────────────────
-const Show = ({ file, auth, canManageFile, canBypassLock }) => {
+const Show = ({ file, auth, canManageFile, canBypassLock, isUnlocked: initialUnlocked = false }) => {
   const { user: currentUser } = auth;
 
   const [currentFile, setCurrentFile] = useState({
@@ -445,7 +445,7 @@ const Show = ({ file, auth, canManageFile, canBypassLock }) => {
   // Simulated collaborators — in production these come from a WebSocket/Pusher channel
   const [activeCollaborators, setActiveCollaborators] = useState([]);
 
-  const [isUnlocked, setIsUnlocked] = useState(canBypassLock);
+  const [isUnlocked, setIsUnlocked] = useState(initialUnlocked || canBypassLock);
 
   const isFileOwner     = currentFile.user_id === currentUser?.id;
   const canEditContent  = isFileEditable(currentFile.type, currentFile.name);
@@ -702,6 +702,7 @@ const handlePasswordSaved = (isNowProtected) => {
                   onDelete={handleDelete}
                   onShare={handleShare}
                   onDownload={handleDownload}
+                  isUnlocked={isUnlocked}
                 />
               </motion.div>
 
