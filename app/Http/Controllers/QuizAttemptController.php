@@ -19,12 +19,21 @@ class QuizAttemptController extends Controller
         }
 
         $validated = $request->validate([
-            'answers' => 'required|array',
+            'answers' => 'nullable|array',
+            'cheating_logs' => 'nullable|array',
         ]);
 
-        $attempt->update([
-            'answers' => $validated['answers'],
-        ]);
+        $updateData = [];
+        if ($request->has('answers')) {
+            $updateData['answers'] = $validated['answers'];
+        }
+        if ($request->has('cheating_logs')) {
+            $updateData['cheating_logs'] = $validated['cheating_logs'];
+        }
+
+        if (!empty($updateData)) {
+            $attempt->update($updateData);
+        }
 
         return response()->json(['success' => true]);
     }

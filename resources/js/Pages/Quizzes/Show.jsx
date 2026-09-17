@@ -3,7 +3,7 @@ import { Link, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { FaClock, FaQuestionCircle, FaPlay, FaArrowLeft, FaTrophy, FaRedo, FaCheckCircle, FaLock, FaChartBar, FaShareAlt, FaCopy, FaCheck } from 'react-icons/fa';
 
-function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, canManage }) {
+function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, canManage, cheatingAttemptsCount = 0 }) {
   const [copied, setCopied] = useState(false);
 
   const handleLaunch = () => {
@@ -164,6 +164,21 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
             >
               <FaChartBar /> Classement
             </Link>
+
+            {canManage && (
+              <Link
+                href={route('projects.quizzes.cheating-logs', [project.id, quiz.id])}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-semibold rounded-xl text-base border border-rose-200 dark:border-rose-800 transition"
+              >
+                <FaExclamationTriangle className="text-rose-500" />
+                <span>Cas de triche</span>
+                {cheatingAttemptsCount > 0 && (
+                  <span className="ml-1 px-2 py-0.5 text-xs bg-rose-600 text-white font-bold rounded-full">
+                    {cheatingAttemptsCount}
+                  </span>
+                )}
+              </Link>
+            )}
           </div>
         </div>
       </div>

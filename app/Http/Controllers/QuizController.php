@@ -225,6 +225,12 @@ class QuizController extends Controller
 
         $userRole = $project->users()->where('user_id', Auth::id())->first()?->pivot->role;
 
+        $cheatingAttemptsCount = QuizAttempt::where('quiz_id', $quiz->id)
+            ->whereNotNull('cheating_logs')
+            ->get()
+            ->filter(fn($a) => is_array($a->cheating_logs) && count($a->cheating_logs) > 0)
+            ->count();
+
         return Inertia::render('Quizzes/Show', [
             'project' => [
                 'id' => $project->id,
@@ -236,6 +242,7 @@ class QuizController extends Controller
             'activeAttemptId' => $activeAttempt?->id,
             'latestResult' => $latestResult,
             'canManage' => Auth::user()->hasRole('admin') || $userRole === 'manager',
+            'cheatingAttemptsCount' => $cheatingAttemptsCount,
         ]);
     }
 
@@ -302,6 +309,7 @@ class QuizController extends Controller
                 'id' => $attempt->id,
                 'started_at' => $attempt->started_at->toIso8601String(),
                 'answers' => $attempt->answers ?? (object)[],
+                'cheating_logs' => $attempt->cheating_logs ?? [],
             ],
         ]);
     }
@@ -313,6 +321,7 @@ class QuizController extends Controller
         $validated = $request->validate([
             'attempt_id' => 'required|exists:quiz_attempts,id',
             'answers' => 'nullable|array',
+            'cheating_logs' => 'nullable|array',
         ]);
 
         $user = Auth::user();
@@ -326,6 +335,7 @@ class QuizController extends Controller
         }
 
         $answers = $validated['answers'] ?? [];
+        $cheatingLogs = $validated['cheating_logs'] ?? $attempt->cheating_logs ?? [];
         $questions = $quiz->questions()->get();
 
         $qcmTotal = $questions->where('question_type', 'qcm')->count();
@@ -366,6 +376,7 @@ class QuizController extends Controller
 
         $attempt->update([
             'answers' => $answers,
+            'cheating_logs' => $cheatingLogs,
             'status' => 'completed',
             'completed_at' => now(),
         ]);
@@ -380,7 +391,9 @@ class QuizController extends Controller
         ]);
 
         if (function_exists('activity_log')) {
-            activity_log('create', 'Soumission de quiz', $quiz, "Quiz '{$quiz->title}' terminé par " . $user->name . " (Score: {$result->score}%)");
+            $cheatingCount = is_array($cheatingLogs) ? count($cheatingLogs) : 0;
+            $cheatingMsg = $cheatingCount > 0 ? " (ALERTE TRICHE: {$cheatingCount} incident(s) détecté(s))" : "";
+            activity_log('create', 'Soumission de quiz', $quiz, "Quiz '{$quiz->title}' terminé par " . $user->name . " (Score: {$result->score}%){$cheatingMsg}");
         }
 
         if ($quiz->show_results) {
@@ -526,5 +539,50 @@ class QuizController extends Controller
         $status = $quiz->allow_public_access ? 'activé' : 'désactivé';
 
         return back()->with('success', "Accès par lien public {$status} avec succès !");
+    }
+
+    public function cheatingLogs(Project $project, Quiz $quiz)
+    {
+        $this->authorize('view', [$quiz, $project]);
+
+        $userRole = $project->users()->where('user_id', Auth::id())->first()?->pivot->role;
+        $canManage = Auth::user()->hasRole('admin') || $userRole === 'manager';
+
+        if (!$canManage) {
+            abort(403, 'Accès non autorisé');
+        }
+
+        $attempts = QuizAttempt::where('quiz_id', $quiz->id)
+            ->whereNotNull('cheating_logs')
+            ->with('user:id,name,email,profile_photo_path')
+            ->orderBy('updated_at', 'desc')
+            ->get()
+            ->filter(fn($a) => is_array($a->cheating_logs) && count($a->cheating_logs) > 0)
+            ->map(function ($a) {
+                return [
+                    'id' => $a->id,
+                    'user_id' => $a->user_id,
+                    'guest_name' => $a->guest_name,
+                    'guest_email' => $a->guest_email,
+                    'user_name' => $a->user?->name ?? $a->guest_name ?? 'Candidat externe',
+                    'user_email' => $a->user?->email ?? $a->guest_email ?? 'Non spécifié',
+                    'user_photo' => $a->user?->profile_photo_path,
+                    'status' => $a->status,
+                    'started_at' => $a->started_at,
+                    'completed_at' => $a->completed_at,
+                    'cheating_logs' => $a->cheating_logs,
+                    'cheating_count' => count($a->cheating_logs),
+                ];
+            })
+            ->values();
+
+        return Inertia::render('Quizzes/CheatingLogs', [
+            'project' => [
+                'id' => $project->id,
+                'name' => $project->name,
+            ],
+            'quiz' => $quiz,
+            'attempts' => $attempts,
+        ]);
     }
 }

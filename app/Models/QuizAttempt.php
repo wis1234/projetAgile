@@ -18,6 +18,7 @@ class QuizAttempt extends Model
         'guest_name',
         'guest_email',
         'answers',
+        'cheating_logs',
         'status',
         'started_at',
         'completed_at',
@@ -25,6 +26,7 @@ class QuizAttempt extends Model
 
     protected $casts = [
         'answers' => 'array',
+        'cheating_logs' => 'array',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];

@@ -306,6 +306,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{quiz}/ranking', [\App\Http\Controllers\QuizController::class, 'ranking'])->name('ranking');
         Route::post('/{quiz}/grade/{response}', [\App\Http\Controllers\QuizController::class, 'gradeResponse'])->name('grade');
         Route::post('/{quiz}/toggle-public-link', [\App\Http\Controllers\QuizController::class, 'togglePublicLink'])->name('toggle-public-link');
+        Route::get('/{quiz}/cheating-logs', [\App\Http\Controllers\QuizController::class, 'cheatingLogs'])->name('cheating-logs');
     });
 
     Route::post('/quiz-attempts/{attempt}/save-progress', [\App\Http\Controllers\QuizAttemptController::class, 'saveProgress'])
