@@ -18,7 +18,7 @@ const parseCoef = (text) => {
   return Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
 };
 const COEF_INPUT = /^\d{0,3}([.,]\d{0,2})?$/; // jusqu'à 2 décimales
-const COEF_PRESETS = [1, 2, 3, 4, 5];
+const COEF_PRESETS = [2, 3, 4];
 
 const TYPE_TONE = { qcm: 'bg-blue-100 text-blue-700', written: 'bg-purple-100 text-purple-700', mixed: 'bg-amber-100 text-amber-700' };
 
