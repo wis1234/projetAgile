@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DraftQuizRequest;
 use App\Http\Requests\StoreQuizRequest;
 use App\Http\Requests\UpdateQuizRequest;
 use App\Models\Project;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
-use App\Models\QuizQuestion;
+use App\Models\QuizCumul;
 use App\Models\QuizResponse;
 use App\Models\QuizResult;
+use App\Services\Quiz\QuizBuilderService;
+use App\Services\Quiz\QuizDeliberationService;
+use App\Services\Quiz\QuizScoringService;
+use App\Services\Quiz\QuizSubmissionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -17,22 +22,42 @@ use Inertia\Inertia;
 
 class QuizController extends Controller
 {
+    public function __construct(
+        private QuizBuilderService $builder,
+        private QuizScoringService $scoring,
+        private QuizSubmissionService $submission,
+        private QuizDeliberationService $deliberation,
+    ) {
+    }
+
+    private function projectSummary(Project $project): array
+    {
+        return ['id' => $project->id, 'name' => $project->name];
+    }
+
     public function index(Project $project)
     {
         $this->authorize('viewAny', [Quiz::class, $project]);
 
+        $userId = Auth::id();
+        $canManage = $project->userCanManageQuizzes(Auth::user());
+
         $quizzes = Quiz::where('project_id', $project->id)
-            ->withCount(['questions', 'attempts'])
-            ->with(['creator', 'results' => function ($q) {
-                $q->where('user_id', Auth::id())->orderBy('completed_at', 'desc');
-            }])
-            ->orderBy('created_at', 'desc')
+            ->visibleFor($canManage)
+            ->withCount([
+                'questions',
+                'attempts',
+                'attempts as user_attempts_count' => fn ($q) => $q->where('user_id', $userId),
+                'results as pending_results_count' => fn ($q) => $q->where('grading_status', QuizResult::STATUS_PENDING),
+            ])
+            ->with([
+                'creator:id,name',
+                'results' => fn ($q) => $q->where('user_id', $userId)->orderByDesc('completed_at')->orderByDesc('id'),
+            ])
+            ->orderByDesc('created_at')
             ->get()
-            ->map(function ($quiz) {
+            ->map(function (Quiz $quiz) use ($canManage) {
                 $userResult = $quiz->results->first();
-                $userAttemptsCount = QuizAttempt::where('quiz_id', $quiz->id)
-                    ->where('user_id', Auth::id())
-                    ->count();
 
                 return [
                     'id' => $quiz->id,
@@ -42,32 +67,66 @@ class QuizController extends Controller
                     'duration_minutes' => $quiz->duration_minutes,
                     'max_attempts' => $quiz->max_attempts,
                     'is_active' => $quiz->is_active,
+                    'is_draft' => $quiz->is_draft,
                     'show_results' => $quiz->show_results,
-                    'public_token' => $quiz->public_token,
+                    'public_token' => $canManage ? $quiz->public_token : null,
                     'allow_public_access' => $quiz->allow_public_access,
+                    'deliberation_status' => $quiz->deliberation_status,
                     'created_at' => $quiz->created_at,
-                    'creator' => $quiz->creator ? [
-                        'id' => $quiz->creator->id,
-                        'name' => $quiz->creator->name,
-                    ] : null,
+                    'creator' => $quiz->creator ? ['id' => $quiz->creator->id, 'name' => $quiz->creator->name] : null,
                     'questions_count' => $quiz->questions_count,
                     'attempts_count' => $quiz->attempts_count,
-                    'user_attempts_count' => $userAttemptsCount,
-                    'user_latest_score' => $userResult ? $userResult->score : null,
-                    'user_has_completed' => $userResult ? true : false,
+                    'pending_copies_count' => $canManage ? $quiz->pending_results_count : null,
+                    'user_attempts_count' => $quiz->user_attempts_count,
+                    'user_latest_score' => $userResult?->score,
+                    'user_latest_pending' => (bool) $userResult?->is_pending,
+                    'user_has_completed' => (bool) $userResult,
                 ];
             });
 
-        $userRole = $project->users()->where('user_id', Auth::id())->first()?->pivot->role;
-
         return Inertia::render('Quizzes/Index', [
-            'project' => [
-                'id' => $project->id,
-                'name' => $project->name,
-            ],
+            'project' => $this->projectSummary($project),
             'quizzes' => $quizzes,
-            'canManage' => Auth::user()->hasRole('admin') || $userRole === 'manager',
+            'cumuls' => $canManage ? $this->cumulCards($project) : [],
+            'canManage' => $canManage,
         ]);
+    }
+
+    /**
+     * Cartes « quiz cumulés » : aperçu visuel des quiz regroupés.
+     */
+    private function cumulCards(Project $project): array
+    {
+        return QuizCumul::where('project_id', $project->id)
+            ->with(['items.quiz:id,title,quiz_type,deliberation_status', 'creator:id,name'])
+            ->latest()
+            ->get()
+            ->map(function (QuizCumul $cumul) {
+                $quizIds = $cumul->items->pluck('quiz_id');
+                $candidates = QuizResult::whereIn('quiz_id', $quizIds)
+                    ->get(['user_id', 'guest_email'])
+                    ->unique(fn ($r) => $r->candidateKey())
+                    ->count();
+
+                return [
+                    'id' => $cumul->id,
+                    'title' => $cumul->title,
+                    'description' => $cumul->description,
+                    'missing_policy' => $cumul->missing_policy,
+                    'include_bonus' => $cumul->include_bonus,
+                    'created_at' => $cumul->created_at,
+                    'creator' => $cumul->creator?->name,
+                    'candidates_count' => $candidates,
+                    'quizzes' => $cumul->items->map(fn ($i) => [
+                        'id' => $i->quiz_id,
+                        'title' => $i->quiz?->title ?? 'Quiz supprimé',
+                        'quiz_type' => $i->quiz?->quiz_type,
+                        'coefficient' => $i->coefficient,
+                        'validated' => $i->quiz?->deliberation_status === Quiz::DELIBERATION_VALIDATED,
+                    ])->values(),
+                ];
+            })
+            ->all();
     }
 
     public function create(Project $project)
@@ -75,45 +134,58 @@ class QuizController extends Controller
         $this->authorize('create', [Quiz::class, $project]);
 
         return Inertia::render('Quizzes/Create', [
-            'project' => [
-                'id' => $project->id,
-                'name' => $project->name,
-            ],
+            'project' => $this->projectSummary($project),
         ]);
+    }
+
+    /**
+     * Brouillon : permet d'enregistrer une question dès sa création, avant le quiz complet.
+     */
+    public function draft(DraftQuizRequest $request, Project $project)
+    {
+        $this->authorize('create', [Quiz::class, $project]);
+
+        $v = $request->validated();
+
+        $quiz = Quiz::create([
+            'project_id' => $project->id,
+            'created_by' => Auth::id(),
+            'title' => $v['title'],
+            'description' => $v['description'] ?? null,
+            'quiz_type' => Quiz::TYPE_QCM,
+            'duration_minutes' => $v['duration_minutes'],
+            'max_attempts' => $v['max_attempts'],
+            'is_active' => false,
+            'is_draft' => true,
+            'show_results' => $v['show_results'] ?? true,
+        ]);
+
+        return response()->json(['quiz' => ['id' => $quiz->id, 'is_draft' => true]], 201);
     }
 
     public function store(StoreQuizRequest $request, Project $project)
     {
         $this->authorize('create', [Quiz::class, $project]);
 
-        $validated = $request->validated();
+        $v = $request->validated();
 
-        DB::transaction(function () use ($validated, $project, &$quiz) {
+        $quiz = DB::transaction(function () use ($v, $project) {
             $quiz = Quiz::create([
                 'project_id' => $project->id,
                 'created_by' => Auth::id(),
-                'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
-                'quiz_type' => $validated['quiz_type'],
-                'duration_minutes' => $validated['duration_minutes'],
-                'max_attempts' => $validated['max_attempts'],
-                'is_active' => $validated['is_active'] ?? true,
-                'show_results' => $validated['show_results'] ?? true,
+                'title' => $v['title'],
+                'description' => $v['description'] ?? null,
+                'quiz_type' => Quiz::TYPE_QCM,
+                'duration_minutes' => $v['duration_minutes'],
+                'max_attempts' => $v['max_attempts'],
+                'is_active' => $v['is_active'] ?? true,
+                'is_draft' => false,
+                'show_results' => $v['show_results'] ?? true,
             ]);
 
-            foreach ($validated['questions'] as $index => $q) {
-                QuizQuestion::create([
-                    'quiz_id' => $quiz->id,
-                    'question_text' => $q['question_text'],
-                    'question_type' => $q['question_type'],
-                    'option_a' => $q['option_a'] ?? null,
-                    'option_b' => $q['option_b'] ?? null,
-                    'option_c' => $q['option_c'] ?? null,
-                    'option_d' => $q['option_d'] ?? null,
-                    'correct_answer' => isset($q['correct_answer']) ? (int) $q['correct_answer'] : null,
-                    'order' => $index + 1,
-                ]);
-            }
+            $this->builder->syncQuestions($quiz, $v['questions']);
+
+            return $quiz;
         });
 
         if (function_exists('activity_log')) {
@@ -131,11 +203,10 @@ class QuizController extends Controller
         $quiz->load('questions');
 
         return Inertia::render('Quizzes/Edit', [
-            'project' => [
-                'id' => $project->id,
-                'name' => $project->name,
-            ],
+            'project' => $this->projectSummary($project),
             'quiz' => $quiz,
+            'structureLocked' => $this->builder->locked($quiz),
+            'validated' => $quiz->isValidated(),
         ]);
     }
 
@@ -143,39 +214,32 @@ class QuizController extends Controller
     {
         $this->authorize('update', [$quiz, $project]);
 
-        $validated = $request->validated();
+        $v = $request->validated();
+        $wasDraft = $quiz->is_draft;
 
-        DB::transaction(function () use ($validated, $quiz) {
+        $this->builder->assertEditable($quiz);
+
+        DB::transaction(function () use ($v, $quiz) {
             $quiz->update([
-                'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
-                'quiz_type' => $validated['quiz_type'],
-                'duration_minutes' => $validated['duration_minutes'],
-                'max_attempts' => $validated['max_attempts'],
-                'is_active' => $validated['is_active'] ?? true,
-                'show_results' => $validated['show_results'] ?? true,
+                'title' => $v['title'],
+                'description' => $v['description'] ?? null,
+                'duration_minutes' => $v['duration_minutes'],
+                'max_attempts' => $v['max_attempts'],
+                'is_active' => $v['is_active'] ?? true,
+                'is_draft' => false,
+                'show_results' => $v['show_results'] ?? true,
             ]);
 
-            // Re-sync questions
-            $quiz->questions()->delete();
-
-            foreach ($validated['questions'] as $index => $q) {
-                QuizQuestion::create([
-                    'quiz_id' => $quiz->id,
-                    'question_text' => $q['question_text'],
-                    'question_type' => $q['question_type'],
-                    'option_a' => $q['option_a'] ?? null,
-                    'option_b' => $q['option_b'] ?? null,
-                    'option_c' => $q['option_c'] ?? null,
-                    'option_d' => $q['option_d'] ?? null,
-                    'correct_answer' => isset($q['correct_answer']) ? (int) $q['correct_answer'] : null,
-                    'order' => $index + 1,
-                ]);
-            }
+            $this->builder->syncQuestions($quiz, $v['questions']);
         });
 
         if (function_exists('activity_log')) {
             activity_log('update', 'Modification de quiz', $quiz, "Quiz '{$quiz->title}' mis à jour");
+        }
+
+        if ($wasDraft) {
+            return redirect()->route('projects.quizzes.index', $project->id)
+                ->with('success', 'Quiz enregistré et publié avec succès !');
         }
 
         return redirect()->route('projects.quizzes.show', [$project->id, $quiz->id])
@@ -187,7 +251,14 @@ class QuizController extends Controller
         $this->authorize('delete', [$quiz, $project]);
 
         $title = $quiz->title;
+        $cumulIds = $quiz->cumulItems()->pluck('quiz_cumul_id');
+
         $quiz->delete();
+
+        // Un cumul qui n'a plus aucun quiz n'a plus de sens.
+        if ($cumulIds->isNotEmpty()) {
+            QuizCumul::whereIn('id', $cumulIds)->doesntHave('items')->delete();
+        }
 
         if (function_exists('activity_log')) {
             activity_log('delete', 'Suppression de quiz', $project, "Quiz '{$title}' supprimé");
@@ -201,49 +272,69 @@ class QuizController extends Controller
     {
         $this->authorize('view', [$quiz, $project]);
 
-        $quiz->loadCount('questions');
+        $user = Auth::user();
+        $canManage = $project->userCanManageQuizzes($user);
 
-        $attemptsCount = QuizAttempt::where('quiz_id', $quiz->id)
-            ->where('user_id', Auth::id())
-            ->count();
+        $quiz->loadCount('questions');
+        if (!$canManage) {
+            $quiz->makeHidden(['public_token']);
+        }
+
+        $attemptsCount = QuizAttempt::where('quiz_id', $quiz->id)->where('user_id', $user->id)->count();
 
         $activeAttempt = QuizAttempt::where('quiz_id', $quiz->id)
-            ->where('user_id', Auth::id())
+            ->where('user_id', $user->id)
             ->where('status', 'in_progress')
             ->first();
 
         $latestResult = QuizResult::where('quiz_id', $quiz->id)
-            ->where(function ($query) {
-                $query->where('user_id', Auth::id())
-                      ->orWhere(function ($query) {
-                          $query->whereNull('user_id')
-                                ->where('guest_email', Auth::user()->email);
-                      });
-            })
-            ->orderBy('completed_at', 'desc')
+            ->where(fn ($q) => $q->where('user_id', $user->id)
+                ->orWhere(fn ($q) => $q->whereNull('user_id')->where('guest_email', $user->email)))
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
             ->first();
 
-        $userRole = $project->users()->where('user_id', Auth::id())->first()?->pivot->role;
+        // Les responsables du projet (ceux qui décident) : photos visibles de tous les membres.
+        $deciders = $quiz->deciders()->map(fn ($u) => [
+            'id' => $u->id,
+            'name' => $u->name,
+            'photo' => $u->profile_photo_url,
+        ])->values();
 
-        $cheatingAttemptsCount = QuizAttempt::where('quiz_id', $quiz->id)
-            ->whereNotNull('cheating_logs')
-            ->get()
-            ->filter(fn($a) => is_array($a->cheating_logs) && count($a->cheating_logs) > 0)
-            ->count();
-
-        return Inertia::render('Quizzes/Show', [
-            'project' => [
-                'id' => $project->id,
-                'name' => $project->name,
-            ],
+        $props = [
+            'project' => $this->projectSummary($project),
             'quiz' => $quiz,
             'attemptsCount' => $attemptsCount,
             'hasActiveAttempt' => (bool) $activeAttempt,
             'activeAttemptId' => $activeAttempt?->id,
             'latestResult' => $latestResult,
-            'canManage' => Auth::user()->hasRole('admin') || $userRole === 'manager',
-            'cheatingAttemptsCount' => $cheatingAttemptsCount,
-        ]);
+            'canManage' => $canManage,
+            'deciders' => $deciders,
+            'cheatingAttemptsCount' => 0,
+            'evaluation' => null,
+        ];
+
+        if ($canManage) {
+            $results = QuizResult::where('quiz_id', $quiz->id);
+            $resultsCount = (clone $results)->count();
+            $pendingCount = (clone $results)->where('grading_status', QuizResult::STATUS_PENDING)->count();
+
+            $props['cheatingAttemptsCount'] = QuizAttempt::where('quiz_id', $quiz->id)
+                ->whereNotNull('cheating_logs')
+                ->get(['id', 'cheating_logs'])
+                ->filter(fn ($a) => is_array($a->cheating_logs) && count($a->cheating_logs) > 0)
+                ->count();
+
+            $props['evaluation'] = [
+                'participants' => $resultsCount,
+                'pending_copies' => $pendingCount,
+                'has_written' => $quiz->questions()->where('question_type', 'written')->exists(),
+                'deliberation' => $this->deliberation->summary($quiz, $user),
+                'is_creator_or_admin' => $user->hasRole('admin') || $quiz->created_by === $user->id,
+            ];
+        }
+
+        return Inertia::render('Quizzes/Show', $props);
     }
 
     public function launch(Project $project, Quiz $quiz)
@@ -252,7 +343,6 @@ class QuizController extends Controller
 
         $user = Auth::user();
 
-        // Check if there is an active in_progress attempt
         $attempt = QuizAttempt::where('quiz_id', $quiz->id)
             ->where('user_id', $user->id)
             ->where('status', 'in_progress')
@@ -278,25 +368,20 @@ class QuizController extends Controller
             ]);
         }
 
-        // Questions without exposing correct_answer to prevent client side cheating
-        $questions = $quiz->questions()->get()->map(function ($q) {
-            return [
-                'id' => $q->id,
-                'question_text' => $q->question_text,
-                'question_type' => $q->question_type,
-                'option_a' => $q->option_a,
-                'option_b' => $q->option_b,
-                'option_c' => $q->option_c,
-                'option_d' => $q->option_d,
-                'order' => $q->order,
-            ];
-        });
+        // Les bonnes réponses ne sont jamais envoyées au navigateur du candidat.
+        $questions = $quiz->questions()->get()->map(fn ($q) => [
+            'id' => $q->id,
+            'question_text' => $q->question_text,
+            'question_type' => $q->question_type,
+            'option_a' => $q->option_a,
+            'option_b' => $q->option_b,
+            'option_c' => $q->option_c,
+            'option_d' => $q->option_d,
+            'order' => $q->order,
+        ]);
 
         return Inertia::render('Quizzes/Take', [
-            'project' => [
-                'id' => $project->id,
-                'name' => $project->name,
-            ],
+            'project' => $this->projectSummary($project),
             'quiz' => [
                 'id' => $quiz->id,
                 'title' => $quiz->title,
@@ -308,7 +393,7 @@ class QuizController extends Controller
             'attempt' => [
                 'id' => $attempt->id,
                 'started_at' => $attempt->started_at->toIso8601String(),
-                'answers' => $attempt->answers ?? (object)[],
+                'answers' => $attempt->answers ?? (object) [],
                 'cheating_logs' => $attempt->cheating_logs ?? [],
             ],
         ]);
@@ -334,67 +419,13 @@ class QuizController extends Controller
             return redirect()->route('projects.quizzes.results', [$project->id, $quiz->id]);
         }
 
-        $answers = $validated['answers'] ?? [];
-        $cheatingLogs = $validated['cheating_logs'] ?? $attempt->cheating_logs ?? [];
-        $questions = $quiz->questions()->get();
-
-        $qcmTotal = $questions->where('question_type', 'qcm')->count();
-        $writtenTotal = $questions->where('question_type', 'written')->count();
-        $qcmEarned = 0;
-
-        foreach ($questions as $q) {
-            $val = $answers[$q->id] ?? null;
-
-            if ($q->question_type === 'written') {
-                QuizResponse::updateOrCreate(
-                    [
-                        'quiz_id' => $quiz->id,
-                        'question_id' => $q->id,
-                        'attempt_id' => $attempt->id,
-                        'user_id' => $user->id,
-                    ],
-                    [
-                        'answer_text' => is_string($val) ? $val : '',
-                        'grading_status' => 'pending',
-                        'score' => 0,
-                    ]
-                );
-            } else if ($q->question_type === 'qcm') {
-                if ($val !== null && (int)$val === (int)$q->correct_answer) {
-                    $qcmEarned++;
-                }
-            }
-        }
-
-        $qcmScore = $qcmTotal > 0 ? ($qcmEarned / $qcmTotal) * 100 : 0;
-        $finalScore = $qcmScore;
-
-        if ($qcmTotal > 0 && $writtenTotal > 0) {
-            // Mixed quiz: QCM represents 50% initial score before manual grading
-            $finalScore = $qcmScore / 2;
-        }
-
-        $attempt->update([
-            'answers' => $answers,
-            'cheating_logs' => $cheatingLogs,
-            'status' => 'completed',
-            'completed_at' => now(),
-        ]);
-
-        $result = QuizResult::create([
-            'quiz_id' => $quiz->id,
-            'user_id' => $user->id,
-            'attempt_id' => $attempt->id,
-            'score' => (int) round($finalScore),
-            'correct_answers' => $qcmEarned,
-            'total_questions' => $questions->count(),
-            'completed_at' => now(),
-        ]);
+        $result = $this->submission->finalize($quiz, $attempt, $validated['answers'] ?? [], $validated['cheating_logs'] ?? null);
 
         if (function_exists('activity_log')) {
-            $cheatingCount = is_array($cheatingLogs) ? count($cheatingLogs) : 0;
-            $cheatingMsg = $cheatingCount > 0 ? " (ALERTE TRICHE: {$cheatingCount} incident(s) détecté(s))" : "";
-            activity_log('create', 'Soumission de quiz', $quiz, "Quiz '{$quiz->title}' terminé par " . $user->name . " (Score: {$result->score}%){$cheatingMsg}");
+            $cheatingCount = count($validated['cheating_logs'] ?? $attempt->cheating_logs ?? []);
+            $cheatingMsg = $cheatingCount > 0 ? " (ALERTE TRICHE: {$cheatingCount} incident(s) détecté(s))" : '';
+            $scoreLabel = $result->is_pending ? 'en attente de correction' : "Score: {$result->score}%";
+            activity_log('create', 'Soumission de quiz', $quiz, "Quiz '{$quiz->title}' terminé par " . $user->name . " ({$scoreLabel}){$cheatingMsg}");
         }
 
         if ($quiz->show_results) {
@@ -412,28 +443,22 @@ class QuizController extends Controller
         $this->authorize('viewResults', [$quiz, $project]);
 
         $user = Auth::user();
+        $isManager = $project->userCanManageQuizzes($user);
 
-        // If user is manager or admin, allow passing user_id param to view specific user results
-        $targetUserId = $user->id;
-        $userRole = $project->users()->where('user_id', $user->id)->first()?->pivot->role;
-        $isManager = $user->hasRole('admin') || $userRole === 'manager';
-
-        // Priorité : attempt_id en query param ou en session flash (après soumission)
         $attemptId = request()->input('attempt_id') ?? session('attempt_id');
 
         if ($attemptId) {
             $result = QuizResult::where('quiz_id', $quiz->id)
                 ->where('attempt_id', $attemptId)
-                ->when(!$isManager, fn($q) => $q->where('user_id', $user->id))
+                ->when(!$isManager, fn ($q) => $q->where('user_id', $user->id))
                 ->firstOrFail();
         } else {
-            if ($isManager && request()->has('user_id')) {
-                $targetUserId = request()->input('user_id');
-            }
+            $targetUserId = ($isManager && request()->has('user_id')) ? request()->input('user_id') : $user->id;
 
             $result = QuizResult::where('quiz_id', $quiz->id)
                 ->where('user_id', $targetUserId)
-                ->orderBy('completed_at', 'desc')
+                ->orderByDesc('completed_at')
+                ->orderByDesc('id')
                 ->firstOrFail();
         }
 
@@ -441,21 +466,23 @@ class QuizController extends Controller
         $questions = $quiz->questions()->get();
         $responses = QuizResponse::where('attempt_id', $attempt->id)->get();
 
+        if (!$isManager) {
+            $quiz->makeHidden(['public_token']);
+        }
+
         return Inertia::render('Quizzes/Results', [
-            'project' => [
-                'id' => $project->id,
-                'name' => $project->name,
-            ],
+            'project' => $this->projectSummary($project),
             'quiz' => $quiz,
             'result' => $result,
-            'attempt' => $attempt,
+            'attempt' => $attempt->makeHidden($isManager ? [] : ['cheating_logs']),
             'questions' => $questions,
             'responses' => $responses,
             'candidate' => [
                 'id' => $result->user_id,
-                'name' => $result->user->name ?? 'Utilisateur',
+                'name' => $result->user?->name ?? $result->guest_name ?? 'Utilisateur',
             ],
-            'canGrade' => $isManager,
+            'canGrade' => $isManager && !$quiz->isValidated(),
+            'validated' => $quiz->isValidated(),
         ]);
     }
 
@@ -463,32 +490,41 @@ class QuizController extends Controller
     {
         $this->authorize('view', [$quiz, $project]);
 
-        $rankings = QuizResult::where('quiz_id', $quiz->id)
-            ->with('user:id,name,profile_photo_path')
-            ->orderBy('score', 'desc')
-            ->orderBy('completed_at', 'asc')
-            ->orderBy('created_at', 'asc')
-            ->get();
+        $canManage = $project->userCanManageQuizzes(Auth::user());
 
-        $userRole = $project->users()->where('user_id', Auth::id())->first()?->pivot->role;
+        // Les membres ne voient le classement que si les résultats leur sont ouverts.
+        abort_if(!$canManage && !$quiz->show_results, 403, 'Les résultats de ce quiz ne sont pas publics.');
+
+        $final = $this->scoring->finalResults($quiz, $canManage);
+
+        if (!$canManage) {
+            $quiz->makeHidden(['public_token']);
+        }
 
         return Inertia::render('Quizzes/Ranking', [
-            'project' => [
-                'id' => $project->id,
-                'name' => $project->name,
-            ],
+            'project' => $this->projectSummary($project),
             'quiz' => $quiz,
-            'rankings' => $rankings,
-            'canManage' => Auth::user()->hasRole('admin') || $userRole === 'manager',
+            'rankings' => $final['rows'],
+            'stats' => $final['stats'],
+            'canManage' => $canManage,
+            'validated' => $quiz->isValidated(),
         ]);
     }
 
+    /**
+     * Notation d'une seule réponse depuis la page de résultats d'une copie.
+     * (L'espace de correction reste l'outil principal pour corriger toutes les copies.)
+     */
     public function gradeResponse(Request $request, Project $project, Quiz $quiz, QuizResponse $response)
     {
         $this->authorize('grade', [Quiz::class, $project]);
 
+        if ($quiz->isValidated()) {
+            return back()->with('error', 'Les résultats sont validés : la correction est verrouillée.');
+        }
+
         $validated = $request->validate([
-            'score' => 'required|integer|min:0|max:10',
+            'score' => 'required|integer|min:0|max:' . QuizScoringService::writtenMax(),
             'admin_comments' => 'nullable|string',
         ]);
 
@@ -499,33 +535,14 @@ class QuizController extends Controller
             'graded_by' => Auth::id(),
         ]);
 
-        // Recalculate QuizResult final score
-        $attempt = QuizAttempt::findOrFail($response->attempt_id);
-        $questions = $quiz->questions()->get();
+        $result = QuizResult::where('attempt_id', $response->attempt_id)->first();
 
-        $qcmTotal = $questions->where('question_type', 'qcm')->count();
-        $writtenTotal = $questions->where('question_type', 'written')->count();
-
-        $result = QuizResult::where('attempt_id', $attempt->id)->first();
         if ($result) {
-            $qcmScore = $qcmTotal > 0 ? ($result->correct_answers / $qcmTotal) * 100 : 0;
-            
-            $allResponses = QuizResponse::where('attempt_id', $attempt->id)->get();
-            $writtenEarnedSum = $allResponses->sum('score');
-            $writtenMaxSum = $writtenTotal * 10;
-            $writtenScore = $writtenMaxSum > 0 ? ($writtenEarnedSum / $writtenMaxSum) * 100 : 0;
+            $result = $this->scoring->refreshResult($result);
 
-            if ($qcmTotal > 0 && $writtenTotal > 0) {
-                $finalScore = ($qcmScore + $writtenScore) / 2;
-            } elseif ($writtenTotal > 0) {
-                $finalScore = $writtenScore;
-            } else {
-                $finalScore = $qcmScore;
+            if (!$result->is_pending) {
+                QuizAttempt::whereKey($response->attempt_id)->update(['graded_at' => now()]);
             }
-
-            $result->update([
-                'score' => (int) round($finalScore),
-            ]);
         }
 
         return back()->with('success', 'Note enregistrée avec succès !');
@@ -551,42 +568,34 @@ class QuizController extends Controller
     {
         $this->authorize('view', [$quiz, $project]);
 
-        $userRole = $project->users()->where('user_id', Auth::id())->first()?->pivot->role;
-        $canManage = Auth::user()->hasRole('admin') || $userRole === 'manager';
-
-        if (!$canManage) {
+        if (!$project->userCanManageQuizzes(Auth::user())) {
             abort(403, 'Accès non autorisé');
         }
 
         $attempts = QuizAttempt::where('quiz_id', $quiz->id)
             ->whereNotNull('cheating_logs')
             ->with('user:id,name,email,profile_photo_path')
-            ->orderBy('updated_at', 'desc')
+            ->orderByDesc('updated_at')
             ->get()
-            ->filter(fn($a) => is_array($a->cheating_logs) && count($a->cheating_logs) > 0)
-            ->map(function ($a) {
-                return [
-                    'id' => $a->id,
-                    'user_id' => $a->user_id,
-                    'guest_name' => $a->guest_name,
-                    'guest_email' => $a->guest_email,
-                    'user_name' => $a->user?->name ?? $a->guest_name ?? 'Candidat externe',
-                    'user_email' => $a->user?->email ?? $a->guest_email ?? 'Non spécifié',
-                    'user_photo' => $a->user?->profile_photo_path,
-                    'status' => $a->status,
-                    'started_at' => $a->started_at,
-                    'completed_at' => $a->completed_at,
-                    'cheating_logs' => $a->cheating_logs,
-                    'cheating_count' => count($a->cheating_logs),
-                ];
-            })
+            ->filter(fn ($a) => is_array($a->cheating_logs) && count($a->cheating_logs) > 0)
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'user_id' => $a->user_id,
+                'guest_name' => $a->guest_name,
+                'guest_email' => $a->guest_email,
+                'user_name' => $a->user?->name ?? $a->guest_name ?? 'Candidat externe',
+                'user_email' => $a->user?->email ?? $a->guest_email ?? 'Non spécifié',
+                'user_photo' => $a->user?->profile_photo_path,
+                'status' => $a->status,
+                'started_at' => $a->started_at,
+                'completed_at' => $a->completed_at,
+                'cheating_logs' => $a->cheating_logs,
+                'cheating_count' => count($a->cheating_logs),
+            ])
             ->values();
 
         return Inertia::render('Quizzes/CheatingLogs', [
-            'project' => [
-                'id' => $project->id,
-                'name' => $project->name,
-            ],
+            'project' => $this->projectSummary($project),
             'quiz' => $quiz,
             'attempts' => $attempts,
         ]);

@@ -50,6 +50,11 @@ if ($request->user()) {
             ...parent::share($request),
             'auth' => $auth,
             'appName' => config('app.name'),
+            'flash' => fn () => [
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
+                'info' => $request->session()->get('info'),
+            ],
         ];
     }
 }

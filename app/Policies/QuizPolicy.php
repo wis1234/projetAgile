@@ -23,7 +23,12 @@ class QuizPolicy
             return true;
         }
 
-        return $project->isMember($user) && $quiz->project_id === $project->id;
+        if (!$project->isMember($user) || $quiz->project_id !== $project->id) {
+            return false;
+        }
+
+        // Un brouillon n'est visible que de ceux qui gèrent les quiz.
+        return !$quiz->is_draft || $project->userCanManageQuizzes($user);
     }
 
     public function create(User $user, Project $project): bool
@@ -82,7 +87,7 @@ class QuizPolicy
         return $project->users()
             ->where('user_id', $user->id)
             ->wherePivot('is_muted', false)
-            ->exists() && $quiz->is_active;
+            ->exists() && $quiz->is_active && !$quiz->is_draft;
     }
 
     public function viewResults(User $user, Quiz $quiz, Project $project): bool
@@ -115,5 +120,14 @@ class QuizPolicy
             ->wherePivot('role', 'manager')
             ->wherePivot('is_muted', false)
             ->exists();
+    }
+
+    /**
+     * Correction, délibération, exports, bonus de participation et cumuls :
+     * réservés aux gestionnaires du projet (admin ou manager actif).
+     */
+    public function manage(User $user, Project $project): bool
+    {
+        return $this->grade($user, $project);
     }
 }

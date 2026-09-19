@@ -1,8 +1,10 @@
 import React from 'react';
 import { FaCheckCircle, FaTimesCircle, FaClock, FaPrint } from 'react-icons/fa';
+import ScoreBadge from '@/Components/Quiz/ScoreBadge';
 
 export default function PublicResults({ quiz, result, attempt, questions = [], responses = [], candidate }) {
-  const isPassed = result.score >= 50;
+  const isPending = !!result.is_pending;
+  const isPassed = !isPending && result.score >= 50;
   const answers = attempt?.answers || {};
 
   return (
@@ -20,7 +22,7 @@ export default function PublicResults({ quiz, result, attempt, questions = [], r
         {/* Summary Card */}
         <div
           className={`bg-white dark:bg-gray-800 rounded-2xl border-t-8 p-8 shadow-sm text-center space-y-4 ${
-            isPassed ? 'border-t-emerald-500' : 'border-t-red-500'
+            isPending ? 'border-t-amber-400' : isPassed ? 'border-t-emerald-500' : 'border-t-red-500'
           }`}
         >
           <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">
@@ -35,25 +37,21 @@ export default function PublicResults({ quiz, result, attempt, questions = [], r
               <span className="block text-xs uppercase font-bold tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                 Score Obtenu
               </span>
-              <span
-                className={`text-5xl font-black ${
-                  isPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
-                }`}
-              >
-                {result.score}%
-              </span>
+              <ScoreBadge score={result.score_exact ?? result.score} pending={isPending} size="xl" />
             </div>
           </div>
 
           <div>
             <span
               className={`px-4 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider ${
-                isPassed
+                isPending
+                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                  : isPassed
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
                   : 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300'
               }`}
             >
-              {isPassed ? 'Admis(e)' : 'Ajourné(e)'}
+              {isPending ? 'En attente de correction' : isPassed ? 'Admis(e)' : 'Ajourné(e)'}
             </span>
           </div>
         </div>

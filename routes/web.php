@@ -292,9 +292,11 @@ Route::middleware('auth')->group(function () {
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
 
     // Routes Quiz
-    Route::prefix('projects/{project}/quizzes')->name('projects.quizzes.')->group(function () {
+    // scopeBindings : {quiz} doit appartenir à {project}, {question}/{response}/{attempt} au {quiz}.
+    Route::prefix('projects/{project}/quizzes')->name('projects.quizzes.')->scopeBindings()->group(function () {
         Route::get('/', [\App\Http\Controllers\QuizController::class, 'index'])->name('index');
         Route::get('/create', [\App\Http\Controllers\QuizController::class, 'create'])->name('create');
+        Route::post('/draft', [\App\Http\Controllers\QuizController::class, 'draft'])->name('draft');
         Route::post('/', [\App\Http\Controllers\QuizController::class, 'store'])->name('store');
         Route::get('/{quiz}', [\App\Http\Controllers\QuizController::class, 'show'])->name('show');
         Route::get('/{quiz}/edit', [\App\Http\Controllers\QuizController::class, 'edit'])->name('edit');
@@ -307,6 +309,46 @@ Route::middleware('auth')->group(function () {
         Route::post('/{quiz}/grade/{response}', [\App\Http\Controllers\QuizController::class, 'gradeResponse'])->name('grade');
         Route::post('/{quiz}/toggle-public-link', [\App\Http\Controllers\QuizController::class, 'togglePublicLink'])->name('toggle-public-link');
         Route::get('/{quiz}/cheating-logs', [\App\Http\Controllers\QuizController::class, 'cheatingLogs'])->name('cheating-logs');
+
+        // Enregistrement question par question (JSON)
+        Route::post('/{quiz}/questions', [\App\Http\Controllers\QuizQuestionController::class, 'store'])->name('questions.store');
+        Route::post('/{quiz}/questions/reorder', [\App\Http\Controllers\QuizQuestionController::class, 'reorder'])->name('questions.reorder');
+        Route::put('/{quiz}/questions/{question}', [\App\Http\Controllers\QuizQuestionController::class, 'update'])->name('questions.update');
+        Route::delete('/{quiz}/questions/{question}', [\App\Http\Controllers\QuizQuestionController::class, 'destroy'])->name('questions.destroy');
+
+        // Espace de correction des copies
+        Route::get('/{quiz}/grading', [\App\Http\Controllers\QuizGradingController::class, 'index'])->name('grading');
+        Route::post('/{quiz}/grading/{attempt}', [\App\Http\Controllers\QuizGradingController::class, 'save'])->name('grading.save');
+        Route::post('/{quiz}/grading/{attempt}/release', [\App\Http\Controllers\QuizGradingController::class, 'release'])->name('grading.release');
+        Route::post('/{quiz}/grading/{attempt}/heartbeat', [\App\Http\Controllers\QuizGradingController::class, 'heartbeat'])->name('grading.heartbeat');
+
+        // Délibération (aval des responsables)
+        Route::get('/{quiz}/deliberation', [\App\Http\Controllers\QuizDeliberationController::class, 'show'])->name('deliberation');
+        Route::post('/{quiz}/deliberation/open', [\App\Http\Controllers\QuizDeliberationController::class, 'open'])->name('deliberation.open');
+        Route::post('/{quiz}/deliberation/approve', [\App\Http\Controllers\QuizDeliberationController::class, 'approve'])->name('deliberation.approve');
+        Route::post('/{quiz}/deliberation/reopen', [\App\Http\Controllers\QuizDeliberationController::class, 'reopen'])->name('deliberation.reopen');
+
+        // Exports des résultats finaux
+        Route::get('/{quiz}/export/{format}', [\App\Http\Controllers\QuizExportController::class, 'quiz'])
+            ->whereIn('format', ['xlsx', 'pdf'])->name('export');
+    });
+
+    // Cumul de plusieurs quiz
+    Route::prefix('projects/{project}/quiz-cumuls')->name('projects.quiz-cumuls.')->scopeBindings()->group(function () {
+        Route::get('/create', [\App\Http\Controllers\QuizCumulController::class, 'create'])->name('create');
+        Route::post('/preview', [\App\Http\Controllers\QuizCumulController::class, 'preview'])->name('preview');
+        Route::post('/', [\App\Http\Controllers\QuizCumulController::class, 'store'])->name('store');
+        Route::get('/{quizCumul}', [\App\Http\Controllers\QuizCumulController::class, 'show'])->name('show');
+        Route::delete('/{quizCumul}', [\App\Http\Controllers\QuizCumulController::class, 'destroy'])->name('destroy');
+        Route::get('/{quizCumul}/export/{format}', [\App\Http\Controllers\QuizExportController::class, 'cumul'])
+            ->whereIn('format', ['xlsx', 'pdf'])->name('export');
+    });
+
+    // Bonus de participation (formations)
+    Route::prefix('projects/{project}/participation-points')->name('projects.participation.')->scopeBindings()->group(function () {
+        Route::get('/', [\App\Http\Controllers\ParticipationPointController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\ParticipationPointController::class, 'store'])->name('store');
+        Route::delete('/{participationPoint}', [\App\Http\Controllers\ParticipationPointController::class, 'destroy'])->name('destroy');
     });
 
     Route::post('/quiz-attempts/{attempt}/save-progress', [\App\Http\Controllers\QuizAttemptController::class, 'saveProgress'])

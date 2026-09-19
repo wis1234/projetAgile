@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { FaArrowLeft, FaCheckCircle, FaTimesCircle, FaClock, FaCheck, FaPen, FaPrint, FaTrophy } from 'react-icons/fa';
+import ScoreBadge from '@/Components/Quiz/ScoreBadge';
+import { FaArrowLeft, FaCheckCircle, FaTimesCircle, FaClock, FaPen, FaPrint, FaShieldAlt } from 'react-icons/fa';
 
-function Results({ project, quiz, result, attempt, questions = [], responses = [], candidate, canGrade }) {
-  const { flash = {} } = usePage().props;
+function Results({ project, quiz, result, attempt, questions = [], responses = [], candidate, canGrade, validated = false }) {
   const [gradingState, setGradingState] = useState({});
 
-  const isPassed = result.score >= 50;
+  const isPending = !!result.is_pending;
+  const isPassed = !isPending && result.score >= 50;
   const answers = attempt?.answers || {};
 
   const handleGradeSubmit = (responseId) => {
@@ -29,13 +30,6 @@ function Results({ project, quiz, result, attempt, questions = [], responses = [
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* Flash Messages */}
-        {flash.success && (
-          <div className="bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 px-5 py-3 rounded-2xl text-sm">
-            {flash.success}
-          </div>
-        )}
-
         {/* Navigation & Actions */}
         <div className="flex items-center justify-between">
           <Link
@@ -45,18 +39,28 @@ function Results({ project, quiz, result, attempt, questions = [], responses = [
             <FaArrowLeft /> Retour aux détails du quiz
           </Link>
 
-          <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-semibold transition"
-          >
-            <FaPrint /> Imprimer
-          </button>
+          <div className="flex items-center gap-2">
+            {canGrade && isPending && (
+              <Link
+                href={route('projects.quizzes.grading', [project.id, quiz.id])}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition"
+              >
+                <FaPen /> Espace de correction
+              </Link>
+            )}
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-semibold transition"
+            >
+              <FaPrint /> Imprimer
+            </button>
+          </div>
         </div>
 
         {/* Summary Banner Card */}
         <div
-          className={`bg-white dark:bg-gray-800 rounded-2xl border-t-8 p-8 shadow-sm text-center space-y-4 ${
-            isPassed ? 'border-t-emerald-500' : 'border-t-red-500'
+          className={`bg-white dark:bg-gray-800 rounded-2xl border-t-8 p-6 sm:p-8 shadow-sm text-center space-y-4 ${
+            isPending ? 'border-t-amber-400' : isPassed ? 'border-t-emerald-500' : 'border-t-red-500'
           }`}
         >
           <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">
@@ -66,31 +70,38 @@ function Results({ project, quiz, result, attempt, questions = [], responses = [
             Candidat(e) : <span className="font-semibold text-gray-800 dark:text-gray-200">{candidate.name}</span>
           </p>
 
-          <div className="inline-flex items-center justify-center p-6 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-700">
+          <div className="inline-flex items-center justify-center p-6 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-700 min-w-[12rem]">
             <div className="text-center">
               <span className="block text-xs uppercase font-bold tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                 Score Final
               </span>
-              <span
-                className={`text-5xl font-black ${
-                  isPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
-                }`}
-              >
-                {result.score}%
-              </span>
+              <ScoreBadge score={result.score_exact ?? result.score} pending={isPending} size="xl" />
             </div>
           </div>
 
-          <div>
+          {isPending && (
+            <p className="text-xs text-amber-700 dark:text-amber-300 max-w-md mx-auto">
+              Les questions écrites sont en cours de correction. Votre note finale sera affichée dès que toutes les réponses auront été notées.
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <span
               className={`px-4 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider ${
-                isPassed
+                isPending
+                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                  : isPassed
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
                   : 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300'
               }`}
             >
-              {isPassed ? 'Réussi (Admis)' : 'Échoué'}
+              {isPending ? 'En attente de correction' : isPassed ? 'Réussi (Admis)' : 'Échoué'}
             </span>
+            {validated && (
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 inline-flex items-center gap-1">
+                <FaShieldAlt /> Résultat officiel
+              </span>
+            )}
           </div>
         </div>
 

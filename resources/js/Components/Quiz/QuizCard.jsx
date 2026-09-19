@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, router } from '@inertiajs/react';
-import { FaClock, FaQuestionCircle, FaPlay, FaEdit, FaTrash, FaCheckCircle, FaTrophy, FaEye, FaLock, FaShareAlt, FaCopy, FaCheck } from 'react-icons/fa';
+import { FaClock, FaQuestionCircle, FaPlay, FaEdit, FaTrash, FaCheckCircle, FaTrophy, FaLock, FaShareAlt, FaCopy, FaCheck, FaPenFancy, FaFileSignature, FaShieldAlt } from 'react-icons/fa';
+import ScoreBadge from '@/Components/Quiz/ScoreBadge';
 
 export default function QuizCard({ quiz, project, canManage }) {
   const [copied, setCopied] = useState(false);
@@ -44,8 +45,16 @@ export default function QuizCard({ quiz, project, canManage }) {
           <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1">{quiz.title}</h3>
           <div className="flex items-center gap-1 flex-shrink-0">
             {getTypeBadge(quiz.quiz_type)}
-            {!quiz.is_active && (
+            {quiz.is_draft && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">Brouillon</span>
+            )}
+            {!quiz.is_draft && !quiz.is_active && (
               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">Inactif</span>
+            )}
+            {quiz.deliberation_status === 'validated' && (
+              <span title="Résultats validés en délibération" className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 inline-flex items-center gap-1">
+                <FaShieldAlt className="text-[10px]" /> Validé
+              </span>
             )}
           </div>
         </div>
@@ -69,12 +78,27 @@ export default function QuizCard({ quiz, project, canManage }) {
           </div>
           <div className="flex items-center gap-1.5">
             <FaTrophy className="text-amber-500" />
-            <span>Score: {quiz.user_latest_score !== null && quiz.user_latest_score !== undefined ? `${quiz.user_latest_score}%` : 'N/A'}</span>
+            <span className="flex items-center gap-1">
+              Score :{' '}
+              {quiz.user_has_completed
+                ? <ScoreBadge score={quiz.user_latest_score} pending={quiz.user_latest_pending} size="sm" />
+                : 'N/A'}
+            </span>
           </div>
         </div>
 
+        {canManage && !quiz.is_draft && quiz.pending_copies_count > 0 && (
+          <Link
+            href={route('projects.quizzes.grading', [project.id, quiz.id])}
+            className="mb-4 flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs font-semibold text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition"
+          >
+            <span className="inline-flex items-center gap-1.5"><FaPenFancy /> {quiz.pending_copies_count} copie(s) à corriger</span>
+            <span className="underline">Corriger →</span>
+          </Link>
+        )}
+
         {/* Public Share Widget */}
-        {canManage && (
+        {canManage && !quiz.is_draft && (
           <div className="mb-4 p-3 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl text-xs space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
@@ -116,9 +140,16 @@ export default function QuizCard({ quiz, project, canManage }) {
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700 gap-2">
-        <div className="flex items-center gap-2">
-          {quiz.is_active ? (
+      <div className="flex flex-wrap items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700 gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {quiz.is_draft ? (
+            <Link
+              href={route('projects.quizzes.edit', [project.id, quiz.id])}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition"
+            >
+              <FaFileSignature className="text-[10px]" /> Continuer l'édition
+            </Link>
+          ) : quiz.is_active ? (
             <Link
               href={route('projects.quizzes.show', [project.id, quiz.id])}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition"

@@ -191,4 +191,40 @@ class Project extends Model
     {
         return $this->users()->where('user_id', $user->id)->exists();
     }
+
+    /**
+     * Les responsables du projet (managers non mis en sourdine) : ce sont eux qui décident.
+     */
+    public function managers()
+    {
+        return $this->users()
+            ->wherePivot('role', 'manager')
+            ->wherePivot('is_muted', false);
+    }
+
+    /**
+     * L'utilisateur peut-il gérer les quiz (créer, corriger, délibérer, exporter) ?
+     */
+    public function userCanManageQuizzes($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        return $this->managers()->where('users.id', $user->id)->exists();
+    }
+
+    public function quizCumuls(): HasMany
+    {
+        return $this->hasMany(QuizCumul::class);
+    }
+
+    public function participationPoints(): HasMany
+    {
+        return $this->hasMany(ParticipationPoint::class);
+    }
 }

@@ -4,11 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
-use App\Models\QuizQuestion;
 use App\Models\QuizResponse;
 use App\Models\QuizResult;
+use App\Services\Quiz\QuizSubmissionService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class PublicQuizController extends Controller
@@ -170,63 +169,12 @@ class PublicQuizController extends Controller
             'cheating_logs' => 'nullable|array',
         ]);
 
-        if ($request->has('cheating_logs')) {
-            $attempt->update(['cheating_logs' => $validated['cheating_logs']]);
-        }
-
-        $answers = $validated['answers'] ?? [];
-        $questions = $quiz->questions()->get();
-
-        $qcmTotal = $questions->where('question_type', 'qcm')->count();
-        $writtenTotal = $questions->where('question_type', 'written')->count();
-        $qcmEarned = 0;
-
-        foreach ($questions as $q) {
-            $val = $answers[$q->id] ?? null;
-
-            if ($q->question_type === 'written') {
-                QuizResponse::create([
-                    'quiz_id' => $quiz->id,
-                    'question_id' => $q->id,
-                    'attempt_id' => $attempt->id,
-                    'user_id' => null,
-                    'guest_name' => $attempt->guest_name,
-                    'guest_email' => $attempt->guest_email,
-                    'answer_text' => is_string($val) ? $val : '',
-                    'grading_status' => 'pending',
-                    'score' => 0,
-                ]);
-            } else if ($q->question_type === 'qcm') {
-                if ($val !== null && (int)$val === (int)$q->correct_answer) {
-                    $qcmEarned++;
-                }
-            }
-        }
-
-        $qcmScore = $qcmTotal > 0 ? ($qcmEarned / $qcmTotal) * 100 : 0;
-        $finalScore = $qcmScore;
-
-        if ($qcmTotal > 0 && $writtenTotal > 0) {
-            $finalScore = $qcmScore / 2;
-        }
-
-        $attempt->update([
-            'answers' => $answers,
-            'status' => 'completed',
-            'completed_at' => now(),
-        ]);
-
-        $result = QuizResult::create([
-            'quiz_id' => $quiz->id,
-            'user_id' => null,
-            'guest_name' => $attempt->guest_name,
-            'guest_email' => $attempt->guest_email,
-            'attempt_id' => $attempt->id,
-            'score' => (int) round($finalScore),
-            'correct_answers' => $qcmEarned,
-            'total_questions' => $questions->count(),
-            'completed_at' => now(),
-        ]);
+        app(QuizSubmissionService::class)->finalize(
+            $quiz,
+            $attempt,
+            $validated['answers'] ?? [],
+            $validated['cheating_logs'] ?? null
+        );
 
         if ($quiz->show_results) {
             return redirect()->route('quizzes.public.results', [$token, $attempt->id]);

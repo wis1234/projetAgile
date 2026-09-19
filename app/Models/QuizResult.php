@@ -17,15 +17,48 @@ class QuizResult extends Model
         'guest_email',
         'attempt_id',
         'score',
+        'score_exact',
         'correct_answers',
         'total_questions',
+        'grading_status',
+        'completed_at',
     ];
 
     protected $casts = [
         'score' => 'integer',
+        'score_exact' => 'float',
+        'completed_at' => 'datetime',
         'correct_answers' => 'integer',
         'total_questions' => 'integer',
     ];
+
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_GRADED = 'graded';
+
+    protected $appends = ['is_pending'];
+
+    public function getIsPendingAttribute(): bool
+    {
+        return $this->grading_status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Note précise (2 décimales) : sert aux classements et aux cumuls.
+     */
+    public function exactScore(): float
+    {
+        return (float) ($this->score_exact ?? $this->score);
+    }
+
+    /**
+     * Clé stable d'un candidat (compte ProJA ou invité identifié par son e-mail).
+     */
+    public function candidateKey(): string
+    {
+        return $this->user_id
+            ? 'u' . $this->user_id
+            : 'g' . mb_strtolower(trim((string) $this->guest_email));
+    }
 
     public function quiz(): BelongsTo
     {
