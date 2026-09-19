@@ -184,7 +184,7 @@ class ProjectController extends Controller
         ]);
 
         event(new ProjectUpdated($project));
-        activity_log('create', 'Création du projet', $project, "Projet '{$project->name}' créé par " . auth()->user()->name);
+        activity_log('create', "Projet '{$project->name}' créé par " . auth()->user()->name, $project);
 
         return redirect()->route('projects.show', $project->id)
             ->with('success', 'Projet créé avec succès !');

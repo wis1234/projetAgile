@@ -189,7 +189,7 @@ class QuizController extends Controller
         });
 
         if (function_exists('activity_log')) {
-            activity_log('create', 'Création de quiz', $quiz, "Quiz '{$quiz->title}' créé par " . Auth::user()->name);
+            activity_log('create', "Quiz '{$quiz->title}' créé par " . Auth::user()->name, $quiz);
         }
 
         return redirect()->route('projects.quizzes.index', $project->id)
@@ -234,7 +234,7 @@ class QuizController extends Controller
         });
 
         if (function_exists('activity_log')) {
-            activity_log('update', 'Modification de quiz', $quiz, "Quiz '{$quiz->title}' mis à jour");
+            activity_log('update', "Quiz '{$quiz->title}' mis à jour", $quiz);
         }
 
         if ($wasDraft) {
@@ -261,7 +261,7 @@ class QuizController extends Controller
         }
 
         if (function_exists('activity_log')) {
-            activity_log('delete', 'Suppression de quiz', $project, "Quiz '{$title}' supprimé");
+            activity_log('delete', "Quiz '{$title}' supprimé", $project);
         }
 
         return redirect()->route('projects.quizzes.index', $project->id)
@@ -425,7 +425,7 @@ class QuizController extends Controller
             $cheatingCount = count($validated['cheating_logs'] ?? $attempt->cheating_logs ?? []);
             $cheatingMsg = $cheatingCount > 0 ? " (ALERTE TRICHE: {$cheatingCount} incident(s) détecté(s))" : '';
             $scoreLabel = $result->is_pending ? 'en attente de correction' : "Score: {$result->score}%";
-            activity_log('create', 'Soumission de quiz', $quiz, "Quiz '{$quiz->title}' terminé par " . $user->name . " ({$scoreLabel}){$cheatingMsg}");
+            activity_log('create', "Quiz '{$quiz->title}' terminé par " . $user->name . " ({$scoreLabel}){$cheatingMsg}", $quiz);
         }
 
         if ($quiz->show_results) {

@@ -172,16 +172,34 @@ if (typeof window !== 'undefined') {
         }
     });
 
-    // Fix 3 — Interception globale des réponses invalides (401 / 403 / 419)
+    // Fix 3 — Interception globale des réponses invalides
+    // Seules les sessions expirées (401 / 419) renvoient vers /login. Une erreur applicative
+    // (404, 422, 423, 500…) laisse l'utilisateur sur sa page : renvoyer un utilisateur déjà
+    // connecté vers /login le ramenait au dashboard au lieu de la page attendue.
     router.on('invalid', (event) => {
         event.preventDefault();
-        const status = event.detail.response.status;
+        const response = event.detail.response;
+        const status = response.status;
 
         if (status === 403) {
             window.location.href = '/403';
-        } else {
-            // 401, 419 (CSRF/session expirés), ou tout autre cas inattendu
-            window.location.href = '/login';
+            return;
         }
+
+        if (status === 401 || status === 419) {
+            window.location.href = '/login';
+            return;
+        }
+
+        let message = null;
+        try {
+            const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+            message = data?.message || null;
+        } catch {
+            // Réponse HTML : pas de message exploitable.
+        }
+
+        console.error(`Réponse inattendue (${status}) pour ${response.config?.url ?? window.location.pathname}`);
+        window.alert(message || `Une erreur est survenue (code ${status}). Veuillez réessayer ou rafraîchir la page.`);
     });
 }

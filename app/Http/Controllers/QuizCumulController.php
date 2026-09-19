@@ -115,7 +115,7 @@ class QuizCumulController extends Controller
         });
 
         if (function_exists('activity_log')) {
-            activity_log('create', 'Création de quiz cumulé', $project, "Quiz cumulé '{$cumul->title}' créé (" . count($data['items']) . ' quiz)');
+            activity_log('create', "Quiz cumulé '{$cumul->title}' créé (" . count($data['items']) . ' quiz)', $project);
         }
 
         return redirect()->route('projects.quizzes.index', $project->id)

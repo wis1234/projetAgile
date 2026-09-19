@@ -95,7 +95,7 @@ class QuizGradingController extends Controller
         $name = $attempt->user?->name ?? $attempt->guest_name ?? 'le candidat';
 
         if (function_exists('activity_log')) {
-            activity_log('update', 'Correction de copie', $quiz, "Copie de {$name} corrigée pour le quiz '{$quiz->title}' (" . ($result->is_pending ? 'partielle' : $result->score . '%') . ')');
+            activity_log('update', "Copie de {$name} corrigée pour le quiz '{$quiz->title}' (" . ($result->is_pending ? 'partielle' : $result->score . '%') . ')', $quiz);
         }
 
         return redirect()

@@ -49,7 +49,7 @@ class QuizDeliberationController extends Controller
         $this->deliberation->open($quiz, Auth::user());
 
         if (function_exists('activity_log')) {
-            activity_log('update', 'Délibération ouverte', $quiz, "Délibération ouverte pour le quiz '{$quiz->title}' par " . Auth::user()->name);
+            activity_log('update', "Délibération ouverte pour le quiz '{$quiz->title}' par " . Auth::user()->name, $quiz);
         }
 
         return redirect()->route('projects.quizzes.deliberation', [$project->id, $quiz->id])
@@ -70,7 +70,7 @@ class QuizDeliberationController extends Controller
         $quiz = $this->deliberation->approve($quiz, Auth::user(), $data['password'], $request);
 
         if (function_exists('activity_log')) {
-            activity_log('update', 'Aval de délibération', $quiz, Auth::user()->name . " a donné son aval pour le quiz '{$quiz->title}'");
+            activity_log('update', Auth::user()->name . " a donné son aval pour le quiz '{$quiz->title}'", $quiz);
         }
 
         return redirect()->route('projects.quizzes.deliberation', [$project->id, $quiz->id])

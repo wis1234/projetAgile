@@ -98,7 +98,7 @@ class ParticipationPointController extends Controller
         ]);
 
         if (function_exists('activity_log')) {
-            activity_log('create', 'Bonus de participation', $project, sprintf('%+g point(s) attribué(s) à %s', $point->points, $point->user?->name));
+            activity_log('create', sprintf('%+g point(s) attribué(s) à %s', $point->points, $point->user?->name), $project);
         }
 
         return back()->with('success', 'Bonus de participation enregistré.');

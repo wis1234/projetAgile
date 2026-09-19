@@ -10,6 +10,16 @@ import {
 } from 'react-icons/fa';
 
 const TYPE_LABEL = { qcm: 'QCM', written: 'Écrit', mixed: 'Mixte' };
+// Le coefficient est saisi librement en texte (virgule ou point) et n'est interprété qu'ensuite.
+// <input type="number" min="0.01" step="0.5"> n'acceptait que 0,01 + 0,5 × n (1,01 · 1,51 · 2,01 · 3,01…) :
+// le navigateur bloquait « 2 » et les flèches proposaient 2,01.
+const parseCoef = (text) => {
+  const n = Number(String(text).trim().replace(',', '.'));
+  return Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
+};
+const COEF_INPUT = /^\d{0,3}([.,]\d{0,2})?$/; // jusqu'à 2 décimales
+const COEF_PRESETS = [1, 2, 3, 4, 5];
+
 const TYPE_TONE = { qcm: 'bg-blue-100 text-blue-700', written: 'bg-purple-100 text-purple-700', mixed: 'bg-amber-100 text-amber-700' };
 
 function CumulCreate({ project, quizzes = [], cap }) {
@@ -25,9 +35,10 @@ function CumulCreate({ project, quizzes = [], cap }) {
   const reqId = useRef(0);
 
   const items = useMemo(
-    () => Object.entries(selected).map(([id, coef]) => ({ quiz_id: Number(id), coefficient: Number(coef) || 1 })),
+    () => Object.entries(selected).map(([id, coef]) => ({ quiz_id: Number(id), coefficient: parseCoef(coef) })),
     [selected]
   );
+  const invalidCoef = items.some((i) => i.coefficient === null);
 
   const toggle = (q) => {
     if (!q.selectable) return;
@@ -48,7 +59,7 @@ function CumulCreate({ project, quizzes = [], cap }) {
 
   // Aperçu du calcul : recalculé automatiquement (léger délai pour éviter les appels en rafale)
   useEffect(() => {
-    if (items.length < 2) {
+    if (items.length < 2 || invalidCoef) {
       setPreview(null);
       return undefined;
     }
@@ -69,10 +80,14 @@ function CumulCreate({ project, quizzes = [], cap }) {
       }
     }, 350);
     return () => clearTimeout(t);
-  }, [items, missingPolicy, includeBonus, project.id]);
+  }, [items, invalidCoef, missingPolicy, includeBonus, project.id]);
 
   const submit = (e) => {
     e.preventDefault();
+    if (invalidCoef) {
+      setErrors((prev) => ({ ...prev, items: 'Un coefficient est invalide : saisissez un nombre entre 0,01 et 100 (ex. 2 ou 2,5).' }));
+      return;
+    }
     setSaving(true);
     router.post(
       route('projects.quiz-cumuls.store', project.id),
@@ -85,7 +100,7 @@ function CumulCreate({ project, quizzes = [], cap }) {
   };
 
   const selectedCount = items.length;
-  const canSubmit = selectedCount >= 2 && title.trim().length > 0 && !saving;
+  const canSubmit = selectedCount >= 2 && title.trim().length > 0 && !invalidCoef && !saving;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 sm:py-8">
@@ -161,11 +176,37 @@ function CumulCreate({ project, quizzes = [], cap }) {
                         <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           <label className="text-[11px] font-bold uppercase text-indigo-700 dark:text-indigo-300">Coef.</label>
                           <input
-                            type="number" min="0.01" max="100" step="0.5"
-                            value={selected[q.id]}
-                            onChange={(e) => setSelected((s) => ({ ...s, [q.id]: e.target.value }))}
-                            className="w-20 rounded-lg border-indigo-200 dark:border-indigo-800 dark:bg-gray-900 dark:text-white text-sm text-center font-bold py-1 focus:ring-indigo-500 focus:border-indigo-500"
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            placeholder="1"
+                            value={String(selected[q.id])}
+                            onChange={(e) => {
+                              const text = e.target.value;
+                              if (COEF_INPUT.test(text)) setSelected((s) => ({ ...s, [q.id]: text }));
+                            }}
+                            onFocus={(e) => e.target.select()}
+                            aria-invalid={parseCoef(selected[q.id]) === null}
+                            className={`w-20 rounded-lg dark:bg-gray-900 dark:text-white text-sm text-center font-bold py-1 focus:ring-indigo-500 focus:border-indigo-500 ${
+                              parseCoef(selected[q.id]) === null ? 'border-red-400' : 'border-indigo-200 dark:border-indigo-800'
+                            }`}
                           />
+                          <div className="flex gap-1">
+                            {COEF_PRESETS.map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setSelected((s) => ({ ...s, [q.id]: String(c) }))}
+                                className={`w-6 h-6 rounded-md text-[11px] font-bold transition ${
+                                  parseCoef(selected[q.id]) === c
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-indigo-400'
+                                }`}
+                              >
+                                {c}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>

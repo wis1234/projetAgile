@@ -274,11 +274,11 @@ class UserController extends Controller
         }
 
         // Journaliser l'action
-        activity_log('update', 'Changement de rôle', $user, [
-            'old_role' => $oldRole,
-            'new_role' => $validated['role'],
-            'changed_by' => $current->id
-        ]);
+        activity_log(
+            'update',
+            "Rôle de {$user->name} modifié : {$oldRole} → {$validated['role']} (par {$current->name})",
+            $user
+        );
 
         return response()->json([
             'success' => true,

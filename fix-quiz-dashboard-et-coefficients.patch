@@ -1,0 +1,557 @@
+From 06e90609f6f7f897f62e54badd89900aa75851f7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 19 Sep 2026 21:10:19 +0000
+Subject: [PATCH] Quiz : corrige les erreurs 500 (activity_log) qui renvoyaient
+ au dashboard, coefficients libres, gestionnaire invalid
+
+---
+ .../ParticipationPointController.php          |   2 +-
+ app/Http/Controllers/ProjectController.php    |   2 +-
+ app/Http/Controllers/QuizController.php       |   8 +-
+ app/Http/Controllers/QuizCumulController.php  |   2 +-
+ .../QuizDeliberationController.php            |   4 +-
+ .../Controllers/QuizGradingController.php     |   2 +-
+ app/Http/Controllers/UserController.php       |  10 +-
+ resources/js/Pages/Quizzes/CumulCreate.jsx    |  57 ++++++--
+ resources/js/app.jsx                          |  28 +++-
+ resources/js/lib/globalErrorHandler.js        |   4 +-
+ .../Quiz/QuizActionsDoNotErrorTest.php        | 126 ++++++++++++++++++
+ tests/Feature/Quiz/QuizHttpTestCase.php       |  82 ++++++++++++
+ 12 files changed, 297 insertions(+), 30 deletions(-)
+ create mode 100644 tests/Feature/Quiz/QuizActionsDoNotErrorTest.php
+ create mode 100644 tests/Feature/Quiz/QuizHttpTestCase.php
+
+diff --git a/app/Http/Controllers/ParticipationPointController.php b/app/Http/Controllers/ParticipationPointController.php
+index a4117ae..3bf9aba 100644
+--- a/app/Http/Controllers/ParticipationPointController.php
++++ b/app/Http/Controllers/ParticipationPointController.php
+@@ -98,7 +98,7 @@ public function store(Request $request, Project $project)
+         ]);
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('create', 'Bonus de participation', $project, sprintf('%+g point(s) attribué(s) à %s', $point->points, $point->user?->name));
++            activity_log('create', sprintf('%+g point(s) attribué(s) à %s', $point->points, $point->user?->name), $project);
+         }
+ 
+         return back()->with('success', 'Bonus de participation enregistré.');
+diff --git a/app/Http/Controllers/ProjectController.php b/app/Http/Controllers/ProjectController.php
+index 924f760..19ee0b7 100644
+--- a/app/Http/Controllers/ProjectController.php
++++ b/app/Http/Controllers/ProjectController.php
+@@ -184,7 +184,7 @@ public function store(Request $request)
+         ]);
+ 
+         event(new ProjectUpdated($project));
+-        activity_log('create', 'Création du projet', $project, "Projet '{$project->name}' créé par " . auth()->user()->name);
++        activity_log('create', "Projet '{$project->name}' créé par " . auth()->user()->name, $project);
+ 
+         return redirect()->route('projects.show', $project->id)
+             ->with('success', 'Projet créé avec succès !');
+diff --git a/app/Http/Controllers/QuizController.php b/app/Http/Controllers/QuizController.php
+index 4f76c83..c5f1179 100644
+--- a/app/Http/Controllers/QuizController.php
++++ b/app/Http/Controllers/QuizController.php
+@@ -189,7 +189,7 @@ public function store(StoreQuizRequest $request, Project $project)
+         });
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('create', 'Création de quiz', $quiz, "Quiz '{$quiz->title}' créé par " . Auth::user()->name);
++            activity_log('create', "Quiz '{$quiz->title}' créé par " . Auth::user()->name, $quiz);
+         }
+ 
+         return redirect()->route('projects.quizzes.index', $project->id)
+@@ -234,7 +234,7 @@ public function update(UpdateQuizRequest $request, Project $project, Quiz $quiz)
+         });
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('update', 'Modification de quiz', $quiz, "Quiz '{$quiz->title}' mis à jour");
++            activity_log('update', "Quiz '{$quiz->title}' mis à jour", $quiz);
+         }
+ 
+         if ($wasDraft) {
+@@ -261,7 +261,7 @@ public function destroy(Project $project, Quiz $quiz)
+         }
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('delete', 'Suppression de quiz', $project, "Quiz '{$title}' supprimé");
++            activity_log('delete', "Quiz '{$title}' supprimé", $project);
+         }
+ 
+         return redirect()->route('projects.quizzes.index', $project->id)
+@@ -425,7 +425,7 @@ public function submit(Request $request, Project $project, Quiz $quiz)
+             $cheatingCount = count($validated['cheating_logs'] ?? $attempt->cheating_logs ?? []);
+             $cheatingMsg = $cheatingCount > 0 ? " (ALERTE TRICHE: {$cheatingCount} incident(s) détecté(s))" : '';
+             $scoreLabel = $result->is_pending ? 'en attente de correction' : "Score: {$result->score}%";
+-            activity_log('create', 'Soumission de quiz', $quiz, "Quiz '{$quiz->title}' terminé par " . $user->name . " ({$scoreLabel}){$cheatingMsg}");
++            activity_log('create', "Quiz '{$quiz->title}' terminé par " . $user->name . " ({$scoreLabel}){$cheatingMsg}", $quiz);
+         }
+ 
+         if ($quiz->show_results) {
+diff --git a/app/Http/Controllers/QuizCumulController.php b/app/Http/Controllers/QuizCumulController.php
+index cbbe538..b854814 100644
+--- a/app/Http/Controllers/QuizCumulController.php
++++ b/app/Http/Controllers/QuizCumulController.php
+@@ -115,7 +115,7 @@ public function store(Request $request, Project $project)
+         });
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('create', 'Création de quiz cumulé', $project, "Quiz cumulé '{$cumul->title}' créé (" . count($data['items']) . ' quiz)');
++            activity_log('create', "Quiz cumulé '{$cumul->title}' créé (" . count($data['items']) . ' quiz)', $project);
+         }
+ 
+         return redirect()->route('projects.quizzes.index', $project->id)
+diff --git a/app/Http/Controllers/QuizDeliberationController.php b/app/Http/Controllers/QuizDeliberationController.php
+index 97092bf..38d3850 100644
+--- a/app/Http/Controllers/QuizDeliberationController.php
++++ b/app/Http/Controllers/QuizDeliberationController.php
+@@ -49,7 +49,7 @@ public function open(Project $project, Quiz $quiz)
+         $this->deliberation->open($quiz, Auth::user());
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('update', 'Délibération ouverte', $quiz, "Délibération ouverte pour le quiz '{$quiz->title}' par " . Auth::user()->name);
++            activity_log('update', "Délibération ouverte pour le quiz '{$quiz->title}' par " . Auth::user()->name, $quiz);
+         }
+ 
+         return redirect()->route('projects.quizzes.deliberation', [$project->id, $quiz->id])
+@@ -70,7 +70,7 @@ public function approve(Request $request, Project $project, Quiz $quiz)
+         $quiz = $this->deliberation->approve($quiz, Auth::user(), $data['password'], $request);
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('update', 'Aval de délibération', $quiz, Auth::user()->name . " a donné son aval pour le quiz '{$quiz->title}'");
++            activity_log('update', Auth::user()->name . " a donné son aval pour le quiz '{$quiz->title}'", $quiz);
+         }
+ 
+         return redirect()->route('projects.quizzes.deliberation', [$project->id, $quiz->id])
+diff --git a/app/Http/Controllers/QuizGradingController.php b/app/Http/Controllers/QuizGradingController.php
+index 675fb92..f4b1116 100644
+--- a/app/Http/Controllers/QuizGradingController.php
++++ b/app/Http/Controllers/QuizGradingController.php
+@@ -95,7 +95,7 @@ public function save(Request $request, Project $project, Quiz $quiz, QuizAttempt
+         $name = $attempt->user?->name ?? $attempt->guest_name ?? 'le candidat';
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('update', 'Correction de copie', $quiz, "Copie de {$name} corrigée pour le quiz '{$quiz->title}' (" . ($result->is_pending ? 'partielle' : $result->score . '%') . ')');
++            activity_log('update', "Copie de {$name} corrigée pour le quiz '{$quiz->title}' (" . ($result->is_pending ? 'partielle' : $result->score . '%') . ')', $quiz);
+         }
+ 
+         return redirect()
+diff --git a/app/Http/Controllers/UserController.php b/app/Http/Controllers/UserController.php
+index 9e9c290..80ca2aa 100644
+--- a/app/Http/Controllers/UserController.php
++++ b/app/Http/Controllers/UserController.php
+@@ -274,11 +274,11 @@ public function assignRole(Request $request, $id)
+         }
+ 
+         // Journaliser l'action
+-        activity_log('update', 'Changement de rôle', $user, [
+-            'old_role' => $oldRole,
+-            'new_role' => $validated['role'],
+-            'changed_by' => $current->id
+-        ]);
++        activity_log(
++            'update',
++            "Rôle de {$user->name} modifié : {$oldRole} → {$validated['role']} (par {$current->name})",
++            $user
++        );
+ 
+         return response()->json([
+             'success' => true,
+diff --git a/resources/js/Pages/Quizzes/CumulCreate.jsx b/resources/js/Pages/Quizzes/CumulCreate.jsx
+index 41f69cd..f59e094 100644
+--- a/resources/js/Pages/Quizzes/CumulCreate.jsx
++++ b/resources/js/Pages/Quizzes/CumulCreate.jsx
+@@ -10,6 +10,16 @@ import {
+ } from 'react-icons/fa';
+ 
+ const TYPE_LABEL = { qcm: 'QCM', written: 'Écrit', mixed: 'Mixte' };
++// Le coefficient est saisi librement en texte (virgule ou point) et n'est interprété qu'ensuite.
++// <input type="number" min="0.01" step="0.5"> n'acceptait que 0,01 + 0,5 × n (1,01 · 1,51 · 2,01 · 3,01…) :
++// le navigateur bloquait « 2 » et les flèches proposaient 2,01.
++const parseCoef = (text) => {
++  const n = Number(String(text).trim().replace(',', '.'));
++  return Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
++};
++const COEF_INPUT = /^\d{0,3}([.,]\d{0,2})?$/; // jusqu'à 2 décimales
++const COEF_PRESETS = [1, 2, 3, 4, 5];
++
+ const TYPE_TONE = { qcm: 'bg-blue-100 text-blue-700', written: 'bg-purple-100 text-purple-700', mixed: 'bg-amber-100 text-amber-700' };
+ 
+ function CumulCreate({ project, quizzes = [], cap }) {
+@@ -25,9 +35,10 @@ function CumulCreate({ project, quizzes = [], cap }) {
+   const reqId = useRef(0);
+ 
+   const items = useMemo(
+-    () => Object.entries(selected).map(([id, coef]) => ({ quiz_id: Number(id), coefficient: Number(coef) || 1 })),
++    () => Object.entries(selected).map(([id, coef]) => ({ quiz_id: Number(id), coefficient: parseCoef(coef) })),
+     [selected]
+   );
++  const invalidCoef = items.some((i) => i.coefficient === null);
+ 
+   const toggle = (q) => {
+     if (!q.selectable) return;
+@@ -48,7 +59,7 @@ function CumulCreate({ project, quizzes = [], cap }) {
+ 
+   // Aperçu du calcul : recalculé automatiquement (léger délai pour éviter les appels en rafale)
+   useEffect(() => {
+-    if (items.length < 2) {
++    if (items.length < 2 || invalidCoef) {
+       setPreview(null);
+       return undefined;
+     }
+@@ -69,10 +80,14 @@ function CumulCreate({ project, quizzes = [], cap }) {
+       }
+     }, 350);
+     return () => clearTimeout(t);
+-  }, [items, missingPolicy, includeBonus, project.id]);
++  }, [items, invalidCoef, missingPolicy, includeBonus, project.id]);
+ 
+   const submit = (e) => {
+     e.preventDefault();
++    if (invalidCoef) {
++      setErrors((prev) => ({ ...prev, items: 'Un coefficient est invalide : saisissez un nombre entre 0,01 et 100 (ex. 2 ou 2,5).' }));
++      return;
++    }
+     setSaving(true);
+     router.post(
+       route('projects.quiz-cumuls.store', project.id),
+@@ -85,7 +100,7 @@ function CumulCreate({ project, quizzes = [], cap }) {
+   };
+ 
+   const selectedCount = items.length;
+-  const canSubmit = selectedCount >= 2 && title.trim().length > 0 && !saving;
++  const canSubmit = selectedCount >= 2 && title.trim().length > 0 && !invalidCoef && !saving;
+ 
+   return (
+     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 sm:py-8">
+@@ -161,11 +176,37 @@ function CumulCreate({ project, quizzes = [], cap }) {
+                         <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                           <label className="text-[11px] font-bold uppercase text-indigo-700 dark:text-indigo-300">Coef.</label>
+                           <input
+-                            type="number" min="0.01" max="100" step="0.5"
+-                            value={selected[q.id]}
+-                            onChange={(e) => setSelected((s) => ({ ...s, [q.id]: e.target.value }))}
+-                            className="w-20 rounded-lg border-indigo-200 dark:border-indigo-800 dark:bg-gray-900 dark:text-white text-sm text-center font-bold py-1 focus:ring-indigo-500 focus:border-indigo-500"
++                            type="text"
++                            inputMode="decimal"
++                            autoComplete="off"
++                            placeholder="1"
++                            value={String(selected[q.id])}
++                            onChange={(e) => {
++                              const text = e.target.value;
++                              if (COEF_INPUT.test(text)) setSelected((s) => ({ ...s, [q.id]: text }));
++                            }}
++                            onFocus={(e) => e.target.select()}
++                            aria-invalid={parseCoef(selected[q.id]) === null}
++                            className={`w-20 rounded-lg dark:bg-gray-900 dark:text-white text-sm text-center font-bold py-1 focus:ring-indigo-500 focus:border-indigo-500 ${
++                              parseCoef(selected[q.id]) === null ? 'border-red-400' : 'border-indigo-200 dark:border-indigo-800'
++                            }`}
+                           />
++                          <div className="flex gap-1">
++                            {COEF_PRESETS.map((c) => (
++                              <button
++                                key={c}
++                                type="button"
++                                onClick={() => setSelected((s) => ({ ...s, [q.id]: String(c) }))}
++                                className={`w-6 h-6 rounded-md text-[11px] font-bold transition ${
++                                  parseCoef(selected[q.id]) === c
++                                    ? 'bg-indigo-600 text-white'
++                                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-indigo-400'
++                                }`}
++                              >
++                                {c}
++                              </button>
++                            ))}
++                          </div>
+                         </div>
+                       )}
+                     </div>
+diff --git a/resources/js/app.jsx b/resources/js/app.jsx
+index 3bbabb0..3167792 100644
+--- a/resources/js/app.jsx
++++ b/resources/js/app.jsx
+@@ -172,16 +172,34 @@ if (typeof window !== 'undefined') {
+         }
+     });
+ 
+-    // Fix 3 — Interception globale des réponses invalides (401 / 403 / 419)
++    // Fix 3 — Interception globale des réponses invalides
++    // Seules les sessions expirées (401 / 419) renvoient vers /login. Une erreur applicative
++    // (404, 422, 423, 500…) laisse l'utilisateur sur sa page : renvoyer un utilisateur déjà
++    // connecté vers /login le ramenait au dashboard au lieu de la page attendue.
+     router.on('invalid', (event) => {
+         event.preventDefault();
+-        const status = event.detail.response.status;
++        const response = event.detail.response;
++        const status = response.status;
+ 
+         if (status === 403) {
+             window.location.href = '/403';
+-        } else {
+-            // 401, 419 (CSRF/session expirés), ou tout autre cas inattendu
++            return;
++        }
++
++        if (status === 401 || status === 419) {
+             window.location.href = '/login';
++            return;
++        }
++
++        let message = null;
++        try {
++            const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
++            message = data?.message || null;
++        } catch {
++            // Réponse HTML : pas de message exploitable.
+         }
++
++        console.error(`Réponse inattendue (${status}) pour ${response.config?.url ?? window.location.pathname}`);
++        window.alert(message || `Une erreur est survenue (code ${status}). Veuillez réessayer ou rafraîchir la page.`);
+     });
+-}
+\ No newline at end of file
++}
+diff --git a/resources/js/lib/globalErrorHandler.js b/resources/js/lib/globalErrorHandler.js
+index d9a1b02..6f4a0a6 100644
+--- a/resources/js/lib/globalErrorHandler.js
++++ b/resources/js/lib/globalErrorHandler.js
+@@ -27,7 +27,7 @@ export function setupGlobalErrorHandler() {
+             // Réponse HTML inattendue (Laravel renvoie la page login en HTML)
+             // = session expirée non interceptée avant
+             const contentType = headers['content-type'] ?? '';
+-            if (contentType.includes('text/html')) {
++            if (contentType.includes('text/html') && status < 400) {
+                 redirectToLogin();
+                 return new Promise(() => {});
+             }
+@@ -50,7 +50,7 @@ export function setupGlobalErrorHandler() {
+         }
+ 
+         const contentType = headers?.['content-type'] ?? '';
+-        if (contentType.includes('text/html')) {
++        if (contentType.includes('text/html') && status < 400) {
+             event.preventDefault();
+             redirectToLogin();
+         }
+diff --git a/tests/Feature/Quiz/QuizActionsDoNotErrorTest.php b/tests/Feature/Quiz/QuizActionsDoNotErrorTest.php
+new file mode 100644
+index 0000000..5fb4041
+--- /dev/null
++++ b/tests/Feature/Quiz/QuizActionsDoNotErrorTest.php
+@@ -0,0 +1,126 @@
++<?php
++
++namespace Tests\Feature\Quiz;
++
++use App\Models\Quiz;
++use App\Models\QuizAttempt;
++use App\Models\QuizResponse;
++
++/**
++ * Régression : chaque action du module doit répondre par une redirection / du JSON valides.
++ * Un code 500 renvoyait l'utilisateur vers /login, donc vers le dashboard, via le gestionnaire
++ * global « invalid » d'Inertia.
++ */
++class QuizActionsDoNotErrorTest extends QuizHttpTestCase
++{
++    public function test_create_update_and_delete_a_quiz(): void
++    {
++        $base = "/projects/{$this->project->id}/quizzes";
++        $questions = [$this->qcm() + ['question_text' => 'Q ?']];
++
++        $this->actingAs($this->manager1)->post($base, [
++            'title' => 'Nouveau', 'duration_minutes' => 10, 'max_attempts' => 1, 'questions' => $questions,
++        ])->assertRedirect(route('projects.quizzes.index', $this->project->id));
++
++        $quiz = Quiz::where('title', 'Nouveau')->firstOrFail();
++
++        $this->actingAs($this->manager1)->put("$base/{$quiz->id}", [
++            'title' => 'Renommé', 'duration_minutes' => 10, 'max_attempts' => 1, 'questions' => $questions,
++        ])->assertRedirect();
++
++        $this->actingAs($this->manager1)->delete("$base/{$quiz->id}")->assertRedirect();
++        $this->assertNull(Quiz::find($quiz->id));
++    }
++
++    public function test_submit_grade_deliberate_and_cumulate(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm(), $this->written()]);
++        $other = $this->makeQuiz([$this->qcm()], 'Second quiz');
++        [$qcm, $written] = $quiz->questions->all();
++
++        // --- Soumission par le candidat --------------------------------
++        $this->actingAs($this->candidate)->post($this->quizUrl($quiz, '/launch'))->assertOk();
++        $attempt = QuizAttempt::where('quiz_id', $quiz->id)->firstOrFail();
++
++        $this->actingAs($this->candidate)->post($this->quizUrl($quiz, '/submit'), [
++            'attempt_id' => $attempt->id,
++            'answers' => [$qcm->id => 0, $written->id => 'Une réponse rédigée'],
++        ])->assertRedirect();
++
++        $this->actingAs($this->candidate)->post($this->quizUrl($other, '/launch'))->assertOk();
++        $otherAttempt = QuizAttempt::where('quiz_id', $other->id)->firstOrFail();
++        $this->actingAs($this->candidate)->post($this->quizUrl($other, '/submit'), [
++            'attempt_id' => $otherAttempt->id, 'answers' => [$other->questions->first()->id => 0],
++        ])->assertRedirect();
++
++        // --- Correction ------------------------------------------------
++        $response = QuizResponse::where('attempt_id', $attempt->id)->firstOrFail();
++        $this->actingAs($this->manager1)->post($this->quizUrl($quiz, "/grading/{$attempt->id}"), [
++            'grades' => [['response_id' => $response->id, 'score' => 8, 'comment' => 'Bien']],
++        ])->assertRedirect();
++
++        // --- Délibération ----------------------------------------------
++        $this->actingAs($this->manager1)->post($this->quizUrl($quiz, '/deliberation/open'))->assertRedirect();
++        $this->actingAs($this->manager1)->post($this->quizUrl($quiz, '/deliberation/approve'), ['password' => 'password'])->assertRedirect();
++        $this->actingAs($this->manager2)->post($this->quizUrl($quiz, '/deliberation/approve'), ['password' => 'password'])->assertRedirect();
++
++        // --- Cumul -----------------------------------------------------
++        $this->actingAs($this->manager1)->post("/projects/{$this->project->id}/quiz-cumuls", [
++            'title' => 'Cumul',
++            'items' => [
++                ['quiz_id' => $quiz->id, 'coefficient' => 2],
++                ['quiz_id' => $other->id, 'coefficient' => 3],
++            ],
++            'missing_policy' => 'zero',
++            'include_bonus' => true,
++        ])->assertRedirect();
++    }
++
++    public function test_cumul_keeps_the_exact_coefficients_chosen(): void
++    {
++        $q1 = $this->makeQuiz([$this->qcm()], 'Quiz 1');
++        $q2 = $this->makeQuiz([$this->qcm()], 'Quiz 2');
++
++        // Le candidat obtient 100 % au Quiz 1 et 0 % au Quiz 2
++        foreach ([[$q1, 0], [$q2, 1]] as [$quiz, $answer]) {
++            $this->actingAs($this->candidate)->post($this->quizUrl($quiz, '/launch'))->assertOk();
++            $attempt = QuizAttempt::where('quiz_id', $quiz->id)->firstOrFail();
++            $this->actingAs($this->candidate)->post($this->quizUrl($quiz, '/submit'), [
++                'attempt_id' => $attempt->id, 'answers' => [$quiz->questions->first()->id => $answer],
++            ])->assertRedirect();
++        }
++
++        $url = "/projects/{$this->project->id}/quiz-cumuls";
++        $payload = fn (array $c) => [
++            'items' => [['quiz_id' => $q1->id, 'coefficient' => $c[0]], ['quiz_id' => $q2->id, 'coefficient' => $c[1]]],
++            'missing_policy' => 'zero', 'include_bonus' => true,
++        ];
++
++        // 2 et 3 : exactement ceux choisis (pas 2,01 / 3,01) -> (100×2 + 0×3) / 5 = 40
++        $json = $this->actingAs($this->manager1)->postJson("$url/preview", $payload([2, 3]))->assertOk()->json();
++        $this->assertEquals([2.0, 3.0], array_column($json['quizzes'], 'coefficient'));
++        $this->assertEquals(40, $json['rows'][0]['average']);
++        $this->assertStringContainsString('× 2', $json['rows'][0]['calculation']);
++
++        // Décimales libres
++        $json = $this->actingAs($this->manager1)->postJson("$url/preview", $payload([2.5, 0.75]))->assertOk()->json();
++        $this->assertEquals([2.5, 0.75], array_column($json['quizzes'], 'coefficient'));
++        $this->assertEquals(76.92, $json['rows'][0]['average']); // 250 / 3,25
++
++        $this->actingAs($this->manager1)->post($url, $payload([3, 2.5]) + ['title' => 'Pondéré'])->assertSessionHasNoErrors();
++        $stored = \App\Models\QuizCumul::firstOrFail()->items()->orderBy('id')->pluck('coefficient')->map(fn ($v) => (float) $v)->all();
++        $this->assertSame([3.0, 2.5], $stored);
++    }
++
++    public function test_participation_bonus_can_be_awarded_and_removed(): void
++    {
++        $url = "/projects/{$this->project->id}/participation-points";
++
++        $this->actingAs($this->manager1)->post($url, ['user_id' => $this->candidate->id, 'points' => 2, 'reason' => 'Très actif'])
++            ->assertRedirect()->assertSessionHasNoErrors();
++
++        $point = \App\Models\ParticipationPoint::firstOrFail();
++        $this->actingAs($this->manager1)->delete("$url/{$point->id}")->assertRedirect();
++        $this->assertSame(0, \App\Models\ParticipationPoint::count());
++    }
++}
+diff --git a/tests/Feature/Quiz/QuizHttpTestCase.php b/tests/Feature/Quiz/QuizHttpTestCase.php
+new file mode 100644
+index 0000000..894a11a
+--- /dev/null
++++ b/tests/Feature/Quiz/QuizHttpTestCase.php
+@@ -0,0 +1,82 @@
++<?php
++
++namespace Tests\Feature\Quiz;
++
++use App\Models\Project;
++use App\Models\Quiz;
++use App\Models\User;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
++use Spatie\Permission\Models\Role;
++
++/**
++ * Base des tests HTTP du module Quiz (les tests existants appellent les services directement
++ * et ne passent donc jamais par les contrôleurs). Les migrations du projet utilisent du SQL
++ * MySQL : lancer avec DB_CONNECTION=mysql.
++ */
++abstract class QuizHttpTestCase extends BaseTestCase
++{
++    use RefreshDatabase;
++
++    protected Project $project;
++    protected User $manager1;
++    protected User $manager2;
++    protected User $candidate;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++
++        $this->withoutVite();
++        config(['inertia.testing.ensure_pages_exist' => false]);
++
++        foreach (['admin', 'manager', 'member'] as $role) {
++            Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
++        }
++
++        $this->project = Project::factory()->create();
++        $this->manager1 = User::factory()->create(['name' => 'Alice Manager']);
++        $this->manager2 = User::factory()->create(['name' => 'Bob Manager']);
++        $this->candidate = User::factory()->create(['name' => 'Chloé Candidate']);
++
++        foreach ([$this->manager1, $this->manager2] as $m) {
++            $this->project->users()->attach($m->id, ['role' => 'manager', 'is_muted' => false]);
++        }
++        $this->project->users()->attach($this->candidate->id, ['role' => 'collaborator', 'is_muted' => false]);
++    }
++
++    protected function makeQuiz(array $questions, string $title = 'Quiz test'): Quiz
++    {
++        $quiz = Quiz::create([
++            'project_id' => $this->project->id,
++            'created_by' => $this->manager1->id,
++            'title' => $title,
++            'quiz_type' => 'mixed',
++            'duration_minutes' => 10,
++            'max_attempts' => 2,
++            'is_active' => true,
++            'show_results' => true,
++        ]);
++
++        foreach ($questions as $i => $q) {
++            $quiz->questions()->create($q + ['order' => $i + 1]);
++        }
++
++        return $quiz->refresh();
++    }
++
++    protected function qcm(int $correct = 0): array
++    {
++        return ['question_text' => 'QCM ?', 'question_type' => 'qcm', 'option_a' => 'A', 'option_b' => 'B', 'correct_answer' => $correct];
++    }
++
++    protected function written(string $text = 'Expliquez'): array
++    {
++        return ['question_text' => $text, 'question_type' => 'written'];
++    }
++
++    protected function quizUrl(Quiz $quiz, string $suffix = ''): string
++    {
++        return "/projects/{$this->project->id}/quizzes/{$quiz->id}" . $suffix;
++    }
++}
+-- 
+2.43.0
+

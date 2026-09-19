@@ -27,7 +27,7 @@ export function setupGlobalErrorHandler() {
             // Réponse HTML inattendue (Laravel renvoie la page login en HTML)
             // = session expirée non interceptée avant
             const contentType = headers['content-type'] ?? '';
-            if (contentType.includes('text/html')) {
+            if (contentType.includes('text/html') && status < 400) {
                 redirectToLogin();
                 return new Promise(() => {});
             }
@@ -50,7 +50,7 @@ export function setupGlobalErrorHandler() {
         }
 
         const contentType = headers?.['content-type'] ?? '';
-        if (contentType.includes('text/html')) {
+        if (contentType.includes('text/html') && status < 400) {
             event.preventDefault();
             redirectToLogin();
         }
