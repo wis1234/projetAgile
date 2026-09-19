@@ -225,6 +225,7 @@ class PublicQuizController extends Controller
             'score' => (int) round($finalScore),
             'correct_answers' => $qcmEarned,
             'total_questions' => $questions->count(),
+            'completed_at' => now(),
         ]);
 
         if ($quiz->show_results) {

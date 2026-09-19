@@ -178,7 +178,7 @@ class QuizController extends Controller
             activity_log('update', 'Modification de quiz', $quiz, "Quiz '{$quiz->title}' mis à jour");
         }
 
-        return redirect()->route('projects.quizzes.index', $project->id)
+        return redirect()->route('projects.quizzes.show', [$project->id, $quiz->id])
             ->with('success', 'Quiz mis à jour avec succès !');
     }
 
@@ -388,6 +388,7 @@ class QuizController extends Controller
             'score' => (int) round($finalScore),
             'correct_answers' => $qcmEarned,
             'total_questions' => $questions->count(),
+            'completed_at' => now(),
         ]);
 
         if (function_exists('activity_log')) {
@@ -398,7 +399,8 @@ class QuizController extends Controller
 
         if ($quiz->show_results) {
             return redirect()->route('projects.quizzes.results', [$project->id, $quiz->id])
-                ->with('success', 'Quiz soumis avec succès !');
+                ->with('success', 'Quiz soumis avec succès !')
+                ->with('attempt_id', $attempt->id);
         }
 
         return redirect()->route('projects.quizzes.show', [$project->id, $quiz->id])
@@ -416,9 +418,13 @@ class QuizController extends Controller
         $userRole = $project->users()->where('user_id', $user->id)->first()?->pivot->role;
         $isManager = $user->hasRole('admin') || $userRole === 'manager';
 
-        if ($isManager && request()->has('attempt_id')) {
+        // Priorité : attempt_id en query param ou en session flash (après soumission)
+        $attemptId = request()->input('attempt_id') ?? session('attempt_id');
+
+        if ($attemptId) {
             $result = QuizResult::where('quiz_id', $quiz->id)
-                ->where('attempt_id', request()->input('attempt_id'))
+                ->where('attempt_id', $attemptId)
+                ->when(!$isManager, fn($q) => $q->where('user_id', $user->id))
                 ->firstOrFail();
         } else {
             if ($isManager && request()->has('user_id')) {
