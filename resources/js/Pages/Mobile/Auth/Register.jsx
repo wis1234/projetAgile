@@ -1,390 +1,79 @@
-// resources/js/Pages/Mobile/Register.jsx
-import { Link, useForm } from '@inertiajs/react';
-import { useState, useEffect, useRef, useMemo } from 'react';
-import {
-    FaEye, FaEyeSlash, FaCheckCircle, FaShieldAlt, FaChevronLeft, FaArrowRight,
-} from 'react-icons/fa';
-import { InputError, PrimaryButton, TextInput } from '@/Components';
+import { Head, Link } from '@inertiajs/react';
+import { useState } from 'react';
+import { FaEye, FaEyeSlash, FaCheckCircle, FaShieldAlt, FaSpinner, FaExclamationCircle, FaUserGraduate, FaUserTie } from 'react-icons/fa';
+import useRegistration from '@/hooks/useRegistration';
 
-function passwordStrength(password) {
-    if (!password) return { score: 0, label: '', color: 'bg-slate-200' };
-    let score = 0;
-    if (password.length >= 8) score++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-    if (/\d/.test(password)) score++;
-    if (/[^A-Za-z0-9]/.test(password)) score++;
-    const levels = [
-        { label: 'Faible', color: 'bg-red-500' },
-        { label: 'Moyen', color: 'bg-amber-500' },
-        { label: 'Bon', color: 'bg-blue-500' },
-        { label: 'Excellent', color: 'bg-emerald-500' },
-    ];
-    return { score, ...levels[Math.max(score - 1, 0)] };
-}
+const field = (err) => `h-14 w-full rounded-2xl border bg-white px-4 text-[16px] text-slate-900 shadow-sm placeholder:text-slate-400 focus:ring-2 dark:bg-slate-900 dark:text-white ${err ? 'border-red-400 bg-red-50/60 focus:border-red-500 focus:ring-red-100' : 'border-slate-200 focus:border-blue-500 focus:ring-blue-100 dark:border-slate-700'}`;
+const label = 'mb-1.5 block text-[13px] font-bold text-slate-700 dark:text-slate-300';
 
-const fieldClasses =
-    'w-full h-14 rounded-2xl text-[15px] text-slate-900 bg-slate-50 border border-slate-200 ' +
-    'focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:bg-white transition-colors placeholder:text-slate-400 px-4';
+export default function MobileRegister({ defaultRole = 'user' }) {
+  const r = useRegistration(defaultRole);
+  const { data, setData, errors, errorFor } = r;
+  const [show, setShow] = useState(false);
+  const [show2, setShow2] = useState(false);
+  const match = data.password_confirmation && data.password === data.password_confirmation;
 
-const fieldLabelClasses =
-    'block text-[13px] font-semibold text-slate-700 mb-2';
+  return (
+    <div className="min-h-[100dvh] bg-gradient-to-b from-blue-600 via-blue-700 to-indigo-800" style={{ paddingTop: 'var(--safe-top)' }}>
+      <Head title="Créer un compte" />
+      <div className="px-6 pb-6 pt-8 text-white">
+        <Link href="/" className="mb-5 flex items-center gap-2.5"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-lg font-black">P</span><span className="text-xl font-extrabold tracking-wide">PROJA</span></Link>
+        <h1 className="text-3xl font-black leading-tight">Créez votre compte</h1>
+        <p className="mt-1 text-sm text-blue-100">Gérez vos projets et passez vos évaluations en quelques instants.</p>
+      </div>
 
-export default function MobileRegister() {
-    const { data, setData, post, processing, errors } = useForm({
-        name: '',
-        email: '',
-        password: '',
-        password_confirmation: '',
-        recaptcha_token: '',
-    });
+      <form onSubmit={r.submit} noValidate className="space-y-4 rounded-t-[32px] bg-slate-50 px-5 pb-10 pt-7 dark:bg-slate-950" style={{ paddingBottom: 'calc(2.5rem + var(--safe-bottom))' }}>
+        {errors.form && <div role="alert" className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><FaExclamationCircle className="mt-0.5 flex-shrink-0" />{errors.form}</div>}
 
-    const recaptchaRef = useRef(null);
-    const [recaptchaError, setRecaptchaError] = useState('');
-    const [formError, setFormError] = useState('');
-    const [isRecaptchaLoaded, setIsRecaptchaLoaded] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-    const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
-
-    const strength = useMemo(() => passwordStrength(data.password), [data.password]);
-    const emailLooksValid = useMemo(
-        () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email),
-        [data.email]
-    );
-    const passwordsMatch =
-        data.password_confirmation.length > 0 && data.password === data.password_confirmation;
-
-    const initializeRecaptcha = () => {
-        if (!window.grecaptcha) return;
-
-        const container = document.getElementById('recaptcha-element');
-        if (container && container.hasChildNodes()) {
-            setIsRecaptchaLoaded(true);
-            return;
-        }
-
-        window.grecaptcha.ready(() => {
-            try {
-                const widgetId = window.grecaptcha.render('recaptcha-element', {
-                    sitekey: window.recaptchaSiteKey || '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN',
-                    callback: onRecaptchaSuccess,
-                    'expired-callback': onRecaptchaExpired,
-                    'error-callback': onRecaptchaError,
-                    theme: 'light',
-                    size: 'normal',
-                });
-                recaptchaRef.current = widgetId;
-                setIsRecaptchaLoaded(true);
-                setRecaptchaError('');
-            } catch (error) {
-                console.error('Erreur lors du rendu de reCAPTCHA:', error);
-                setRecaptchaError("La vérification de sécurité n'a pas pu se charger. Rechargez la page ou réessayez.");
-                setIsRecaptchaLoaded(false);
-            }
-        });
-    };
-
-    const onRecaptchaSuccess = (token) => {
-        setData('recaptcha_token', token);
-        setRecaptchaError('');
-        setIsRecaptchaLoaded(true);
-    };
-    const onRecaptchaExpired = () => {
-        setData('recaptcha_token', '');
-        setRecaptchaError('La vérification a expiré. Veuillez réessayer.');
-        setIsRecaptchaLoaded(false);
-    };
-    const onRecaptchaError = () => {
-        setData('recaptcha_token', '');
-        setRecaptchaError('Une erreur est survenue. Veuillez réessayer.');
-        setIsRecaptchaLoaded(false);
-    };
-
-    useEffect(() => {
-        const handleRecaptchaLoaded = () => initializeRecaptcha();
-        if (window.grecaptcha) handleRecaptchaLoaded();
-        document.addEventListener('recaptcha-loaded', handleRecaptchaLoaded);
-        return () => document.removeEventListener('recaptcha-loaded', handleRecaptchaLoaded);
-    }, []);
-
-    const submit = (e) => {
-        e.preventDefault();
-
-        if (!data.recaptcha_token) {
-            if (!isRecaptchaLoaded) {
-                setRecaptchaError("La vérification de sécurité n'a pas pu se charger. Nouvelle tentative en cours…");
-                initializeRecaptcha();
-            } else {
-                setRecaptchaError("Veuillez cocher la case « Je ne suis pas un robot » avant de continuer.");
-            }
-            return;
-        }
-
-        setFormError('');
-
-        post(route('register'), {
-            onSuccess: () => {
-                if (window.grecaptcha) window.grecaptcha.reset(recaptchaRef.current ?? undefined);
-            },
-            onError: (errs) => {
-                if (errs.recaptcha_token) {
-                    setRecaptchaError(errs.recaptcha_token);
-                } else if (Object.keys(errs).length === 0) {
-                    setFormError("Une erreur est survenue lors de l'inscription. Veuillez réessayer.");
-                }
-                if (window.grecaptcha) window.grecaptcha.reset(recaptchaRef.current ?? undefined);
-                setData('recaptcha_token', '');
-            },
-            preserveScroll: true,
-            onFinish: () => setData('recaptcha_token', ''),
-        });
-    };
-
-    return (
-        <div
-            className="h-[100dvh] overflow-y-auto overscroll-contain flex flex-col bg-white"
-            style={{
-                paddingTop: 'env(safe-area-inset-top, 0px)',
-                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-                WebkitOverflowScrolling: 'touch',
-            }}
-        >
-            {/* ─── Barre de navigation native : retour vers le login ─── */}
-            <div className="flex items-center gap-1 px-3 py-3 sticky top-0 bg-white/95 backdrop-blur z-10 border-b border-slate-100">
-                <Link
-                    href={route('login')}
-                    className="w-10 h-10 flex items-center justify-center rounded-full active:bg-slate-100 transition-colors"
-                    aria-label="Retour à la connexion"
-                >
-                    <FaChevronLeft className="h-4 w-4 text-slate-700" />
-                </Link>
-                <span className="text-sm font-semibold text-slate-800">Connexion</span>
-            </div>
-
-            <div className="flex-1 px-6 pt-8 pb-10 max-w-md w-full mx-auto">
-
-                <div className="text-center mb-8">
-                    <h1 className="text-[26px] leading-tight font-extrabold text-slate-900 mb-1.5">
-                        Créer un compte
-                    </h1>
-                    <p className="text-sm text-slate-500">
-                        Moins de 2 minutes, sans carte bancaire.
-                    </p>
-                </div>
-
-                {formError && (
-                    <div className="mb-5 rounded-2xl px-4 py-3 bg-red-50 border border-red-100" role="alert">
-                        <p className="text-sm font-medium leading-snug text-red-700">{formError}</p>
-                    </div>
-                )}
-
-                <form onSubmit={submit} className="space-y-5" noValidate>
-
-                    {/* Compartiment Nom */}
-                    <div>
-                        <label htmlFor="name" className={fieldLabelClasses}>Nom complet</label>
-                        <TextInput
-                            id="name"
-                            type="text"
-                            name="name"
-                            value={data.name}
-                            className={fieldClasses}
-                            placeholder="Ronaldo Agbohou"
-                            onChange={(e) => setData('name', e.target.value)}
-                            required
-                            autoComplete="name"
-                            isFocused
-                        />
-                        <InputError message={errors.name} className="mt-1.5" />
-                    </div>
-
-                    {/* Compartiment Email */}
-                    <div>
-                        <label htmlFor="email" className={fieldLabelClasses}>Adresse email</label>
-                        <div className="relative">
-                            <TextInput
-                                id="email"
-                                type="email"
-                                name="email"
-                                value={data.email}
-                                className={`${fieldClasses} pr-11`}
-                                placeholder="vous@entreprise.com"
-                                onChange={(e) => setData('email', e.target.value)}
-                                required
-                                autoComplete="username"
-                            />
-                            {emailLooksValid && (
-                                <FaCheckCircle className="absolute inset-y-0 right-4 my-auto h-4 w-4 text-emerald-500" />
-                            )}
-                        </div>
-                        <InputError message={errors.email} className="mt-1.5" />
-                    </div>
-
-                    {/* Compartiment Mot de passe */}
-                    <div>
-                        <label htmlFor="password" className={fieldLabelClasses}>Mot de passe</label>
-                        <div className="relative">
-                            <TextInput
-                                id="password"
-                                type={showPassword ? 'text' : 'password'}
-                                name="password"
-                                value={data.password}
-                                className={`${fieldClasses} pr-11`}
-                                placeholder="8 caractères minimum"
-                                onChange={(e) => setData('password', e.target.value)}
-                                required
-                                autoComplete="new-password"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword((v) => !v)}
-                                className="absolute inset-y-0 right-4 flex items-center text-slate-400 active:scale-90 transition-transform"
-                                aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-                                tabIndex={-1}
-                            >
-                                {showPassword ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
-                            </button>
-                        </div>
-                        {data.password.length > 0 && (
-                            <div className="mt-2.5">
-                                <div className="flex gap-1">
-                                    {Array.from({ length: 4 }).map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className={`h-1 flex-1 rounded-full transition-colors ${i < strength.score ? strength.color : 'bg-slate-200'}`}
-                                        />
-                                    ))}
-                                </div>
-                                <p className="mt-1.5 text-xs text-slate-500">
-                                    Robustesse : <span className="font-semibold">{strength.label}</span>
-                                </p>
-                            </div>
-                        )}
-                        <InputError message={errors.password} className="mt-1.5" />
-                    </div>
-
-                    {/* Compartiment Confirmation mot de passe */}
-                    <div>
-                        <label htmlFor="password_confirmation" className={fieldLabelClasses}>Confirmer le mot de passe</label>
-                        <div className="relative">
-                            <TextInput
-                                id="password_confirmation"
-                                type={showPasswordConfirm ? 'text' : 'password'}
-                                name="password_confirmation"
-                                value={data.password_confirmation}
-                                className={`${fieldClasses} pr-11`}
-                                placeholder="Ressaisissez le mot de passe"
-                                onChange={(e) => setData('password_confirmation', e.target.value)}
-                                required
-                                autoComplete="new-password"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPasswordConfirm((v) => !v)}
-                                className="absolute inset-y-0 right-4 flex items-center text-slate-400 active:scale-90 transition-transform"
-                                aria-label={showPasswordConfirm ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-                                tabIndex={-1}
-                            >
-                                {showPasswordConfirm ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
-                            </button>
-                        </div>
-                        {passwordsMatch && (
-                            <p className="mt-1.5 flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                                <FaCheckCircle className="h-3 w-3" /> Les mots de passe correspondent
-                            </p>
-                        )}
-                        <InputError message={errors.password_confirmation} className="mt-1.5" />
-                    </div>
-
-                    {/* Compartiment reCAPTCHA */}
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="mb-3 flex items-center gap-2">
-                            <FaShieldAlt className="h-4 w-4 text-slate-400" />
-                            <span className="text-xs font-semibold text-slate-600">
-                                Vérification de sécurité
-                            </span>
-                        </div>
-                        <div
-                            id="recaptcha-element"
-                            className={errors.recaptcha_token || recaptchaError ? 'rounded-xl border border-red-400 p-2 bg-white' : ''}
-                        />
-                        {!isRecaptchaLoaded && !recaptchaError && (
-                            <p className="mt-2.5 text-xs text-amber-600">
-                                Chargement de la vérification…
-                            </p>
-                        )}
-                        {recaptchaError && (
-                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                                <p className="text-xs text-red-600" role="alert">{recaptchaError}</p>
-                                {!isRecaptchaLoaded && (
-                                    <button
-                                        type="button"
-                                        onClick={initializeRecaptcha}
-                                        className="text-xs font-semibold text-blue-600 underline"
-                                    >
-                                        Réessayer
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                        {errors.recaptcha_token && (
-                            <p className="mt-2.5 text-xs text-red-600" role="alert">{errors.recaptcha_token}</p>
-                        )}
-                    </div>
-
-                    {/* Compartiment Bouton */}
-                    <PrimaryButton
-                        type="submit"
-                        disabled={processing}
-                        className="relative w-full h-14 rounded-2xl text-[15px] font-bold text-white bg-gradient-to-b from-blue-500 to-blue-600 active:scale-[0.98] active:from-blue-600 active:to-blue-700 transition-transform disabled:active:scale-100 shadow-lg shadow-blue-600/25 mt-2 overflow-hidden"
-                    >
-                        {/* État normal */}
-                        <span
-                            className={`absolute inset-0 flex items-center justify-center gap-2 transition-all duration-300 ${
-                                processing ? 'opacity-0 -translate-y-1' : 'opacity-100 translate-y-0'
-                            }`}
-                        >
-                            Créer mon compte
-                            <FaArrowRight className="h-3.5 w-3.5" />
-                        </span>
-
-                        {/* État chargement (preloader) */}
-                        <span
-                            className={`absolute inset-0 flex items-center justify-center gap-2.5 transition-all duration-300 ${
-                                processing ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'
-                            }`}
-                        >
-                            <span className="relative h-5 w-5 flex-shrink-0">
-                                <span className="absolute inset-0 rounded-full border-2 border-white/25" />
-                                <span className="absolute inset-0 rounded-full border-2 border-transparent border-t-white animate-spin" />
-                            </span>
-                            <span className="tracking-wide">Inscription...</span>
-                        </span>
-                    </PrimaryButton>
-
-                    <p className="text-center text-xs text-slate-500 leading-relaxed">
-                        En créant un compte, vous acceptez nos{' '}
-                        <a href="/conditions" className="underline text-slate-700 font-medium">conditions d'utilisation</a> et notre{' '}
-                        <a href="/confidentialite" className="underline text-slate-700 font-medium">politique de confidentialité</a>.
-                    </p>
-                </form>
-
-                {/* ─── Séparateur ─── */}
-                <div className="flex items-center gap-3 my-8">
-                    <div className="h-px flex-1 bg-slate-100" />
-                    <span className="text-xs text-slate-400 font-medium">ou</span>
-                    <div className="h-px flex-1 bg-slate-100" />
-                </div>
-
-                {/* ─── Lien connexion ─── */}
-                <div className="text-center">
-                    <p className="text-sm text-slate-500">
-                        Vous avez déjà un compte ?{' '}
-                        <Link href={route('login')} className="font-semibold text-slate-900">
-                            Connectez-vous
-                        </Link>
-                    </p>
-                </div>
-            </div>
+        <div>
+          <span className={label}>Je m&apos;inscris en tant que</span>
+          <div className="grid grid-cols-2 gap-2">
+            {[['user', 'Utilisateur', FaUserTie, 'Projets, tâches, équipes'], ['candidate', 'Candidat', FaUserGraduate, 'Quiz et évaluations']].map(([v, l, Icon, hint]) => (
+              <button key={v} type="button" onClick={() => setData('role', v)} className={`rounded-2xl border-2 p-3 text-left transition active:scale-[.98] ${data.role === v ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/40' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}>
+                <Icon className={`mb-1 text-lg ${data.role === v ? 'text-blue-600' : 'text-slate-400'}`} /><p className="text-sm font-extrabold text-slate-900 dark:text-white">{l}</p><p className="text-[11px] text-slate-500">{hint}</p>
+              </button>
+            ))}
+          </div>
+          {/* Champ « select » standard conservé pour l'accessibilité / les lecteurs d'écran */}
+          <select id="role" name="role" value={data.role} onChange={(e) => setData('role', e.target.value)} className="sr-only" tabIndex={-1} aria-label="Type de compte"><option value="user">Utilisateur</option><option value="candidate">Candidat</option></select>
+          {errors.role && <p className="mt-1 text-xs text-red-500">{errors.role}</p>}
         </div>
-    );
+
+        <div><label htmlFor="name" className={label}>Nom complet</label>
+          <input id="name" value={data.name} onChange={r.onChange('name')} onBlur={r.onBlur('name')} autoComplete="name" placeholder="Ronaldo Agbohou" className={field(errorFor('name'))} aria-invalid={!!errorFor('name')} />
+          {errorFor('name') && <p className="mt-1 text-xs text-red-500">{errorFor('name')}</p>}</div>
+
+        <div><label htmlFor="email" className={label}>Adresse email</label>
+          <div className="relative"><input id="email" type="email" inputMode="email" autoCapitalize="none" value={data.email} onChange={r.onChange('email')} onBlur={r.onBlur('email')} autoComplete="username" placeholder="vous@entreprise.com" className={`${field(errorFor('email'))} pr-11`} aria-invalid={!!errorFor('email')} />
+            {r.emailOk && !errorFor('email') && <FaCheckCircle className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500" />}</div>
+          {errorFor('email') && <p className="mt-1 text-xs text-red-500">{errorFor('email')}</p>}
+          {r.emailSuggestion && !errorFor('email') && <p className="mt-1 text-xs text-amber-600">Vouliez-vous dire <button type="button" className="font-bold underline" onClick={() => setData('email', r.emailSuggestion)}>{r.emailSuggestion}</button> ?</p>}</div>
+
+        <div><label htmlFor="password" className={label}>Mot de passe</label>
+          <div className="relative"><input id="password" type={show ? 'text' : 'password'} value={data.password} onChange={r.onChange('password')} onBlur={r.onBlur('password')} autoComplete="new-password" placeholder="8 caractères minimum" className={`${field(errorFor('password'))} pr-12`} aria-invalid={!!errorFor('password')} />
+            <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-400" aria-label="Afficher le mot de passe">{show ? <FaEyeSlash /> : <FaEye />}</button></div>
+          {data.password && <div className="mt-2 flex items-center gap-2"><div className="flex flex-1 gap-1">{[1, 2, 3, 4].map((i) => <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= r.strength.score ? r.strength.color : 'bg-slate-200'}`} />)}</div><span className="text-[11px] font-bold text-slate-500">{r.strength.label}</span></div>}
+          {errorFor('password') && <p className="mt-1 text-xs text-red-500">{errorFor('password')}</p>}</div>
+
+        <div><label htmlFor="password_confirmation" className={label}>Confirmer le mot de passe</label>
+          <div className="relative"><input id="password_confirmation" type={show2 ? 'text' : 'password'} value={data.password_confirmation} onChange={r.onChange('password_confirmation')} onBlur={r.onBlur('password_confirmation')} autoComplete="new-password" placeholder="Ressaisissez le mot de passe" className={`${field(errorFor('password_confirmation'))} pr-12`} aria-invalid={!!errorFor('password_confirmation')} />
+            <button type="button" onClick={() => setShow2((s) => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-400" aria-label="Afficher la confirmation">{show2 ? <FaEyeSlash /> : <FaEye />}</button></div>
+          {match && !errorFor('password_confirmation') && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-emerald-600"><FaCheckCircle /> Les mots de passe correspondent</p>}
+          {errorFor('password_confirmation') && <p className="mt-1 text-xs text-red-500">{errorFor('password_confirmation')}</p>}</div>
+
+        <div ref={r.captchaBox} className={`rounded-2xl border p-3.5 ${r.recaptchaError || errors.recaptcha_token ? 'border-red-300 bg-red-50/60' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}>
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300"><FaShieldAlt className="text-slate-400" /> Vérification de sécurité{data.recaptcha_token && <span className="ml-auto flex items-center gap-1 text-xs text-emerald-600"><FaCheckCircle /> Validée</span>}</div>
+          <div id="recaptcha-element" className="max-w-full overflow-x-auto" />
+          {!r.captchaLoaded && !r.recaptchaError && <p className="mt-2 flex items-center gap-2 text-sm text-amber-600"><FaSpinner className="animate-spin" />{r.captchaSlow ? 'Le chargement est plus long que prévu…' : 'Chargement de la vérification…'}</p>}
+          {(r.recaptchaError || errors.recaptcha_token) && <p role="alert" className="mt-2 text-sm text-red-600">{r.recaptchaError || errors.recaptcha_token}</p>}
+          {(!r.captchaLoaded || r.captchaSlow) && <button type="button" onClick={r.retryCaptcha} className="mt-2 text-sm font-bold text-blue-600 underline">Réessayer</button>}
+        </div>
+
+        <button type="submit" disabled={r.processing} className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-base font-extrabold text-white shadow-lg shadow-blue-600/30 transition active:scale-[.98] disabled:opacity-70">
+          {r.processing ? <><FaSpinner className="animate-spin" /> Création de votre compte…</> : 'Créer mon compte'}
+        </button>
+        <p className="text-center text-sm text-slate-500">Déjà inscrit ? <Link href={route('login')} className="font-extrabold text-blue-600">Se connecter</Link></p>
+      </form>
+    </div>
+  );
 }

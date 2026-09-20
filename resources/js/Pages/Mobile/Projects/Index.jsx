@@ -1,14 +1,59 @@
-import React, { useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import React, { useMemo, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { FaPlus, FaTasks, FaUsers, FaFolderOpen, FaChevronRight } from 'react-icons/fa';
 import MobileLayout from '@/Layouts/MobileLayout';
-import { FaArrowRight, FaPlus, FaSearch, FaTasks, FaUsers } from 'react-icons/fa';
+import { MHero, MCard, MPill, MStat, MSearch, MSegmented, MEmpty, MFab, MPager } from '@/Components/Mobile/kit';
 
-const statusColors = { nouveau: 'bg-slate-100 text-slate-600', demarrage: 'bg-emerald-100 text-emerald-700', en_cours: 'bg-blue-100 text-blue-700', termine: 'bg-teal-100 text-teal-700', suspendu: 'bg-rose-100 text-rose-700' };
+const STATUS = { nouveau: ['Nouveau', 'slate'], demarrage: ['Démarrage', 'green'], en_cours: ['En cours', 'blue'], termine: ['Terminé', 'green'], suspendu: ['Suspendu', 'red'] };
+const GRAD = ['from-blue-500 to-indigo-600', 'from-emerald-500 to-teal-600', 'from-amber-500 to-orange-600', 'from-pink-500 to-rose-600', 'from-violet-500 to-purple-600', 'from-cyan-500 to-sky-600'];
 
-export default function MobileProjectsIndex({ projects: projectProp = { data: [] }, filters = {}, globalStats = {} }) {
-	const projects = Array.isArray(projectProp) ? projectProp : projectProp.data || [];
-	const [search, setSearch] = useState(filters.search || '');
-	const submitSearch = (event) => { event.preventDefault(); router.get('/projects', { ...filters, search }, { preserveState: true, replace: true }); };
+export default function MobileProjectsIndex({ projects: prop = { data: [] }, filters = {}, globalStats = {} }) {
+  const projects = Array.isArray(prop) ? prop : prop.data || [];
+  const [search, setSearch] = useState(filters.search || '');
+  const [status, setStatus] = useState('all');
 
-	return <MobileLayout title="Projets" fullBleed><Head title="Projets" /><div className="min-h-full bg-slate-50 px-4 pb-5 pt-4 dark:bg-slate-950"><div className="mb-5 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-widest text-blue-600">Espace de travail</p><h2 className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Vos projets</h2></div><Link href="/projects/create" className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/25 active:scale-95" aria-label="Nouveau projet"><FaPlus /></Link></div><form onSubmit={submitSearch} className="relative mb-5"><FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un projet" className="h-12 w-full rounded-2xl border-0 bg-white pl-11 pr-4 text-sm shadow-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:ring-slate-800" /></form><div className="mb-5 grid grid-cols-3 gap-2"><div className="rounded-2xl bg-blue-600 p-3 text-white"><p className="text-2xl font-bold">{globalStats.total || projects.length}</p><p className="text-[11px] text-blue-100">Total</p></div><div className="rounded-2xl bg-white p-3 text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"><p className="text-2xl font-bold">{globalStats.active || 0}</p><p className="text-[11px] text-slate-500">Actifs</p></div><div className="rounded-2xl bg-white p-3 text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"><p className="text-2xl font-bold">{globalStats.completed || 0}</p><p className="text-[11px] text-slate-500">Termines</p></div></div><div className="space-y-3">{projects.map((project) => <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm active:scale-[.99] dark:border-slate-800 dark:bg-slate-900"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">{project.name?.slice(0, 2).toUpperCase()}</div><div className="min-w-0"><h3 className="truncate text-sm font-bold text-slate-950 dark:text-white">{project.name}</h3><p className="mt-1 flex items-center gap-2 text-xs text-slate-500"><span><FaTasks className="mr-1 inline" />{project.task_count || 0}</span><span><FaUsers className="mr-1 inline" />{project.members_count || 0}</span></p></div></div><FaArrowRight className="mt-1 flex-shrink-0 text-xs text-slate-400" /></div><div className="mt-4 flex items-center justify-between"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusColors[project.status] || statusColors.nouveau}`}>{project.status || 'Nouveau'}</span><span className="text-xs text-slate-400">Ouvrir</span></div></Link>)}{!projects.length && <div className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500 dark:bg-slate-900">Aucun projet trouve.</div>}</div></div></MobileLayout>;
+  const submit = (v) => { setSearch(v); };
+  const runSearch = (e) => { e.preventDefault(); router.get('/projects', { ...filters, search }, { preserveState: true, replace: true }); };
+
+  const list = useMemo(() => projects.filter((p) => status === 'all' || (p.status || 'nouveau') === status), [projects, status]);
+  const counts = useMemo(() => projects.reduce((a, p) => { const k = p.status || 'nouveau'; a[k] = (a[k] || 0) + 1; return a; }, {}), [projects]);
+
+  return (
+    <MobileLayout title="Projets">
+      <Head title="Projets" />
+      <div className="space-y-4 py-4 pb-8">
+        <MHero eyebrow="Espace de travail" title="Vos projets" subtitle={`${globalStats.total || projects.length} projet(s) au total`} />
+        <div className="grid grid-cols-3 gap-2">
+          <MStat label="Total" value={globalStats.total || projects.length} tone="text-blue-600" />
+          <MStat label="Actifs" value={globalStats.active || 0} tone="text-emerald-600" />
+          <MStat label="Terminés" value={globalStats.completed || 0} />
+        </div>
+        <form onSubmit={runSearch}><MSearch value={search} onChange={submit} placeholder="Rechercher un projet (Entrée)" /></form>
+        <MSegmented value={status} onChange={setStatus} options={[{ value: 'all', label: 'Tous', count: projects.length }, ...Object.entries(STATUS).filter(([k]) => counts[k]).map(([k, [l]]) => ({ value: k, label: l, count: counts[k] }))]} />
+
+        {list.length === 0 ? <MEmpty icon={FaFolderOpen} title="Aucun projet" text="Aucun projet ne correspond à votre recherche." /> : (
+          <div className="space-y-3">
+            {list.map((p, i) => {
+              const [label, tone] = STATUS[p.status || 'nouveau'] || STATUS.nouveau;
+              return (
+                <MCard key={p.id} href={`/projects/${p.id}`} className="!p-3.5">
+                  <div className="flex items-center gap-3">
+                    <span className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${GRAD[i % GRAD.length]} text-lg font-black text-white shadow-md`}>{(p.name || '?').slice(0, 2).toUpperCase()}</span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-[15px] font-extrabold text-slate-900 dark:text-white">{p.name}</h3>
+                      <p className="mt-1 flex items-center gap-3 text-xs text-slate-500"><span><FaTasks className="mr-1 inline text-[10px]" />{p.task_count || 0}</span><span><FaUsers className="mr-1 inline text-[10px]" />{p.members_count || 0}</span></p>
+                      <div className="mt-2"><MPill tone={tone}>{label}</MPill></div>
+                    </div>
+                    <FaChevronRight className="text-xs text-slate-300" />
+                  </div>
+                </MCard>
+              );
+            })}
+            {!Array.isArray(prop) && <MPager paginator={prop} only={['projects']} />}
+          </div>
+        )}
+      </div>
+      <MFab href="/projects/create" label="Nouveau projet"><FaPlus /> Nouveau</MFab>
+    </MobileLayout>
+  );
 }

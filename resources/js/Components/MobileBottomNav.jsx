@@ -1,4 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
+import { FaHome, FaFolderOpen, FaCheckSquare, FaComments, FaEllipsisH, FaQuestionCircle } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
 import { nativeFeedback } from '@/lib/platform';
@@ -13,58 +14,22 @@ const getUnreadCount = () => {
 };
 
 const primaryItems = [
-  {
-    href: '/dashboard',
-    label: 'dashboard',
-    icon: (active) => (
-      <svg className="w-6 h-6" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6m-6 0v6m0-6H7m6 0h6" />
-      </svg>
-    ),
-  },
-  {
-    href: '/projects',
-    label: 'projects',
-    icon: (active) => (
-      <svg className="w-6 h-6" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/tasks',
-    label: 'tasks',
-    icon: (active) => (
-      <svg className="w-6 h-6" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6m9 2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7l5 5v10z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/discussions',
-    label: 'discussions',
-    icon: (active) => (
-      <svg className="w-6 h-6" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-      </svg>
-    ),
-    badge: true,
-  },
+  { href: '/dashboard', label: 'dashboard', fallback: 'Accueil', Icon: FaHome },
+  { href: '/projects', label: 'projects', fallback: 'Projets', Icon: FaFolderOpen },
+  { href: '/tasks', label: 'tasks', fallback: 'Tâches', Icon: FaCheckSquare },
+  { href: '/discussions', label: 'discussions', fallback: 'Discussions', Icon: FaComments, badge: true },
 ];
 
-const quizItem = {
-  href: '/quizzes',
-  label: 'quiz',
-  icon: (active) => (
-    <svg className="w-6 h-6" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-    </svg>
-  ),
-};
+const quizItem = { href: '/quizzes', label: 'quiz', fallback: 'Quiz', Icon: FaQuestionCircle };
 
 // Actif sur toutes les pages quiz (liste, détail d'un quiz d'un projet, cumul…)
 const QUIZ_URL = /^\/(quizzes|projects\/\d+\/(quizzes|quiz-cumuls|participation-points))(\/|\?|$)/;
 
+/**
+ * Barre de navigation flottante « application mobile » :
+ * verre dépoli, coins très arrondis, onglet actif en pilule colorée avec son libellé,
+ * pastille de non-lus, retour haptique.
+ */
 export default function MobileBottomNav({ onMoreClick }) {
   const { t } = useTranslation();
   const { url, props } = usePage();
@@ -77,7 +42,6 @@ export default function MobileBottomNav({ onMoreClick }) {
     const refresh = () => setUnreadCount(getUnreadCount());
     refresh();
     const interval = setInterval(refresh, 30_000);
-    // Met aussi à jour quand on revient sur l'onglet
     const handleFocus = () => refresh();
     window.addEventListener('focus', handleFocus);
     window.addEventListener('proja:discussions-updated', handleFocus);
@@ -94,49 +58,53 @@ export default function MobileBottomNav({ onMoreClick }) {
     return url.startsWith(href);
   };
 
+  const moreActive = url.startsWith('/more');
+
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-lg border-t border-gray-200 dark:border-gray-700 flex items-center justify-around px-1"
-      style={{
-        paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 6px)',
-        paddingTop: '6px',
-      }}
+      aria-label="Navigation principale"
+      className="md:hidden fixed inset-x-0 bottom-0 z-40 px-3 pointer-events-none"
+      style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 10px)' }}
     >
-      {items.map((item) => {
-        const active = isActive(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => nativeFeedback.tap()}
-            className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl min-w-[56px] transition-all active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 ${
-              active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
-            }`}
-          >
-            {item.icon(active)}
-            {/* Badge de non-lus pour Discussions */}
-            {item.badge && unreadCount > 0 && (
-              <span className="absolute -top-0.5 right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-            <span className={`text-[10px] leading-none ${active ? 'font-semibold' : 'font-medium'}`}>
-              {t(item.label) || item.label}
-            </span>
-          </Link>
-        );
-      })}
+      <div className="pointer-events-auto mx-auto flex max-w-md items-center justify-between rounded-[28px] border border-white/60 bg-white/85 p-2 shadow-[0_10px_40px_-8px_rgba(15,23,42,0.35)] ring-1 ring-black/5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/85 dark:ring-white/10">
+        {items.map(({ href, label, fallback, Icon, badge }) => {
+          const active = isActive(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => nativeFeedback.tap()}
+              aria-current={active ? 'page' : undefined}
+              className={`relative flex h-12 items-center justify-center rounded-2xl transition-all duration-300 ease-out active:scale-90 ${
+                active
+                  ? 'gap-2 bg-gradient-to-br from-blue-600 to-indigo-600 px-4 text-white shadow-lg shadow-blue-600/40'
+                  : 'w-12 text-slate-400 dark:text-slate-500'
+              }`}
+            >
+              <Icon className={active ? 'text-[17px]' : 'text-[19px]'} />
+              {active && <span className="text-[13px] font-bold leading-none">{t(label) || fallback}</span>}
+              {badge && unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[9px] font-black leading-none text-white dark:border-slate-900">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </Link>
+          );
+        })}
 
-      {/* Bouton "Plus" ouvre le drawer complet pour le reste du menu */}
-      <button
-        onClick={async () => { await nativeFeedback.tap(); onMoreClick(); }}
-        className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl min-w-[56px] text-gray-400 dark:text-gray-500 transition-all active:scale-90 active:bg-gray-100 dark:active:bg-gray-700"
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-        <span className="text-[10px] leading-none font-medium">{t('more') || 'Plus'}</span>
-      </button>
+        {/* « Menu » : accès au reste de l'application */}
+        <button
+          type="button"
+          onClick={async () => { await nativeFeedback.tap(); onMoreClick(); }}
+          aria-label={t('more') || 'Menu'}
+          className={`flex h-12 items-center justify-center rounded-2xl transition-all duration-300 active:scale-90 ${
+            moreActive ? 'gap-2 bg-gradient-to-br from-blue-600 to-indigo-600 px-4 text-white shadow-lg shadow-blue-600/40' : 'w-12 text-slate-400 dark:text-slate-500'
+          }`}
+        >
+          <FaEllipsisH className="text-[19px]" />
+          {moreActive && <span className="text-[13px] font-bold leading-none">{t('more') || 'Menu'}</span>}
+        </button>
+      </div>
     </nav>
   );
 }

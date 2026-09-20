@@ -275,3 +275,51 @@ input, select, textarea {
 .hljs-number { @apply text-blue-600 dark:text-blue-400; }
 .hljs-built_in { @apply text-yellow-600 dark:text-yellow-400; }
 .hljs-literal { @apply text-red-600 dark:text-red-400; }
+
+
+/* ─────────────  Finitions « application mobile »  ───────────── */
+.native-mobile-app .mobile-app-shell,
+.native-mobile-app .mobile-app-shell * {
+  -webkit-touch-callout: none;
+}
+
+.native-mobile-app .mobile-app-shell p,
+.native-mobile-app .mobile-app-shell h1,
+.native-mobile-app .mobile-app-shell h2,
+.native-mobile-app .mobile-app-shell h3,
+.native-mobile-app .mobile-app-shell textarea,
+.native-mobile-app .mobile-app-shell input {
+  -webkit-touch-callout: default;
+}
+
+/* Retour tactile immédiat sur tout ce qui se touche dans les pages adaptées */
+.native-mobile-app .mobile-native-content button:not(:disabled),
+.native-mobile-app .mobile-native-content a[href] {
+  transition: transform 120ms ease, background-color 150ms ease, opacity 150ms ease;
+}
+.native-mobile-app .mobile-native-content button:not(:disabled):active,
+.native-mobile-app .mobile-native-content a[href]:active {
+  transform: scale(0.98);
+}
+
+/* Champs : 16 px minimum (évite le zoom automatique d'iOS) et coins arrondis cohérents */
+.native-mobile-app .mobile-app-shell input:not([type='checkbox']):not([type='radio']),
+.native-mobile-app .mobile-app-shell select,
+.native-mobile-app .mobile-app-shell textarea {
+  font-size: max(16px, 1rem);
+  border-radius: 0.875rem;
+}
+
+/* Contenus larges (tableaux, blocs de code) : défilement horizontal fluide, jamais de débordement de la page */
+.native-mobile-app .mobile-native-content pre,
+.native-mobile-app .mobile-native-content .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* Les animations respectent le réglage « réduire les animations » du téléphone */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-page-enter { animation: none; }
+  .native-mobile-app .mobile-native-content button,
+  .native-mobile-app .mobile-native-content a { transition: none; }
+}

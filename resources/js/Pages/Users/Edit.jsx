@@ -51,6 +51,7 @@ function Edit({ user }) {
             <select id="role" value={values.role} onChange={handleChange} className="border px-3 py-2 rounded w-full focus:ring-2 focus:ring-blue-400">
               <option value="user">Utilisateur</option>
               <option value="admin">Admin</option>
+              <option value="candidate">Candidat (quiz uniquement)</option>
             </select>
             {errors.role && <div className="text-error text-sm mt-1">{errors.role}</div>}
           </div>

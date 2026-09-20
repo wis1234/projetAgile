@@ -98,10 +98,13 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:admin,manager,member,user',
+            'role' => 'required|in:admin,manager,member,user,candidate',
         ]);
         $user = User::create($validated);
-        $user->assignRole($validated['role']); // Assignation du rôle spatie
+        // « candidate » n'est qu'une valeur du champ users.role (pas un rôle Spatie).
+        if ($validated['role'] !== User::ROLE_CANDIDATE) {
+            $user->assignRole($validated['role']); // Assignation du rôle spatie
+        }
         activity_log('create', 'Création utilisateur', $user);
         return redirect()->route('users.index')->with('success', 'Utilisateur créé avec succès');
     }
@@ -177,7 +180,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,'.$id,
-            'role' => 'required|in:admin,manager,member,user,developer',
+            'role' => 'required|in:admin,manager,member,user,developer,candidate',
             'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
@@ -196,7 +199,9 @@ class UserController extends Controller
         unset($validated['profile_photo']);
         
         $user->update($validated);
-        if ($user->hasRole($validated['role']) === false) {
+        if ($validated['role'] === User::ROLE_CANDIDATE) {
+            $user->syncRoles([]); // un candidat n'a aucun rôle Spatie
+        } elseif ($user->hasRole($validated['role']) === false) {
             $user->syncRoles([$validated['role']]); // Met à jour le rôle spatie
         }
         
@@ -242,7 +247,7 @@ class UserController extends Controller
 
         // Valider la requête
         $validated = $request->validate([
-            'role' => 'required|in:admin,manager,member,user,developer',
+            'role' => 'required|in:admin,manager,member,user,developer,candidate',
             'send_email' => 'sometimes|boolean'
         ]);
 
@@ -254,7 +259,7 @@ class UserController extends Controller
         }
 
         // Mettre à jour le rôle
-        $user->syncRoles([$validated['role']]);
+        $user->syncRoles($validated['role'] === User::ROLE_CANDIDATE ? [] : [$validated['role']]);
         $user->role = $validated['role'];
         $user->save();
 

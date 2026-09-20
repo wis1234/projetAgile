@@ -23,7 +23,7 @@ function Show({ user, auth }) {
     ...user,
     email: user?.email || '',
     name: user?.name || 'Utilisateur sans nom',
-    role: ['admin', 'manager', 'user'].includes(user?.role) ? user.role : 'user',
+    role: ['admin', 'manager', 'user', 'candidate'].includes(user?.role) ? user.role : 'user',
     created_at: user?.created_at || new Date().toISOString()
   }), [user]);
 
@@ -77,6 +77,7 @@ function Show({ user, auth }) {
       admin: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: <FaUserShield className="mr-1" />, label: 'Administrateur' },
       manager: { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: <FaUserTie className="mr-1" />, label: 'Manager' },
       member: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: <FaUser className="mr-1" />, label: 'Membre' },
+      candidate: { color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200', icon: <FaUser className="mr-1" />, label: 'Candidat' },
       user: { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200', icon: <FaUser className="mr-1" />, label: 'Utilisateur' }
     };
     const currentRole = roles[role] || roles.user;

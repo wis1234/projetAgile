@@ -30,6 +30,7 @@ export default function MobileLayout({
   hideHeader = false,
   hideBottomNav = false,
   fullBleed = false,
+  refreshable,
   onMoreClick,
 }) {
   const { flash = {} } = usePage().props;
@@ -52,8 +53,9 @@ export default function MobileLayout({
       <Notification message={flash.success} type="success" />
       <Notification message={flash.error} type="error" />
       <Notification message={flash.info} type="info" />
+      <Notification message={flash.warning} type="info" />
 
-      <MobilePageContainer fullBleed={fullBleed} hideHeader={hideHeader} hideBottomNav={hideBottomNav}>
+      <MobilePageContainer fullBleed={fullBleed} hideHeader={hideHeader} hideBottomNav={hideBottomNav} refreshable={refreshable}>
         {children}
       </MobilePageContainer>
 

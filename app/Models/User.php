@@ -17,6 +17,10 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
+    /** Valeurs du champ users.role choisies à l'inscription. */
+    public const ROLE_USER = 'user';
+    public const ROLE_CANDIDATE = 'candidate';
+
     /** Cache par requête de isQuizCandidateOnly(). */
     protected ?bool $candidateOnlyCache = null;
 
@@ -337,9 +341,30 @@ class User extends Authenticatable implements MustVerifyEmail
             return $this->candidateOnlyCache;
         }
 
-        return $this->candidateOnlyCache = ! $this->hasRole('admin')
-            && ! $this->projects()->exists()
+        if ($this->hasRole('admin')) {
+            return $this->candidateOnlyCache = false;
+        }
+
+        // Compte créé comme « Candidat » à l'inscription (users.role = candidate) : il n'accède qu'aux quiz,
+        // sauf s'il est ensuite nommé responsable d'un projet (il a alors besoin de l'application complète).
+        if ($this->role === self::ROLE_CANDIDATE) {
+            return $this->candidateOnlyCache = ! $this->managedProjects()->exists();
+        }
+
+        // Cas historique : compte inscrit à des quiz par un responsable, sans projet.
+        return $this->candidateOnlyCache = ! $this->projects()->exists()
             && $this->quizCandidacies()->exists();
+    }
+
+    /**
+     * Page d'accueil après connexion / vérification de l'e-mail :
+     * un candidat n'a pas de tableau de bord, il arrive directement sur ses quiz.
+     */
+    public function homeUrl(): string
+    {
+        return $this->isQuizCandidateOnly()
+            ? route('quizzes.index', absolute: false)
+            : route('dashboard', absolute: false);
     }
 
     public function projects() {

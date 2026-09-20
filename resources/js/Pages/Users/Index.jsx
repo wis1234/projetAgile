@@ -165,6 +165,8 @@ export default function Index({ users, filters, roles = [], auth, stats = null }
             case 'developer':
             case 'développeur':
                 return 'bg-blue-100 text-blue-800 border-blue-200';
+            case 'candidate':
+                return 'bg-emerald-100 text-emerald-800 border-emerald-200';
             default:
                 return 'bg-gray-100 text-gray-800 border-gray-200';
         }
@@ -375,7 +377,7 @@ export default function Index({ users, filters, roles = [], auth, stats = null }
                                             <td className="p-4 align-middle">
                                                 <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getRoleBadgeColor(user.role)}`}>
                                                     {getRoleIcon(user.role)}
-                                                    {user.role || 'Utilisateur'}
+                                                    {user.role === 'candidate' ? 'Candidat' : (user.role || 'Utilisateur')}
                                                 </span>
                                             </td>
                                             <td className="p-4 align-middle text-xs text-gray-400 dark:text-gray-500">
@@ -451,7 +453,7 @@ export default function Index({ users, filters, roles = [], auth, stats = null }
                                 <div className="flex justify-center mb-4">
                                     <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getRoleBadgeColor(user.role)}`}>
                                         {getRoleIcon(user.role)}
-                                        {user.role || 'Utilisateur'}
+                                        {user.role === 'candidate' ? 'Candidat' : (user.role || 'Utilisateur')}
                                     </span>
                                 </div>
 

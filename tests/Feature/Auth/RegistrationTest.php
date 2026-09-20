@@ -105,4 +105,41 @@ class RegistrationTest extends TestCase
             session('errors')->first('password')
         );
     }
+
+    public function test_user_can_register_as_candidate(): void
+    {
+        $this->fakeRecaptcha();
+        Notification::fake();
+
+        $this->post('/register', $this->payload(['role' => 'candidate']))
+            ->assertRedirect(route('register.success'));
+
+        $user = User::where('email', 'test@example.com')->firstOrFail();
+        $this->assertSame('candidate', $user->role);
+        $this->assertTrue($user->isQuizCandidateOnly());
+    }
+
+    public function test_role_defaults_to_user_and_rejects_unknown_values(): void
+    {
+        $this->fakeRecaptcha();
+        Notification::fake();
+
+        $this->post('/register', $this->payload());
+        $this->assertSame('user', User::where('email', 'test@example.com')->value('role'));
+
+        $this->post('/register', $this->payload(['email' => 'admin@example.com', 'role' => 'admin']))
+            ->assertSessionHasErrors('role');
+        $this->assertDatabaseMissing('users', ['email' => 'admin@example.com']);
+    }
+
+    public function test_candidate_lands_on_quizzes_and_cannot_open_the_dashboard(): void
+    {
+        $candidate = User::factory()->create(['role' => 'candidate']);
+
+        $this->assertSame(route('quizzes.index', absolute: false), $candidate->homeUrl());
+
+        $this->actingAs($candidate)
+            ->get('/dashboard')
+            ->assertRedirect(route('quizzes.index'));
+    }
 }

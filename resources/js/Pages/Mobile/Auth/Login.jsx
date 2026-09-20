@@ -6,6 +6,7 @@ import TextInput from '@/Components/TextInput';
 import { FaEnvelope, FaLock, FaExclamationTriangle, FaEye, FaEyeSlash, FaArrowRight } from 'react-icons/fa';
 import { useEffect, useState } from 'react';
 import { nativeStorage } from '@/lib/platform';
+import toast from '@/lib/toast';
 
 export default function MobileLogin({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -49,7 +50,15 @@ export default function MobileLogin({ status, canResetPassword }) {
 
     const submit = (e) => {
         e.preventDefault();
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            toast.error('Vous semblez hors ligne. Vérifiez votre connexion puis réessayez.', { title: 'Connexion impossible' });
+            return;
+        }
         post(route('login'), {
+            onError: (errs) => {
+                const message = errs.email || errs.password;
+                if (message) toast.error(message, { title: 'Connexion impossible' });
+            },
             onSuccess: async () => {
                 try {
                     if (data.remember) {

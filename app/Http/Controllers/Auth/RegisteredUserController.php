@@ -26,9 +26,12 @@ class RegisteredUserController extends Controller
     /**
      * Display the registration view.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return Inertia::render('Auth/Register');
+        // ?role=candidate pré-sélectionne « Candidat » (lien envoyé aux personnes invitées à passer un quiz).
+        $role = $request->query('role') === User::ROLE_CANDIDATE ? User::ROLE_CANDIDATE : User::ROLE_USER;
+
+        return Inertia::render('Auth/Register', ['defaultRole' => $role]);
     }
 
     /**
@@ -64,6 +67,7 @@ class RegisteredUserController extends Controller
                 'name' => $request->input('name'),
                 'email' => $request->input('email'),
                 'password' => Hash::make($request->input('password')),
+                'role' => $request->input('role', User::ROLE_USER),
                 'phone' => $request->input('phone'),
                 'job_title' => $request->input('job_title'),
                 'company' => $request->input('company'),
@@ -97,6 +101,7 @@ class RegisteredUserController extends Controller
         $request->session()->put([
             'registered_email' => $user->email,
             'registered_email_sent' => $emailSent,
+            'registered_role' => $user->role,
         ]);
 
         $redirect = redirect()->route('register.success');
@@ -120,6 +125,7 @@ class RegisteredUserController extends Controller
         return Inertia::render('Auth/RegisterSuccess', [
             'email' => $email,
             'emailSent' => (bool) $request->session()->get('registered_email_sent', true),
+            'role' => $request->session()->get('registered_role', User::ROLE_USER),
         ]);
     }
 

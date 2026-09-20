@@ -331,6 +331,7 @@ function Create({ roles = [] }) {
                     <option value="admin">Administrateur</option>
                     <option value="manager">Manager</option>
                     <option value="developer">Développeur</option>
+                    <option value="candidate">Candidat (quiz uniquement)</option>
                     {roles.map(role => (
                       <option key={role.id} value={role.name}>{role.name}</option>
                     ))}

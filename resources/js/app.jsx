@@ -79,6 +79,19 @@ const createInertiaApp = (options) => {
 const webPages = import.meta.glob('./Pages/**/*.jsx');
 const mobilePages = import.meta.glob('./Pages/Mobile/**/*.jsx');
 
+// Aperçu de l'interface mobile dans un navigateur : ouvrez n'importe quelle page avec ?mobile-ui=1
+// (désactivation : ?mobile-ui=0). Le choix est mémorisé pour la session. Sans effet dans l'APK.
+const previewMobileUi = () => {
+    try {
+        const flag = new URLSearchParams(window.location.search).get('mobile-ui');
+        if (flag === '1') sessionStorage.setItem('proja:mobile-ui', '1');
+        if (flag === '0') sessionStorage.removeItem('proja:mobile-ui');
+        return sessionStorage.getItem('proja:mobile-ui') === '1';
+    } catch {
+        return false;
+    }
+};
+
 const mobilePageCandidates = (name) => {
     const parts = name.split('/').filter(Boolean);
     const leaf = parts[parts.length - 1];
@@ -97,7 +110,7 @@ createInertiaApp({
         }
 
         // Dans l'APK Capacitor : bascule automatique vers la version Mobile UI si elle existe.
-        if (isNativeApp()) {
+        if (isNativeApp() || previewMobileUi()) {
             const mobileKey = mobilePageCandidates(name).find((candidate) => mobilePages[candidate]);
             if (mobileKey) {
                 return (await mobilePages[mobileKey]()).default;

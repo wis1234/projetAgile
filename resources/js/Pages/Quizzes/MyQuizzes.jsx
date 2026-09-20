@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import ScoreBadge from '@/Components/Quiz/ScoreBadge';
 import {
@@ -35,6 +35,7 @@ const FILTERS = [
 ];
 
 function MyQuizzes({ quizzes = [], candidateOnly = false }) {
+  const { auth } = usePage().props;
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
 
@@ -111,7 +112,7 @@ function MyQuizzes({ quizzes = [], candidateOnly = false }) {
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Aucun quiz pour le moment</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
               {candidateOnly
-                ? 'Vous serez notifié dès qu\'un responsable vous ajoutera à un quiz.'
+                ? `Vous serez notifié dès qu'un responsable vous ajoutera à un quiz. Communiquez-lui l'adresse ${auth?.user?.email ?? 'de votre compte'} pour être inscrit(e).`
                 : 'Les quiz de vos projets apparaîtront ici.'}
             </p>
           </div>

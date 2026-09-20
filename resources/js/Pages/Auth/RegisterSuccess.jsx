@@ -16,7 +16,7 @@ const WEBMAIL = {
     'yahoo.fr': { label: 'Ouvrir Yahoo Mail', url: 'https://mail.yahoo.com/' },
 };
 
-export default function RegisterSuccess({ email, emailSent = true }) {
+export default function RegisterSuccess({ email, emailSent = true, role = 'user' }) {
     const toast = useToast();
     const cooldown = useCooldown(emailSent ? 45 : 0);
     const [sending, setSending] = useState(false);
@@ -75,7 +75,9 @@ export default function RegisterSuccess({ email, emailSent = true }) {
                             {[
                                 'Ouvrez le message « Vérifiez votre adresse email ».',
                                 'Cliquez sur le bouton de vérification (le lien est valable 60 minutes).',
-                                'Revenez vous connecter : votre compte est prêt.',
+                                role === 'candidate'
+                                    ? 'Connectez-vous : vos quiz vous attendent dans la rubrique « Quiz ».'
+                                    : 'Revenez vous connecter : votre compte est prêt.',
                             ].map((step, i) => (
                                 <li key={step} className="flex items-start gap-3">
                                     <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">

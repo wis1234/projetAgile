@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Auth;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\User;
 use Illuminate\Support\Str;
 
 class RegisterRequest extends FormRequest
@@ -18,6 +19,8 @@ class RegisterRequest extends FormRequest
         $this->merge([
             'name' => trim(preg_replace('/\s+/', ' ', (string) $this->input('name'))),
             'email' => Str::lower(trim((string) $this->input('email'))),
+            // Un ancien formulaire (sans choix de rôle) crée un compte « Utilisateur ».
+            'role' => $this->filled('role') ? $this->input('role') : User::ROLE_USER,
         ]);
     }
 
@@ -26,6 +29,7 @@ class RegisterRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'min:2', 'max:255'],
             'email' => ['required', 'string', 'email:rfc', 'max:255', 'unique:users,email'],
+            'role' => ['required', 'in:' . User::ROLE_USER . ',' . User::ROLE_CANDIDATE],
             'password' => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
             'phone' => ['nullable', 'string', 'max:20'],
@@ -47,6 +51,9 @@ class RegisterRequest extends FormRequest
             'email.email' => 'Cette adresse email n\'est pas valide (exemple : nom@entreprise.com).',
             'email.max' => 'Cette adresse email est trop longue.',
             'email.unique' => 'Cette adresse email est déjà associée à un compte. Connectez-vous ou réinitialisez votre mot de passe.',
+
+            'role.required' => 'Indiquez votre type de compte.',
+            'role.in' => 'Ce type de compte n\'est pas valide. Choisissez « Utilisateur » ou « Candidat ».',
 
             'password.required' => 'Choisissez un mot de passe.',
             'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',

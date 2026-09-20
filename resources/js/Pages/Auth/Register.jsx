@@ -225,13 +225,14 @@ const suggestEmail = (email) => {
 
 const RECAPTCHA_LOAD_TIMEOUT = 12000;
 
-export default function Register() {
+export default function Register({ defaultRole = 'user' }) {
     const toast = useToast();
     const { data, setData, post, processing, errors, clearErrors } = useForm({
         name: '',
         email: '',
         password: '',
         password_confirmation: '',
+        role: defaultRole,
         recaptcha_token: '',
     });
 
@@ -683,6 +684,29 @@ export default function Register() {
                                         </p>
                                     )}
                                 </div>
+                            </div>
+
+                            {/* Type de compte */}
+                            <div>
+                                <label htmlFor="role" className={fieldLabelClasses}>
+                                    Je m&apos;inscris en tant que
+                                </label>
+                                <select
+                                    id="role"
+                                    name="role"
+                                    value={data.role}
+                                    onChange={onFieldChange('role')}
+                                    className={fieldClass('role')}
+                                >
+                                    <option value="user">Utilisateur</option>
+                                    <option value="candidate">Candidat</option>
+                                </select>
+                                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                    {data.role === 'candidate'
+                                        ? 'Vous accédez uniquement aux quiz et évaluations auxquels vous êtes invité(e).'
+                                        : 'Accès complet : projets, tâches, équipes, discussions et quiz.'}
+                                </p>
+                                <InputError message={errors.role} className="mt-1" />
                             </div>
 
                             {/* Mot de passe */}
