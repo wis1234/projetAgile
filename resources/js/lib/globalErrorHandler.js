@@ -1,9 +1,8 @@
 import axios from 'axios';
+import handleSessionExpired from '@/lib/sessionExpired';
 
-const redirectToLogin = () => {
-    if (window.location.pathname === '/login') return;
-    window.location.href = '/login';
-};
+const suspendOrFail = (error) => (handleSessionExpired() ? new Promise(() => {}) : Promise.reject(error));
+const redirectToLogin = () => handleSessionExpired();
 
 export function setupGlobalErrorHandler() {
 
@@ -17,8 +16,7 @@ export function setupGlobalErrorHandler() {
 
             // Session / CSRF expirés → login
             if (status === 401 || status === 419) {
-                redirectToLogin();
-                return new Promise(() => {}); // stoppe la chaîne proprement
+                return suspendOrFail(error); // page publique : l'échec se propage, le formulaire se débloque
             }
 
             // 403 → laisser Inertia/Handler gérer
@@ -28,8 +26,7 @@ export function setupGlobalErrorHandler() {
             // = session expirée non interceptée avant
             const contentType = headers['content-type'] ?? '';
             if (contentType.includes('text/html') && status < 400) {
-                redirectToLogin();
-                return new Promise(() => {});
+                return suspendOrFail(error);
             }
 
             return Promise.reject(error);

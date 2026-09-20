@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { router } from '@inertiajs/react';
+import handleSessionExpired from '@/lib/sessionExpired';
 
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 axios.defaults.headers.common['Accept'] = 'application/json';
@@ -15,10 +16,26 @@ const axiosInstance = axios.create({
 });
 
 // ── Intercepteur requête : ajout CSRF ─────────────────────
+// Le jeton du <meta> est figé au chargement de la page : dans une application Inertia (navigation sans rechargement),
+// il devient obsolète après une déconnexion / reconnexion et provoque des erreurs 419 silencieuses (inscription,
+// connexion…). Le cookie XSRF-TOKEN, lui, est renouvelé à chaque réponse : on le préfère.
+const readXsrfCookie = () => {
+    const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+};
+
 const requestInterceptor = config => {
     if (['get', 'head', 'options'].includes(config.method?.toLowerCase())) {
         return config;
     }
+
+    const cookieToken = readXsrfCookie();
+    if (cookieToken) {
+        config.headers['X-XSRF-TOKEN'] = cookieToken;
+        delete config.headers['X-CSRF-TOKEN'];
+        return config;
+    }
+
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     if (token) {
         config.headers['X-CSRF-TOKEN'] = token;
@@ -30,12 +47,8 @@ const requestInterceptor = config => {
 axiosInstance.interceptors.request.use(requestInterceptor, e => Promise.reject(e));
 axios.interceptors.request.use(requestInterceptor, e => Promise.reject(e));
 
-// ── Fonction de redirection vers login ────────────────────
-const redirectToLogin = () => {
-    // Éviter les redirections en boucle si on est déjà sur login
-    if (window.location.pathname === '/login') return;
-    window.location.href = '/login';
-};
+// ── Session expirée : message clair au lieu d'une redirection silencieuse ──
+const suspendOrFail = (error) => (handleSessionExpired() ? new Promise(() => {}) : Promise.reject(error));
 
 // ── Intercepteur réponse ──────────────────────────────────
 const responseInterceptor = [
@@ -50,14 +63,9 @@ const responseInterceptor = [
 
         switch (status) {
             case 401:
-                // Session expirée → redirection propre
-                redirectToLogin();
-                return new Promise(() => {}); // stoppe la chaîne
-
             case 419:
-                // CSRF expiré → redirection propre (pas de reload)
-                redirectToLogin();
-                return new Promise(() => {}); // stoppe la chaîne
+                // Session / CSRF expiré : page privée → /login?expired=1 ; page publique → message + jeton renouvelé
+                return suspendOrFail(error);
 
             case 403:
                 // Accès refusé → laisser Inertia gérer (page Error403)

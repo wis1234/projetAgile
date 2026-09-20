@@ -1,0 +1,2238 @@
+diff --git a/app/Http/Controllers/Auth/EmailVerificationNotificationController.php b/app/Http/Controllers/Auth/EmailVerificationNotificationController.php
+index f64fa9b..b4cfebf 100644
+--- a/app/Http/Controllers/Auth/EmailVerificationNotificationController.php
++++ b/app/Http/Controllers/Auth/EmailVerificationNotificationController.php
+@@ -17,8 +17,16 @@ public function store(Request $request): RedirectResponse
+             return redirect()->intended(route('dashboard', absolute: false));
+         }
+ 
+-        $request->user()->sendEmailVerificationNotification();
++        try {
++            $request->user()->sendEmailVerificationNotification();
++        } catch (\Throwable $e) {
++            report($e);
+ 
+-        return back()->with('status', 'verification-link-sent');
++            return back()->with('error', 'L\'e-mail n\'a pas pu être envoyé. Réessayez dans quelques minutes.');
++        }
++
++        return back()
++            ->with('status', 'verification-link-sent')
++            ->with('success', 'Un nouveau lien de vérification vient de vous être envoyé.');
+     }
+ }
+diff --git a/app/Http/Controllers/Auth/RegisteredUserController.php b/app/Http/Controllers/Auth/RegisteredUserController.php
+index 0ef3b05..e31745f 100644
+--- a/app/Http/Controllers/Auth/RegisteredUserController.php
++++ b/app/Http/Controllers/Auth/RegisteredUserController.php
+@@ -3,31 +3,26 @@
+ namespace App\Http\Controllers\Auth;
+ 
+ use App\Http\Controllers\Controller;
++use App\Http\Requests\Auth\RegisterRequest;
+ use App\Models\User;
++use App\Services\Auth\RecaptchaVerifier;
+ use Illuminate\Auth\Events\Registered;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+-use Illuminate\Support\Facades\Auth;
++use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Facades\Hash;
+-use Illuminate\Support\Facades\Http;
+ use Illuminate\Support\Facades\Log;
+-use Illuminate\Validation\Rules;
++use Illuminate\Support\Facades\RateLimiter;
++use Illuminate\Validation\ValidationException;
+ use Inertia\Inertia;
+ use Inertia\Response;
+-use Illuminate\Support\Facades\Validator;
++use Throwable;
+ 
+ class RegisteredUserController extends Controller
+ {
+-    /**
+-     * Create a new controller instance.
+-     */
+-    /**
+-     * Create a new controller instance.
+-     */
+-    public function __construct()
+-    {
+-        // Le middleware reCAPTCHA est maintenant géré par la règle de validation
+-    }
++    private const MAX_ATTEMPTS = 10;   // tentatives d'inscription valides par IP…
++    private const DECAY_SECONDS = 600;  // …sur 10 minutes
++
+     /**
+      * Display the registration view.
+      */
+@@ -39,199 +34,139 @@ public function create(): Response
+     /**
+      * Handle an incoming registration request.
+      *
+-     * @throws \Illuminate\Validation\ValidationException
++     * Chaque cause d'échec renvoie un message précis (clé `form` = erreur générale) :
++     * l'interface l'affiche à la fois dans le formulaire et en notification.
+      */
+-    public function store(Request $request): RedirectResponse
++    public function store(RegisterRequest $request, RecaptchaVerifier $recaptcha): RedirectResponse
+     {
+-        // Validation des données du formulaire
+-        $validator = Validator::make($request->all(), [
+-            'name' => 'required|string|max:255',
+-            'email' => 'required|string|email|max:255|unique:'.User::class,
+-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+-            'profile_photo' => 'nullable|image|max:2048',
+-            'phone' => 'nullable|string|max:20',
+-            'job_title' => 'nullable|string|max:100',
+-            'company' => 'nullable|string|max:100',
+-            'bio' => 'nullable|string|max:1000',
+-            'recaptcha_token' => 'required|string',
+-        ]);
++        $throttleKey = 'register:' . $request->ip();
+ 
+-        // Validation du token reCAPTCHA
+-        try {
+-            $recaptchaToken = $request->recaptcha_token;
+-            
+-            if (empty($recaptchaToken)) {
+-                $validator->errors()->add('recaptcha_token', 'Le jeton de vérification est manquant.');
+-                return back()
+-                    ->withErrors($validator)
+-                    ->withInput();
+-            }
++        if (RateLimiter::tooManyAttempts($throttleKey, self::MAX_ATTEMPTS)) {
++            $minutes = max(1, (int) ceil(RateLimiter::availableIn($throttleKey) / 60));
+ 
+-            $recaptchaResponse = Http::timeout(10)->asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
+-                'secret' => config('services.recaptcha.secret_key', '6Lcvg8krAAAAADCaicd7FIRDZNKxXPPgWKcq-K6e'),
+-                'response' => $recaptchaToken,
+-                'remoteip' => $request->ip(),
++            throw ValidationException::withMessages([
++                'form' => "Trop de tentatives d'inscription depuis votre connexion. Réessayez dans {$minutes} minute(s).",
+             ]);
++        }
+ 
+-            // Vérifier si la requête a réussi
+-            if (!$recaptchaResponse->successful()) {
+-                Log::error('Erreur de réponse reCAPTCHA', [
+-                    'status' => $recaptchaResponse->status(),
+-                    'body' => $recaptchaResponse->body(),
+-                ]);
+-                
+-                $validator->errors()->add('recaptcha_token', 'Impossible de vérifier la sécurité. Veuillez réessayer.');
+-                return back()
+-                    ->withErrors($validator)
+-                    ->withInput();
+-            }
++        // Le reCAPTCHA n'est vérifié qu'une fois les champs valides : un jeton n'est utilisable qu'une fois,
++        // une faute de frappe ne doit donc pas obliger à recocher la case.
++        $check = $recaptcha->verify($request->input('recaptcha_token'), $request->ip());
+ 
+-            $responseData = $recaptchaResponse->json();
+-            
+-            // Journalisation pour le débogage
+-            Log::debug('Réponse reCAPTCHA', [
+-                'success' => $responseData['success'] ?? null,
+-                'score' => $responseData['score'] ?? null,
+-                'action' => $responseData['action'] ?? null,
+-                'hostname' => $responseData['hostname'] ?? null,
+-                'error_codes' => $responseData['error-codes'] ?? null,
+-            ]);
++        if (!$check['ok']) {
++            throw ValidationException::withMessages(['recaptcha_token' => $check['message']]);
++        }
+ 
+-            if (!$responseData['success']) {
+-                $errorMessage = 'La vérification de sécurité a échoué. ';
+-                $errorCodes = $responseData['error-codes'] ?? [];
+-                
+-                // Messages d'erreur plus détaillés
+-                $errorMessages = [
+-                    'missing-input-secret' => 'Le paramètre secret est manquant.',
+-                    'invalid-input-secret' => 'Le paramètre secret est invalide ou malformé.',
+-                    'missing-input-response' => 'Le paramètre de réponse est manquant.',
+-                    'invalid-input-response' => 'Le paramètre de réponse est invalide ou malformé.',
+-                    'bad-request' => 'La requête est invalide ou malformée.',
+-                    'timeout-or-duplicate' => 'La réponse n\'est plus valide : elle est trop ancienne ou a déjà été utilisée.',
+-                ];
+-                
+-                $detailedErrors = [];
+-                foreach ($errorCodes as $code) {
+-                    $detailedErrors[] = $errorMessages[$code] ?? $code;
+-                }
+-                
+-                if (!empty($detailedErrors)) {
+-                    $errorMessage .= 'Raisons : ' . implode(', ', $detailedErrors);
+-                }
+-                
+-                Log::warning('Échec de la validation reCAPTCHA', [
+-                    'errors' => $errorCodes,
+-                    'ip' => $request->ip(),
+-                    'user_agent' => $request->userAgent(),
+-                ]);
+-                
+-                $validator->errors()->add('recaptcha_token', $errorMessage);
+-                return back()
+-                    ->withErrors($validator)
+-                    ->withInput()
+-                    ->with('error', $errorMessage);
+-            }
++        RateLimiter::hit($throttleKey, self::DECAY_SECONDS);
+ 
+-            // Vérifier le score pour reCAPTCHA v3 (optionnel)
+-            $minimumScore = 0.5; // Score minimum acceptable (0.0 à 1.0)
+-            if (isset($responseData['score']) && $responseData['score'] < $minimumScore) {
+-                Log::warning('Score reCAPTCHA trop bas', [
+-                    'score' => $responseData['score'],
+-                    'minimum_required' => $minimumScore,
+-                    'ip' => $request->ip(),
+-                ]);
+-                
+-                $validator->errors()->add('recaptcha_token', 'Activité suspecte détectée. Veuillez réessayer.');
+-                return back()
+-                    ->withErrors($validator)
+-                    ->withInput()
+-                    ->with('error', 'Activité suspecte détectée. Veuillez réessayer.');
+-            }
+-            
+-            // Vérifier l'action (pour reCAPTCHA v3)
+-            if (isset($responseData['action']) && $responseData['action'] !== 'submit') {
+-                Log::warning('Action reCAPTCHA invalide', [
+-                    'expected' => 'submit',
+-                    'actual' => $responseData['action'],
+-                    'ip' => $request->ip(),
+-                ]);
+-                
+-                $validator->errors()->add('recaptcha_token', 'Action de vérification invalide.');
+-                return back()
+-                    ->withErrors($validator)
+-                    ->withInput()
+-                    ->with('error', 'Action de vérification invalide.');
+-            }
+-            
+-        } catch (\Exception $e) {
+-            Log::error('Erreur lors de la vérification reCAPTCHA', [
+-                'exception' => get_class($e),
+-                'message' => $e->getMessage(),
+-                'trace' => $e->getTraceAsString(),
++        try {
++            $user = DB::transaction(fn () => User::create([
++                'name' => $request->input('name'),
++                'email' => $request->input('email'),
++                'password' => Hash::make($request->input('password')),
++                'phone' => $request->input('phone'),
++                'job_title' => $request->input('job_title'),
++                'company' => $request->input('company'),
++                'bio' => $request->input('bio'),
++            ]));
++        } catch (Throwable $e) {
++            Log::error('Erreur lors de la création du compte', [
++                'error' => $e->getMessage(),
++                'email' => $request->input('email'),
+                 'ip' => $request->ip(),
+             ]);
+-            
+-            $validator->errors()->add('recaptcha_token', 'Une erreur est survenue lors de la vérification de sécurité. Veuillez réessayer.');
+-            return back()
+-                ->withErrors($validator)
+-                ->withInput()
+-                ->with('error', 'Une erreur est survenue lors de la vérification de sécurité. Veuillez réessayer.');
++
++            throw ValidationException::withMessages([
++                'form' => 'Votre compte n\'a pas pu être créé pour le moment. Réessayez dans quelques instants.',
++            ]);
+         }
+ 
+-        if ($validator->fails()) {
+-            return back()
+-                ->withErrors($validator)
+-                ->withInput();
++        // Une photo qui échoue ne doit jamais empêcher l'inscription.
++        if ($request->hasFile('profile_photo')) {
++            try {
++                $user->updateProfilePhoto($request->file('profile_photo'));
++            } catch (Throwable $e) {
++                report($e);
++            }
+         }
+ 
+-        $validated = $validator->validated();
++        // Le compte existe : on envoie l'e-mail de vérification (via l'événement standard `Registered`,
++        // un seul e-mail). S'il échoue, l'utilisateur en est informé et peut le renvoyer.
++        $emailSent = $this->dispatchRegistered($user);
+ 
+-        try {
+-            // Création de l'utilisateur avec les données validées
+-            $user = User::create([
+-                'name' => $validated['name'],
+-                'email' => $validated['email'],
+-                'password' => Hash::make($validated['password']),
+-                'phone' => $validated['phone'] ?? null,
+-                'job_title' => $validated['job_title'] ?? null,
+-                'company' => $validated['company'] ?? null,
+-                'bio' => $validated['bio'] ?? null,
+-            ]);
++        $request->session()->put([
++            'registered_email' => $user->email,
++            'registered_email_sent' => $emailSent,
++        ]);
+ 
+-            // Gestion de la photo de profil si fournie
+-            if ($request->hasFile('profile_photo')) {
+-                $user->updateProfilePhoto($request->file('profile_photo'));
+-            }
++        $redirect = redirect()->route('register.success');
+ 
+-            // Déclencher l'événement d'inscription
+-            event(new Registered($user));
++        return $emailSent
++            ? $redirect->with('success', 'Votre compte a été créé avec succès.')
++            : $redirect->with('warning', 'Votre compte a été créé, mais l\'e-mail de vérification n\'a pas pu être envoyé. Utilisez le bouton « Renvoyer l\'e-mail ».');
++    }
++
++    /**
++     * Écran de confirmation après l'inscription (avec renvoi de l'e-mail).
++     */
++    public function success(Request $request): Response|RedirectResponse
++    {
++        $email = $request->session()->get('registered_email');
++
++        if (!$email) {
++            return redirect()->route('register');
++        }
++
++        return Inertia::render('Auth/RegisterSuccess', [
++            'email' => $email,
++            'emailSent' => (bool) $request->session()->get('registered_email_sent', true),
++        ]);
++    }
++
++    /**
++     * Renvoie l'e-mail de vérification à l'adresse saisie dans CETTE session
++     * (aucune adresse n'est acceptée en paramètre : pas d'énumération de comptes).
++     */
++    public function resend(Request $request): RedirectResponse
++    {
++        $email = $request->session()->get('registered_email');
++        $user = $email ? User::where('email', $email)->first() : null;
++
++        if (!$user) {
++            return redirect()->route('register')->with('info', 'Votre session a expiré. Recommencez l\'inscription.');
++        }
+ 
+-            // Connecter automatiquement l'utilisateur
+-            Auth::login($user);
++        if ($user->hasVerifiedEmail()) {
++            return redirect()->route('login')->with('success', 'Votre adresse email est déjà vérifiée. Connectez-vous.');
++        }
+ 
+-            // Envoyer l'email de vérification
++        try {
+             $user->sendEmailVerificationNotification();
++        } catch (Throwable $e) {
++            Log::error('Renvoi de l\'e-mail de vérification impossible', ['user_id' => $user->id, 'error' => $e->getMessage()]);
++            $request->session()->put('registered_email_sent', false);
+ 
+-            // Déconnecter l'utilisateur pour forcer la vérification
+-            Auth::logout();
++            return back()->with('error', 'L\'e-mail n\'a pas pu être envoyé. Réessayez dans quelques minutes.');
++        }
+ 
+-            // Rediriger vers la page de connexion avec un message pour vérifier l'email
+-            return redirect()->route('login')
+-                ->with('status', 'Un lien de vérification a été envoyé à votre adresse email. Veuillez vérifier votre boîte de réception pour activer votre compte.');
++        $request->session()->put('registered_email_sent', true);
+ 
+-        } catch (\Exception $e) {
+-            // Journalisation des erreurs en cas d'échec
+-            Log::error('Erreur lors de la création du compte', [
++        return back()->with('success', 'Un nouvel e-mail de vérification vient de vous être envoyé.');
++    }
++
++    private function dispatchRegistered(User $user): bool
++    {
++        try {
++            event(new Registered($user));
++
++            return true;
++        } catch (Throwable $e) {
++            Log::error('Envoi de l\'e-mail de vérification impossible', [
++                'user_id' => $user->id,
+                 'error' => $e->getMessage(),
+-                'trace' => $e->getTraceAsString(),
+-                'ip' => $request->ip(),
+-                'email' => $validated['email'] ?? null,
+             ]);
+ 
+-            // Redirection avec les erreurs
+-            return back()->withInput()
+-                ->with('error', 'Une erreur est survenue lors de la création de votre compte. Veuillez réessayer ou contacter le support si le problème persiste.');
++            return false;
+         }
+     }
+ }
+diff --git a/app/Http/Middleware/HandleInertiaRequests.php b/app/Http/Middleware/HandleInertiaRequests.php
+index 607d64b..e5d6f2a 100644
+--- a/app/Http/Middleware/HandleInertiaRequests.php
++++ b/app/Http/Middleware/HandleInertiaRequests.php
+@@ -54,6 +54,7 @@ public function share(Request $request): array
+             'flash' => fn () => [
+                 'success' => $request->session()->get('success'),
+                 'error' => $request->session()->get('error'),
++                'warning' => $request->session()->get('warning'),
+                 'info' => $request->session()->get('info'),
+             ],
+         ];
+diff --git a/app/Http/Requests/Auth/RegisterRequest.php b/app/Http/Requests/Auth/RegisterRequest.php
+new file mode 100644
+index 0000000..794ece3
+--- /dev/null
++++ b/app/Http/Requests/Auth/RegisterRequest.php
+@@ -0,0 +1,62 @@
++<?php
++
++namespace App\Http\Requests\Auth;
++
++use Illuminate\Foundation\Http\FormRequest;
++use Illuminate\Support\Str;
++
++class RegisterRequest extends FormRequest
++{
++    public function authorize(): bool
++    {
++        return true;
++    }
++
++    /** Nettoie les saisies avant validation (espaces, casse de l'e-mail). */
++    protected function prepareForValidation(): void
++    {
++        $this->merge([
++            'name' => trim(preg_replace('/\s+/', ' ', (string) $this->input('name'))),
++            'email' => Str::lower(trim((string) $this->input('email'))),
++        ]);
++    }
++
++    public function rules(): array
++    {
++        return [
++            'name' => ['required', 'string', 'min:2', 'max:255'],
++            'email' => ['required', 'string', 'email:rfc', 'max:255', 'unique:users,email'],
++            'password' => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
++            'profile_photo' => ['nullable', 'image', 'max:2048'],
++            'phone' => ['nullable', 'string', 'max:20'],
++            'job_title' => ['nullable', 'string', 'max:100'],
++            'company' => ['nullable', 'string', 'max:100'],
++            'bio' => ['nullable', 'string', 'max:1000'],
++            'recaptcha_token' => ['required', 'string'],
++        ];
++    }
++
++    public function messages(): array
++    {
++        return [
++            'name.required' => 'Indiquez votre nom complet.',
++            'name.min' => 'Votre nom doit contenir au moins 2 caractères.',
++            'name.max' => 'Votre nom ne peut pas dépasser 255 caractères.',
++
++            'email.required' => 'Indiquez votre adresse email.',
++            'email.email' => 'Cette adresse email n\'est pas valide (exemple : nom@entreprise.com).',
++            'email.max' => 'Cette adresse email est trop longue.',
++            'email.unique' => 'Cette adresse email est déjà associée à un compte. Connectez-vous ou réinitialisez votre mot de passe.',
++
++            'password.required' => 'Choisissez un mot de passe.',
++            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
++            'password.max' => 'Le mot de passe est trop long.',
++            'password.confirmed' => 'Les deux mots de passe ne correspondent pas.',
++
++            'profile_photo.image' => 'La photo de profil doit être une image (JPG, PNG…).',
++            'profile_photo.max' => 'La photo de profil ne doit pas dépasser 2 Mo.',
++
++            'recaptcha_token.required' => 'Cochez la case « Je ne suis pas un robot » avant de continuer.',
++        ];
++    }
++}
+diff --git a/app/Services/Auth/RecaptchaVerifier.php b/app/Services/Auth/RecaptchaVerifier.php
+new file mode 100644
+index 0000000..8b1e906
+--- /dev/null
++++ b/app/Services/Auth/RecaptchaVerifier.php
+@@ -0,0 +1,91 @@
++<?php
++
++namespace App\Services\Auth;
++
++use Illuminate\Http\Client\ConnectionException;
++use Illuminate\Support\Facades\Http;
++use Illuminate\Support\Facades\Log;
++use Throwable;
++
++/**
++ * Vérification serveur du reCAPTCHA Google, avec des messages clairs pour l'utilisateur.
++ */
++class RecaptchaVerifier
++{
++    /**
++     * Clé secrète historique du projet, conservée en dernier recours pour ne rien casser en production.
++     * Renseignez RECAPTCHA_SECRET_KEY dans le .env : ce repli pourra alors être supprimé.
++     */
++    private const LEGACY_SECRET = '6Lcvg8krAAAAADCaicd7FIRDZNKxXPPgWKcq-K6e';
++
++    private const MESSAGES = [
++        'missing-input-response' => 'Cochez la case « Je ne suis pas un robot » avant de continuer.',
++        'invalid-input-response' => 'La vérification est invalide. Cochez à nouveau la case « Je ne suis pas un robot ».',
++        'timeout-or-duplicate' => 'La vérification a expiré. Cochez à nouveau la case « Je ne suis pas un robot ».',
++        'missing-input-secret' => 'La vérification de sécurité est mal configurée. Contactez le support.',
++        'invalid-input-secret' => 'La vérification de sécurité est mal configurée. Contactez le support.',
++        'bad-request' => 'La vérification a échoué. Rechargez la page puis réessayez.',
++    ];
++
++    /**
++     * @return array{ok:bool, message:?string}
++     */
++    public function verify(?string $token, ?string $ip = null): array
++    {
++        if (blank($token)) {
++            return $this->fail(self::MESSAGES['missing-input-response']);
++        }
++
++        try {
++            $response = Http::timeout(8)
++                ->retry(1, 300, throw: false)
++                ->asForm()
++                ->post('https://www.google.com/recaptcha/api/siteverify', [
++                    'secret' => config('services.recaptcha.secret_key') ?: self::LEGACY_SECRET,
++                    'response' => $token,
++                    'remoteip' => $ip,
++                ]);
++        } catch (ConnectionException $e) {
++            Log::warning('reCAPTCHA injoignable', ['message' => $e->getMessage()]);
++
++            return $this->fail('Le service de vérification est momentanément injoignable. Réessayez dans quelques secondes.');
++        } catch (Throwable $e) {
++            report($e);
++
++            return $this->fail('La vérification de sécurité a rencontré une erreur. Réessayez dans quelques secondes.');
++        }
++
++        if (!$response->successful()) {
++            Log::error('Réponse reCAPTCHA en erreur', ['status' => $response->status()]);
++
++            return $this->fail('Le service de vérification est momentanément indisponible. Réessayez dans quelques secondes.');
++        }
++
++        $data = $response->json() ?? [];
++
++        if (!($data['success'] ?? false)) {
++            $codes = (array) ($data['error-codes'] ?? []);
++            Log::warning('Échec reCAPTCHA', ['codes' => $codes, 'ip' => $ip]);
++
++            foreach ($codes as $code) {
++                if (isset(self::MESSAGES[$code])) {
++                    return $this->fail(self::MESSAGES[$code]);
++                }
++            }
++
++            return $this->fail('La vérification de sécurité a échoué. Cochez à nouveau la case « Je ne suis pas un robot ».');
++        }
++
++        // reCAPTCHA v3 uniquement : le v2 « case à cocher » ne renvoie pas de score.
++        if (isset($data['score']) && (float) $data['score'] < (float) config('services.recaptcha.score_threshold', 0.5)) {
++            return $this->fail('Activité suspecte détectée. Réessayez dans quelques instants.');
++        }
++
++        return ['ok' => true, 'message' => null];
++    }
++
++    private function fail(string $message): array
++    {
++        return ['ok' => false, 'message' => $message];
++    }
++}
+diff --git a/bootstrap/app.php b/bootstrap/app.php
+index dcf6e31..250288c 100644
+--- a/bootstrap/app.php
++++ b/bootstrap/app.php
+@@ -39,13 +39,32 @@
+         ]);
+     })
+     ->withExceptions(function (Exceptions $exceptions): void {
+-        // Gestion personnalisée des erreurs CSRF
+-        $exceptions->renderable(function (\Illuminate\Session\TokenMismatchException $e, $request) {
++        // Session / jeton CSRF expiré (419).
++        // Laravel convertit TokenMismatchException en HttpException(419) avant d'appeler les renderers :
++        // on traite donc les deux formes. Pour une navigation Inertia, on RENVOIE l'utilisateur sur la page
++        // qu'il quittait avec un message (le formulaire reste rempli) au lieu de le jeter sur /login sans explication.
++        $exceptions->render(function (\Throwable $e, $request) {
++            $isCsrf = $e instanceof \Illuminate\Session\TokenMismatchException
++                || ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface && $e->getStatusCode() === 419);
++
++            if (!$isCsrf) {
++                return null;
++            }
++
++            if ($request->header('X-Inertia')) {
++                return redirect()->back()->with(
++                    'error',
++                    'Votre session de sécurité a expiré. Nous l\'avons renouvelée : veuillez réessayer.'
++                );
++            }
++
+             if ($request->expectsJson()) {
+                 return response()->json([
+                     'message' => 'CSRF token mismatch. Please refresh the page and try again.',
+-                    'requiresPageReload' => true
++                    'requiresPageReload' => true,
+                 ], 419);
+             }
++
++            return null;
+         });
+     })->create();
+diff --git a/resources/js/Components/AuthShell.jsx b/resources/js/Components/AuthShell.jsx
+new file mode 100644
+index 0000000..939572f
+--- /dev/null
++++ b/resources/js/Components/AuthShell.jsx
+@@ -0,0 +1,32 @@
++import { Link } from '@inertiajs/react';
++import GlobalFooter from '@/Components/GlobalFooter';
++
++/**
++ * Habillage commun des écrans d'authentification « secondaires » (confirmation d'inscription,
++ * vérification d'e-mail…) : même en-tête PROJA que la page d'inscription.
++ */
++export default function AuthShell({ children, headerAction }) {
++    return (
++        <div className="flex min-h-screen flex-col bg-[#F8FAFC] font-sans antialiased dark:bg-gray-950">
++            <header className="border-b border-gray-200/70 bg-white/80 backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
++                <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
++                    <Link href="/" className="flex items-center gap-2.5">
++                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
++                            P
++                        </span>
++                        <span className="text-lg font-extrabold uppercase tracking-wide text-gray-900 dark:text-white">
++                            PROJA
++                        </span>
++                    </Link>
++                    {headerAction}
++                </div>
++            </header>
++
++            <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
++                <div className="w-full max-w-lg">{children}</div>
++            </main>
++
++            <GlobalFooter />
++        </div>
++    );
++}
+diff --git a/resources/js/Components/Toaster.jsx b/resources/js/Components/Toaster.jsx
+new file mode 100644
+index 0000000..4369618
+--- /dev/null
++++ b/resources/js/Components/Toaster.jsx
+@@ -0,0 +1,153 @@
++import { useCallback, useEffect, useRef, useState } from 'react';
++import { router } from '@inertiajs/react';
++import { FaCheckCircle, FaExclamationCircle, FaExclamationTriangle, FaInfoCircle, FaTimes } from 'react-icons/fa';
++import toast from '@/lib/toast';
++
++const STYLES = {
++    success: { icon: FaCheckCircle, bar: 'bg-emerald-500', ring: 'border-emerald-200 dark:border-emerald-800', text: 'text-emerald-600 dark:text-emerald-400', title: 'Succès' },
++    error: { icon: FaExclamationCircle, bar: 'bg-red-500', ring: 'border-red-200 dark:border-red-800', text: 'text-red-600 dark:text-red-400', title: 'Erreur' },
++    warning: { icon: FaExclamationTriangle, bar: 'bg-amber-500', ring: 'border-amber-200 dark:border-amber-800', text: 'text-amber-600 dark:text-amber-400', title: 'Attention' },
++    info: { icon: FaInfoCircle, bar: 'bg-blue-500', ring: 'border-blue-200 dark:border-blue-800', text: 'text-blue-600 dark:text-blue-400', title: 'Information' },
++};
++
++/** Lit les props de la page initiale (attribut data-page ou balise <script data-page>). */
++function readInitialPage() {
++    try {
++        const el = document.querySelector('script[data-page="app"]') || document.getElementById('app');
++        const raw = el?.dataset?.page || el?.textContent;
++        return raw ? JSON.parse(raw) : null;
++    } catch {
++        return null;
++    }
++}
++
++/**
++ * Affiche les notifications de `toast` et transforme les messages « flash » du serveur en notifications
++ * sur les pages publiques (les pages connectées ont déjà leur propre affichage dans AdminLayout).
++ */
++function flashToToasts(page) {
++    if (!page?.props || page.props.auth?.user) return;
++    const flash = page.props.flash || {};
++
++    ['success', 'error', 'warning', 'info'].forEach((type) => {
++        if (flash[type]) toast[type](flash[type]);
++    });
++}
++
++function ToastItem({ item, onClose }) {
++    const [paused, setPaused] = useState(false);
++    const s = STYLES[item.type] || STYLES.info;
++    const Icon = s.icon;
++    const remaining = useRef(item.duration);
++    const startedAt = useRef(Date.now());
++    const timer = useRef(null);
++
++    useEffect(() => {
++        if (!item.duration) return undefined;
++        if (paused) {
++            clearTimeout(timer.current);
++            remaining.current -= Date.now() - startedAt.current;
++            return undefined;
++        }
++        startedAt.current = Date.now();
++        timer.current = setTimeout(onClose, Math.max(remaining.current, 800));
++        return () => clearTimeout(timer.current);
++    }, [paused]); // eslint-disable-line react-hooks/exhaustive-deps
++
++    const runAction = () => {
++        if (item.action?.onClick) item.action.onClick();
++        if (item.action?.href) router.visit(item.action.href);
++        onClose();
++    };
++
++    return (
++        <div
++            role={item.type === 'error' ? 'alert' : 'status'}
++            onMouseEnter={() => setPaused(true)}
++            onMouseLeave={() => setPaused(false)}
++            className={`pointer-events-auto relative w-full overflow-hidden rounded-xl border bg-white shadow-xl dark:bg-gray-900 ${s.ring} animate-[toastIn_.22s_ease-out]`}
++        >
++            <div className="flex items-start gap-3 p-4 pr-10">
++                <Icon className={`mt-0.5 h-5 w-5 flex-shrink-0 ${s.text}`} aria-hidden="true" />
++                <div className="min-w-0 flex-1">
++                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.title || s.title}</p>
++                    {item.message && <p className="mt-0.5 text-sm leading-snug text-gray-600 dark:text-gray-300">{item.message}</p>}
++                    {item.action && (
++                        <button
++                            type="button"
++                            onClick={runAction}
++                            className={`mt-2 text-sm font-semibold underline underline-offset-2 ${s.text}`}
++                        >
++                            {item.action.label}
++                        </button>
++                    )}
++                </div>
++            </div>
++            <button
++                type="button"
++                onClick={onClose}
++                aria-label="Fermer la notification"
++                className="absolute right-2 top-2 rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
++            >
++                <FaTimes className="h-3 w-3" />
++            </button>
++            {item.duration > 0 && (
++                <span
++                    className={`absolute bottom-0 left-0 h-0.5 ${s.bar}`}
++                    style={{
++                        width: '100%',
++                        animation: `toastBar ${item.duration}ms linear forwards`,
++                        animationPlayState: paused ? 'paused' : 'running',
++                    }}
++                />
++            )}
++        </div>
++    );
++}
++
++export default function Toaster() {
++    const [items, setItems] = useState([]);
++
++    const remove = useCallback((id) => setItems((list) => list.filter((t) => t.id !== id)), []);
++
++    useEffect(() => {
++        const unsubscribe = toast.subscribe((event) => {
++            if (event.kind === 'add') {
++                setItems((list) => [...list.filter((t) => t.id !== event.toast.id), event.toast].slice(-4));
++            } else if (event.kind === 'remove') {
++                remove(event.id);
++            } else if (event.kind === 'clear') {
++                setItems([]);
++            }
++        });
++
++        // Messages du serveur : page affichée au chargement, puis chaque navigation (redirection après un POST…)
++        flashToToasts(readInitialPage());
++        const off = router.on('navigate', (event) => flashToToasts(event.detail.page));
++
++        return () => {
++            unsubscribe();
++            off?.();
++        };
++    }, [remove]);
++
++    return (
++        <>
++            <style>{`
++                @keyframes toastIn { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
++                @keyframes toastBar { from { transform: scaleX(1); transform-origin: left; } to { transform: scaleX(0); transform-origin: left; } }
++                @media (prefers-reduced-motion: reduce) { [role="status"], [role="alert"] { animation: none !important; } }
++            `}</style>
++            <div
++                aria-live="polite"
++                className="pointer-events-none fixed inset-x-0 top-0 z-[10000] flex flex-col items-center gap-2 p-3 sm:items-end sm:p-5"
++            >
++                <div className="flex w-full max-w-sm flex-col gap-2">
++                    {items.map((item) => (
++                        <ToastItem key={item.id} item={item} onClose={() => remove(item.id)} />
++                    ))}
++                </div>
++            </div>
++        </>
++    );
++}
+diff --git a/resources/js/Pages/Auth/Login.jsx b/resources/js/Pages/Auth/Login.jsx
+index 4b85781..1079674 100644
+--- a/resources/js/Pages/Auth/Login.jsx
++++ b/resources/js/Pages/Auth/Login.jsx
+@@ -5,8 +5,10 @@ import TextInput from '@/Components/TextInput';
+ import { FaEnvelope, FaLock, FaSignInAlt, FaExclamationTriangle, FaEye, FaEyeSlash } from 'react-icons/fa';
+ import { useEffect, useState } from 'react';
+ import GlobalFooter from '@/Components/GlobalFooter';
++import useToast from '@/hooks/useToast';
+ 
+ export default function Login({ status, canResetPassword }) {
++    const toast = useToast();
+     const { data, setData, post, processing, errors, reset } = useForm({
+         email: '',
+         password: '',
+@@ -46,7 +48,17 @@ export default function Login({ status, canResetPassword }) {
+ 
+     const submit = (e) => {
+         e.preventDefault();
++
++        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
++            toast.error('Vous semblez hors ligne. Vérifiez votre connexion internet puis réessayez.', { title: 'Connexion impossible' });
++            return;
++        }
++
+         post(route('login'), {
++            onError: (errs) => {
++                const message = errs.email || errs.password;
++                if (message) toast.error(message, { title: 'Connexion impossible' });
++            },
+             onSuccess: () => {
+                 try {
+                     if (data.remember) {
+diff --git a/resources/js/Pages/Auth/Register.jsx b/resources/js/Pages/Auth/Register.jsx
+index 689f9fa..0a62e7b 100644
+--- a/resources/js/Pages/Auth/Register.jsx
++++ b/resources/js/Pages/Auth/Register.jsx
+@@ -1,11 +1,12 @@
+-import { Link, useForm } from '@inertiajs/react';
+-import { useState, useEffect, useRef, useMemo } from 'react';
++import { Head, Link, useForm } from '@inertiajs/react';
++import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+ import {
+     FaEye, FaEyeSlash, FaCheckCircle, FaColumns, FaUsers, FaChartLine,
+-    FaChevronDown, FaLockOpen, FaShieldAlt, FaCloud, FaVideo,
++    FaChevronDown, FaLockOpen, FaShieldAlt, FaCloud, FaVideo, FaExclamationCircle, FaSpinner,
+ } from 'react-icons/fa';
+ import { InputError, PrimaryButton, TextInput } from '@/Components';
+ import GlobalFooter from '@/Components/GlobalFooter';
++import useToast from '@/hooks/useToast';
+ 
+ /* ------------------------------------------------------------------ */
+ /*  Contenu statique de la page                                        */
+@@ -176,8 +177,57 @@ const fieldLabelClasses =
+ /*  Page principale                                                     */
+ /* ------------------------------------------------------------------ */
+ 
++/* ------------------------------------------------------------------ */
++/*  Validation côté navigateur (mêmes règles que le serveur)            */
++/* ------------------------------------------------------------------ */
++
++const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
++
++const validators = {
++    name: (v) => {
++        const t = v.trim();
++        if (!t) return 'Indiquez votre nom complet.';
++        if (t.length < 2) return 'Votre nom doit contenir au moins 2 caractères.';
++        return '';
++    },
++    email: (v) => {
++        const t = v.trim();
++        if (!t) return 'Indiquez votre adresse email.';
++        if (!EMAIL_RX.test(t)) return "Cette adresse email n'est pas valide (exemple : nom@entreprise.com).";
++        return '';
++    },
++    password: (v) => {
++        if (!v) return 'Choisissez un mot de passe.';
++        if (v.length < 8) return 'Le mot de passe doit contenir au moins 8 caractères.';
++        return '';
++    },
++    password_confirmation: (v, all) => {
++        if (!v) return 'Confirmez votre mot de passe.';
++        if (v !== all.password) return 'Les deux mots de passe ne correspondent pas.';
++        return '';
++    },
++};
++
++const FIELD_ORDER = ['name', 'email', 'password', 'password_confirmation'];
++
++// Fautes de frappe fréquentes dans le domaine de l'email (l'e-mail de vérification ne serait jamais reçu)
++const DOMAIN_TYPOS = {
++    'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com', 'gmail.con': 'gmail.com', 'gmail.co': 'gmail.com', 'gamil.com': 'gmail.com',
++    'yahooo.com': 'yahoo.com', 'yaho.com': 'yahoo.com', 'yahoo.con': 'yahoo.com',
++    'hotmial.com': 'hotmail.com', 'hotmail.con': 'hotmail.com', 'hotmai.com': 'hotmail.com',
++    'outlok.com': 'outlook.com', 'outlook.con': 'outlook.com',
++};
++
++const suggestEmail = (email) => {
++    const [local, domain] = email.trim().toLowerCase().split('@');
++    return domain && DOMAIN_TYPOS[domain] ? `${local}@${DOMAIN_TYPOS[domain]}` : null;
++};
++
++const RECAPTCHA_LOAD_TIMEOUT = 12000;
++
+ export default function Register() {
+-    const { data, setData, post, processing, errors } = useForm({
++    const toast = useToast();
++    const { data, setData, post, processing, errors, clearErrors } = useForm({
+         name: '',
+         email: '',
+         password: '',
+@@ -186,44 +236,116 @@ export default function Register() {
+     });
+ 
+     const recaptchaRef = useRef(null);
++    const captchaBoxRef = useRef(null);
++    const submittingRef = useRef(false);
+     const [recaptchaError, setRecaptchaError] = useState('');
+-    const [formError, setFormError] = useState('');
+     const [isRecaptchaLoaded, setIsRecaptchaLoaded] = useState(false);
++    const [captchaSlow, setCaptchaSlow] = useState(false);
++    const [touched, setTouched] = useState({});
++    const [submitted, setSubmitted] = useState(false);
+     const [showPassword, setShowPassword] = useState(false);
+     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+     const [openFaq, setOpenFaq] = useState(0);
+ 
+     const strength = useMemo(() => passwordStrength(data.password), [data.password]);
+-    const emailLooksValid = useMemo(
+-        () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email),
+-        [data.email]
+-    );
++    const emailLooksValid = useMemo(() => EMAIL_RX.test(data.email.trim()), [data.email]);
++    const emailSuggestion = useMemo(() => suggestEmail(data.email), [data.email]);
+     const passwordsMatch =
+         data.password_confirmation.length > 0 && data.password === data.password_confirmation;
+ 
+-    // Initialise le widget reCAPTCHA
+-    // Important : grecaptcha.render() doit être appelé une fois l'API prête
+-    // (grecaptcha.ready), sinon "render is not a function" apparaît car le
+-    // script vient tout juste de se charger. Comme il s'agit d'un widget
+-    // visible (size: 'normal'), on ne doit PAS appeler grecaptcha.execute()
+-    // dessus : execute() n'existe que pour le reCAPTCHA invisible, l'utilisateur
+-    // doit cocher la case lui-même.
+-    const initializeRecaptcha = () => {
++    // Erreurs de saisie calculées côté navigateur (affichées après passage sur le champ ou à l'envoi)
++    const clientErrors = useMemo(
++        () =>
++            Object.fromEntries(
++                FIELD_ORDER.map((f) => [f, validators[f](data[f], data)]).filter(([, msg]) => msg)
++            ),
++        [data]
++    );
++
++    // Erreur à afficher : celle du serveur en priorité, sinon celle du navigateur
++    const errorFor = (field) =>
++        errors[field] || ((touched[field] || submitted) ? clientErrors[field] : '') || '';
++
++    const fieldClass = (field, extra = '') =>
++        `${fieldClasses} ${extra} ${
++            errorFor(field)
++                ? '!border-red-400 !bg-red-50/60 focus:!border-red-500 focus:!ring-red-100 dark:!bg-red-900/10'
++                : ''
++        }`;
++
++    const onFieldChange = (field) => (e) => {
++        setData(field, e.target.value);
++        if (errors[field]) clearErrors(field);
++        if (errors.form) clearErrors('form');
++    };
++
++    const onFieldBlur = (field) => () => setTouched((t) => ({ ...t, [field]: true }));
++
++    const focusField = (field) => {
++        const el = document.getElementById(field);
++        if (el) {
++            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
++            setTimeout(() => el.focus({ preventScroll: true }), 250);
++        }
++    };
++
++    const scrollToCaptcha = () => {
++        captchaBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
++    };
++
++    /* ---------------- reCAPTCHA ---------------- */
++
++    const onRecaptchaSuccess = useCallback((token) => {
++        setData('recaptcha_token', token);
++        setRecaptchaError('');
++        clearErrors('recaptcha_token');
++    }, []); // eslint-disable-line react-hooks/exhaustive-deps
++
++    const onRecaptchaExpired = useCallback(() => {
++        setData('recaptcha_token', '');
++        setRecaptchaError('La vérification a expiré. Cochez à nouveau la case « Je ne suis pas un robot ».');
++        toast.warning('La vérification anti-robot a expiré. Cochez à nouveau la case avant de valider.', {
++            title: 'Vérification expirée',
++        });
++    }, []); // eslint-disable-line react-hooks/exhaustive-deps
++
++    const onRecaptchaError = useCallback(() => {
++        setData('recaptcha_token', '');
++        setRecaptchaError('La vérification de sécurité a rencontré une erreur. Réessayez.');
++        toast.error('La vérification anti-robot a rencontré une erreur. Cliquez sur « Réessayer » ou rechargez la page.', {
++            title: 'Vérification indisponible',
++        });
++    }, []); // eslint-disable-line react-hooks/exhaustive-deps
++
++    const resetCaptcha = () => {
++        try {
++            if (window.grecaptcha && recaptchaRef.current !== null) {
++                window.grecaptcha.reset(recaptchaRef.current);
++            }
++        } catch {
++            /* widget indisponible : ignoré */
++        }
++        setData('recaptcha_token', '');
++    };
++
++    // grecaptcha.render() doit être appelé une fois l'API prête (grecaptcha.ready).
++    // Widget visible (« case à cocher ») : l'utilisateur coche lui-même, on n'appelle jamais execute().
++    const initializeRecaptcha = useCallback(() => {
+         if (!window.grecaptcha) {
+-            console.error('grecaptcha non disponible');
++            setIsRecaptchaLoaded(false);
+             return;
+         }
+ 
+         const container = document.getElementById('recaptcha-element');
+         if (container && container.hasChildNodes()) {
+-            // Déjà rendu, rien à faire
+             setIsRecaptchaLoaded(true);
++            setCaptchaSlow(false);
+             return;
+         }
+ 
+         window.grecaptcha.ready(() => {
+             try {
+-                const widgetId = window.grecaptcha.render('recaptcha-element', {
++                recaptchaRef.current = window.grecaptcha.render('recaptcha-element', {
+                     sitekey: window.recaptchaSiteKey || '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN',
+                     callback: onRecaptchaSuccess,
+                     'expired-callback': onRecaptchaExpired,
+@@ -231,95 +353,180 @@ export default function Register() {
+                     theme: 'light',
+                     size: 'normal',
+                 });
+-
+-                recaptchaRef.current = widgetId;
+                 setIsRecaptchaLoaded(true);
++                setCaptchaSlow(false);
+                 setRecaptchaError('');
+             } catch (error) {
+                 console.error('Erreur lors du rendu de reCAPTCHA:', error);
+-                setRecaptchaError(
+-                    "La vérification de sécurité n'a pas pu se charger. Rechargez la page ou réessayez."
+-                );
++                setRecaptchaError("La vérification de sécurité n'a pas pu se charger. Rechargez la page ou réessayez.");
+                 setIsRecaptchaLoaded(false);
+             }
+         });
+-    };
++    }, [onRecaptchaSuccess, onRecaptchaExpired, onRecaptchaError]);
+ 
+-    const onRecaptchaSuccess = (token) => {
+-        setData('recaptcha_token', token);
++    useEffect(() => {
++        const onLoaded = () => initializeRecaptcha();
++        // Le script de chargement (app.blade.php) signale un échec réseau via cet événement.
++        const onScriptFailed = () => {
++            setIsRecaptchaLoaded(false);
++            setRecaptchaError("Impossible de charger la vérification de sécurité de Google. Vérifiez votre connexion internet.");
++            toast.error(
++                "La vérification anti-robot n'a pas pu se charger (connexion internet ou blocage par un bloqueur de publicités). Corrigez puis cliquez sur « Réessayer ».",
++                { title: 'Vérification indisponible' }
++            );
++        };
++
++        if (window.grecaptcha) onLoaded();
++        document.addEventListener('recaptcha-loaded', onLoaded);
++        document.addEventListener('recaptcha-error', onScriptFailed);
++
++        // Chargement anormalement long : on prévient l'utilisateur au lieu de le laisser attendre en silence
++        const slow = setTimeout(() => {
++            if (!document.getElementById('recaptcha-element')?.hasChildNodes()) {
++                setCaptchaSlow(true);
++                toast.warning(
++                    'La vérification anti-robot met du temps à se charger. Vérifiez votre connexion ou cliquez sur « Réessayer ».',
++                    { title: 'Chargement lent' }
++                );
++            }
++        }, RECAPTCHA_LOAD_TIMEOUT);
++
++        return () => {
++            clearTimeout(slow);
++            document.removeEventListener('recaptcha-loaded', onLoaded);
++            document.removeEventListener('recaptcha-error', onScriptFailed);
++        };
++    }, [initializeRecaptcha]); // eslint-disable-line react-hooks/exhaustive-deps
++
++    // Coupure / retour de connexion : on prévient tout de suite
++    useEffect(() => {
++        const offline = () => toast.warning('Connexion internet perdue. Vous pourrez valider dès son retour.', { title: 'Hors ligne' });
++        const online = () => toast.success('Connexion rétablie.', { title: 'De retour en ligne' });
++        window.addEventListener('offline', offline);
++        window.addEventListener('online', online);
++        return () => {
++            window.removeEventListener('offline', offline);
++            window.removeEventListener('online', online);
++        };
++    }, []); // eslint-disable-line react-hooks/exhaustive-deps
++
++    const retryCaptcha = () => {
+         setRecaptchaError('');
+-        setIsRecaptchaLoaded(true);
++        setCaptchaSlow(false);
++        if (window.grecaptcha) {
++            initializeRecaptcha();
++        } else {
++            // Le script Google n'est jamais arrivé : on le recharge
++            const script = document.createElement('script');
++            script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
++            script.async = true;
++            script.onerror = () => document.dispatchEvent(new Event('recaptcha-error'));
++            document.head.appendChild(script);
++        }
+     };
+ 
+-    const onRecaptchaExpired = () => {
+-        setData('recaptcha_token', '');
+-        setRecaptchaError('La vérification a expiré. Veuillez réessayer.');
+-        setIsRecaptchaLoaded(false);
+-    };
++    /* ---------------- Envoi ---------------- */
+ 
+-    const onRecaptchaError = () => {
+-        setData('recaptcha_token', '');
+-        setRecaptchaError('Une erreur est survenue. Veuillez réessayer.');
+-        setIsRecaptchaLoaded(false);
+-    };
++    const handleServerErrors = (errs) => {
++        const keys = Object.keys(errs);
+ 
+-    useEffect(() => {
+-        const handleRecaptchaLoaded = () => initializeRecaptcha();
++        if (errs.form) {
++            toast.error(errs.form, { title: 'Inscription impossible' });
++        }
+ 
+-        if (window.grecaptcha) {
+-            handleRecaptchaLoaded();
++        if (errs.recaptcha_token) {
++            setRecaptchaError(errs.recaptcha_token);
++            resetCaptcha();
++            toast.warning(errs.recaptcha_token, { title: 'Vérification anti-robot' });
++            scrollToCaptcha();
++            return;
++        }
++
++        if (errs.email && /déjà/i.test(errs.email)) {
++            toast.error(errs.email, {
++                title: 'Adresse email déjà utilisée',
++                action: { label: 'Se connecter', href: route('login') },
++            });
++            focusField('email');
++            return;
++        }
++
++        const fieldKeys = keys.filter((k) => FIELD_ORDER.includes(k));
++        if (fieldKeys.length > 0) {
++            toast.error(
++                fieldKeys.length === 1
++                    ? errs[fieldKeys[0]]
++                    : `Veuillez corriger ${fieldKeys.length} champs du formulaire avant de continuer.`,
++                { title: 'Formulaire incomplet' }
++            );
++            focusField(FIELD_ORDER.find((f) => fieldKeys.includes(f)));
++            return;
+         }
+ 
+-        document.addEventListener('recaptcha-loaded', handleRecaptchaLoaded);
+-        return () => document.removeEventListener('recaptcha-loaded', handleRecaptchaLoaded);
+-    }, []);
++        if (!errs.form) {
++            toast.error("L'inscription n'a pas pu aboutir. Vérifiez vos informations puis réessayez.", {
++                title: 'Inscription impossible',
++            });
++        }
++    };
+ 
+     const submit = (e) => {
+         e.preventDefault();
++        if (processing || submittingRef.current) return; // anti double-clic
++
++        setSubmitted(true);
++        clearErrors();
++
++        // 1) Champs invalides : on l'annonce et on place le curseur sur le premier
++        const firstInvalid = FIELD_ORDER.find((f) => clientErrors[f]);
++        if (firstInvalid) {
++            const count = Object.keys(clientErrors).length;
++            toast.error(
++                count === 1
++                    ? clientErrors[firstInvalid]
++                    : `Veuillez corriger ${count} champs du formulaire avant de continuer.`,
++                { title: 'Formulaire incomplet' }
++            );
++            focusField(firstInvalid);
++            return;
++        }
++
++        // 2) Hors ligne : inutile d'envoyer
++        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
++            toast.error('Vous semblez hors ligne. Vérifiez votre connexion internet puis réessayez.', {
++                title: 'Connexion impossible',
++            });
++            return;
++        }
+ 
++        // 3) reCAPTCHA
+         if (!data.recaptcha_token) {
+-            if (!isRecaptchaLoaded) {
+-                // Le widget n'a jamais pu se charger : on retente plutôt que
+-                // d'appeler une API invalide sur un widget qui n'existe pas.
+-                setRecaptchaError(
+-                    "La vérification de sécurité n'a pas pu se charger. Nouvelle tentative en cours…"
+-                );
+-                initializeRecaptcha();
+-            } else {
+-                setRecaptchaError("Veuillez cocher la case « Je ne suis pas un robot » avant de continuer.");
+-            }
++            const message = !isRecaptchaLoaded
++                ? "La vérification anti-robot n'est pas encore chargée. Patientez un instant ou cliquez sur « Réessayer »."
++                : 'Cochez la case « Je ne suis pas un robot » avant de continuer.';
++            setRecaptchaError(message);
++            toast.warning(message, { title: 'Vérification anti-robot' });
++            if (!isRecaptchaLoaded) initializeRecaptcha();
++            scrollToCaptcha();
+             return;
+         }
+ 
+-        setFormError('');
++        submittingRef.current = true;
+ 
+         post(route('register'), {
+-            onSuccess: () => {
+-                if (window.grecaptcha) {
+-                    window.grecaptcha.reset(recaptchaRef.current ?? undefined);
+-                }
+-            },
+-            onError: (errs) => {
+-                if (errs.recaptcha_token) {
+-                    setRecaptchaError(errs.recaptcha_token);
+-                } else if (Object.keys(errs).length === 0) {
+-                    // Erreur serveur non associée à un champ précis (ex : session expirée)
+-                    setFormError(
+-                        "Une erreur est survenue lors de l'inscription. Veuillez réessayer."
+-                    );
+-                }
+-                if (window.grecaptcha) {
+-                    window.grecaptcha.reset(recaptchaRef.current ?? undefined);
+-                }
+-                setData('recaptcha_token', '');
+-            },
+             preserveScroll: true,
+-            onFinish: () => setData('recaptcha_token', ''),
++            // Garde le formulaire rempli si la page est rechargée en coulisses (ex. session renouvelée)
++            preserveState: true,
++            onError: handleServerErrors,
++            onFinish: () => {
++                submittingRef.current = false;
++            },
+         });
+     };
+ 
+     return (
+         <div className="min-h-screen bg-[#F8FAFC] font-sans antialiased dark:bg-gray-950">
++            <Head title="Créer un compte" />
+             {/* ---------------------------------------------------------- */}
+             {/* En-tête produit                                             */}
+             {/* ---------------------------------------------------------- */}
+@@ -404,12 +611,13 @@ export default function Register() {
+                             Moins de 2 minutes pour démarrer, aucune carte bancaire requise.
+                         </p>
+ 
+-                        {formError && (
++                        {errors.form && (
+                             <div
+-                                className="mb-5 max-w-md rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400"
++                                className="mb-5 flex max-w-md items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400"
+                                 role="alert"
+                             >
+-                                {formError}
++                                <FaExclamationCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
++                                <span>{errors.form}</span>
+                             </div>
+                         )}
+ 
+@@ -425,14 +633,16 @@ export default function Register() {
+                                         type="text"
+                                         name="name"
+                                         value={data.name}
+-                                        className={fieldClasses}
++                                        className={fieldClass('name')}
+                                         placeholder="Ronaldo Agbohou"
+-                                        onChange={(e) => setData('name', e.target.value)}
++                                        onChange={onFieldChange('name')}
++                                        onBlur={onFieldBlur('name')}
++                                        aria-invalid={!!errorFor('name')}
+                                         required
+                                         autoComplete="name"
+                                         isFocused
+                                     />
+-                                    <InputError message={errors.name} className="mt-1" />
++                                    <InputError message={errorFor('name')} className="mt-1" />
+                                 </div>
+ 
+                                 <div>
+@@ -445,17 +655,33 @@ export default function Register() {
+                                             type="email"
+                                             name="email"
+                                             value={data.email}
+-                                            className={`${fieldClasses} pr-9`}
++                                            className={fieldClass('email', 'pr-9')}
+                                             placeholder="vous@entreprise.com"
+-                                            onChange={(e) => setData('email', e.target.value)}
++                                            onChange={onFieldChange('email')}
++                                            onBlur={onFieldBlur('email')}
++                                            aria-invalid={!!errorFor('email')}
+                                             required
+                                             autoComplete="username"
++                                            inputMode="email"
+                                         />
+-                                        {emailLooksValid && (
++                                        {emailLooksValid && !errorFor('email') && (
+                                             <FaCheckCircle className="absolute inset-y-0 right-3 my-auto h-4 w-4 text-emerald-500" />
+                                         )}
+                                     </div>
+-                                    <InputError message={errors.email} className="mt-1" />
++                                    <InputError message={errorFor('email')} className="mt-1" />
++                                    {emailSuggestion && !errorFor('email') && (
++                                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
++                                            Vouliez-vous dire{' '}
++                                            <button
++                                                type="button"
++                                                onClick={() => setData('email', emailSuggestion)}
++                                                className="font-semibold underline"
++                                            >
++                                                {emailSuggestion}
++                                            </button>{' '}
++                                            ? Le lien de vérification sera envoyé à cette adresse.
++                                        </p>
++                                    )}
+                                 </div>
+                             </div>
+ 
+@@ -470,9 +696,11 @@ export default function Register() {
+                                         type={showPassword ? 'text' : 'password'}
+                                         name="password"
+                                         value={data.password}
+-                                        className={`${fieldClasses} pr-10`}
++                                        className={fieldClass('password', 'pr-10')}
+                                         placeholder="8 caractères minimum"
+-                                        onChange={(e) => setData('password', e.target.value)}
++                                        onChange={onFieldChange('password')}
++                                        onBlur={onFieldBlur('password')}
++                                        aria-invalid={!!errorFor('password')}
+                                         required
+                                         autoComplete="new-password"
+                                     />
+@@ -514,7 +742,7 @@ export default function Register() {
+                                         </p>
+                                     </div>
+                                 )}
+-                                <InputError message={errors.password} className="mt-1" />
++                                <InputError message={errorFor('password')} className="mt-1" />
+                             </div>
+ 
+                             {/* Confirmation mot de passe */}
+@@ -528,11 +756,11 @@ export default function Register() {
+                                         type={showPasswordConfirm ? 'text' : 'password'}
+                                         name="password_confirmation"
+                                         value={data.password_confirmation}
+-                                        className={`${fieldClasses} pr-10`}
++                                        className={fieldClass('password_confirmation', 'pr-10')}
+                                         placeholder="Ressaisissez le mot de passe"
+-                                        onChange={(e) =>
+-                                            setData('password_confirmation', e.target.value)
+-                                        }
++                                        onChange={onFieldChange('password_confirmation')}
++                                        onBlur={onFieldBlur('password_confirmation')}
++                                        aria-invalid={!!errorFor('password_confirmation')}
+                                         required
+                                         autoComplete="new-password"
+                                     />
+@@ -559,51 +787,52 @@ export default function Register() {
+                                         correspondent
+                                     </p>
+                                 )}
+-                                <InputError message={errors.password_confirmation} className="mt-1" />
++                                <InputError message={errorFor('password_confirmation')} className="mt-1" />
+                             </div>
+ 
+                             {/* reCAPTCHA */}
+-                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
++                            <div
++                                ref={captchaBoxRef}
++                                className={`rounded-xl border p-4 dark:bg-gray-800/60 ${
++                                    recaptchaError || errors.recaptcha_token
++                                        ? 'border-red-300 bg-red-50/60 dark:border-red-800'
++                                        : 'border-gray-200 bg-gray-50 dark:border-gray-700'
++                                }`}
++                            >
+                                 <div className="mb-2 flex items-center gap-2">
+                                     <FaShieldAlt className="h-4 w-4 text-gray-400" />
+                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                         Vérification de sécurité
+                                     </span>
++                                    {data.recaptcha_token && (
++                                        <span className="ml-auto flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
++                                            <FaCheckCircle className="h-3 w-3" /> Validée
++                                        </span>
++                                    )}
+                                 </div>
+-                                <div
+-                                    id="recaptcha-element"
+-                                    className={
+-                                        errors.recaptcha_token || recaptchaError
+-                                            ? 'rounded border border-red-500 p-2'
+-                                            : ''
+-                                    }
+-                                />
++                                <div id="recaptcha-element" className="max-w-full overflow-x-auto" />
+                                 {!isRecaptchaLoaded && !recaptchaError && (
+-                                    <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+-                                        Chargement de la vérification de sécurité…
++                                    <p className="mt-2 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
++                                        <FaSpinner className="h-3 w-3 animate-spin" />
++                                        {captchaSlow
++                                            ? 'Le chargement est plus long que prévu…'
++                                            : 'Chargement de la vérification de sécurité…'}
+                                     </p>
+                                 )}
+-                                {recaptchaError && (
+-                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+-                                        <p className="text-sm text-red-600" role="alert">
+-                                            {recaptchaError}
+-                                        </p>
+-                                        {!isRecaptchaLoaded && (
+-                                            <button
+-                                                type="button"
+-                                                onClick={initializeRecaptcha}
+-                                                className="text-sm font-medium text-blue-600 underline hover:text-blue-700 dark:text-blue-400"
+-                                            >
+-                                                Réessayer
+-                                            </button>
+-                                        )}
+-                                    </div>
+-                                )}
+-                                {errors.recaptcha_token && (
+-                                    <p className="mt-2 text-sm text-red-600" role="alert">
+-                                        {errors.recaptcha_token}
++                                {(recaptchaError || errors.recaptcha_token) && (
++                                    <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
++                                        {recaptchaError || errors.recaptcha_token}
+                                     </p>
+                                 )}
++                                {(!isRecaptchaLoaded || captchaSlow) && (
++                                    <button
++                                        type="button"
++                                        onClick={retryCaptcha}
++                                        className="mt-2 text-sm font-medium text-blue-600 underline hover:text-blue-700 dark:text-blue-400"
++                                    >
++                                        Réessayer
++                                    </button>
++                                )}
+                             </div>
+ 
+                             <PrimaryButton
+@@ -611,7 +840,13 @@ export default function Register() {
+                                 className="w-full justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60"
+                                 disabled={processing}
+                             >
+-                                {processing ? 'Inscription en cours…' : 'Créer mon compte'}
++                                {processing ? (
++                                    <span className="inline-flex items-center gap-2">
++                                        <FaSpinner className="h-4 w-4 animate-spin" /> Création de votre compte…
++                                    </span>
++                                ) : (
++                                    'Créer mon compte'
++                                )}
+                             </PrimaryButton>
+ 
+                             <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+diff --git a/resources/js/Pages/Auth/RegisterSuccess.jsx b/resources/js/Pages/Auth/RegisterSuccess.jsx
+new file mode 100644
+index 0000000..a131074
+--- /dev/null
++++ b/resources/js/Pages/Auth/RegisterSuccess.jsx
+@@ -0,0 +1,140 @@
++import { Head, Link, router } from '@inertiajs/react';
++import { useState } from 'react';
++import { FaEnvelopeOpenText, FaCheckCircle, FaExclamationTriangle, FaSpinner, FaRedo, FaSignInAlt } from 'react-icons/fa';
++import AuthShell from '@/Components/AuthShell';
++import useCooldown from '@/hooks/useCooldown';
++import useToast from '@/hooks/useToast';
++
++// Accès direct à la boîte mail pour les fournisseurs les plus courants
++const WEBMAIL = {
++    'gmail.com': { label: 'Ouvrir Gmail', url: 'https://mail.google.com/' },
++    'googlemail.com': { label: 'Ouvrir Gmail', url: 'https://mail.google.com/' },
++    'outlook.com': { label: 'Ouvrir Outlook', url: 'https://outlook.live.com/mail/' },
++    'hotmail.com': { label: 'Ouvrir Outlook', url: 'https://outlook.live.com/mail/' },
++    'live.com': { label: 'Ouvrir Outlook', url: 'https://outlook.live.com/mail/' },
++    'yahoo.com': { label: 'Ouvrir Yahoo Mail', url: 'https://mail.yahoo.com/' },
++    'yahoo.fr': { label: 'Ouvrir Yahoo Mail', url: 'https://mail.yahoo.com/' },
++};
++
++export default function RegisterSuccess({ email, emailSent = true }) {
++    const toast = useToast();
++    const cooldown = useCooldown(emailSent ? 45 : 0);
++    const [sending, setSending] = useState(false);
++    const webmail = WEBMAIL[(email.split('@')[1] || '').toLowerCase()];
++
++    const resend = () => {
++        if (sending || cooldown.active) return;
++
++        router.post(route('register.resend'), {}, {
++            preserveScroll: true,
++            preserveState: true,
++            onStart: () => setSending(true),
++            onSuccess: () => cooldown.start(60),
++            onError: () => toast.error("L'e-mail n'a pas pu être renvoyé. Réessayez dans un instant."),
++            onFinish: () => setSending(false),
++        });
++    };
++
++    return (
++        <AuthShell
++            headerAction={
++                <Link
++                    href={route('login')}
++                    className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 transition hover:border-blue-600 hover:text-blue-600 dark:border-gray-700 dark:text-gray-300"
++                >
++                    Se connecter
++                </Link>
++            }
++        >
++            <Head title="Compte créé" />
++
++            <div className="overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-black/5 dark:bg-gray-900">
++                <div className={`px-8 py-8 text-center text-white ${emailSent ? 'bg-gradient-to-br from-blue-600 to-blue-800' : 'bg-gradient-to-br from-amber-500 to-orange-600'}`}>
++                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/15 text-3xl">
++                        {emailSent ? <FaEnvelopeOpenText /> : <FaExclamationTriangle />}
++                    </div>
++                    <h1 className="text-2xl font-bold">
++                        {emailSent ? 'Vérifiez votre boîte mail' : 'Compte créé, e-mail non envoyé'}
++                    </h1>
++                    <p className="mt-2 text-sm text-white/90">
++                        {emailSent ? (
++                            <>
++                                Un lien d&apos;activation a été envoyé à
++                                <br />
++                                <strong className="break-all text-base">{email}</strong>
++                            </>
++                        ) : (
++                            <>Votre compte pour <strong className="break-all">{email}</strong> existe bien, mais nous n&apos;avons pas pu envoyer l&apos;e-mail de vérification.</>
++                        )}
++                    </p>
++                </div>
++
++                <div className="space-y-6 p-8">
++                    {emailSent ? (
++                        <ol className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
++                            {[
++                                'Ouvrez le message « Vérifiez votre adresse email ».',
++                                'Cliquez sur le bouton de vérification (le lien est valable 60 minutes).',
++                                'Revenez vous connecter : votre compte est prêt.',
++                            ].map((step, i) => (
++                                <li key={step} className="flex items-start gap-3">
++                                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
++                                        {i + 1}
++                                    </span>
++                                    <span className="pt-0.5">{step}</span>
++                                </li>
++                            ))}
++                        </ol>
++                    ) : (
++                        <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
++                            Cliquez sur « Renvoyer l&apos;e-mail ». Si le problème persiste, connectez-vous : nous vous proposerons de renvoyer le lien depuis votre compte.
++                        </p>
++                    )}
++
++                    {webmail && emailSent && (
++                        <a
++                            href={webmail.url}
++                            target="_blank"
++                            rel="noopener noreferrer"
++                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:from-blue-700 hover:to-blue-800"
++                        >
++                            <FaEnvelopeOpenText /> {webmail.label}
++                        </a>
++                    )}
++
++                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-gray-700 dark:bg-gray-800/60">
++                        <p className="font-medium text-gray-800 dark:text-gray-200">Vous ne voyez rien ?</p>
++                        <p className="mt-1 text-gray-600 dark:text-gray-400">
++                            Regardez dans vos courriers indésirables (spam) et patientez une minute. Sinon, renvoyez le lien.
++                        </p>
++                        <button
++                            type="button"
++                            onClick={resend}
++                            disabled={sending || cooldown.active}
++                            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-transparent dark:hover:bg-blue-900/20"
++                        >
++                            {sending ? <FaSpinner className="animate-spin" /> : <FaRedo />}
++                            {sending
++                                ? 'Envoi en cours…'
++                                : cooldown.active
++                                ? `Renvoyer l'e-mail (${cooldown.seconds} s)`
++                                : "Renvoyer l'e-mail"}
++                        </button>
++                    </div>
++
++                    <div className="flex flex-col gap-3 border-t border-gray-100 pt-5 text-sm dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
++                        <Link href={route('register')} className="text-gray-500 underline hover:text-gray-700 dark:text-gray-400">
++                            Mauvaise adresse ? Recommencer
++                        </Link>
++                        <Link
++                            href={route('login')}
++                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2 font-semibold text-white transition hover:bg-gray-800 dark:bg-white dark:text-gray-900"
++                        >
++                            <FaSignInAlt /> Aller à la connexion
++                        </Link>
++                    </div>
++                </div>
++            </div>
++        </AuthShell>
++    );
++}
+diff --git a/resources/js/Pages/Auth/VerifyEmail.jsx b/resources/js/Pages/Auth/VerifyEmail.jsx
+index e4a97cb..9ea125f 100644
+--- a/resources/js/Pages/Auth/VerifyEmail.jsx
++++ b/resources/js/Pages/Auth/VerifyEmail.jsx
+@@ -1,50 +1,87 @@
+-import PrimaryButton from '@/Components/PrimaryButton';
+-import GuestLayout from '@/Layouts/GuestLayout';
+-import { Head, Link, useForm } from '@inertiajs/react';
++import { Head, Link, router, usePage } from '@inertiajs/react';
++import { useState } from 'react';
++import { FaEnvelopeOpenText, FaRedo, FaSpinner, FaSignOutAlt, FaCheckCircle } from 'react-icons/fa';
++import AuthShell from '@/Components/AuthShell';
++import useCooldown from '@/hooks/useCooldown';
++import useToast from '@/hooks/useToast';
+ 
+ export default function VerifyEmail({ status }) {
+-    const { post, processing } = useForm({});
++    const { auth } = usePage().props;
++    const toast = useToast();
++    const cooldown = useCooldown(0);
++    const [sending, setSending] = useState(false);
++    const email = auth?.user?.email;
++    const justSent = status === 'verification-link-sent';
+ 
+-    const submit = (e) => {
+-        e.preventDefault();
++    const resend = () => {
++        if (sending || cooldown.active) return;
+ 
+-        post(route('verification.send'));
++        router.post(route('verification.send'), {}, {
++            preserveScroll: true,
++            onStart: () => setSending(true),
++            onSuccess: () => cooldown.start(60),
++            onError: () => toast.error("L'e-mail n'a pas pu être renvoyé. Réessayez dans un instant."),
++            onFinish: () => setSending(false),
++        });
+     };
+ 
+     return (
+-        <GuestLayout>
+-            <Head title="Email Verification" />
+-
+-            <div className="mb-4 text-sm text-gray-600">
+-                Thanks for signing up! Before getting started, could you verify
+-                your email address by clicking on the link we just emailed to
+-                you? If you didn't receive the email, we will gladly send you
+-                another.
+-            </div>
++        <AuthShell
++            headerAction={
++                <Link
++                    href={route('logout')}
++                    method="post"
++                    as="button"
++                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 transition hover:border-red-500 hover:text-red-600 dark:border-gray-700 dark:text-gray-300"
++                >
++                    <FaSignOutAlt /> Se déconnecter
++                </Link>
++            }
++        >
++            <Head title="Vérification de l'adresse email" />
+ 
+-            {status === 'verification-link-sent' && (
+-                <div className="mb-4 text-sm font-medium text-green-600">
+-                    A new verification link has been sent to the email address
+-                    you provided during registration.
++            <div className="overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-black/5 dark:bg-gray-900">
++                <div className="bg-gradient-to-br from-blue-600 to-blue-800 px-8 py-8 text-center text-white">
++                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/15 text-3xl">
++                        <FaEnvelopeOpenText />
++                    </div>
++                    <h1 className="text-2xl font-bold">Confirmez votre adresse email</h1>
++                    <p className="mt-2 text-sm text-white/90">
++                        Une dernière étape avant d&apos;accéder à PROJA.
++                    </p>
+                 </div>
+-            )}
+-
+-            <form onSubmit={submit}>
+-                <div className="mt-4 flex items-center justify-between">
+-                    <PrimaryButton disabled={processing}>
+-                        Resend Verification Email
+-                    </PrimaryButton>
+-
+-                    <Link
+-                        href={route('logout')}
+-                        method="post"
+-                        as="button"
+-                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
++
++                <div className="space-y-5 p-8">
++                    <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
++                        Cliquez sur le lien que nous avons envoyé
++                        {email ? (
++                            <> à <strong className="break-all">{email}</strong></>
++                        ) : null}
++                        . Vous ne l&apos;avez pas reçu ? Vérifiez vos courriers indésirables, puis demandez un nouveau lien.
++                    </p>
++
++                    {justSent && (
++                        <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300" role="status">
++                            <FaCheckCircle className="mt-0.5 flex-shrink-0" />
++                            Un nouveau lien de vérification vient d&apos;être envoyé à votre adresse email.
++                        </div>
++                    )}
++
++                    <button
++                        type="button"
++                        onClick={resend}
++                        disabled={sending || cooldown.active}
++                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:from-blue-700 hover:to-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                     >
+-                        Log Out
+-                    </Link>
++                        {sending ? <FaSpinner className="animate-spin" /> : <FaRedo />}
++                        {sending
++                            ? 'Envoi en cours…'
++                            : cooldown.active
++                            ? `Renvoyer le lien (${cooldown.seconds} s)`
++                            : "Renvoyer l'e-mail de vérification"}
++                    </button>
+                 </div>
+-            </form>
+-        </GuestLayout>
++            </div>
++        </AuthShell>
+     );
+ }
+diff --git a/resources/js/app.jsx b/resources/js/app.jsx
+index 3167792..74c40d0 100644
+--- a/resources/js/app.jsx
++++ b/resources/js/app.jsx
+@@ -4,6 +4,9 @@ import { createInertiaApp as createInertiaAppOriginal, router } from '@inertiajs
+ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+ import { createRoot } from 'react-dom/client';
+ import CsrfErrorModal from '@/Components/CsrfErrorModal';
++import Toaster from '@/Components/Toaster';
++import toast from '@/lib/toast';
++import handleSessionExpired from '@/lib/sessionExpired';
+ import { TutorialProvider } from '@/contexts/TutorialContext';
+ import { I18nextProvider } from 'react-i18next';
+ import i18n from './i18n';
+@@ -50,6 +53,7 @@ function AppWithCsrfErrorModal({ children }) {
+         <>
+             {children}
+             <CsrfErrorModal />
++            <Toaster />
+         </>
+     );
+ }
+@@ -172,10 +176,10 @@ if (typeof window !== 'undefined') {
+         }
+     });
+ 
+-    // Fix 3 — Interception globale des réponses invalides
+-    // Seules les sessions expirées (401 / 419) renvoient vers /login. Une erreur applicative
+-    // (404, 422, 423, 500…) laisse l'utilisateur sur sa page : renvoyer un utilisateur déjà
+-    // connecté vers /login le ramenait au dashboard au lieu de la page attendue.
++    // Fix 3 — Interception globale des réponses invalides (HTML inattendu, 401, 403, 419, 5xx…)
++    // - 401 / 419 : session ou jeton expiré → message clair (page publique) ou /login?expired=1 (page privée)
++    // - 403       : page « accès refusé »
++    // - autres    : notification à l'écran (au lieu d'une redirection silencieuse ou d'une alerte du navigateur)
+     router.on('invalid', (event) => {
+         event.preventDefault();
+         const response = event.detail.response;
+@@ -187,7 +191,7 @@ if (typeof window !== 'undefined') {
+         }
+ 
+         if (status === 401 || status === 419) {
+-            window.location.href = '/login';
++            handleSessionExpired();
+             return;
+         }
+ 
+@@ -200,6 +204,29 @@ if (typeof window !== 'undefined') {
+         }
+ 
+         console.error(`Réponse inattendue (${status}) pour ${response.config?.url ?? window.location.pathname}`);
+-        window.alert(message || `Une erreur est survenue (code ${status}). Veuillez réessayer ou rafraîchir la page.`);
++
++        const text =
++            status === 429
++                ? 'Trop de requêtes en peu de temps. Patientez quelques instants puis réessayez.'
++                : status >= 500
++                ? 'Le serveur a rencontré un problème. Vos données sont conservées : réessayez dans quelques instants.'
++                : message || `Une erreur est survenue (code ${status}). Veuillez réessayer ou rafraîchir la page.`;
++
++        if (toast.isReady()) {
++            toast.error(text, { title: status >= 500 ? 'Erreur serveur' : 'Action impossible' });
++        } else {
++            window.alert(text);
++        }
++    });
++
++    // Fix 4 — Perte de connexion / délai dépassé (aucune réponse du serveur)
++    router.on('exception', (event) => {
++        if (event.detail?.exception?.response) return; // une réponse existe : gérée ci-dessus
++        toast.error(
++            navigator.onLine === false
++                ? 'Vous semblez hors ligne. Vérifiez votre connexion internet puis réessayez.'
++                : 'Le serveur ne répond pas. Vérifiez votre connexion puis réessayez.',
++            { title: 'Connexion impossible' }
++        );
+     });
+ }
+diff --git a/resources/js/hooks/useCooldown.js b/resources/js/hooks/useCooldown.js
+new file mode 100644
+index 0000000..0bfbbf4
+--- /dev/null
++++ b/resources/js/hooks/useCooldown.js
+@@ -0,0 +1,19 @@
++import { useCallback, useEffect, useState } from 'react';
++
++/**
++ * Compte à rebours (secondes) pour bloquer temporairement un bouton (ex. « Renvoyer l'e-mail »).
++ *   const { seconds, start } = useCooldown(60);
++ */
++export default function useCooldown(initial = 0) {
++    const [seconds, setSeconds] = useState(initial);
++
++    useEffect(() => {
++        if (seconds <= 0) return undefined;
++        const t = setTimeout(() => setSeconds((s) => s - 1), 1000);
++        return () => clearTimeout(t);
++    }, [seconds]);
++
++    const start = useCallback((value = 60) => setSeconds(value), []);
++
++    return { seconds, start, active: seconds > 0 };
++}
+diff --git a/resources/js/hooks/useToast.js b/resources/js/hooks/useToast.js
+new file mode 100644
+index 0000000..2254304
+--- /dev/null
++++ b/resources/js/hooks/useToast.js
+@@ -0,0 +1,11 @@
++import toast from '@/lib/toast';
++
++/**
++ * Hook de notification : `const toast = useToast(); toast.error('…')`.
++ * L'objet retourné est stable (pas de re-render inutile) et utilisable dans les callbacks Inertia.
++ */
++export default function useToast() {
++    return toast;
++}
++
++export { toast };
+diff --git a/resources/js/lib/axios.js b/resources/js/lib/axios.js
+index af98359..7ef8893 100644
+--- a/resources/js/lib/axios.js
++++ b/resources/js/lib/axios.js
+@@ -1,5 +1,6 @@
+ import axios from 'axios';
+ import { router } from '@inertiajs/react';
++import handleSessionExpired from '@/lib/sessionExpired';
+ 
+ axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+ axios.defaults.headers.common['Accept'] = 'application/json';
+@@ -15,10 +16,26 @@ const axiosInstance = axios.create({
+ });
+ 
+ // ── Intercepteur requête : ajout CSRF ─────────────────────
++// Le jeton du <meta> est figé au chargement de la page : dans une application Inertia (navigation sans rechargement),
++// il devient obsolète après une déconnexion / reconnexion et provoque des erreurs 419 silencieuses (inscription,
++// connexion…). Le cookie XSRF-TOKEN, lui, est renouvelé à chaque réponse : on le préfère.
++const readXsrfCookie = () => {
++    const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
++    return match ? decodeURIComponent(match[1]) : null;
++};
++
+ const requestInterceptor = config => {
+     if (['get', 'head', 'options'].includes(config.method?.toLowerCase())) {
+         return config;
+     }
++
++    const cookieToken = readXsrfCookie();
++    if (cookieToken) {
++        config.headers['X-XSRF-TOKEN'] = cookieToken;
++        delete config.headers['X-CSRF-TOKEN'];
++        return config;
++    }
++
+     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+     if (token) {
+         config.headers['X-CSRF-TOKEN'] = token;
+@@ -30,12 +47,8 @@ const requestInterceptor = config => {
+ axiosInstance.interceptors.request.use(requestInterceptor, e => Promise.reject(e));
+ axios.interceptors.request.use(requestInterceptor, e => Promise.reject(e));
+ 
+-// ── Fonction de redirection vers login ────────────────────
+-const redirectToLogin = () => {
+-    // Éviter les redirections en boucle si on est déjà sur login
+-    if (window.location.pathname === '/login') return;
+-    window.location.href = '/login';
+-};
++// ── Session expirée : message clair au lieu d'une redirection silencieuse ──
++const suspendOrFail = (error) => (handleSessionExpired() ? new Promise(() => {}) : Promise.reject(error));
+ 
+ // ── Intercepteur réponse ──────────────────────────────────
+ const responseInterceptor = [
+@@ -50,14 +63,9 @@ const responseInterceptor = [
+ 
+         switch (status) {
+             case 401:
+-                // Session expirée → redirection propre
+-                redirectToLogin();
+-                return new Promise(() => {}); // stoppe la chaîne
+-
+             case 419:
+-                // CSRF expiré → redirection propre (pas de reload)
+-                redirectToLogin();
+-                return new Promise(() => {}); // stoppe la chaîne
++                // Session / CSRF expiré : page privée → /login?expired=1 ; page publique → message + jeton renouvelé
++                return suspendOrFail(error);
+ 
+             case 403:
+                 // Accès refusé → laisser Inertia gérer (page Error403)
+diff --git a/resources/js/lib/globalErrorHandler.js b/resources/js/lib/globalErrorHandler.js
+index 6f4a0a6..e577d41 100644
+--- a/resources/js/lib/globalErrorHandler.js
++++ b/resources/js/lib/globalErrorHandler.js
+@@ -1,9 +1,8 @@
+ import axios from 'axios';
++import handleSessionExpired from '@/lib/sessionExpired';
+ 
+-const redirectToLogin = () => {
+-    if (window.location.pathname === '/login') return;
+-    window.location.href = '/login';
+-};
++const suspendOrFail = (error) => (handleSessionExpired() ? new Promise(() => {}) : Promise.reject(error));
++const redirectToLogin = () => handleSessionExpired();
+ 
+ export function setupGlobalErrorHandler() {
+ 
+@@ -17,8 +16,7 @@ export function setupGlobalErrorHandler() {
+ 
+             // Session / CSRF expirés → login
+             if (status === 401 || status === 419) {
+-                redirectToLogin();
+-                return new Promise(() => {}); // stoppe la chaîne proprement
++                return suspendOrFail(error); // page publique : l'échec se propage, le formulaire se débloque
+             }
+ 
+             // 403 → laisser Inertia/Handler gérer
+@@ -28,8 +26,7 @@ export function setupGlobalErrorHandler() {
+             // = session expirée non interceptée avant
+             const contentType = headers['content-type'] ?? '';
+             if (contentType.includes('text/html') && status < 400) {
+-                redirectToLogin();
+-                return new Promise(() => {});
++                return suspendOrFail(error);
+             }
+ 
+             return Promise.reject(error);
+diff --git a/resources/js/lib/sessionExpired.js b/resources/js/lib/sessionExpired.js
+new file mode 100644
+index 0000000..74ed510
+--- /dev/null
++++ b/resources/js/lib/sessionExpired.js
+@@ -0,0 +1,37 @@
++import { router } from '@inertiajs/react';
++import toast from '@/lib/toast';
++
++// Pages accessibles sans être connecté : on y reste et on informe l'utilisateur.
++const GUEST_PATHS = [/^\/register/, /^\/login/, /^\/forgot-password/, /^\/reset-password/];
++
++let handling = false;
++
++/**
++ * Session ou jeton CSRF expiré (401 / 419).
++ *  - Page publique (inscription, connexion…) : on reste sur la page, on avertit, on renouvelle le jeton
++ *    (rechargement des données, formulaire conservé) → l'utilisateur peut simplement recliquer.
++ *  - Page privée : redirection vers /login?expired=1 (la page de connexion explique pourquoi).
++ *
++ * @returns {boolean} true si l'on quitte la page (l'appelant peut alors suspendre la requête),
++ *                    false si l'on reste (l'appelant doit laisser la requête échouer proprement,
++ *                    sinon le bouton « en cours… » du formulaire resterait bloqué).
++ */
++export default function handleSessionExpired() {
++    const path = window.location.pathname;
++    const isGuestPage = GUEST_PATHS.some((rx) => rx.test(path));
++
++    if (handling) return !isGuestPage;
++    handling = true;
++    setTimeout(() => { handling = false; }, 2000);
++
++    if (isGuestPage) {
++        toast.warning('Votre session de sécurité a expiré. Nous venons de la renouveler : cliquez à nouveau sur le bouton pour continuer.', {
++            title: 'Session expirée',
++        });
++        router.reload({ preserveState: true, preserveScroll: true });
++        return false;
++    }
++
++    window.location.href = '/login?expired=1';
++    return true;
++}
+diff --git a/resources/js/lib/toast.js b/resources/js/lib/toast.js
+new file mode 100644
+index 0000000..6dbee5f
+--- /dev/null
++++ b/resources/js/lib/toast.js
+@@ -0,0 +1,62 @@
++/**
++ * Mini système de notifications (« toasts ») utilisable partout, sans contexte React :
++ *
++ *   import toast from '@/lib/toast';
++ *   toast.success('Compte créé');
++ *   toast.error('Email déjà utilisé', { title: 'Inscription impossible', action: { label: 'Se connecter', href: '/login' } });
++ *
++ * Dans un composant, préférez le hook `useToast()` (mêmes méthodes).
++ * Le composant <Toaster /> (monté une seule fois dans app.jsx) affiche les notifications.
++ */
++
++const listeners = new Set();
++let counter = 0;
++const recent = new Map(); // anti-doublon : même message ignoré pendant 1,5 s
++
++const DEFAULT_DURATION = { success: 5000, info: 5000, warning: 7000, error: 8000 };
++
++function emit(event) {
++    listeners.forEach((fn) => fn(event));
++}
++
++function show(type, message, options = {}) {
++    if (!message && !options.title) return null;
++
++    const key = `${type}|${options.title || ''}|${message}`;
++    const now = Date.now();
++    if (recent.has(key) && now - recent.get(key) < 1500) return null;
++    recent.set(key, now);
++
++    const id = options.id ?? `t${++counter}`;
++    emit({
++        kind: 'add',
++        toast: {
++            id,
++            type,
++            title: options.title,
++            message,
++            action: options.action,
++            duration: options.duration ?? DEFAULT_DURATION[type] ?? 5000,
++        },
++    });
++
++    return id;
++}
++
++const toast = {
++    show,
++    success: (message, options) => show('success', message, options),
++    error: (message, options) => show('error', message, options),
++    warning: (message, options) => show('warning', message, options),
++    info: (message, options) => show('info', message, options),
++    dismiss: (id) => emit({ kind: 'remove', id }),
++    clear: () => emit({ kind: 'clear' }),
++    subscribe(fn) {
++        listeners.add(fn);
++        return () => listeners.delete(fn);
++    },
++    /** Vrai si un <Toaster /> est monté (sinon on retombe sur un comportement de secours). */
++    isReady: () => listeners.size > 0,
++};
++
++export default toast;
+diff --git a/routes/auth.php b/routes/auth.php
+index 3926ecf..4b4320f 100644
+--- a/routes/auth.php
++++ b/routes/auth.php
+@@ -17,6 +17,14 @@
+ 
+     Route::post('register', [RegisteredUserController::class, 'store']);
+ 
++    // Écran de confirmation + renvoi de l'e-mail de vérification (limité : 3 envois / minute)
++    Route::get('register/success', [RegisteredUserController::class, 'success'])
++        ->name('register.success');
++
++    Route::post('register/resend', [RegisteredUserController::class, 'resend'])
++        ->middleware('throttle:3,1')
++        ->name('register.resend');
++
+     Route::get('login', [AuthenticatedSessionController::class, 'create'])
+         ->name('login');
+ 
+diff --git a/tests/Feature/Auth/RegistrationTest.php b/tests/Feature/Auth/RegistrationTest.php
+index 1489d0e..d849b4f 100644
+--- a/tests/Feature/Auth/RegistrationTest.php
++++ b/tests/Feature/Auth/RegistrationTest.php
+@@ -2,30 +2,107 @@
+ 
+ namespace Tests\Feature\Auth;
+ 
++use App\Models\User;
++use App\Notifications\VerifyEmailNotification;
+ use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Support\Facades\Http;
++use Illuminate\Support\Facades\Notification;
+ use Tests\TestCase;
+ 
+ class RegistrationTest extends TestCase
+ {
+     use RefreshDatabase;
+ 
+-    public function test_registration_screen_can_be_rendered(): void
++    private function fakeRecaptcha(bool $success = true, array $codes = []): void
+     {
+-        $response = $this->get('/register');
+-
+-        $response->assertStatus(200);
++        Http::fake([
++            'www.google.com/recaptcha/*' => Http::response(
++                $success ? ['success' => true] : ['success' => false, 'error-codes' => $codes]
++            ),
++        ]);
+     }
+ 
+-    public function test_new_users_can_register(): void
++    private function payload(array $overrides = []): array
+     {
+-        $response = $this->post('/register', [
++        return array_merge([
+             'name' => 'Test User',
+             'email' => 'test@example.com',
+-            'password' => 'password',
+-            'password_confirmation' => 'password',
+-        ]);
++            'password' => 'password123',
++            'password_confirmation' => 'password123',
++            'recaptcha_token' => 'token',
++        ], $overrides);
++    }
++
++    public function test_registration_screen_can_be_rendered(): void
++    {
++        $this->get('/register')->assertStatus(200);
++    }
++
++    public function test_new_users_can_register_and_receive_one_verification_email(): void
++    {
++        $this->fakeRecaptcha();
++        Notification::fake();
++
++        $this->post('/register', $this->payload())
++            ->assertRedirect(route('register.success'));
++
++        $this->assertGuest();
++
++        $user = User::where('email', 'test@example.com')->firstOrFail();
++        $this->assertNull($user->email_verified_at);
++        Notification::assertSentToTimes($user, VerifyEmailNotification::class, 1);
++    }
++
++    public function test_success_page_needs_a_fresh_registration_and_allows_resending(): void
++    {
++        $this->get(route('register.success'))->assertRedirect(route('register'));
++
++        $this->fakeRecaptcha();
++        Notification::fake();
++        $this->post('/register', $this->payload());
++
++        $this->get(route('register.success'))->assertOk();
++
++        $this->post(route('register.resend'))->assertRedirect();
++
++        Notification::assertSentToTimes(User::where('email', 'test@example.com')->first(), VerifyEmailNotification::class, 2);
++    }
++
++    public function test_failed_recaptcha_gives_a_clear_message_and_creates_no_account(): void
++    {
++        $this->fakeRecaptcha(false, ['timeout-or-duplicate']);
++
++        $this->post('/register', $this->payload())
++            ->assertSessionHasErrors(['recaptcha_token' => 'La vérification a expiré. Cochez à nouveau la case « Je ne suis pas un robot ».']);
++
++        $this->assertDatabaseMissing('users', ['email' => 'test@example.com']);
++    }
++
++    public function test_missing_recaptcha_token_is_reported(): void
++    {
++        $this->post('/register', $this->payload(['recaptcha_token' => '']))
++            ->assertSessionHasErrors('recaptcha_token');
++    }
++
++    public function test_duplicate_email_returns_a_french_message(): void
++    {
++        User::factory()->create(['email' => 'test@example.com']);
++        $this->fakeRecaptcha();
++
++        $this->post('/register', $this->payload(['email' => 'TEST@example.com ']))
++            ->assertSessionHasErrors(['email' => 'Cette adresse email est déjà associée à un compte. Connectez-vous ou réinitialisez votre mot de passe.']);
++    }
++
++    public function test_validation_messages_are_in_french(): void
++    {
++        $this->fakeRecaptcha();
++
++        $this->post('/register', $this->payload(['password' => 'short', 'password_confirmation' => 'other']))
++            ->assertSessionHasErrors('password');
+ 
+-        $this->assertAuthenticated();
+-        $response->assertRedirect(route('dashboard', absolute: false));
++        $this->assertStringContainsString(
++            'au moins 8 caractères',
++            session('errors')->first('password')
++        );
+     }
+ }

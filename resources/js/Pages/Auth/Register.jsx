@@ -1,11 +1,12 @@
-import { Link, useForm } from '@inertiajs/react';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     FaEye, FaEyeSlash, FaCheckCircle, FaColumns, FaUsers, FaChartLine,
-    FaChevronDown, FaLockOpen, FaShieldAlt, FaCloud, FaVideo,
+    FaChevronDown, FaLockOpen, FaShieldAlt, FaCloud, FaVideo, FaExclamationCircle, FaSpinner,
 } from 'react-icons/fa';
 import { InputError, PrimaryButton, TextInput } from '@/Components';
 import GlobalFooter from '@/Components/GlobalFooter';
+import useToast from '@/hooks/useToast';
 
 /* ------------------------------------------------------------------ */
 /*  Contenu statique de la page                                        */
@@ -176,8 +177,57 @@ const fieldLabelClasses =
 /*  Page principale                                                     */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/*  Validation côté navigateur (mêmes règles que le serveur)            */
+/* ------------------------------------------------------------------ */
+
+const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+const validators = {
+    name: (v) => {
+        const t = v.trim();
+        if (!t) return 'Indiquez votre nom complet.';
+        if (t.length < 2) return 'Votre nom doit contenir au moins 2 caractères.';
+        return '';
+    },
+    email: (v) => {
+        const t = v.trim();
+        if (!t) return 'Indiquez votre adresse email.';
+        if (!EMAIL_RX.test(t)) return "Cette adresse email n'est pas valide (exemple : nom@entreprise.com).";
+        return '';
+    },
+    password: (v) => {
+        if (!v) return 'Choisissez un mot de passe.';
+        if (v.length < 8) return 'Le mot de passe doit contenir au moins 8 caractères.';
+        return '';
+    },
+    password_confirmation: (v, all) => {
+        if (!v) return 'Confirmez votre mot de passe.';
+        if (v !== all.password) return 'Les deux mots de passe ne correspondent pas.';
+        return '';
+    },
+};
+
+const FIELD_ORDER = ['name', 'email', 'password', 'password_confirmation'];
+
+// Fautes de frappe fréquentes dans le domaine de l'email (l'e-mail de vérification ne serait jamais reçu)
+const DOMAIN_TYPOS = {
+    'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com', 'gmail.con': 'gmail.com', 'gmail.co': 'gmail.com', 'gamil.com': 'gmail.com',
+    'yahooo.com': 'yahoo.com', 'yaho.com': 'yahoo.com', 'yahoo.con': 'yahoo.com',
+    'hotmial.com': 'hotmail.com', 'hotmail.con': 'hotmail.com', 'hotmai.com': 'hotmail.com',
+    'outlok.com': 'outlook.com', 'outlook.con': 'outlook.com',
+};
+
+const suggestEmail = (email) => {
+    const [local, domain] = email.trim().toLowerCase().split('@');
+    return domain && DOMAIN_TYPOS[domain] ? `${local}@${DOMAIN_TYPOS[domain]}` : null;
+};
+
+const RECAPTCHA_LOAD_TIMEOUT = 12000;
+
 export default function Register() {
-    const { data, setData, post, processing, errors } = useForm({
+    const toast = useToast();
+    const { data, setData, post, processing, errors, clearErrors } = useForm({
         name: '',
         email: '',
         password: '',
@@ -186,44 +236,116 @@ export default function Register() {
     });
 
     const recaptchaRef = useRef(null);
+    const captchaBoxRef = useRef(null);
+    const submittingRef = useRef(false);
     const [recaptchaError, setRecaptchaError] = useState('');
-    const [formError, setFormError] = useState('');
     const [isRecaptchaLoaded, setIsRecaptchaLoaded] = useState(false);
+    const [captchaSlow, setCaptchaSlow] = useState(false);
+    const [touched, setTouched] = useState({});
+    const [submitted, setSubmitted] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
     const [openFaq, setOpenFaq] = useState(0);
 
     const strength = useMemo(() => passwordStrength(data.password), [data.password]);
-    const emailLooksValid = useMemo(
-        () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email),
-        [data.email]
-    );
+    const emailLooksValid = useMemo(() => EMAIL_RX.test(data.email.trim()), [data.email]);
+    const emailSuggestion = useMemo(() => suggestEmail(data.email), [data.email]);
     const passwordsMatch =
         data.password_confirmation.length > 0 && data.password === data.password_confirmation;
 
-    // Initialise le widget reCAPTCHA
-    // Important : grecaptcha.render() doit être appelé une fois l'API prête
-    // (grecaptcha.ready), sinon "render is not a function" apparaît car le
-    // script vient tout juste de se charger. Comme il s'agit d'un widget
-    // visible (size: 'normal'), on ne doit PAS appeler grecaptcha.execute()
-    // dessus : execute() n'existe que pour le reCAPTCHA invisible, l'utilisateur
-    // doit cocher la case lui-même.
-    const initializeRecaptcha = () => {
+    // Erreurs de saisie calculées côté navigateur (affichées après passage sur le champ ou à l'envoi)
+    const clientErrors = useMemo(
+        () =>
+            Object.fromEntries(
+                FIELD_ORDER.map((f) => [f, validators[f](data[f], data)]).filter(([, msg]) => msg)
+            ),
+        [data]
+    );
+
+    // Erreur à afficher : celle du serveur en priorité, sinon celle du navigateur
+    const errorFor = (field) =>
+        errors[field] || ((touched[field] || submitted) ? clientErrors[field] : '') || '';
+
+    const fieldClass = (field, extra = '') =>
+        `${fieldClasses} ${extra} ${
+            errorFor(field)
+                ? '!border-red-400 !bg-red-50/60 focus:!border-red-500 focus:!ring-red-100 dark:!bg-red-900/10'
+                : ''
+        }`;
+
+    const onFieldChange = (field) => (e) => {
+        setData(field, e.target.value);
+        if (errors[field]) clearErrors(field);
+        if (errors.form) clearErrors('form');
+    };
+
+    const onFieldBlur = (field) => () => setTouched((t) => ({ ...t, [field]: true }));
+
+    const focusField = (field) => {
+        const el = document.getElementById(field);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => el.focus({ preventScroll: true }), 250);
+        }
+    };
+
+    const scrollToCaptcha = () => {
+        captchaBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    /* ---------------- reCAPTCHA ---------------- */
+
+    const onRecaptchaSuccess = useCallback((token) => {
+        setData('recaptcha_token', token);
+        setRecaptchaError('');
+        clearErrors('recaptcha_token');
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const onRecaptchaExpired = useCallback(() => {
+        setData('recaptcha_token', '');
+        setRecaptchaError('La vérification a expiré. Cochez à nouveau la case « Je ne suis pas un robot ».');
+        toast.warning('La vérification anti-robot a expiré. Cochez à nouveau la case avant de valider.', {
+            title: 'Vérification expirée',
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const onRecaptchaError = useCallback(() => {
+        setData('recaptcha_token', '');
+        setRecaptchaError('La vérification de sécurité a rencontré une erreur. Réessayez.');
+        toast.error('La vérification anti-robot a rencontré une erreur. Cliquez sur « Réessayer » ou rechargez la page.', {
+            title: 'Vérification indisponible',
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const resetCaptcha = () => {
+        try {
+            if (window.grecaptcha && recaptchaRef.current !== null) {
+                window.grecaptcha.reset(recaptchaRef.current);
+            }
+        } catch {
+            /* widget indisponible : ignoré */
+        }
+        setData('recaptcha_token', '');
+    };
+
+    // grecaptcha.render() doit être appelé une fois l'API prête (grecaptcha.ready).
+    // Widget visible (« case à cocher ») : l'utilisateur coche lui-même, on n'appelle jamais execute().
+    const initializeRecaptcha = useCallback(() => {
         if (!window.grecaptcha) {
-            console.error('grecaptcha non disponible');
+            setIsRecaptchaLoaded(false);
             return;
         }
 
         const container = document.getElementById('recaptcha-element');
         if (container && container.hasChildNodes()) {
-            // Déjà rendu, rien à faire
             setIsRecaptchaLoaded(true);
+            setCaptchaSlow(false);
             return;
         }
 
         window.grecaptcha.ready(() => {
             try {
-                const widgetId = window.grecaptcha.render('recaptcha-element', {
+                recaptchaRef.current = window.grecaptcha.render('recaptcha-element', {
                     sitekey: window.recaptchaSiteKey || '6Lcvg8krAAAAAEoghMGKFg4jZwQkh-vYfzzYMFcN',
                     callback: onRecaptchaSuccess,
                     'expired-callback': onRecaptchaExpired,
@@ -231,95 +353,180 @@ export default function Register() {
                     theme: 'light',
                     size: 'normal',
                 });
-
-                recaptchaRef.current = widgetId;
                 setIsRecaptchaLoaded(true);
+                setCaptchaSlow(false);
                 setRecaptchaError('');
             } catch (error) {
                 console.error('Erreur lors du rendu de reCAPTCHA:', error);
-                setRecaptchaError(
-                    "La vérification de sécurité n'a pas pu se charger. Rechargez la page ou réessayez."
-                );
+                setRecaptchaError("La vérification de sécurité n'a pas pu se charger. Rechargez la page ou réessayez.");
                 setIsRecaptchaLoaded(false);
             }
         });
-    };
-
-    const onRecaptchaSuccess = (token) => {
-        setData('recaptcha_token', token);
-        setRecaptchaError('');
-        setIsRecaptchaLoaded(true);
-    };
-
-    const onRecaptchaExpired = () => {
-        setData('recaptcha_token', '');
-        setRecaptchaError('La vérification a expiré. Veuillez réessayer.');
-        setIsRecaptchaLoaded(false);
-    };
-
-    const onRecaptchaError = () => {
-        setData('recaptcha_token', '');
-        setRecaptchaError('Une erreur est survenue. Veuillez réessayer.');
-        setIsRecaptchaLoaded(false);
-    };
+    }, [onRecaptchaSuccess, onRecaptchaExpired, onRecaptchaError]);
 
     useEffect(() => {
-        const handleRecaptchaLoaded = () => initializeRecaptcha();
+        const onLoaded = () => initializeRecaptcha();
+        // Le script de chargement (app.blade.php) signale un échec réseau via cet événement.
+        const onScriptFailed = () => {
+            setIsRecaptchaLoaded(false);
+            setRecaptchaError("Impossible de charger la vérification de sécurité de Google. Vérifiez votre connexion internet.");
+            toast.error(
+                "La vérification anti-robot n'a pas pu se charger (connexion internet ou blocage par un bloqueur de publicités). Corrigez puis cliquez sur « Réessayer ».",
+                { title: 'Vérification indisponible' }
+            );
+        };
 
+        if (window.grecaptcha) onLoaded();
+        document.addEventListener('recaptcha-loaded', onLoaded);
+        document.addEventListener('recaptcha-error', onScriptFailed);
+
+        // Chargement anormalement long : on prévient l'utilisateur au lieu de le laisser attendre en silence
+        const slow = setTimeout(() => {
+            if (!document.getElementById('recaptcha-element')?.hasChildNodes()) {
+                setCaptchaSlow(true);
+                toast.warning(
+                    'La vérification anti-robot met du temps à se charger. Vérifiez votre connexion ou cliquez sur « Réessayer ».',
+                    { title: 'Chargement lent' }
+                );
+            }
+        }, RECAPTCHA_LOAD_TIMEOUT);
+
+        return () => {
+            clearTimeout(slow);
+            document.removeEventListener('recaptcha-loaded', onLoaded);
+            document.removeEventListener('recaptcha-error', onScriptFailed);
+        };
+    }, [initializeRecaptcha]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Coupure / retour de connexion : on prévient tout de suite
+    useEffect(() => {
+        const offline = () => toast.warning('Connexion internet perdue. Vous pourrez valider dès son retour.', { title: 'Hors ligne' });
+        const online = () => toast.success('Connexion rétablie.', { title: 'De retour en ligne' });
+        window.addEventListener('offline', offline);
+        window.addEventListener('online', online);
+        return () => {
+            window.removeEventListener('offline', offline);
+            window.removeEventListener('online', online);
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const retryCaptcha = () => {
+        setRecaptchaError('');
+        setCaptchaSlow(false);
         if (window.grecaptcha) {
-            handleRecaptchaLoaded();
+            initializeRecaptcha();
+        } else {
+            // Le script Google n'est jamais arrivé : on le recharge
+            const script = document.createElement('script');
+            script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
+            script.async = true;
+            script.onerror = () => document.dispatchEvent(new Event('recaptcha-error'));
+            document.head.appendChild(script);
+        }
+    };
+
+    /* ---------------- Envoi ---------------- */
+
+    const handleServerErrors = (errs) => {
+        const keys = Object.keys(errs);
+
+        if (errs.form) {
+            toast.error(errs.form, { title: 'Inscription impossible' });
         }
 
-        document.addEventListener('recaptcha-loaded', handleRecaptchaLoaded);
-        return () => document.removeEventListener('recaptcha-loaded', handleRecaptchaLoaded);
-    }, []);
-
-    const submit = (e) => {
-        e.preventDefault();
-
-        if (!data.recaptcha_token) {
-            if (!isRecaptchaLoaded) {
-                // Le widget n'a jamais pu se charger : on retente plutôt que
-                // d'appeler une API invalide sur un widget qui n'existe pas.
-                setRecaptchaError(
-                    "La vérification de sécurité n'a pas pu se charger. Nouvelle tentative en cours…"
-                );
-                initializeRecaptcha();
-            } else {
-                setRecaptchaError("Veuillez cocher la case « Je ne suis pas un robot » avant de continuer.");
-            }
+        if (errs.recaptcha_token) {
+            setRecaptchaError(errs.recaptcha_token);
+            resetCaptcha();
+            toast.warning(errs.recaptcha_token, { title: 'Vérification anti-robot' });
+            scrollToCaptcha();
             return;
         }
 
-        setFormError('');
+        if (errs.email && /déjà/i.test(errs.email)) {
+            toast.error(errs.email, {
+                title: 'Adresse email déjà utilisée',
+                action: { label: 'Se connecter', href: route('login') },
+            });
+            focusField('email');
+            return;
+        }
+
+        const fieldKeys = keys.filter((k) => FIELD_ORDER.includes(k));
+        if (fieldKeys.length > 0) {
+            toast.error(
+                fieldKeys.length === 1
+                    ? errs[fieldKeys[0]]
+                    : `Veuillez corriger ${fieldKeys.length} champs du formulaire avant de continuer.`,
+                { title: 'Formulaire incomplet' }
+            );
+            focusField(FIELD_ORDER.find((f) => fieldKeys.includes(f)));
+            return;
+        }
+
+        if (!errs.form) {
+            toast.error("L'inscription n'a pas pu aboutir. Vérifiez vos informations puis réessayez.", {
+                title: 'Inscription impossible',
+            });
+        }
+    };
+
+    const submit = (e) => {
+        e.preventDefault();
+        if (processing || submittingRef.current) return; // anti double-clic
+
+        setSubmitted(true);
+        clearErrors();
+
+        // 1) Champs invalides : on l'annonce et on place le curseur sur le premier
+        const firstInvalid = FIELD_ORDER.find((f) => clientErrors[f]);
+        if (firstInvalid) {
+            const count = Object.keys(clientErrors).length;
+            toast.error(
+                count === 1
+                    ? clientErrors[firstInvalid]
+                    : `Veuillez corriger ${count} champs du formulaire avant de continuer.`,
+                { title: 'Formulaire incomplet' }
+            );
+            focusField(firstInvalid);
+            return;
+        }
+
+        // 2) Hors ligne : inutile d'envoyer
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            toast.error('Vous semblez hors ligne. Vérifiez votre connexion internet puis réessayez.', {
+                title: 'Connexion impossible',
+            });
+            return;
+        }
+
+        // 3) reCAPTCHA
+        if (!data.recaptcha_token) {
+            const message = !isRecaptchaLoaded
+                ? "La vérification anti-robot n'est pas encore chargée. Patientez un instant ou cliquez sur « Réessayer »."
+                : 'Cochez la case « Je ne suis pas un robot » avant de continuer.';
+            setRecaptchaError(message);
+            toast.warning(message, { title: 'Vérification anti-robot' });
+            if (!isRecaptchaLoaded) initializeRecaptcha();
+            scrollToCaptcha();
+            return;
+        }
+
+        submittingRef.current = true;
 
         post(route('register'), {
-            onSuccess: () => {
-                if (window.grecaptcha) {
-                    window.grecaptcha.reset(recaptchaRef.current ?? undefined);
-                }
-            },
-            onError: (errs) => {
-                if (errs.recaptcha_token) {
-                    setRecaptchaError(errs.recaptcha_token);
-                } else if (Object.keys(errs).length === 0) {
-                    // Erreur serveur non associée à un champ précis (ex : session expirée)
-                    setFormError(
-                        "Une erreur est survenue lors de l'inscription. Veuillez réessayer."
-                    );
-                }
-                if (window.grecaptcha) {
-                    window.grecaptcha.reset(recaptchaRef.current ?? undefined);
-                }
-                setData('recaptcha_token', '');
-            },
             preserveScroll: true,
-            onFinish: () => setData('recaptcha_token', ''),
+            // Garde le formulaire rempli si la page est rechargée en coulisses (ex. session renouvelée)
+            preserveState: true,
+            onError: handleServerErrors,
+            onFinish: () => {
+                submittingRef.current = false;
+            },
         });
     };
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-sans antialiased dark:bg-gray-950">
+            <Head title="Créer un compte" />
             {/* ---------------------------------------------------------- */}
             {/* En-tête produit                                             */}
             {/* ---------------------------------------------------------- */}
@@ -404,12 +611,13 @@ export default function Register() {
                             Moins de 2 minutes pour démarrer, aucune carte bancaire requise.
                         </p>
 
-                        {formError && (
+                        {errors.form && (
                             <div
-                                className="mb-5 max-w-md rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400"
+                                className="mb-5 flex max-w-md items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400"
                                 role="alert"
                             >
-                                {formError}
+                                <FaExclamationCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                                <span>{errors.form}</span>
                             </div>
                         )}
 
@@ -425,14 +633,16 @@ export default function Register() {
                                         type="text"
                                         name="name"
                                         value={data.name}
-                                        className={fieldClasses}
+                                        className={fieldClass('name')}
                                         placeholder="Ronaldo Agbohou"
-                                        onChange={(e) => setData('name', e.target.value)}
+                                        onChange={onFieldChange('name')}
+                                        onBlur={onFieldBlur('name')}
+                                        aria-invalid={!!errorFor('name')}
                                         required
                                         autoComplete="name"
                                         isFocused
                                     />
-                                    <InputError message={errors.name} className="mt-1" />
+                                    <InputError message={errorFor('name')} className="mt-1" />
                                 </div>
 
                                 <div>
@@ -445,17 +655,33 @@ export default function Register() {
                                             type="email"
                                             name="email"
                                             value={data.email}
-                                            className={`${fieldClasses} pr-9`}
+                                            className={fieldClass('email', 'pr-9')}
                                             placeholder="vous@entreprise.com"
-                                            onChange={(e) => setData('email', e.target.value)}
+                                            onChange={onFieldChange('email')}
+                                            onBlur={onFieldBlur('email')}
+                                            aria-invalid={!!errorFor('email')}
                                             required
                                             autoComplete="username"
+                                            inputMode="email"
                                         />
-                                        {emailLooksValid && (
+                                        {emailLooksValid && !errorFor('email') && (
                                             <FaCheckCircle className="absolute inset-y-0 right-3 my-auto h-4 w-4 text-emerald-500" />
                                         )}
                                     </div>
-                                    <InputError message={errors.email} className="mt-1" />
+                                    <InputError message={errorFor('email')} className="mt-1" />
+                                    {emailSuggestion && !errorFor('email') && (
+                                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                            Vouliez-vous dire{' '}
+                                            <button
+                                                type="button"
+                                                onClick={() => setData('email', emailSuggestion)}
+                                                className="font-semibold underline"
+                                            >
+                                                {emailSuggestion}
+                                            </button>{' '}
+                                            ? Le lien de vérification sera envoyé à cette adresse.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -470,9 +696,11 @@ export default function Register() {
                                         type={showPassword ? 'text' : 'password'}
                                         name="password"
                                         value={data.password}
-                                        className={`${fieldClasses} pr-10`}
+                                        className={fieldClass('password', 'pr-10')}
                                         placeholder="8 caractères minimum"
-                                        onChange={(e) => setData('password', e.target.value)}
+                                        onChange={onFieldChange('password')}
+                                        onBlur={onFieldBlur('password')}
+                                        aria-invalid={!!errorFor('password')}
                                         required
                                         autoComplete="new-password"
                                     />
@@ -514,7 +742,7 @@ export default function Register() {
                                         </p>
                                     </div>
                                 )}
-                                <InputError message={errors.password} className="mt-1" />
+                                <InputError message={errorFor('password')} className="mt-1" />
                             </div>
 
                             {/* Confirmation mot de passe */}
@@ -528,11 +756,11 @@ export default function Register() {
                                         type={showPasswordConfirm ? 'text' : 'password'}
                                         name="password_confirmation"
                                         value={data.password_confirmation}
-                                        className={`${fieldClasses} pr-10`}
+                                        className={fieldClass('password_confirmation', 'pr-10')}
                                         placeholder="Ressaisissez le mot de passe"
-                                        onChange={(e) =>
-                                            setData('password_confirmation', e.target.value)
-                                        }
+                                        onChange={onFieldChange('password_confirmation')}
+                                        onBlur={onFieldBlur('password_confirmation')}
+                                        aria-invalid={!!errorFor('password_confirmation')}
                                         required
                                         autoComplete="new-password"
                                     />
@@ -559,50 +787,51 @@ export default function Register() {
                                         correspondent
                                     </p>
                                 )}
-                                <InputError message={errors.password_confirmation} className="mt-1" />
+                                <InputError message={errorFor('password_confirmation')} className="mt-1" />
                             </div>
 
                             {/* reCAPTCHA */}
-                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
+                            <div
+                                ref={captchaBoxRef}
+                                className={`rounded-xl border p-4 dark:bg-gray-800/60 ${
+                                    recaptchaError || errors.recaptcha_token
+                                        ? 'border-red-300 bg-red-50/60 dark:border-red-800'
+                                        : 'border-gray-200 bg-gray-50 dark:border-gray-700'
+                                }`}
+                            >
                                 <div className="mb-2 flex items-center gap-2">
                                     <FaShieldAlt className="h-4 w-4 text-gray-400" />
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Vérification de sécurité
                                     </span>
+                                    {data.recaptcha_token && (
+                                        <span className="ml-auto flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                            <FaCheckCircle className="h-3 w-3" /> Validée
+                                        </span>
+                                    )}
                                 </div>
-                                <div
-                                    id="recaptcha-element"
-                                    className={
-                                        errors.recaptcha_token || recaptchaError
-                                            ? 'rounded border border-red-500 p-2'
-                                            : ''
-                                    }
-                                />
+                                <div id="recaptcha-element" className="max-w-full overflow-x-auto" />
                                 {!isRecaptchaLoaded && !recaptchaError && (
-                                    <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
-                                        Chargement de la vérification de sécurité…
+                                    <p className="mt-2 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                                        <FaSpinner className="h-3 w-3 animate-spin" />
+                                        {captchaSlow
+                                            ? 'Le chargement est plus long que prévu…'
+                                            : 'Chargement de la vérification de sécurité…'}
                                     </p>
                                 )}
-                                {recaptchaError && (
-                                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                                        <p className="text-sm text-red-600" role="alert">
-                                            {recaptchaError}
-                                        </p>
-                                        {!isRecaptchaLoaded && (
-                                            <button
-                                                type="button"
-                                                onClick={initializeRecaptcha}
-                                                className="text-sm font-medium text-blue-600 underline hover:text-blue-700 dark:text-blue-400"
-                                            >
-                                                Réessayer
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                                {errors.recaptcha_token && (
-                                    <p className="mt-2 text-sm text-red-600" role="alert">
-                                        {errors.recaptcha_token}
+                                {(recaptchaError || errors.recaptcha_token) && (
+                                    <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
+                                        {recaptchaError || errors.recaptcha_token}
                                     </p>
+                                )}
+                                {(!isRecaptchaLoaded || captchaSlow) && (
+                                    <button
+                                        type="button"
+                                        onClick={retryCaptcha}
+                                        className="mt-2 text-sm font-medium text-blue-600 underline hover:text-blue-700 dark:text-blue-400"
+                                    >
+                                        Réessayer
+                                    </button>
                                 )}
                             </div>
 
@@ -611,7 +840,13 @@ export default function Register() {
                                 className="w-full justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60"
                                 disabled={processing}
                             >
-                                {processing ? 'Inscription en cours…' : 'Créer mon compte'}
+                                {processing ? (
+                                    <span className="inline-flex items-center gap-2">
+                                        <FaSpinner className="h-4 w-4 animate-spin" /> Création de votre compte…
+                                    </span>
+                                ) : (
+                                    'Créer mon compte'
+                                )}
                             </PrimaryButton>
 
                             <p className="text-center text-xs text-gray-500 dark:text-gray-400">

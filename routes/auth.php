@@ -17,6 +17,14 @@ Route::middleware('guest')->group(function () {
 
     Route::post('register', [RegisteredUserController::class, 'store']);
 
+    // Écran de confirmation + renvoi de l'e-mail de vérification (limité : 3 envois / minute)
+    Route::get('register/success', [RegisteredUserController::class, 'success'])
+        ->name('register.success');
+
+    Route::post('register/resend', [RegisteredUserController::class, 'resend'])
+        ->middleware('throttle:3,1')
+        ->name('register.resend');
+
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 

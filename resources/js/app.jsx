@@ -4,6 +4,9 @@ import { createInertiaApp as createInertiaAppOriginal, router } from '@inertiajs
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import CsrfErrorModal from '@/Components/CsrfErrorModal';
+import Toaster from '@/Components/Toaster';
+import toast from '@/lib/toast';
+import handleSessionExpired from '@/lib/sessionExpired';
 import { TutorialProvider } from '@/contexts/TutorialContext';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
@@ -50,6 +53,7 @@ function AppWithCsrfErrorModal({ children }) {
         <>
             {children}
             <CsrfErrorModal />
+            <Toaster />
         </>
     );
 }
@@ -172,10 +176,10 @@ if (typeof window !== 'undefined') {
         }
     });
 
-    // Fix 3 — Interception globale des réponses invalides
-    // Seules les sessions expirées (401 / 419) renvoient vers /login. Une erreur applicative
-    // (404, 422, 423, 500…) laisse l'utilisateur sur sa page : renvoyer un utilisateur déjà
-    // connecté vers /login le ramenait au dashboard au lieu de la page attendue.
+    // Fix 3 — Interception globale des réponses invalides (HTML inattendu, 401, 403, 419, 5xx…)
+    // - 401 / 419 : session ou jeton expiré → message clair (page publique) ou /login?expired=1 (page privée)
+    // - 403       : page « accès refusé »
+    // - autres    : notification à l'écran (au lieu d'une redirection silencieuse ou d'une alerte du navigateur)
     router.on('invalid', (event) => {
         event.preventDefault();
         const response = event.detail.response;
@@ -187,7 +191,7 @@ if (typeof window !== 'undefined') {
         }
 
         if (status === 401 || status === 419) {
-            window.location.href = '/login';
+            handleSessionExpired();
             return;
         }
 
@@ -200,6 +204,29 @@ if (typeof window !== 'undefined') {
         }
 
         console.error(`Réponse inattendue (${status}) pour ${response.config?.url ?? window.location.pathname}`);
-        window.alert(message || `Une erreur est survenue (code ${status}). Veuillez réessayer ou rafraîchir la page.`);
+
+        const text =
+            status === 429
+                ? 'Trop de requêtes en peu de temps. Patientez quelques instants puis réessayez.'
+                : status >= 500
+                ? 'Le serveur a rencontré un problème. Vos données sont conservées : réessayez dans quelques instants.'
+                : message || `Une erreur est survenue (code ${status}). Veuillez réessayer ou rafraîchir la page.`;
+
+        if (toast.isReady()) {
+            toast.error(text, { title: status >= 500 ? 'Erreur serveur' : 'Action impossible' });
+        } else {
+            window.alert(text);
+        }
+    });
+
+    // Fix 4 — Perte de connexion / délai dépassé (aucune réponse du serveur)
+    router.on('exception', (event) => {
+        if (event.detail?.exception?.response) return; // une réponse existe : gérée ci-dessus
+        toast.error(
+            navigator.onLine === false
+                ? 'Vous semblez hors ligne. Vérifiez votre connexion internet puis réessayez.'
+                : 'Le serveur ne répond pas. Vérifiez votre connexion puis réessayez.',
+            { title: 'Connexion impossible' }
+        );
     });
 }

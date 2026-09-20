@@ -5,8 +5,10 @@ import TextInput from '@/Components/TextInput';
 import { FaEnvelope, FaLock, FaSignInAlt, FaExclamationTriangle, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useEffect, useState } from 'react';
 import GlobalFooter from '@/Components/GlobalFooter';
+import useToast from '@/hooks/useToast';
 
 export default function Login({ status, canResetPassword }) {
+    const toast = useToast();
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
@@ -46,7 +48,17 @@ export default function Login({ status, canResetPassword }) {
 
     const submit = (e) => {
         e.preventDefault();
+
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            toast.error('Vous semblez hors ligne. Vérifiez votre connexion internet puis réessayez.', { title: 'Connexion impossible' });
+            return;
+        }
+
         post(route('login'), {
+            onError: (errs) => {
+                const message = errs.email || errs.password;
+                if (message) toast.error(message, { title: 'Connexion impossible' });
+            },
             onSuccess: () => {
                 try {
                     if (data.remember) {
