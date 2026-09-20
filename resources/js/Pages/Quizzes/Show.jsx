@@ -3,6 +3,7 @@ import { Link, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import Avatar from '@/Components/Quiz/Avatar';
 import ScoreBadge from '@/Components/Quiz/ScoreBadge';
+import CandidatesPanel from '@/Components/Quiz/CandidatesPanel';
 import {
   FaClock, FaQuestionCircle, FaPlay, FaArrowLeft, FaTrophy, FaRedo, FaCheckCircle, FaLock, FaChartBar,
   FaShareAlt, FaCopy, FaCheck, FaExclamationTriangle, FaGavel, FaStar, FaUsers, FaPenFancy, FaShieldAlt,
@@ -57,7 +58,7 @@ function Stepper({ ev }) {
 
 const actionBtn = 'w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 font-semibold rounded-xl text-sm transition';
 
-function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, canManage, deciders = [], cheatingAttemptsCount = 0, evaluation = null }) {
+function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, canManage, deciders = [], cheatingAttemptsCount = 0, evaluation = null, candidates = [], canViewRanking = true, isProjectMember = true }) {
   const [copied, setCopied] = useState(false);
 
   const handleLaunch = () => router.post(route('projects.quizzes.launch', [project.id, quiz.id]));
@@ -81,10 +82,10 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 sm:py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
         <Link
-          href={route('projects.quizzes.index', project.id)}
+          href={isProjectMember ? route('projects.quizzes.index', project.id) : route('quizzes.index')}
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-blue-600 dark:text-gray-400"
         >
-          <FaArrowLeft /> Retour à la liste des quiz
+          <FaArrowLeft /> {isProjectMember ? 'Retour à la liste des quiz' : 'Retour à mes quiz'}
         </Link>
 
         {/* Carte principale */}
@@ -326,7 +327,7 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
               </Link>
             )}
 
-            {(canManage || quiz.show_results) && (
+            {canViewRanking && (
               <Link
                 href={route('projects.quizzes.ranking', [project.id, quiz.id])}
                 className={`${actionBtn} bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200`}
@@ -344,7 +345,7 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
                   <FaEdit /> Modifier
                 </Link>
                 <Link
-                  href={route('projects.participation.index', project.id)}
+                  href={route('projects.quizzes.participation.index', [project.id, quiz.id])}
                   className={`${actionBtn} bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800`}
                 >
                   <FaStar className="text-amber-500" /> Bonus de participation
@@ -363,6 +364,9 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
             )}
           </div>
         </div>
+
+        {/* Candidats : utilisateurs ProJA inscrits à ce quiz */}
+        {canManage && !quiz.is_draft && <CandidatesPanel project={project} quiz={quiz} candidates={candidates} />}
       </div>
     </div>
   );

@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Middleware web par défaut
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
+            \App\Http\Middleware\RestrictQuizCandidateAccounts::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 

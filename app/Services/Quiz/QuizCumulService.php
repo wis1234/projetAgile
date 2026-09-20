@@ -87,7 +87,7 @@ class QuizCumulService
             }
         }
 
-        $bonusTotals = $includeBonus ? ParticipationPoint::totalsForProject($project->id) : collect();
+        $bonusTotals = $includeBonus ? ParticipationPoint::totalsForQuizzes($project->id, array_keys($coefs)) : collect();
         $passMark = QuizScoringService::passMark();
 
         $rows = [];

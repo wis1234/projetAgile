@@ -2,6 +2,7 @@
 
 namespace App\Services\Quiz;
 
+use App\Models\ParticipationPoint;
 use App\Models\Quiz;
 use App\Models\QuizApproval;
 use App\Models\QuizResult;
@@ -30,7 +31,12 @@ class QuizDeliberationService
             ->get(['id', 'score', 'score_exact', 'grading_status'])
             ->map(fn ($r) => $r->id . ':' . number_format($r->exactScore(), 2, '.', '') . ':' . $r->grading_status);
 
-        return sha1($rows->implode('|'));
+        // Le bonus de participation modifie la note finale : il fait partie de l'empreinte,
+        // donc l'ajouter ou le retirer après un aval rend cet aval caduc.
+        $bonus = ParticipationPoint::totalsForQuiz($quiz)->sortKeys()
+            ->map(fn ($v, $uid) => 'b' . $uid . ':' . number_format($v, 2, '.', ''));
+
+        return sha1($rows->merge($bonus)->implode('|'));
     }
 
     /** @return array{results:int, pending:int} */

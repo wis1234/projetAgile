@@ -31,13 +31,6 @@ function Index({ project, quizzes = [], cumuls = [], canManage }) {
           {canManage && (
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <Link
-                href={route('projects.participation.index', project.id)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800 font-semibold rounded-xl text-sm transition"
-                title="Attribuer des points aux membres qui s'impliquent pendant les formations"
-              >
-                <FaStar className="text-amber-500" /> Bonus de participation
-              </Link>
-              <Link
                 href={route('projects.quiz-cumuls.create', project.id)}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 font-semibold rounded-xl text-sm transition"
               >

@@ -1,0 +1,1004 @@
+From 4ce4d060a331895c597468525dfd9f0108be6e61 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 20 Sep 2026 08:05:24 +0000
+Subject: [PATCH] =?UTF-8?q?Quiz=20:=20bonus=20de=20participation=20rattach?=
+ =?UTF-8?q?=C3=A9=20au=20quiz=20et=20attribu=C3=A9=20=C3=A0=20ses=20membre?=
+ =?UTF-8?q?s=20(candidats=20inscrits)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ .../ParticipationPointController.php          | 196 ++++++++++++++---
+ .../Controllers/QuizCandidateController.php   |  16 +-
+ app/Models/ParticipationPoint.php             |  35 ++-
+ app/Models/Quiz.php                           |   6 +
+ app/Notifications/QuizNotification.php        |   2 +-
+ app/Services/Quiz/QuizCumulService.php        |   2 +-
+ app/Services/Quiz/QuizDeliberationService.php |   8 +-
+ app/Services/Quiz/QuizScoringService.php      |   2 +-
+ ..._quiz_id_to_participation_points_table.php |  28 +++
+ .../js/Components/Quiz/CandidatesPanel.jsx    |  18 +-
+ resources/js/Pages/Quizzes/Index.jsx          |   7 -
+ resources/js/Pages/Quizzes/MyQuizzes.jsx      |   2 +-
+ resources/js/Pages/Quizzes/Participation.jsx  |  51 ++++-
+ resources/js/Pages/Quizzes/Show.jsx           |   2 +-
+ routes/web.php                                |   5 +
+ tests/Feature/Quiz/QuizBonusTest.php          | 206 ++++++++++++++++++
+ 16 files changed, 508 insertions(+), 78 deletions(-)
+ create mode 100644 database/migrations/2026_09_21_000001_add_quiz_id_to_participation_points_table.php
+ create mode 100644 tests/Feature/Quiz/QuizBonusTest.php
+
+diff --git a/app/Http/Controllers/ParticipationPointController.php b/app/Http/Controllers/ParticipationPointController.php
+index 3bf9aba..9ccd20f 100644
+--- a/app/Http/Controllers/ParticipationPointController.php
++++ b/app/Http/Controllers/ParticipationPointController.php
+@@ -4,22 +4,139 @@
+ 
+ use App\Models\ParticipationPoint;
+ use App\Models\Project;
++use App\Models\Quiz;
++use App\Models\QuizResult;
++use App\Models\User;
+ use Illuminate\Http\Request;
++use Illuminate\Support\Collection;
+ use Illuminate\Support\Facades\Auth;
++use Illuminate\Validation\ValidationException;
+ use Inertia\Inertia;
+ 
+ /**
+- * Bonus de participation : points attribués aux membres qui s'impliquent pendant les formations.
++ * Bonus de participation : points attribués à ceux qui s'impliquent pendant les formations.
+  * Ils s'ajoutent (plafonnés) à la note finale lors de la sélection.
++ *
++ * Le bonus est attribué dans le cadre d'un QUIZ, à ses MEMBRES (les candidats inscrits au quiz,
++ * à ne pas confondre avec les membres du projet). Les anciens bonus « généraux » du projet
++ * (sans quiz) restent gérés par les méthodes index/store/destroy ci-dessous.
+  */
+ class ParticipationPointController extends Controller
+ {
++    // ------------------------------------------------------------------
++    // Bonus par quiz : destinataires = membres du quiz
++    // ------------------------------------------------------------------
++
++    public function quizIndex(Project $project, Quiz $quiz)
++    {
++        $this->authorize('manage', [Quiz::class, $project]);
++
++        $memberIds = $this->quizMemberIds($quiz);
++        $enrolled = $quiz->candidates()->pluck('user_id')->flip();
++
++        $totals = ParticipationPoint::totalsForQuiz($quiz);
++        $own = ParticipationPoint::where('quiz_id', $quiz->id)->get();
++        $entriesByUser = $own->groupBy('user_id');
++
++        $members = User::whereIn('id', $memberIds)->orderBy('name')->get(['id', 'name', 'email', 'profile_photo_path'])
++            ->map(function (User $u) use ($totals, $entriesByUser, $enrolled) {
++                $raw = (float) ($totals[$u->id] ?? 0);
++
++                return [
++                    'id' => $u->id,
++                    'name' => $u->name,
++                    'email' => $u->email,
++                    'photo' => $u->profile_photo_url,
++                    'total' => round($raw, 2),
++                    'effective' => ParticipationPoint::capped($raw),
++                    'entries_count' => $entriesByUser->get($u->id, collect())->count(),
++                    'enrolled' => $enrolled->has($u->id),
++                ];
++            })
++            ->values();
++
++        return Inertia::render('Quizzes/Participation', [
++            'project' => ['id' => $project->id, 'name' => $project->name],
++            'quiz' => ['id' => $quiz->id, 'title' => $quiz->title, 'validated' => $quiz->isValidated()],
++            'members' => $members,
++            'history' => $this->history($own->sortByDesc('id')->take(200)->values()),
++            'cap' => (float) config('quiz.participation_cap', 10),
++            'stepMax' => (float) config('quiz.participation_step_max', 10),
++            'legacyCount' => ParticipationPoint::where('project_id', $project->id)->whereNull('quiz_id')->count(),
++        ]);
++    }
++
++    public function quizStore(Request $request, Project $project, Quiz $quiz)
++    {
++        $this->authorize('manage', [Quiz::class, $project]);
++
++        if ($quiz->isValidated()) {
++            return back()->with('error', 'Les résultats sont validés : rouvrez la délibération pour modifier les bonus.');
++        }
++
++        $data = $this->validated($request);
++
++        // Seuls les membres du quiz peuvent recevoir un bonus (et non tous les membres du projet).
++        if (! in_array((int) $data['user_id'], $this->quizMemberIds($quiz), true)) {
++            throw ValidationException::withMessages([
++                'user_id' => "Cet utilisateur n'est pas membre de ce quiz. Ajoutez-le d'abord depuis la page du quiz.",
++            ]);
++        }
++
++        $point = ParticipationPoint::create([
++            'project_id' => $project->id,
++            'quiz_id' => $quiz->id,
++            'user_id' => $data['user_id'],
++            'awarded_by' => Auth::id(),
++            'points' => $data['points'],
++            'reason' => $data['reason'] ?? null,
++            'awarded_on' => $data['awarded_on'] ?? now()->toDateString(),
++        ]);
++
++        if (function_exists('activity_log')) {
++            activity_log('create', sprintf("%+g point(s) de participation attribué(s) à %s (quiz '%s')", $point->points, $point->user?->name, $quiz->title), $quiz);
++        }
++
++        return back()->with('success', 'Bonus de participation enregistré.');
++    }
++
++    public function quizDestroy(Project $project, Quiz $quiz, ParticipationPoint $participationPoint)
++    {
++        $this->authorize('manage', [Quiz::class, $project]);
++
++        if ($quiz->isValidated()) {
++            return back()->with('error', 'Les résultats sont validés : rouvrez la délibération pour modifier les bonus.');
++        }
++
++        $participationPoint->delete();
++
++        return back()->with('success', 'Attribution supprimée.');
++    }
++
++    /**
++     * Membres du quiz : les candidats inscrits, plus les utilisateurs qui ont déjà passé le quiz
++     * (quiz créés avant les inscriptions).
++     *
++     * @return list<int>
++     */
++    private function quizMemberIds(Quiz $quiz): array
++    {
++        return $quiz->candidates()->pluck('user_id')
++            ->merge(QuizResult::where('quiz_id', $quiz->id)->whereNotNull('user_id')->pluck('user_id'))
++            ->unique()->map(fn ($id) => (int) $id)->values()->all();
++    }
++
++    // ------------------------------------------------------------------
++    // Anciens bonus généraux du projet (quiz_id NULL)
++    // ------------------------------------------------------------------
++
+     public function index(Project $project)
+     {
+-        $this->authorize('manage', [\App\Models\Quiz::class, $project]);
++        $this->authorize('manage', [Quiz::class, $project]);
+ 
+         $totals = ParticipationPoint::totalsForProject($project->id);
+-        $entriesByUser = ParticipationPoint::where('project_id', $project->id)->get()->groupBy('user_id');
++        $legacy = ParticipationPoint::where('project_id', $project->id)->whereNull('quiz_id');
++        $entriesByUser = (clone $legacy)->get()->groupBy('user_id');
+ 
+         $members = $project->users()
+             ->wherePivot('role', '!=', 'manager')
+@@ -40,47 +157,22 @@ public function index(Project $project)
+             })
+             ->values();
+ 
+-        $history = ParticipationPoint::where('project_id', $project->id)
+-            ->with(['user:id,name,profile_photo_path', 'awarder:id,name'])
+-            ->orderByDesc('awarded_on')
+-            ->orderByDesc('id')
+-            ->limit(200)
+-            ->get()
+-            ->map(fn ($p) => [
+-                'id' => $p->id,
+-                'user_id' => $p->user_id,
+-                'user_name' => $p->user?->name,
+-                'user_photo' => $p->user?->profile_photo_url,
+-                'points' => $p->points,
+-                'reason' => $p->reason,
+-                'awarded_on' => optional($p->awarded_on)->toDateString(),
+-                'awarded_by' => $p->awarder?->name,
+-            ]);
+-
+         return Inertia::render('Quizzes/Participation', [
+             'project' => ['id' => $project->id, 'name' => $project->name],
++            'quiz' => null,
+             'members' => $members,
+-            'history' => $history,
++            'history' => $this->history((clone $legacy)->orderByDesc('id')->limit(200)->get()),
+             'cap' => (float) config('quiz.participation_cap', 10),
+             'stepMax' => (float) config('quiz.participation_step_max', 10),
++            'legacyCount' => 0,
+         ]);
+     }
+ 
+     public function store(Request $request, Project $project)
+     {
+-        $this->authorize('manage', [\App\Models\Quiz::class, $project]);
+-
+-        $step = (float) config('quiz.participation_step_max', 10);
++        $this->authorize('manage', [Quiz::class, $project]);
+ 
+-        $data = $request->validate([
+-            'user_id' => ['required', 'integer'],
+-            'points' => ['required', 'numeric', 'between:-' . $step . ',' . $step, 'not_in:0'],
+-            'reason' => ['nullable', 'string', 'max:255'],
+-            'awarded_on' => ['nullable', 'date'],
+-        ], [
+-            'points.not_in' => 'Indiquez un nombre de points différent de 0.',
+-            'points.between' => "Une attribution est limitée à ±{$step} points.",
+-        ]);
++        $data = $this->validated($request);
+ 
+         abort_unless(
+             $project->users()->where('users.id', $data['user_id'])->exists(),
+@@ -106,12 +198,46 @@ public function store(Request $request, Project $project)
+ 
+     public function destroy(Project $project, ParticipationPoint $participationPoint)
+     {
+-        $this->authorize('manage', [\App\Models\Quiz::class, $project]);
++        $this->authorize('manage', [Quiz::class, $project]);
+ 
+-        abort_unless($participationPoint->project_id === $project->id, 404);
++        abort_unless($participationPoint->project_id === $project->id && $participationPoint->quiz_id === null, 404);
+ 
+         $participationPoint->delete();
+ 
+         return back()->with('success', 'Attribution supprimée.');
+     }
++
++    // ------------------------------------------------------------------
++
++    /** @return array<string, mixed> */
++    private function validated(Request $request): array
++    {
++        $step = (float) config('quiz.participation_step_max', 10);
++
++        return $request->validate([
++            'user_id' => ['required', 'integer'],
++            'points' => ['required', 'numeric', 'between:-' . $step . ',' . $step, 'not_in:0'],
++            'reason' => ['nullable', 'string', 'max:255'],
++            'awarded_on' => ['nullable', 'date'],
++        ], [
++            'points.not_in' => 'Indiquez un nombre de points différent de 0.',
++            'points.between' => "Une attribution est limitée à ±{$step} points.",
++        ]);
++    }
++
++    /** @param Collection<int, ParticipationPoint> $points */
++    private function history(Collection $points): Collection
++    {
++        return $points->load(['user:id,name,profile_photo_path', 'awarder:id,name'])
++            ->map(fn ($p) => [
++                'id' => $p->id,
++                'user_id' => $p->user_id,
++                'user_name' => $p->user?->name,
++                'user_photo' => $p->user?->profile_photo_url,
++                'points' => $p->points,
++                'reason' => $p->reason,
++                'awarded_on' => optional($p->awarded_on)->toDateString(),
++                'awarded_by' => $p->awarder?->name,
++            ]);
++    }
+ }
+diff --git a/app/Http/Controllers/QuizCandidateController.php b/app/Http/Controllers/QuizCandidateController.php
+index a82a43e..6e45526 100644
+--- a/app/Http/Controllers/QuizCandidateController.php
++++ b/app/Http/Controllers/QuizCandidateController.php
+@@ -89,17 +89,17 @@ public function destroy(Project $project, Quiz $quiz, QuizCandidate $candidate)
+ 
+         // Après une tentative, on garde l'inscription : elle documente l'origine des résultats.
+         if (QuizAttempt::where('quiz_id', $quiz->id)->where('user_id', $candidate->user_id)->exists()) {
+-            return back()->with('error', 'Ce candidat a déjà commencé le quiz : il ne peut plus être retiré.');
++            return back()->with('error', 'Ce membre a déjà commencé le quiz : il ne peut plus être retiré.');
+         }
+ 
+         $name = $candidate->user?->name ?? 'Candidat';
+         $candidate->delete();
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('update', "{$name} retiré des candidats du quiz '{$quiz->title}'", $quiz);
++            activity_log('update', "{$name} retiré des membres du quiz '{$quiz->title}'", $quiz);
+         }
+ 
+-        return back()->with('success', "{$name} a été retiré des candidats.");
++        return back()->with('success', "{$name} a été retiré des membres du quiz.");
+     }
+ 
+     /** Quiz « réservé aux candidats ajoutés » : les autres membres du projet ne le voient plus. */
+@@ -111,7 +111,7 @@ public function restriction(Request $request, Project $project, Quiz $quiz)
+         $quiz->update(['restricted_to_candidates' => (bool) $data['restricted']]);
+ 
+         return back()->with('success', $quiz->restricted_to_candidates
+-            ? 'Quiz réservé aux candidats ajoutés.'
++            ? 'Quiz réservé aux membres du quiz.'
+             : 'Quiz ouvert à tous les membres du projet.');
+     }
+ 
+@@ -119,14 +119,14 @@ public function restriction(Request $request, Project $project, Quiz $quiz)
+     private function enrol(Quiz $quiz, array $userIds)
+     {
+         if ($quiz->is_draft) {
+-            return back()->with('error', 'Publiez d\'abord le quiz avant d\'ajouter des candidats.');
++            return back()->with('error', 'Publiez d\'abord le quiz avant d\'y ajouter des membres.');
+         }
+ 
+         $already = $quiz->candidates()->pluck('user_id')->all();
+         $new = array_values(array_diff($userIds, $already));
+ 
+         if (! $new) {
+-            return back()->with('info', 'Ces utilisateurs sont déjà candidats de ce quiz.');
++            return back()->with('info', 'Ces utilisateurs sont déjà membres de ce quiz.');
+         }
+ 
+         $actor = Auth::user();
+@@ -137,10 +137,10 @@ private function enrol(Quiz $quiz, array $userIds)
+         $this->notify($quiz, $new, $actor);
+ 
+         if (function_exists('activity_log')) {
+-            activity_log('create', count($new) . " candidat(s) ajouté(s) au quiz '{$quiz->title}' par {$actor->name}", $quiz);
++            activity_log('create', count($new) . " membre(s) ajouté(s) au quiz '{$quiz->title}' par {$actor->name}", $quiz);
+         }
+ 
+-        return back()->with('success', count($new) . ' candidat(s) ajouté(s).');
++        return back()->with('success', count($new) . ' membre(s) ajouté(s) au quiz.');
+     }
+ 
+     /** @param list<int> $userIds */
+diff --git a/app/Models/ParticipationPoint.php b/app/Models/ParticipationPoint.php
+index ce67bd1..21516e4 100644
+--- a/app/Models/ParticipationPoint.php
++++ b/app/Models/ParticipationPoint.php
+@@ -13,6 +13,7 @@ class ParticipationPoint extends Model
+ {
+     protected $fillable = [
+         'project_id',
++        'quiz_id',
+         'user_id',
+         'awarded_by',
+         'points',
+@@ -30,6 +31,11 @@ public function project(): BelongsTo
+         return $this->belongsTo(Project::class);
+     }
+ 
++    public function quiz(): BelongsTo
++    {
++        return $this->belongsTo(Quiz::class);
++    }
++
+     public function user(): BelongsTo
+     {
+         return $this->belongsTo(User::class);
+@@ -41,11 +47,38 @@ public function awarder(): BelongsTo
+     }
+ 
+     /**
+-     * Total brut par membre (user_id => somme) pour un projet.
++     * Total brut par membre (user_id => somme) des anciens bonus « généraux » du projet
++     * (attribués avant que le bonus soit rattaché à un quiz : quiz_id NULL).
+      */
+     public static function totalsForProject(int $projectId): Collection
+     {
+         return static::where('project_id', $projectId)
++            ->whereNull('quiz_id')
++            ->selectRaw('user_id, SUM(points) as total')
++            ->groupBy('user_id')
++            ->pluck('total', 'user_id')
++            ->map(fn ($v) => (float) $v);
++    }
++
++    /**
++     * Total brut par membre du quiz (user_id => somme) : bonus attribués dans ce quiz,
++     * plus les anciens bonus généraux du projet.
++     */
++    public static function totalsForQuiz(Quiz $quiz): Collection
++    {
++        return static::totalsForQuizzes($quiz->project_id, [$quiz->id]);
++    }
++
++    /**
++     * Idem pour plusieurs quiz (cumuls) : les bonus de tous ces quiz s'additionnent,
++     * les anciens bonus généraux ne sont comptés qu'une fois.
++     *
++     * @param list<int> $quizIds
++     */
++    public static function totalsForQuizzes(int $projectId, array $quizIds): Collection
++    {
++        return static::where('project_id', $projectId)
++            ->where(fn ($q) => $q->whereNull('quiz_id')->orWhereIn('quiz_id', $quizIds))
+             ->selectRaw('user_id, SUM(points) as total')
+             ->groupBy('user_id')
+             ->pluck('total', 'user_id')
+diff --git a/app/Models/Quiz.php b/app/Models/Quiz.php
+index fd0b31a..7b73057 100644
+--- a/app/Models/Quiz.php
++++ b/app/Models/Quiz.php
+@@ -106,6 +106,12 @@ public function cumulItems(): HasMany
+         return $this->hasMany(QuizCumulItem::class);
+     }
+ 
++    /** Bonus de participation attribués dans ce quiz (à ses membres). */
++    public function participationPoints(): HasMany
++    {
++        return $this->hasMany(ParticipationPoint::class);
++    }
++
+     /** Candidats inscrits à ce quiz (utilisateurs ProJA, membres du projet ou non). */
+     public function candidates(): HasMany
+     {
+diff --git a/app/Notifications/QuizNotification.php b/app/Notifications/QuizNotification.php
+index 104d502..50e40cc 100644
+--- a/app/Notifications/QuizNotification.php
++++ b/app/Notifications/QuizNotification.php
+@@ -40,7 +40,7 @@ public function toDatabase($notifiable): array
+ 
+         $message = match($this->type) {
+             'quiz_created' => 'Le quiz "' . ($this->data['quiz_title'] ?? '') . '" a été publié par ' . ($this->data['creator_name'] ?? 'un membre') . '.',
+-            'quiz_assigned' => ($this->data['actor_name'] ?? 'Un responsable') . ' vous a ajouté comme candidat. Ouvrez la rubrique Quiz pour le passer.',
++            'quiz_assigned' => ($this->data['actor_name'] ?? 'Un responsable') . ' vous a ajouté aux membres de ce quiz. Ouvrez la rubrique Quiz pour le passer.',
+             'quiz_graded' => 'Votre réponse écrite a été notée. Votre score final est de ' . ($this->data['score'] ?? 0) . '%.',
+             'deliberation_opened' => ($this->data['actor_name'] ?? 'Un responsable') . ' a ouvert la délibération : votre aval est attendu.',
+             'deliberation_reopened' => ($this->data['actor_name'] ?? 'Un responsable') . ' a rouvert la délibération : les avals précédents sont annulés.',
+diff --git a/app/Services/Quiz/QuizCumulService.php b/app/Services/Quiz/QuizCumulService.php
+index d3b7786..49c10dd 100644
+--- a/app/Services/Quiz/QuizCumulService.php
++++ b/app/Services/Quiz/QuizCumulService.php
+@@ -87,7 +87,7 @@ public function compute(Project $project, array $items, string $missingPolicy, b
+             }
+         }
+ 
+-        $bonusTotals = $includeBonus ? ParticipationPoint::totalsForProject($project->id) : collect();
++        $bonusTotals = $includeBonus ? ParticipationPoint::totalsForQuizzes($project->id, array_keys($coefs)) : collect();
+         $passMark = QuizScoringService::passMark();
+ 
+         $rows = [];
+diff --git a/app/Services/Quiz/QuizDeliberationService.php b/app/Services/Quiz/QuizDeliberationService.php
+index f78fcf1..6adc300 100644
+--- a/app/Services/Quiz/QuizDeliberationService.php
++++ b/app/Services/Quiz/QuizDeliberationService.php
+@@ -2,6 +2,7 @@
+ 
+ namespace App\Services\Quiz;
+ 
++use App\Models\ParticipationPoint;
+ use App\Models\Quiz;
+ use App\Models\QuizApproval;
+ use App\Models\QuizResult;
+@@ -30,7 +31,12 @@ public function fingerprint(Quiz $quiz): string
+             ->get(['id', 'score', 'score_exact', 'grading_status'])
+             ->map(fn ($r) => $r->id . ':' . number_format($r->exactScore(), 2, '.', '') . ':' . $r->grading_status);
+ 
+-        return sha1($rows->implode('|'));
++        // Le bonus de participation modifie la note finale : il fait partie de l'empreinte,
++        // donc l'ajouter ou le retirer après un aval rend cet aval caduc.
++        $bonus = ParticipationPoint::totalsForQuiz($quiz)->sortKeys()
++            ->map(fn ($v, $uid) => 'b' . $uid . ':' . number_format($v, 2, '.', ''));
++
++        return sha1($rows->merge($bonus)->implode('|'));
+     }
+ 
+     /** @return array{results:int, pending:int} */
+diff --git a/app/Services/Quiz/QuizScoringService.php b/app/Services/Quiz/QuizScoringService.php
+index 6a81e9c..b289752 100644
+--- a/app/Services/Quiz/QuizScoringService.php
++++ b/app/Services/Quiz/QuizScoringService.php
+@@ -213,7 +213,7 @@ public function finalResults(Quiz $quiz, bool $withBonus = true): array
+         $attempts = QuizAttempt::whereIn('id', $best->pluck('attempt_id'))->get()->keyBy('id');
+         $responses = QuizResponse::whereIn('attempt_id', $best->pluck('attempt_id'))->get()->groupBy('attempt_id');
+ 
+-        $bonusTotals = $withBonus ? ParticipationPoint::totalsForProject($quiz->project_id) : collect();
++        $bonusTotals = $withBonus ? ParticipationPoint::totalsForQuiz($quiz) : collect();
+ 
+         $rows = $best->map(function (QuizResult $r) use ($quiz, $questions, $attempts, $responses, $bonusTotals, $withBonus) {
+             $attempt = $attempts->get($r->attempt_id);
+diff --git a/database/migrations/2026_09_21_000001_add_quiz_id_to_participation_points_table.php b/database/migrations/2026_09_21_000001_add_quiz_id_to_participation_points_table.php
+new file mode 100644
+index 0000000..59253bc
+--- /dev/null
++++ b/database/migrations/2026_09_21_000001_add_quiz_id_to_participation_points_table.php
+@@ -0,0 +1,28 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    public function up(): void
++    {
++        // Le bonus est désormais attribué dans le cadre d'un quiz, à ses membres (candidats inscrits).
++        // quiz_id NULL = ancien bonus « général » du projet : il continue de compter pour tous les quiz
++        // du projet, afin de ne pas modifier les résultats déjà établis.
++        Schema::table('participation_points', function (Blueprint $table) {
++            $table->foreignId('quiz_id')->nullable()->after('project_id')->constrained('quizzes')->cascadeOnDelete();
++            $table->index(['quiz_id', 'user_id']);
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::table('participation_points', function (Blueprint $table) {
++            $table->dropForeign(['quiz_id']);
++            $table->dropIndex(['quiz_id', 'user_id']);
++            $table->dropColumn('quiz_id');
++        });
++    }
++};
+diff --git a/resources/js/Components/Quiz/CandidatesPanel.jsx b/resources/js/Components/Quiz/CandidatesPanel.jsx
+index 8582159..db79e8d 100644
+--- a/resources/js/Components/Quiz/CandidatesPanel.jsx
++++ b/resources/js/Components/Quiz/CandidatesPanel.jsx
+@@ -83,12 +83,12 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
+   };
+ 
+   const addAllMembers = () => {
+-    if (!confirm('Ajouter tous les membres du projet (hors responsables) comme candidats de ce quiz ?')) return;
++    if (!confirm('Ajouter tous les membres du projet (hors responsables) comme membres de ce quiz ?')) return;
+     router.post(route('projects.quizzes.candidates.members', routeArgs), {}, { preserveScroll: true, onStart: () => setBusy(true), onFinish: () => setBusy(false) });
+   };
+ 
+   const remove = (candidate) => {
+-    if (!confirm(`Retirer ${candidate.name} des candidats de ce quiz ?`)) return;
++    if (!confirm(`Retirer ${candidate.name} des membres de ce quiz ?`)) return;
+     router.delete(route('projects.quizzes.candidates.destroy', [...routeArgs, candidate.id]), { preserveScroll: true });
+   };
+ 
+@@ -102,11 +102,11 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
+       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+         <div>
+           <h2 id="candidates-title" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+-            <FaUsers className="text-purple-600" /> Candidats du quiz
++            <FaUsers className="text-purple-600" /> Membres du quiz
+             <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 text-xs font-bold">{candidates.length}</span>
+           </h2>
+           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+-            Ajoutez des utilisateurs déjà inscrits sur ProJA : ils voient ce quiz dans leur menu « Quiz », même sans faire partie du projet.
++            Ajoutez des utilisateurs déjà inscrits sur ProJA : ils deviennent membres de ce quiz et le voient dans leur menu « Quiz », sans faire partie du projet. Seuls les membres du quiz peuvent recevoir un bonus de participation.
+             {candidates.length > 0 && ` ${done} / ${candidates.length} ont terminé.`}
+           </p>
+         </div>
+@@ -116,7 +116,7 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
+           disabled={busy}
+           className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition disabled:opacity-50"
+         >
+-          <FaUserPlus /> Ajouter les membres du projet
++          <FaUserPlus /> Ajouter les membres du projet au quiz
+         </button>
+       </div>
+ 
+@@ -135,7 +135,7 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
+ 
+           {query.trim().length >= 2 && !searching && (
+             <ul className="absolute z-20 mt-1.5 w-full max-h-72 overflow-y-auto rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg divide-y divide-gray-100 dark:divide-gray-700">
+-              {results.length === 0 && <li className="px-4 py-3 text-sm text-gray-500">Aucun utilisateur trouvé (ou déjà candidat).</li>}
++              {results.length === 0 && <li className="px-4 py-3 text-sm text-gray-500">Aucun utilisateur trouvé (ou déjà membre du quiz).</li>}
+               {results.map((u) => (
+                 <li key={u.id}>
+                   <button
+@@ -176,7 +176,7 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
+               disabled={busy}
+               className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition disabled:opacity-50"
+             >
+-              {busy ? <FaSpinner className="animate-spin" /> : <FaUserPlus />} Ajouter {selected.length} candidat(s)
++              {busy ? <FaSpinner className="animate-spin" /> : <FaUserPlus />} Ajouter {selected.length} membre(s)
+             </button>
+           </div>
+         )}
+@@ -191,7 +191,7 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
+           className="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+         />
+         <span>
+-          <span className="block text-sm font-semibold text-gray-900 dark:text-white">Réservé aux candidats ajoutés</span>
++          <span className="block text-sm font-semibold text-gray-900 dark:text-white">Réservé aux membres du quiz</span>
+           <span className="block text-xs text-gray-500 dark:text-gray-400">
+             Les autres membres du projet ne voient plus ce quiz. Les responsables y ont toujours accès.
+           </span>
+@@ -200,7 +200,7 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
+ 
+       {/* Liste */}
+       {candidates.length === 0 ? (
+-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">Aucun candidat ajouté pour l'instant.</p>
++        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">Aucun membre ajouté pour l'instant.</p>
+       ) : (
+         <ul className="divide-y divide-gray-100 dark:divide-gray-700 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+           {candidates.map((c) => {
+diff --git a/resources/js/Pages/Quizzes/Index.jsx b/resources/js/Pages/Quizzes/Index.jsx
+index 68b4a25..0580d1d 100644
+--- a/resources/js/Pages/Quizzes/Index.jsx
++++ b/resources/js/Pages/Quizzes/Index.jsx
+@@ -30,13 +30,6 @@ function Index({ project, quizzes = [], cumuls = [], canManage }) {
+ 
+           {canManage && (
+             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+-              <Link
+-                href={route('projects.participation.index', project.id)}
+-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800 font-semibold rounded-xl text-sm transition"
+-                title="Attribuer des points aux membres qui s'impliquent pendant les formations"
+-              >
+-                <FaStar className="text-amber-500" /> Bonus de participation
+-              </Link>
+               <Link
+                 href={route('projects.quiz-cumuls.create', project.id)}
+                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800 font-semibold rounded-xl text-sm transition"
+diff --git a/resources/js/Pages/Quizzes/MyQuizzes.jsx b/resources/js/Pages/Quizzes/MyQuizzes.jsx
+index 479af36..72c217d 100644
+--- a/resources/js/Pages/Quizzes/MyQuizzes.jsx
++++ b/resources/js/Pages/Quizzes/MyQuizzes.jsx
+@@ -147,7 +147,7 @@ function QuizTile({ quiz }) {
+         <div className="flex flex-wrap gap-1.5">
+           {quiz.invited && (
+             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+-              <FaUserCheck /> Vous êtes candidat
++              <FaUserCheck /> Vous êtes membre de ce quiz
+             </span>
+           )}
+           {quiz.validated && (
+diff --git a/resources/js/Pages/Quizzes/Participation.jsx b/resources/js/Pages/Quizzes/Participation.jsx
+index 0167fda..30654c2 100644
+--- a/resources/js/Pages/Quizzes/Participation.jsx
++++ b/resources/js/Pages/Quizzes/Participation.jsx
+@@ -17,7 +17,12 @@ const REASONS = [
+ const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
+ const signed = (n) => `${n > 0 ? '+' : ''}${fmtNumber(n)}`;
+ 
+-function Participation({ project, members = [], history = [], cap, stepMax }) {
++function Participation({ project, quiz = null, members = [], history = [], cap, stepMax, legacyCount = 0 }) {
++  // Mode quiz : les destinataires sont les MEMBRES DU QUIZ (candidats inscrits), pas les membres du projet.
++  const storeUrl = quiz ? route('projects.quizzes.participation.store', [project.id, quiz.id]) : route('projects.participation.store', project.id);
++  const destroyUrl = (id) => (quiz ? route('projects.quizzes.participation.destroy', [project.id, quiz.id, id]) : route('projects.participation.destroy', [project.id, id]));
++  const backHref = quiz ? route('projects.quizzes.show', [project.id, quiz.id]) : route('projects.quizzes.index', project.id);
++
+   const [search, setSearch] = useState('');
+   const [sort, setSort] = useState('points');
+   const [target, setTarget] = useState(null);
+@@ -35,7 +40,7 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
+   const quick = (m, points) => {
+     setQuickBusy(`${m.id}:${points}`);
+     router.post(
+-      route('projects.participation.store', project.id),
++      storeUrl,
+       { user_id: m.id, points },
+       { preserveScroll: true, onFinish: () => setQuickBusy(null) }
+     );
+@@ -51,7 +56,7 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
+     e.preventDefault();
+     setBusy(true);
+     router.post(
+-      route('projects.participation.store', project.id),
++      storeUrl,
+       { user_id: target.id, ...form },
+       {
+         preserveScroll: true,
+@@ -64,36 +69,50 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
+ 
+   const remove = (entry) => {
+     if (window.confirm(`Supprimer l'attribution de ${signed(entry.points)} pt(s) à ${entry.user_name} ?`)) {
+-      router.delete(route('projects.participation.destroy', [project.id, entry.id]), { preserveScroll: true });
++      router.delete(destroyUrl(entry.id), { preserveScroll: true });
+     }
+   };
+ 
+   return (
+     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 sm:py-8">
+       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
+-        <Link href={route('projects.quizzes.index', project.id)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-blue-600 dark:text-gray-400">
+-          <FaArrowLeft /> Retour aux quiz
++        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-blue-600 dark:text-gray-400">
++          <FaArrowLeft /> {quiz ? 'Retour au quiz' : 'Retour aux quiz'}
+         </Link>
+ 
+         <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-5 sm:p-6 text-white shadow-md">
+-          <span className="text-xs uppercase font-bold tracking-wider text-amber-100">Formations</span>
++          <span className="text-xs uppercase font-bold tracking-wider text-amber-100">{quiz ? `Quiz : ${quiz.title}` : 'Formations · bonus généraux du projet'}</span>
+           <h1 className="text-xl sm:text-2xl font-extrabold flex items-center gap-2 mt-1"><FaStar /> Bonus de participation</h1>
+           <p className="text-sm text-amber-50 mt-1 max-w-2xl">
+-            Récompensez les membres qui s&apos;impliquent lors des échanges. Ces points s&apos;ajoutent à leur note lors de la sélection finale.
++            {quiz
++              ? "Récompensez les membres du quiz qui s'impliquent lors des échanges. Ces points s'ajoutent à leur note finale dans ce quiz."
++              : "Anciens bonus attribués à l'ensemble du projet : ils comptent pour tous les quiz du projet. Pour un nouveau bonus, ouvrez le quiz concerné."}
+           </p>
+           <p className="mt-3 inline-flex items-start gap-2 text-xs bg-white/15 rounded-xl px-3 py-2">
+             <FaInfoCircle className="mt-0.5 flex-shrink-0" />
+-            Le bonus total d&apos;un membre est plafonné à {cap} points ; il est ajouté une seule fois à la note finale (100 % maximum), y compris dans les cumuls de quiz.
++            Le bonus total d&apos;un {quiz ? 'membre du quiz' : 'membre'} est plafonné à {cap} points ; il est ajouté une seule fois à la note finale (100 % maximum), y compris dans les cumuls de quiz.
+           </p>
+         </div>
+ 
++        {quiz?.validated && (
++          <p className="text-sm rounded-xl px-4 py-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200">
++            Les résultats de ce quiz sont validés : rouvrez la délibération pour modifier les bonus.
++          </p>
++        )}
++        {quiz && legacyCount > 0 && (
++          <p className="text-xs rounded-xl px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300">
++            {legacyCount} ancien(s) bonus général(aux) du projet s&apos;ajoutent aussi aux membres ci-dessous.{' '}
++            <Link href={route('projects.participation.index', project.id)} className="font-semibold text-amber-700 dark:text-amber-300 hover:underline">Les consulter</Link>
++          </p>
++        )}
++
+         <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+           {/* Membres */}
+           <div className="xl:col-span-8 space-y-4">
+             <div className="bg-white dark:bg-gray-800 rounded-2xl p-3 sm:p-4 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+               <div className="flex items-center gap-3 flex-1 min-w-0">
+                 <FaSearch className="text-gray-400" />
+-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un membre..."
++                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={quiz ? "Rechercher un membre du quiz..." : "Rechercher un membre..."}
+                   className="flex-1 min-w-0 border-0 bg-transparent text-sm focus:ring-0 dark:text-white" />
+               </div>
+               <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-900/60 rounded-xl text-xs font-semibold">
+@@ -105,7 +124,12 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
+ 
+             {members.length === 0 && (
+               <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-10 text-center text-sm text-gray-500">
+-                Aucun membre à récompenser dans ce projet.
++                {quiz ? (
++                  <>
++                    Ce quiz n&apos;a encore aucun membre. Ajoutez des membres depuis la page du quiz : ce sont eux qui peuvent recevoir un bonus.{' '}
++                    <Link href={backHref} className="font-semibold text-amber-700 dark:text-amber-300 hover:underline">Ouvrir le quiz</Link>
++                  </>
++                ) : 'Aucun membre à récompenser dans ce projet.'}
+               </div>
+             )}
+ 
+@@ -124,6 +148,9 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
+                       <div className="min-w-0 flex-1">
+                         <p className="font-bold text-gray-900 dark:text-white truncate">{m.name}</p>
+                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{m.email}</p>
++                        {quiz && m.enrolled === false && (
++                          <p className="text-[11px] text-gray-400">A passé le quiz sans être inscrit</p>
++                        )}
+                       </div>
+                       <div className="text-right">
+                         <div className="text-2xl font-black text-amber-600 dark:text-amber-400 leading-none">{fmtNumber(m.effective)}</div>
+@@ -212,7 +239,7 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
+                     className="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-amber-500 focus:border-amber-500" />
+                 </div>
+               </div>
+-              {(errors.points || errors.awarded_on) && <p className="text-xs text-red-500">{errors.points || errors.awarded_on}</p>}
++              {(errors.points || errors.awarded_on || errors.user_id) && <p className="text-xs text-red-500">{errors.points || errors.awarded_on || errors.user_id}</p>}
+ 
+               <div>
+                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Motif</label>
+diff --git a/resources/js/Pages/Quizzes/Show.jsx b/resources/js/Pages/Quizzes/Show.jsx
+index 1ed1d8e..6deb2fb 100644
+--- a/resources/js/Pages/Quizzes/Show.jsx
++++ b/resources/js/Pages/Quizzes/Show.jsx
+@@ -345,7 +345,7 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
+                   <FaEdit /> Modifier
+                 </Link>
+                 <Link
+-                  href={route('projects.participation.index', project.id)}
++                  href={route('projects.quizzes.participation.index', [project.id, quiz.id])}
+                   className={`${actionBtn} bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800`}
+                 >
+                   <FaStar className="text-amber-500" /> Bonus de participation
+diff --git a/routes/web.php b/routes/web.php
+index 042f28d..1f232e8 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -297,6 +297,11 @@
+     // Routes Quiz
+     // scopeBindings : {quiz} doit appartenir à {project}, {question}/{response}/{attempt} au {quiz}.
+     Route::prefix('projects/{project}/quizzes')->name('projects.quizzes.')->scopeBindings()->group(function () {
++        // Bonus de participation : attribués aux membres du quiz
++        Route::get('/{quiz}/participation', [\App\Http\Controllers\ParticipationPointController::class, 'quizIndex'])->name('participation.index');
++        Route::post('/{quiz}/participation', [\App\Http\Controllers\ParticipationPointController::class, 'quizStore'])->name('participation.store');
++        Route::delete('/{quiz}/participation/{participationPoint}', [\App\Http\Controllers\ParticipationPointController::class, 'quizDestroy'])->name('participation.destroy');
++
+         // Candidats du quiz (utilisateurs ProJA inscrits)
+         Route::get('/{quiz}/candidates/search', [\App\Http\Controllers\QuizCandidateController::class, 'search'])->name('candidates.search');
+         Route::post('/{quiz}/candidates', [\App\Http\Controllers\QuizCandidateController::class, 'store'])->name('candidates.store');
+diff --git a/tests/Feature/Quiz/QuizBonusTest.php b/tests/Feature/Quiz/QuizBonusTest.php
+new file mode 100644
+index 0000000..0923175
+--- /dev/null
++++ b/tests/Feature/Quiz/QuizBonusTest.php
+@@ -0,0 +1,206 @@
++<?php
++
++namespace Tests\Feature\Quiz;
++
++use App\Models\ParticipationPoint;
++use App\Models\Quiz;
++use App\Models\QuizAttempt;
++use App\Models\QuizCandidate;
++use App\Models\User;
++use App\Services\Quiz\QuizDeliberationService;
++
++/**
++ * Le bonus de participation est attribué dans un quiz, à ses MEMBRES (candidats inscrits),
++ * et non aux membres du projet.
++ */
++class QuizBonusTest extends QuizHttpTestCase
++{
++    private User $outsider; // utilisateur ProJA hors projet, membre du quiz
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++        $this->outsider = User::factory()->create(['name' => 'Diane Externe']);
++    }
++
++    private function enrol(Quiz $quiz, User $user): void
++    {
++        QuizCandidate::create(['quiz_id' => $quiz->id, 'user_id' => $user->id, 'added_by' => $this->manager1->id]);
++    }
++
++    /** Fait passer le quiz en donnant une mauvaise réponse : note du quiz = 0 %, donc le bonus se lit tel quel. */
++    private function failQuiz(Quiz $quiz, User $user): void
++    {
++        $this->actingAs($user)->post($this->quizUrl($quiz, '/launch'))->assertOk();
++        $attempt = QuizAttempt::where('quiz_id', $quiz->id)->where('user_id', $user->id)->latest('id')->firstOrFail();
++        $this->actingAs($user)->post($this->quizUrl($quiz, '/submit'), [
++            'attempt_id' => $attempt->id, 'answers' => [$quiz->questions->first()->id => 1],
++        ])->assertRedirect();
++    }
++
++    private function award(Quiz $quiz, User $to, float $points)
++    {
++        return $this->actingAs($this->manager1)->post($this->quizUrl($quiz, '/participation'), [
++            'user_id' => $to->id, 'points' => $points, 'reason' => 'Très actif',
++        ]);
++    }
++
++    private function row(Quiz $quiz, User $user): array
++    {
++        $rows = $this->inertia($this->manager1, $this->quizUrl($quiz, '/ranking'))->json('props.rankings');
++
++        return collect($rows)->firstWhere('user_id', $user->id);
++    }
++
++    public function test_bonus_goes_to_quiz_members_including_candidates_outside_the_project(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->enrol($quiz, $this->outsider);
++
++        // La page liste les membres DU QUIZ : la candidate hors projet y est ; les membres du projet non inscrits n'y sont pas
++        $members = $this->inertia($this->manager1, $this->quizUrl($quiz, '/participation'))->json('props.members');
++        $this->assertSame([$this->outsider->id], array_column($members, 'id'));
++        $this->assertTrue($members[0]['enrolled']);
++
++        $this->award($quiz, $this->outsider, 5)->assertSessionHasNoErrors()->assertSessionHas('success');
++        $this->assertSame($quiz->id, ParticipationPoint::firstOrFail()->quiz_id);
++
++        // Elle passe le quiz avec 0 % : sa note finale est le bonus
++        $this->failQuiz($quiz, $this->outsider->fresh());
++        $row = $this->row($quiz, $this->outsider);
++        $this->assertEquals(0, $row['score']);
++        $this->assertEquals(5, $row['bonus']);
++        $this->assertEquals(5, $row['final']);
++    }
++
++    public function test_project_members_who_are_not_quiz_members_cannot_receive_a_bonus(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++
++        // $this->candidate est membre du PROJET, pas du quiz
++        $this->award($quiz, $this->candidate, 3)->assertSessionHasErrors('user_id');
++        $this->assertSame(0, ParticipationPoint::count());
++
++        // Une fois ajouté au quiz, c'est possible
++        $this->enrol($quiz, $this->candidate);
++        $this->award($quiz, $this->candidate, 3)->assertSessionHasNoErrors();
++        $this->assertSame(1, ParticipationPoint::count());
++    }
++
++    public function test_users_who_already_took_the_quiz_are_members_too(): void
++    {
++        // Quiz créé avant les inscriptions : les membres du projet qui l'ont passé restent récompensables
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->failQuiz($quiz, $this->candidate);
++
++        $members = $this->inertia($this->manager1, $this->quizUrl($quiz, '/participation'))->json('props.members');
++        $this->assertSame([$this->candidate->id], array_column($members, 'id'));
++        $this->assertFalse($members[0]['enrolled']);
++
++        $this->award($quiz, $this->candidate, 2)->assertSessionHasNoErrors();
++    }
++
++    public function test_bonus_belongs_to_one_quiz_and_is_capped(): void
++    {
++        $quizA = $this->makeQuiz([$this->qcm()], 'Quiz A');
++        $quizB = $this->makeQuiz([$this->qcm()], 'Quiz B');
++        foreach ([$quizA, $quizB] as $q) {
++            $this->enrol($q, $this->outsider);
++            $this->failQuiz($q, $this->outsider->fresh());
++        }
++
++        $this->award($quizA, $this->outsider, 4);
++        $this->assertEquals(4, $this->row($quizA, $this->outsider)['bonus']);
++        $this->assertEquals(0, $this->row($quizB, $this->outsider)['bonus'], 'le bonus du quiz A ne compte pas dans le quiz B');
++
++        // Plafond : 8 + 8 = 16 -> 10 (config quiz.participation_cap)
++        $this->award($quizA, $this->outsider, 8);
++        $this->award($quizA, $this->outsider, 8);
++        $this->assertEquals(10, $this->row($quizA, $this->outsider)['bonus']);
++    }
++
++    public function test_legacy_project_wide_bonus_still_counts_for_every_quiz(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->enrol($quiz, $this->candidate);
++        $this->failQuiz($quiz, $this->candidate);
++
++        // Ancien bonus « général » (sans quiz), comme avant
++        $this->actingAs($this->manager1)->post("/projects/{$this->project->id}/participation-points", [
++            'user_id' => $this->candidate->id, 'points' => 3,
++        ])->assertSessionHasNoErrors();
++        $this->assertNull(ParticipationPoint::firstOrFail()->quiz_id);
++        $this->assertEquals(3, $this->row($quiz, $this->candidate)['bonus']);
++
++        // Il s'additionne au bonus du quiz
++        $this->award($quiz, $this->candidate, 2);
++        $this->assertEquals(5, $this->row($quiz, $this->candidate)['bonus']);
++        $this->assertSame(1, $this->inertia($this->manager1, $this->quizUrl($quiz, '/participation'))->json('props.legacyCount'));
++    }
++
++    public function test_bonuses_of_several_quizzes_add_up_in_a_cumul(): void
++    {
++        $quizA = $this->makeQuiz([$this->qcm()], 'Quiz A');
++        $quizB = $this->makeQuiz([$this->qcm()], 'Quiz B');
++        foreach ([$quizA, $quizB] as $q) {
++            $this->enrol($q, $this->outsider);
++            $this->failQuiz($q, $this->outsider->fresh());
++        }
++        $this->award($quizA, $this->outsider, 3);
++        $this->award($quizB, $this->outsider, 4);
++
++        $json = $this->actingAs($this->manager1)->postJson("/projects/{$this->project->id}/quiz-cumuls/preview", [
++            'items' => [['quiz_id' => $quizA->id, 'coefficient' => 1], ['quiz_id' => $quizB->id, 'coefficient' => 1]],
++            'missing_policy' => 'zero', 'include_bonus' => true,
++        ])->assertOk()->json();
++
++        $row = collect($json['rows'])->firstWhere('user_id', $this->outsider->id);
++        $this->assertEquals(7, $row['bonus']);
++        $this->assertEquals(7, $row['final']); // moyenne 0 % + bonus 7
++    }
++
++    public function test_changing_a_bonus_invalidates_the_results_fingerprint(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->enrol($quiz, $this->outsider);
++        $this->failQuiz($quiz, $this->outsider->fresh());
++
++        $service = app(QuizDeliberationService::class);
++        $before = $service->fingerprint($quiz);
++
++        $this->award($quiz, $this->outsider, 2);
++        $after = $service->fingerprint($quiz);
++        $this->assertNotSame($before, $after, 'un aval donné avant le bonus n\'est plus valable');
++
++        $entry = ParticipationPoint::firstOrFail();
++        $this->actingAs($this->manager1)->delete($this->quizUrl($quiz, "/participation/{$entry->id}"))->assertSessionHas('success');
++        $this->assertSame($before, $service->fingerprint($quiz));
++    }
++
++    public function test_bonus_is_locked_once_results_are_validated_and_only_managers_manage_it(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->enrol($quiz, $this->outsider);
++
++        // Un membre ordinaire ne peut ni voir ni attribuer
++        $this->actingAs($this->candidate)->get($this->quizUrl($quiz, '/participation'))->assertForbidden();
++        $this->actingAs($this->candidate)->post($this->quizUrl($quiz, '/participation'), ['user_id' => $this->outsider->id, 'points' => 1])->assertForbidden();
++
++        $quiz->update(['deliberation_status' => Quiz::DELIBERATION_VALIDATED]);
++        $this->award($quiz, $this->outsider, 2)->assertSessionHas('error');
++        $this->assertSame(0, ParticipationPoint::count());
++    }
++
++    public function test_a_quiz_bonus_cannot_be_deleted_through_another_quiz_or_the_legacy_route(): void
++    {
++        $quizA = $this->makeQuiz([$this->qcm()], 'Quiz A');
++        $quizB = $this->makeQuiz([$this->qcm()], 'Quiz B');
++        $this->enrol($quizA, $this->outsider);
++        $this->award($quizA, $this->outsider, 2);
++        $entry = ParticipationPoint::firstOrFail();
++
++        $this->actingAs($this->manager1)->delete($this->quizUrl($quizB, "/participation/{$entry->id}"))->assertNotFound();
++        $this->actingAs($this->manager1)->delete("/projects/{$this->project->id}/participation-points/{$entry->id}")->assertNotFound();
++        $this->assertSame(1, ParticipationPoint::count());
++    }
++}
+-- 
+2.43.0
+

@@ -1,0 +1,1826 @@
+From ec32b57714fd12690c21706820c1aa5dfbdcc06e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 20 Sep 2026 07:52:13 +0000
+Subject: [PATCH] =?UTF-8?q?Quiz=20:=20menu=20Quiz,=20candidats=20inscrits?=
+ =?UTF-8?q?=20(utilisateurs=20ProJA),=20compte=20candidat=20=C3=A0=20menu?=
+ =?UTF-8?q?=20r=C3=A9duit?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ app/Http/Controllers/MyQuizzesController.php  |  95 +++++++
+ app/Http/Controllers/ProjectController.php    |   4 +-
+ .../Controllers/QuizCandidateController.php   | 206 +++++++++++++++
+ app/Http/Controllers/QuizController.php       |  10 +-
+ app/Http/Middleware/HandleInertiaRequests.php |   1 +
+ .../RestrictQuizCandidateAccounts.php         |  74 ++++++
+ app/Models/Quiz.php                           |  30 +++
+ app/Models/QuizCandidate.php                  |  26 ++
+ app/Models/User.php                           |  25 ++
+ app/Notifications/QuizNotification.php        |   2 +
+ app/Policies/QuizPolicy.php                   |  29 ++-
+ app/Services/Quiz/QuizAccessService.php       |  78 ++++++
+ bootstrap/app.php                             |   1 +
+ ...20_000001_create_quiz_candidates_table.php |  37 +++
+ resources/js/Components/MobileBottomNav.jsx   |  20 +-
+ .../js/Components/Quiz/CandidatesPanel.jsx    | 241 ++++++++++++++++++
+ resources/js/Layouts/AdminLayout.jsx          |  19 +-
+ resources/js/Pages/Mobile/More/Index.jsx      |   3 +-
+ resources/js/Pages/Quizzes/MyQuizzes.jsx      | 209 +++++++++++++++
+ resources/js/Pages/Quizzes/Show.jsx           |  12 +-
+ resources/js/lang/en/app.json                 |   1 +
+ resources/js/lang/fon/app.json                |   1 +
+ resources/js/lang/fr/app.json                 |   1 +
+ resources/js/lang/yo/app.json                 |   1 +
+ routes/web.php                                |  10 +
+ tests/Feature/Quiz/QuizCandidatesTest.php     | 196 ++++++++++++++
+ tests/Feature/Quiz/QuizHttpTestCase.php       |   6 +
+ 27 files changed, 1318 insertions(+), 20 deletions(-)
+ create mode 100644 app/Http/Controllers/MyQuizzesController.php
+ create mode 100644 app/Http/Controllers/QuizCandidateController.php
+ create mode 100644 app/Http/Middleware/RestrictQuizCandidateAccounts.php
+ create mode 100644 app/Models/QuizCandidate.php
+ create mode 100644 app/Services/Quiz/QuizAccessService.php
+ create mode 100644 database/migrations/2026_09_20_000001_create_quiz_candidates_table.php
+ create mode 100644 resources/js/Components/Quiz/CandidatesPanel.jsx
+ create mode 100644 resources/js/Pages/Quizzes/MyQuizzes.jsx
+ create mode 100644 tests/Feature/Quiz/QuizCandidatesTest.php
+
+diff --git a/app/Http/Controllers/MyQuizzesController.php b/app/Http/Controllers/MyQuizzesController.php
+new file mode 100644
+index 0000000..6b75356
+--- /dev/null
++++ b/app/Http/Controllers/MyQuizzesController.php
+@@ -0,0 +1,95 @@
++<?php
++
++namespace App\Http\Controllers;
++
++use App\Models\Quiz;
++use App\Models\QuizAttempt;
++use App\Models\QuizCandidate;
++use App\Models\QuizResult;
++use App\Services\Quiz\QuizAccessService;
++use Illuminate\Support\Facades\Auth;
++use Inertia\Inertia;
++
++/**
++ * Rubrique « Quiz » du menu : tous les quiz de l'utilisateur, quel que soit le projet.
++ * Un candidat (compte sans projet) n'a que cette rubrique.
++ */
++class MyQuizzesController extends Controller
++{
++    public function index(QuizAccessService $access)
++    {
++        $user = Auth::user();
++        $isAdmin = $user->hasRole('admin');
++        $managed = $isAdmin ? null : $access->managedProjectIds($user);
++
++        $quizzes = $access->visibleQuizzes($user)
++            ->with('project:id,name')
++            ->withCount(['questions'])
++            ->orderByDesc('created_at')
++            ->get();
++
++        $ids = $quizzes->pluck('id');
++
++        $attempts = QuizAttempt::whereIn('quiz_id', $ids)->where('user_id', $user->id)
++            ->get(['id', 'quiz_id', 'status'])
++            ->groupBy('quiz_id');
++
++        $latestResults = QuizResult::whereIn('quiz_id', $ids)->where('user_id', $user->id)
++            ->orderByDesc('completed_at')->orderByDesc('id')
++            ->get()
++            ->groupBy('quiz_id')
++            ->map->first();
++
++        $enrolled = QuizCandidate::where('user_id', $user->id)->pluck('quiz_id')->flip();
++
++        $pending = QuizResult::whereIn('quiz_id', $ids)
++            ->where('grading_status', QuizResult::STATUS_PENDING)
++            ->selectRaw('quiz_id, COUNT(*) as c')->groupBy('quiz_id')->pluck('c', 'quiz_id');
++
++        $items = $quizzes->map(function (Quiz $quiz) use ($attempts, $latestResults, $enrolled, $pending, $isAdmin, $managed) {
++            $mine = $attempts->get($quiz->id, collect());
++            $completed = $mine->where('status', 'completed')->count();
++            $active = $mine->firstWhere('status', 'in_progress');
++            $latest = $latestResults->get($quiz->id);
++            $canManage = $isAdmin || in_array($quiz->project_id, $managed ?? [], true);
++
++            $status = match (true) {
++                $quiz->is_draft => 'draft',
++                (bool) $active => 'in_progress',
++                $completed >= $quiz->max_attempts && $completed > 0 => 'completed',
++                $quiz->isValidated() => $completed > 0 ? 'completed' : 'closed',
++                ! $quiz->is_active => 'inactive',
++                $completed > 0 => 'retake',
++                default => 'to_take',
++            };
++
++            return [
++                'id' => $quiz->id,
++                'title' => $quiz->title,
++                'description' => $quiz->description,
++                'quiz_type' => $quiz->quiz_type,
++                'duration_minutes' => $quiz->duration_minutes,
++                'max_attempts' => $quiz->max_attempts,
++                'questions_count' => $quiz->questions_count,
++                'project' => ['id' => $quiz->project?->id, 'name' => $quiz->project?->name],
++                'status' => $status,
++                'attempts_done' => $completed,
++                'score' => $latest?->exactScore(),
++                'score_pending' => (bool) $latest?->is_pending,
++                'show_results' => $quiz->show_results,
++                'validated' => $quiz->isValidated(),
++                'is_draft' => $quiz->is_draft,
++                'invited' => $enrolled->has($quiz->id),
++                'restricted' => $quiz->restricted_to_candidates,
++                'can_manage' => $canManage,
++                'pending_copies' => $canManage ? ($pending[$quiz->id] ?? 0) : 0,
++                'created_at' => $quiz->created_at,
++            ];
++        })->values();
++
++        return Inertia::render('Quizzes/MyQuizzes', [
++            'quizzes' => $items,
++            'candidateOnly' => $user->isQuizCandidateOnly(),
++        ]);
++    }
++}
+diff --git a/app/Http/Controllers/ProjectController.php b/app/Http/Controllers/ProjectController.php
+index 19ee0b7..3f9da98 100644
+--- a/app/Http/Controllers/ProjectController.php
++++ b/app/Http/Controllers/ProjectController.php
+@@ -310,7 +310,7 @@ public function show(string $id)
+ 
+         $canSeeDrafts = $project->userCanManageQuizzes($currentUser);
+         $quizzes = $project->quizzes()
+-            ->visibleFor($canSeeDrafts)
++            ->visibleForUser($currentUser, $canSeeDrafts)
+             ->withCount(['questions', 'attempts'])
+             ->orderBy('created_at', 'desc')
+             ->limit(5)
+@@ -324,7 +324,7 @@ public function show(string $id)
+             'doneTasksCount'    => $doneTasksCount,
+             'doneTasksByUser'   => $doneTasksByUser,
+             'doneTasksByWeek'   => $doneTasksByWeek,
+-            'quizzesCount'      => $project->quizzes()->visibleFor($canSeeDrafts)->count(),
++            'quizzesCount'      => $project->quizzes()->visibleForUser($currentUser, $canSeeDrafts)->count(),
+         ]);
+ 
+         return Inertia::render('Projects/Show', [
+diff --git a/app/Http/Controllers/QuizCandidateController.php b/app/Http/Controllers/QuizCandidateController.php
+new file mode 100644
+index 0000000..a82a43e
+--- /dev/null
++++ b/app/Http/Controllers/QuizCandidateController.php
+@@ -0,0 +1,206 @@
++<?php
++
++namespace App\Http\Controllers;
++
++use App\Models\Project;
++use App\Models\Quiz;
++use App\Models\QuizAttempt;
++use App\Models\QuizCandidate;
++use App\Models\QuizResult;
++use App\Models\User;
++use App\Notifications\QuizNotification;
++use Illuminate\Http\JsonResponse;
++use Illuminate\Http\Request;
++use Illuminate\Support\Facades\Auth;
++use Illuminate\Support\Facades\Log;
++use Illuminate\Validation\Rule;
++
++/**
++ * Candidats d'un quiz : des utilisateurs ProJA déjà inscrits, ajoutés par un responsable.
++ */
++class QuizCandidateController extends Controller
++{
++    /** Recherche d'utilisateurs à ajouter (nom ou e-mail, 2 caractères minimum). */
++    public function search(Request $request, Project $project, Quiz $quiz): JsonResponse
++    {
++        $this->authorize('manage', [Quiz::class, $project]);
++
++        $term = trim((string) $request->query('q', ''));
++        if (mb_strlen($term) < 2) {
++            return response()->json(['users' => []]);
++        }
++
++        $like = '%' . addcslashes($term, '%_\\') . '%';
++        $enrolled = $quiz->candidates()->pluck('user_id');
++        $memberIds = $project->users()->pluck('users.id');
++
++        // Seuls les comptes vérifiés peuvent se connecter : inutile de proposer les autres.
++        $users = User::query()
++            ->whereNotNull('email_verified_at')
++            ->whereNotIn('id', $enrolled)
++            ->where(fn ($q) => $q->where('name', 'like', $like)->orWhere('email', 'like', $like))
++            ->orderBy('name')
++            ->limit(10)
++            ->get(['id', 'name', 'email', 'profile_photo_path'])
++            ->map(fn (User $u) => [
++                'id' => $u->id,
++                'name' => $u->name,
++                'email' => $u->email,
++                'photo' => $u->profile_photo_url,
++                'is_member' => $memberIds->contains($u->id),
++            ]);
++
++        return response()->json(['users' => $users]);
++    }
++
++    public function store(Request $request, Project $project, Quiz $quiz)
++    {
++        $this->authorize('manage', [Quiz::class, $project]);
++
++        $data = $request->validate([
++            'user_ids' => ['required', 'array', 'min:1', 'max:200'],
++            'user_ids.*' => ['integer', 'distinct', Rule::exists('users', 'id')],
++        ]);
++
++        return $this->enrol($quiz, $data['user_ids']);
++    }
++
++    /** Inscrit d'un coup tous les membres du projet (hors responsables). */
++    public function addMembers(Project $project, Quiz $quiz)
++    {
++        $this->authorize('manage', [Quiz::class, $project]);
++
++        $ids = $project->users()
++            ->wherePivot('role', '!=', 'manager')
++            ->wherePivot('is_muted', false)
++            ->pluck('users.id')
++            ->all();
++
++        if (! $ids) {
++            return back()->with('error', 'Ce projet n\'a aucun membre à ajouter.');
++        }
++
++        return $this->enrol($quiz, $ids);
++    }
++
++    public function destroy(Project $project, Quiz $quiz, QuizCandidate $candidate)
++    {
++        $this->authorize('manage', [Quiz::class, $project]);
++
++        // Après une tentative, on garde l'inscription : elle documente l'origine des résultats.
++        if (QuizAttempt::where('quiz_id', $quiz->id)->where('user_id', $candidate->user_id)->exists()) {
++            return back()->with('error', 'Ce candidat a déjà commencé le quiz : il ne peut plus être retiré.');
++        }
++
++        $name = $candidate->user?->name ?? 'Candidat';
++        $candidate->delete();
++
++        if (function_exists('activity_log')) {
++            activity_log('update', "{$name} retiré des candidats du quiz '{$quiz->title}'", $quiz);
++        }
++
++        return back()->with('success', "{$name} a été retiré des candidats.");
++    }
++
++    /** Quiz « réservé aux candidats ajoutés » : les autres membres du projet ne le voient plus. */
++    public function restriction(Request $request, Project $project, Quiz $quiz)
++    {
++        $this->authorize('manage', [Quiz::class, $project]);
++
++        $data = $request->validate(['restricted' => ['required', 'boolean']]);
++        $quiz->update(['restricted_to_candidates' => (bool) $data['restricted']]);
++
++        return back()->with('success', $quiz->restricted_to_candidates
++            ? 'Quiz réservé aux candidats ajoutés.'
++            : 'Quiz ouvert à tous les membres du projet.');
++    }
++
++    /** @param list<int> $userIds */
++    private function enrol(Quiz $quiz, array $userIds)
++    {
++        if ($quiz->is_draft) {
++            return back()->with('error', 'Publiez d\'abord le quiz avant d\'ajouter des candidats.');
++        }
++
++        $already = $quiz->candidates()->pluck('user_id')->all();
++        $new = array_values(array_diff($userIds, $already));
++
++        if (! $new) {
++            return back()->with('info', 'Ces utilisateurs sont déjà candidats de ce quiz.');
++        }
++
++        $actor = Auth::user();
++        foreach ($new as $userId) {
++            QuizCandidate::create(['quiz_id' => $quiz->id, 'user_id' => $userId, 'added_by' => $actor->id]);
++        }
++
++        $this->notify($quiz, $new, $actor);
++
++        if (function_exists('activity_log')) {
++            activity_log('create', count($new) . " candidat(s) ajouté(s) au quiz '{$quiz->title}' par {$actor->name}", $quiz);
++        }
++
++        return back()->with('success', count($new) . ' candidat(s) ajouté(s).');
++    }
++
++    /** @param list<int> $userIds */
++    private function notify(Quiz $quiz, array $userIds, User $actor): void
++    {
++        try {
++            $url = route('projects.quizzes.show', [$quiz->project_id, $quiz->id]);
++
++            User::whereIn('id', $userIds)->get()->each(fn (User $u) => $u->notify(new QuizNotification('quiz_assigned', [
++                'quiz_id' => $quiz->id,
++                'project_id' => $quiz->project_id,
++                'quiz_title' => $quiz->title,
++                'actor_name' => $actor->name,
++                'url' => $url,
++            ])));
++        } catch (\Throwable $e) {
++            // Une notification ne doit jamais empêcher l'inscription.
++            Log::warning('Quiz assignment notification failed: ' . $e->getMessage());
++        }
++    }
++
++    /**
++     * Liste des candidats avec leur avancement (pour la page détail, responsables uniquement).
++     *
++     * @return list<array<string, mixed>>
++     */
++    public static function roster(Quiz $quiz): array
++    {
++        $candidates = $quiz->candidates()->with(['user:id,name,email,profile_photo_path', 'adder:id,name'])->get();
++        $userIds = $candidates->pluck('user_id');
++
++        $attempts = QuizAttempt::where('quiz_id', $quiz->id)->whereIn('user_id', $userIds)
++            ->get(['id', 'user_id', 'status'])->groupBy('user_id');
++
++        $results = QuizResult::where('quiz_id', $quiz->id)->whereIn('user_id', $userIds)
++            ->orderByDesc('score_exact')->orderByDesc('score')->get()->groupBy('user_id')->map->first();
++
++        return $candidates->map(function (QuizCandidate $c) use ($attempts, $results) {
++            $mine = $attempts->get($c->user_id, collect());
++            $result = $results->get($c->user_id);
++
++            $status = match (true) {
++                $result && $result->is_pending => 'pending',
++                (bool) $result => 'completed',
++                $mine->contains('status', 'in_progress') => 'in_progress',
++                default => 'not_started',
++            };
++
++            return [
++                'id' => $c->id,
++                'user_id' => $c->user_id,
++                'name' => $c->user?->name ?? 'Utilisateur supprimé',
++                'email' => $c->user?->email,
++                'photo' => $c->user?->profile_photo_url,
++                'added_by' => $c->adder?->name,
++                'added_at' => $c->created_at?->toIso8601String(),
++                'status' => $status,
++                'score' => $result?->exactScore(),
++                'locked' => $mine->isNotEmpty(), // a déjà commencé : ne peut plus être retiré
++            ];
++        })->sortBy('name')->values()->all();
++    }
++}
+diff --git a/app/Http/Controllers/QuizController.php b/app/Http/Controllers/QuizController.php
+index c5f1179..d1849c2 100644
+--- a/app/Http/Controllers/QuizController.php
++++ b/app/Http/Controllers/QuizController.php
+@@ -11,6 +11,7 @@
+ use App\Models\QuizCumul;
+ use App\Models\QuizResponse;
+ use App\Models\QuizResult;
++use App\Http\Controllers\QuizCandidateController;
+ use App\Services\Quiz\QuizBuilderService;
+ use App\Services\Quiz\QuizDeliberationService;
+ use App\Services\Quiz\QuizScoringService;
+@@ -43,7 +44,7 @@ public function index(Project $project)
+         $canManage = $project->userCanManageQuizzes(Auth::user());
+ 
+         $quizzes = Quiz::where('project_id', $project->id)
+-            ->visibleFor($canManage)
++            ->visibleForUser(Auth::user(), $canManage)
+             ->withCount([
+                 'questions',
+                 'attempts',
+@@ -312,9 +313,14 @@ public function show(Project $project, Quiz $quiz)
+             'deciders' => $deciders,
+             'cheatingAttemptsCount' => 0,
+             'evaluation' => null,
++            'candidates' => [],
++            // Le classement nominatif n'est pas ouvert aux candidats extérieurs au projet.
++            'canViewRanking' => $canManage || ($quiz->show_results && $project->isMember($user)),
++            'isProjectMember' => $project->isMember($user),
+         ];
+ 
+         if ($canManage) {
++            $props['candidates'] = QuizCandidateController::roster($quiz);
+             $results = QuizResult::where('quiz_id', $quiz->id);
+             $resultsCount = (clone $results)->count();
+             $pendingCount = (clone $results)->where('grading_status', QuizResult::STATUS_PENDING)->count();
+@@ -494,6 +500,8 @@ public function ranking(Project $project, Quiz $quiz)
+ 
+         // Les membres ne voient le classement que si les résultats leur sont ouverts.
+         abort_if(!$canManage && !$quiz->show_results, 403, 'Les résultats de ce quiz ne sont pas publics.');
++        // Un candidat extérieur au projet ne voit pas les noms et notes des autres candidats.
++        abort_if(!$canManage && !$project->isMember(Auth::user()), 403, 'Le classement est réservé aux membres du projet.');
+ 
+         $final = $this->scoring->finalResults($quiz, $canManage);
+ 
+diff --git a/app/Http/Middleware/HandleInertiaRequests.php b/app/Http/Middleware/HandleInertiaRequests.php
+index fa85a12..607d64b 100644
+--- a/app/Http/Middleware/HandleInertiaRequests.php
++++ b/app/Http/Middleware/HandleInertiaRequests.php
+@@ -43,6 +43,7 @@ public function share(Request $request): array
+         'notifications' => $request->user()->notifications()->latest()->take(20)->get(),
+         'unreadNotificationsCount' => $request->user()->unreadNotifications()->count(),
+         'share_discussions_by_email' => (bool) $request->user()->share_discussions_by_email,
++        'quiz_candidate_only' => $request->user()->isQuizCandidateOnly(),
+     ];
+ }
+ 
+diff --git a/app/Http/Middleware/RestrictQuizCandidateAccounts.php b/app/Http/Middleware/RestrictQuizCandidateAccounts.php
+new file mode 100644
+index 0000000..36742fd
+--- /dev/null
++++ b/app/Http/Middleware/RestrictQuizCandidateAccounts.php
+@@ -0,0 +1,74 @@
++<?php
++
++namespace App\Http\Middleware;
++
++use Closure;
++use Illuminate\Http\Request;
++use Illuminate\Support\Str;
++use Symfony\Component\HttpFoundation\Response;
++
++/**
++ * Un compte « candidat » (inscrit à des quiz, sans projet ni droit d'administration) n'a accès
++ * qu'aux quiz, à son profil, à ses notifications et à la déconnexion. Masquer le menu ne suffit pas :
++ * toute autre page est refusée ici, côté serveur.
++ */
++class RestrictQuizCandidateAccounts
++{
++    /** Chemins autorisés (motifs Str::is). */
++    private const ALLOWED = [
++        // Quiz
++        'quizzes', 'quizzes/*',
++        'quiz-attempts/*',
++        'q/*',
++        // Compte
++        'profile', 'profile/*', 'password', 'logout', 'more',
++        'notifications', 'activities/notifications', 'activities/notifications/*',
++        'user/discussion-email-sharing',
++        'device-tokens', 'push/subscribe', 'push/unsubscribe', 'broadcasting/auth',
++        // Technique / authentification
++        'csrf-token', 'sanctum/csrf-cookie', 'up', '403', '404', '419', '500', 'storage/*',
++        'email/verification-notification', 'verify-email', 'verify-email/*', 'confirm-password',
++        'login', 'register', 'forgot-password', 'reset-password', 'reset-password/*',
++        // Pages publiques d'information
++        'about', 'contact', 'guide', 'privacy-policy', 'terms-of-service',
++    ];
++
++    /** Chemins autorisés définis par expression régulière (le « * » de Str::is traverse les « / »). */
++    private const ALLOWED_REGEX = [
++        '#^projects/\d+/quizzes(/.*)?$#',
++    ];
++
++    public function handle(Request $request, Closure $next): Response
++    {
++        $user = $request->user();
++
++        if (! $user || ! $user->isQuizCandidateOnly() || $this->isAllowed($request)) {
++            return $next($request);
++        }
++
++        if ($request->expectsJson() && ! $request->header('X-Inertia')) {
++            return response()->json(['message' => 'Votre compte candidat donne accès aux quiz uniquement.'], 403);
++        }
++
++        return redirect()->route('quizzes.index');
++    }
++
++    private function isAllowed(Request $request): bool
++    {
++        $path = trim($request->path(), '/');
++
++        foreach (self::ALLOWED as $pattern) {
++            if (Str::is($pattern, $path)) {
++                return true;
++            }
++        }
++
++        foreach (self::ALLOWED_REGEX as $regex) {
++            if (preg_match($regex, $path)) {
++                return true;
++            }
++        }
++
++        return false;
++    }
++}
+diff --git a/app/Models/Quiz.php b/app/Models/Quiz.php
+index 0544dd8..fd0b31a 100644
+--- a/app/Models/Quiz.php
++++ b/app/Models/Quiz.php
+@@ -21,6 +21,7 @@ class Quiz extends Model
+     public const DELIBERATION_VALIDATED = 'validated';
+ 
+     protected $fillable = [
++        'restricted_to_candidates',
+         'project_id',
+         'created_by',
+         'title',
+@@ -40,6 +41,7 @@ class Quiz extends Model
+     ];
+ 
+     protected $casts = [
++        'restricted_to_candidates' => 'boolean',
+         'is_active' => 'boolean',
+         'is_draft' => 'boolean',
+         'show_results' => 'boolean',
+@@ -104,6 +106,17 @@ public function cumulItems(): HasMany
+         return $this->hasMany(QuizCumulItem::class);
+     }
+ 
++    /** Candidats inscrits à ce quiz (utilisateurs ProJA, membres du projet ou non). */
++    public function candidates(): HasMany
++    {
++        return $this->hasMany(QuizCandidate::class);
++    }
++
++    public function isCandidate(User $user): bool
++    {
++        return $this->candidates()->where('user_id', $user->id)->exists();
++    }
++
+     public function isValidated(): bool
+     {
+         return $this->deliberation_status === self::DELIBERATION_VALIDATED;
+@@ -140,6 +153,23 @@ public function scopeVisibleFor($query, bool $canManage)
+         return $canManage ? $query : $query->where('is_draft', false);
+     }
+ 
++    /**
++     * Comme visibleFor(), mais tient aussi compte des quiz « réservés aux candidats ajoutés » :
++     * un membre du projet non inscrit ne les voit pas.
++     */
++    public function scopeVisibleForUser($query, User $user, bool $canManage)
++    {
++        if ($canManage) {
++            return $query;
++        }
++
++        $enrolled = QuizCandidate::where('user_id', $user->id)->pluck('quiz_id');
++
++        return $query->where('is_draft', false)->where(function ($q) use ($enrolled) {
++            $q->where('restricted_to_candidates', false)->orWhereIn('quizzes.id', $enrolled);
++        });
++    }
++
+     public function scopeActive($query)
+     {
+         return $query->where('is_active', true);
+diff --git a/app/Models/QuizCandidate.php b/app/Models/QuizCandidate.php
+new file mode 100644
+index 0000000..bb2eced
+--- /dev/null
++++ b/app/Models/QuizCandidate.php
+@@ -0,0 +1,26 @@
++<?php
++
++namespace App\Models;
++
++use Illuminate\Database\Eloquent\Model;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++class QuizCandidate extends Model
++{
++    protected $fillable = ['quiz_id', 'user_id', 'added_by'];
++
++    public function quiz(): BelongsTo
++    {
++        return $this->belongsTo(Quiz::class);
++    }
++
++    public function user(): BelongsTo
++    {
++        return $this->belongsTo(User::class);
++    }
++
++    public function adder(): BelongsTo
++    {
++        return $this->belongsTo(User::class, 'added_by');
++    }
++}
+diff --git a/app/Models/User.php b/app/Models/User.php
+index 40a0778..d83ce53 100644
+--- a/app/Models/User.php
++++ b/app/Models/User.php
+@@ -17,6 +17,9 @@
+ 
+ class User extends Authenticatable implements MustVerifyEmail
+ {
++    /** Cache par requête de isQuizCandidateOnly(). */
++    protected ?bool $candidateOnlyCache = null;
++
+     /** @use HasFactory<\Database\Factories\UserFactory> */
+     use HasFactory, Notifiable, HasRoles;
+ 
+@@ -317,6 +320,28 @@ protected function casts(): array
+         ];
+     }
+ 
++    /** Inscriptions de l'utilisateur comme candidat à des quiz. */
++    public function quizCandidacies(): HasMany
++    {
++        return $this->hasMany(QuizCandidate::class);
++    }
++
++    /**
++     * Compte « candidat » : inscrit à au moins un quiz, mais sans projet et sans droit
++     * d'administration. Il n'accède qu'aux quiz (menu réduit). S'il rejoint un projet plus tard,
++     * il retrouve automatiquement l'application complète.
++     */
++    public function isQuizCandidateOnly(): bool
++    {
++        if ($this->candidateOnlyCache !== null) {
++            return $this->candidateOnlyCache;
++        }
++
++        return $this->candidateOnlyCache = ! $this->hasRole('admin')
++            && ! $this->projects()->exists()
++            && $this->quizCandidacies()->exists();
++    }
++
+     public function projects() {
+         return $this->belongsToMany(Project::class)->withPivot('role')->withTimestamps();
+     }
+diff --git a/app/Notifications/QuizNotification.php b/app/Notifications/QuizNotification.php
+index 04ad3ee..104d502 100644
+--- a/app/Notifications/QuizNotification.php
++++ b/app/Notifications/QuizNotification.php
+@@ -29,6 +29,7 @@ public function toDatabase($notifiable): array
+     {
+         $title = match($this->type) {
+             'quiz_created' => 'Nouveau Quiz dans ' . ($this->data['project_name'] ?? 'votre projet'),
++            'quiz_assigned' => 'Nouveau quiz à passer : ' . ($this->data['quiz_title'] ?? 'Quiz'),
+             'quiz_graded' => 'Quiz corrigé : ' . ($this->data['quiz_title'] ?? 'Quiz'),
+             'deliberation_opened' => 'Délibération ouverte : ' . ($this->data['quiz_title'] ?? 'Quiz'),
+             'deliberation_reopened' => 'Délibération rouverte : ' . ($this->data['quiz_title'] ?? 'Quiz'),
+@@ -39,6 +40,7 @@ public function toDatabase($notifiable): array
+ 
+         $message = match($this->type) {
+             'quiz_created' => 'Le quiz "' . ($this->data['quiz_title'] ?? '') . '" a été publié par ' . ($this->data['creator_name'] ?? 'un membre') . '.',
++            'quiz_assigned' => ($this->data['actor_name'] ?? 'Un responsable') . ' vous a ajouté comme candidat. Ouvrez la rubrique Quiz pour le passer.',
+             'quiz_graded' => 'Votre réponse écrite a été notée. Votre score final est de ' . ($this->data['score'] ?? 0) . '%.',
+             'deliberation_opened' => ($this->data['actor_name'] ?? 'Un responsable') . ' a ouvert la délibération : votre aval est attendu.',
+             'deliberation_reopened' => ($this->data['actor_name'] ?? 'Un responsable') . ' a rouvert la délibération : les avals précédents sont annulés.',
+diff --git a/app/Policies/QuizPolicy.php b/app/Policies/QuizPolicy.php
+index 84b25eb..f97f9a0 100644
+--- a/app/Policies/QuizPolicy.php
++++ b/app/Policies/QuizPolicy.php
+@@ -5,9 +5,14 @@
+ use App\Models\Project;
+ use App\Models\Quiz;
+ use App\Models\User;
++use App\Services\Quiz\QuizAccessService;
+ 
+ class QuizPolicy
+ {
++    public function __construct(private QuizAccessService $access)
++    {
++    }
++
+     public function viewAny(User $user, Project $project): bool
+     {
+         if ($user->hasRole('admin')) {
+@@ -23,12 +28,16 @@ public function view(User $user, Quiz $quiz, Project $project): bool
+             return true;
+         }
+ 
+-        if (!$project->isMember($user) || $quiz->project_id !== $project->id) {
++        if ($quiz->project_id !== $project->id) {
+             return false;
+         }
+ 
+         // Un brouillon n'est visible que de ceux qui gèrent les quiz.
+-        return !$quiz->is_draft || $project->userCanManageQuizzes($user);
++        if ($quiz->is_draft) {
++            return $project->userCanManageQuizzes($user);
++        }
++
++        return $project->userCanManageQuizzes($user) || $this->access->canAccess($user, $quiz, $project);
+     }
+ 
+     public function create(User $user, Project $project): bool
+@@ -84,10 +93,18 @@ public function launch(User $user, Quiz $quiz, Project $project): bool
+             return true;
+         }
+ 
+-        return $project->users()
++        if (!$quiz->is_active || $quiz->is_draft || $quiz->project_id !== $project->id) {
++            return false;
++        }
++
++        // Un membre suspendu (muet) ne passe pas le quiz ; un candidat inscrit hors projet, si.
++        $mutedMember = $project->users()
+             ->where('user_id', $user->id)
+-            ->wherePivot('is_muted', false)
+-            ->exists() && $quiz->is_active && !$quiz->is_draft;
++            ->wherePivot('is_muted', true)
++            ->exists();
++
++        return !$mutedMember
++            && ($project->userCanManageQuizzes($user) || $this->access->canAccess($user, $quiz, $project));
+     }
+ 
+     public function viewResults(User $user, Quiz $quiz, Project $project): bool
+@@ -106,7 +123,7 @@ public function viewResults(User $user, Quiz $quiz, Project $project): bool
+             return true;
+         }
+ 
+-        return $quiz->show_results && $project->isMember($user);
++        return $quiz->show_results && $this->access->canAccess($user, $quiz, $project);
+     }
+ 
+     public function grade(User $user, Project $project): bool
+diff --git a/app/Services/Quiz/QuizAccessService.php b/app/Services/Quiz/QuizAccessService.php
+new file mode 100644
+index 0000000..2856ef9
+--- /dev/null
++++ b/app/Services/Quiz/QuizAccessService.php
+@@ -0,0 +1,78 @@
++<?php
++
++namespace App\Services\Quiz;
++
++use App\Models\Project;
++use App\Models\Quiz;
++use App\Models\QuizCandidate;
++use App\Models\User;
++use Illuminate\Database\Eloquent\Builder;
++
++/**
++ * Qui peut voir / passer quel quiz.
++ *
++ *  - Responsables du projet et administrateurs : tout, brouillons compris.
++ *  - Membres du projet : les quiz publiés, sauf ceux « réservés aux candidats » où ils ne sont pas inscrits.
++ *  - Candidats inscrits (même hors projet) : les quiz publiés auxquels ils ont été ajoutés.
++ */
++class QuizAccessService
++{
++    /** Le quiz est-il accessible à cet utilisateur (hors droits de gestion) ? */
++    public function canAccess(User $user, Quiz $quiz, Project $project): bool
++    {
++        if ($quiz->project_id !== $project->id || $quiz->is_draft) {
++            return false;
++        }
++
++        $enrolled = $quiz->isCandidate($user);
++
++        if ($project->isMember($user)) {
++            return ! $quiz->restricted_to_candidates || $enrolled;
++        }
++
++        return $enrolled;
++    }
++
++    /** Identifiants des projets où l'utilisateur est responsable actif. */
++    public function managedProjectIds(User $user): array
++    {
++        return $user->projects()
++            ->wherePivot('role', 'manager')
++            ->wherePivot('is_muted', false)
++            ->pluck('projects.id')
++            ->all();
++    }
++
++    /**
++     * Tous les quiz visibles par l'utilisateur, tous projets confondus (liste « Quiz » du menu).
++     */
++    public function visibleQuizzes(User $user): Builder
++    {
++        $query = Quiz::query();
++
++        if ($user->hasRole('admin')) {
++            return $query;
++        }
++
++        $managed = $this->managedProjectIds($user);
++        $memberProjects = $user->projects()->pluck('projects.id')->all();
++        $enrolled = QuizCandidate::where('user_id', $user->id)->pluck('quiz_id')->all();
++
++        return $query->where(function (Builder $q) use ($managed, $memberProjects, $enrolled) {
++            // Responsable : tout ce qui est dans ses projets (brouillons compris).
++            $q->whereIn('project_id', $managed)
++                // Membre : quiz publiés, hors quiz réservés aux candidats où il n'est pas inscrit.
++                ->orWhere(function (Builder $q) use ($memberProjects, $enrolled) {
++                    $q->where('is_draft', false)
++                        ->whereIn('project_id', $memberProjects)
++                        ->where(function (Builder $q) use ($enrolled) {
++                            $q->where('restricted_to_candidates', false)->orWhereIn('id', $enrolled);
++                        });
++                })
++                // Candidat inscrit : quel que soit le projet.
++                ->orWhere(function (Builder $q) use ($enrolled) {
++                    $q->where('is_draft', false)->whereIn('id', $enrolled);
++                });
++        });
++    }
++}
+diff --git a/bootstrap/app.php b/bootstrap/app.php
+index a50742f..dcf6e31 100644
+--- a/bootstrap/app.php
++++ b/bootstrap/app.php
+@@ -24,6 +24,7 @@
+         // Middleware web par défaut
+         $middleware->web(append: [
+             \App\Http\Middleware\HandleInertiaRequests::class,
++            \App\Http\Middleware\RestrictQuizCandidateAccounts::class,
+             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
+         ]);
+ 
+diff --git a/database/migrations/2026_09_20_000001_create_quiz_candidates_table.php b/database/migrations/2026_09_20_000001_create_quiz_candidates_table.php
+new file mode 100644
+index 0000000..e53a39e
+--- /dev/null
++++ b/database/migrations/2026_09_20_000001_create_quiz_candidates_table.php
+@@ -0,0 +1,37 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    public function up(): void
++    {
++        // Candidats inscrits à un quiz : des utilisateurs ProJA qui n'ont pas besoin d'être membres du projet.
++        Schema::create('quiz_candidates', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('quiz_id')->constrained('quizzes')->cascadeOnDelete();
++            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
++            $table->foreignId('added_by')->nullable()->constrained('users')->nullOnDelete();
++            $table->timestamps();
++
++            $table->unique(['quiz_id', 'user_id']);
++            $table->index('user_id');
++        });
++
++        // Quiz « fermé » : seuls les candidats ajoutés (et les responsables) y ont accès.
++        Schema::table('quizzes', function (Blueprint $table) {
++            $table->boolean('restricted_to_candidates')->default(false);
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::table('quizzes', function (Blueprint $table) {
++            $table->dropColumn('restricted_to_candidates');
++        });
++
++        Schema::dropIfExists('quiz_candidates');
++    }
++};
+diff --git a/resources/js/Components/MobileBottomNav.jsx b/resources/js/Components/MobileBottomNav.jsx
+index bcffec3..1284129 100644
+--- a/resources/js/Components/MobileBottomNav.jsx
++++ b/resources/js/Components/MobileBottomNav.jsx
+@@ -52,9 +52,24 @@ const primaryItems = [
+   },
+ ];
+ 
++const quizItem = {
++  href: '/quizzes',
++  label: 'quiz',
++  icon: (active) => (
++    <svg className="w-6 h-6" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
++      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
++    </svg>
++  ),
++};
++
++// Actif sur toutes les pages quiz (liste, détail d'un quiz d'un projet, cumul…)
++const QUIZ_URL = /^\/(quizzes|projects\/\d+\/(quizzes|quiz-cumuls|participation-points))(\/|\?|$)/;
++
+ export default function MobileBottomNav({ onMoreClick }) {
+   const { t } = useTranslation();
+-  const { url } = usePage();
++  const { url, props } = usePage();
++  // Compte candidat : un seul onglet, « Quiz ».
++  const items = props.auth?.user?.quiz_candidate_only ? [quizItem] : primaryItems;
+   const [unreadCount, setUnreadCount] = useState(0);
+ 
+   // Rafraîchit le badge de non-lus toutes les 30 secondes
+@@ -75,6 +90,7 @@ export default function MobileBottomNav({ onMoreClick }) {
+ 
+   const isActive = (href) => {
+     if (href === '/dashboard') return url === '/dashboard' || url === '/';
++    if (href === '/quizzes') return QUIZ_URL.test(url);
+     return url.startsWith(href);
+   };
+ 
+@@ -86,7 +102,7 @@ export default function MobileBottomNav({ onMoreClick }) {
+         paddingTop: '6px',
+       }}
+     >
+-      {primaryItems.map((item) => {
++      {items.map((item) => {
+         const active = isActive(item.href);
+         return (
+           <Link
+diff --git a/resources/js/Components/Quiz/CandidatesPanel.jsx b/resources/js/Components/Quiz/CandidatesPanel.jsx
+new file mode 100644
+index 0000000..8582159
+--- /dev/null
++++ b/resources/js/Components/Quiz/CandidatesPanel.jsx
+@@ -0,0 +1,241 @@
++import React, { useEffect, useRef, useState } from 'react';
++import axios from 'axios';
++import { router } from '@inertiajs/react';
++import {
++  FaCheckCircle,
++  FaClock,
++  FaHourglassHalf,
++  FaLock,
++  FaSearch,
++  FaSpinner,
++  FaTimes,
++  FaTrash,
++  FaUserPlus,
++  FaUsers,
++} from 'react-icons/fa';
++import Avatar from '@/Components/Quiz/Avatar';
++import ScoreBadge from '@/Components/Quiz/ScoreBadge';
++
++const STATUS = {
++  not_started: { label: 'Pas commencé', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
++  in_progress: { label: 'En cours', cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
++  pending: { label: 'En attente de correction', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' },
++  completed: { label: 'Terminé', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' },
++};
++
++/**
++ * Candidats d'un quiz : ajout d'utilisateurs ProJA déjà inscrits, suivi de leur avancement,
++ * et option « réservé aux candidats ajoutés ».
++ */
++export default function CandidatesPanel({ project, quiz, candidates = [] }) {
++  const [query, setQuery] = useState('');
++  const [results, setResults] = useState([]);
++  const [searching, setSearching] = useState(false);
++  const [selected, setSelected] = useState([]); // utilisateurs choisis, pas encore ajoutés
++  const [busy, setBusy] = useState(false);
++  const requestId = useRef(0);
++
++  const routeArgs = [project.id, quiz.id];
++  const alreadyPicked = new Set(selected.map((u) => u.id));
++
++  // Recherche dans les utilisateurs inscrits (nom ou e-mail), avec un léger délai.
++  useEffect(() => {
++    const term = query.trim();
++    if (term.length < 2) {
++      setResults([]);
++      setSearching(false);
++      return undefined;
++    }
++    const current = ++requestId.current;
++    setSearching(true);
++    const timer = setTimeout(async () => {
++      try {
++        const { data } = await axios.get(route('projects.quizzes.candidates.search', routeArgs), { params: { q: term } });
++        if (current === requestId.current) setResults(data.users);
++      } catch {
++        if (current === requestId.current) setResults([]);
++      } finally {
++        if (current === requestId.current) setSearching(false);
++      }
++    }, 300);
++    return () => clearTimeout(timer);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [query, candidates.length]);
++
++  const pick = (user) => {
++    if (!alreadyPicked.has(user.id)) setSelected((list) => [...list, user]);
++    setQuery('');
++    setResults([]);
++  };
++
++  const submit = () => {
++    if (!selected.length) return;
++    router.post(
++      route('projects.quizzes.candidates.store', routeArgs),
++      { user_ids: selected.map((u) => u.id) },
++      {
++        preserveScroll: true,
++        onStart: () => setBusy(true),
++        onSuccess: () => setSelected([]),
++        onFinish: () => setBusy(false),
++      }
++    );
++  };
++
++  const addAllMembers = () => {
++    if (!confirm('Ajouter tous les membres du projet (hors responsables) comme candidats de ce quiz ?')) return;
++    router.post(route('projects.quizzes.candidates.members', routeArgs), {}, { preserveScroll: true, onStart: () => setBusy(true), onFinish: () => setBusy(false) });
++  };
++
++  const remove = (candidate) => {
++    if (!confirm(`Retirer ${candidate.name} des candidats de ce quiz ?`)) return;
++    router.delete(route('projects.quizzes.candidates.destroy', [...routeArgs, candidate.id]), { preserveScroll: true });
++  };
++
++  const toggleRestriction = () =>
++    router.put(route('projects.quizzes.candidates.restriction', routeArgs), { restricted: !quiz.restricted_to_candidates }, { preserveScroll: true });
++
++  const done = candidates.filter((c) => ['completed', 'pending'].includes(c.status)).length;
++
++  return (
++    <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 sm:p-6 space-y-5" aria-labelledby="candidates-title">
++      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
++        <div>
++          <h2 id="candidates-title" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
++            <FaUsers className="text-purple-600" /> Candidats du quiz
++            <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 text-xs font-bold">{candidates.length}</span>
++          </h2>
++          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
++            Ajoutez des utilisateurs déjà inscrits sur ProJA : ils voient ce quiz dans leur menu « Quiz », même sans faire partie du projet.
++            {candidates.length > 0 && ` ${done} / ${candidates.length} ont terminé.`}
++          </p>
++        </div>
++        <button
++          type="button"
++          onClick={addAllMembers}
++          disabled={busy}
++          className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition disabled:opacity-50"
++        >
++          <FaUserPlus /> Ajouter les membres du projet
++        </button>
++      </div>
++
++      {/* Recherche / ajout */}
++      <div className="space-y-3">
++        <div className="relative">
++          <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
++          <input
++            value={query}
++            onChange={(e) => setQuery(e.target.value)}
++            placeholder="Rechercher un utilisateur par nom ou e-mail (2 lettres minimum)…"
++            className="w-full pl-10 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:border-purple-500 focus:ring-purple-500"
++            aria-label="Rechercher un utilisateur à ajouter"
++          />
++          {searching && <FaSpinner className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />}
++
++          {query.trim().length >= 2 && !searching && (
++            <ul className="absolute z-20 mt-1.5 w-full max-h-72 overflow-y-auto rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg divide-y divide-gray-100 dark:divide-gray-700">
++              {results.length === 0 && <li className="px-4 py-3 text-sm text-gray-500">Aucun utilisateur trouvé (ou déjà candidat).</li>}
++              {results.map((u) => (
++                <li key={u.id}>
++                  <button
++                    type="button"
++                    onClick={() => pick(u)}
++                    disabled={alreadyPicked.has(u.id)}
++                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-purple-50 dark:hover:bg-purple-950/30 disabled:opacity-40 transition"
++                  >
++                    <Avatar name={u.name} src={u.photo} size="sm" />
++                    <span className="min-w-0 flex-1">
++                      <span className="block text-sm font-semibold text-gray-900 dark:text-white truncate">{u.name}</span>
++                      <span className="block text-xs text-gray-500 truncate">{u.email}</span>
++                    </span>
++                    <span className={`flex-shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${u.is_member ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
++                      {u.is_member ? 'Membre' : 'Hors projet'}
++                    </span>
++                  </button>
++                </li>
++              ))}
++            </ul>
++          )}
++        </div>
++
++        {selected.length > 0 && (
++          <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40">
++            {selected.map((u) => (
++              <span key={u.id} className="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-sm">
++                <Avatar name={u.name} src={u.photo} size="xs" />
++                {u.name}
++                <button type="button" onClick={() => setSelected((l) => l.filter((x) => x.id !== u.id))} className="text-gray-400 hover:text-red-500" aria-label={`Retirer ${u.name} de la sélection`}>
++                  <FaTimes className="text-xs" />
++                </button>
++              </span>
++            ))}
++            <button
++              type="button"
++              onClick={submit}
++              disabled={busy}
++              className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition disabled:opacity-50"
++            >
++              {busy ? <FaSpinner className="animate-spin" /> : <FaUserPlus />} Ajouter {selected.length} candidat(s)
++            </button>
++          </div>
++        )}
++      </div>
++
++      {/* Quiz réservé */}
++      <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
++        <input
++          type="checkbox"
++          checked={Boolean(quiz.restricted_to_candidates)}
++          onChange={toggleRestriction}
++          className="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
++        />
++        <span>
++          <span className="block text-sm font-semibold text-gray-900 dark:text-white">Réservé aux candidats ajoutés</span>
++          <span className="block text-xs text-gray-500 dark:text-gray-400">
++            Les autres membres du projet ne voient plus ce quiz. Les responsables y ont toujours accès.
++          </span>
++        </span>
++      </label>
++
++      {/* Liste */}
++      {candidates.length === 0 ? (
++        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">Aucun candidat ajouté pour l'instant.</p>
++      ) : (
++        <ul className="divide-y divide-gray-100 dark:divide-gray-700 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
++          {candidates.map((c) => {
++            const st = STATUS[c.status] || STATUS.not_started;
++            return (
++              <li key={c.id} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800">
++                <Avatar name={c.name} src={c.photo} size="md" />
++                <div className="min-w-0 flex-1">
++                  <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name}</p>
++                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.email}</p>
++                </div>
++                <div className="flex items-center gap-2 flex-shrink-0">
++                  {c.status === 'completed' && c.score !== null && <ScoreBadge score={c.score} size="sm" />}
++                  <span className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.cls}`}>
++                    {c.status === 'completed' && <FaCheckCircle />}
++                    {c.status === 'in_progress' && <FaClock />}
++                    {c.status === 'pending' && <FaHourglassHalf />}
++                    {st.label}
++                  </span>
++                  <button
++                    type="button"
++                    onClick={() => remove(c)}
++                    disabled={c.locked}
++                    title={c.locked ? 'A déjà commencé le quiz : ne peut plus être retiré' : 'Retirer ce candidat'}
++                    className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-30 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition"
++                    aria-label={`Retirer ${c.name}`}
++                  >
++                    {c.locked ? <FaLock /> : <FaTrash />}
++                  </button>
++                </div>
++              </li>
++            );
++          })}
++        </ul>
++      )}
++    </section>
++  );
++}
+diff --git a/resources/js/Layouts/AdminLayout.jsx b/resources/js/Layouts/AdminLayout.jsx
+index 1ea0b93..808c484 100644
+--- a/resources/js/Layouts/AdminLayout.jsx
++++ b/resources/js/Layouts/AdminLayout.jsx
+@@ -39,6 +39,12 @@ const navLinks = [
+   { href: '/tasks', label: 'tasks', icon: (
+     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6m9 2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7l5 5v10z" /></svg>
+   ) },
++  { href: '/quizzes', label: 'quiz',
++    // actif sur toutes les pages quiz (liste, détail, correction, cumul…)
++    match: (url) => /^\/(quizzes|projects\/\d+\/(quizzes|quiz-cumuls|participation-points))(\/|\?|$)/.test(url || ''),
++    icon: (
++    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
++  ) },
+   { href: '/discussions', label: 'discussions', icon: (
+     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /></svg>
+   ) },
+@@ -117,6 +123,11 @@ const Loader = () => {
+ 
+ export default function AdminLayout({ children }) {
+   const { auth, flash = {}, appName } = usePage().props;
++  const { url: currentUrl } = usePage();
++  // Compte candidat (inscrit à des quiz, sans projet) : un seul menu, « Quiz ».
++  const candidateOnly = Boolean(auth?.user?.quiz_candidate_only);
++  const menuLinks = candidateOnly ? navLinks.filter((l) => l.href === '/quizzes') : navLinks;
++  const isLinkActive = (link) => (link.match ? link.match(currentUrl) : route().current(link.href.replace(/^\//, '')));
+   const [sidebarOpen, setSidebarOpen] = useState(false);
+   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+   const [darkMode, setDarkMode] = useState(() => {
+@@ -455,13 +466,13 @@ const stopRingtone = () => {
+ 
+         {/* Menu */}
+         <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide space-y-1.5">
+-          {navLinks.map((link) => (
++          {menuLinks.map((link) => (
+             <Link
+               key={link.href}
+               href={link.href}
+               onClick={() => setSidebarOpen(false)}
+               className={`flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 active:scale-[0.98] ${
+-                route().current(link.href.replace(/^\//, ''))
++                isLinkActive(link)
+                   ? 'bg-white/10 dark:bg-blue-900/50 text-white dark:text-blue-100 shadow-lg'
+                   : 'text-white/80 hover:bg-white/5 dark:hover:bg-blue-900/30 hover:text-white dark:hover:text-blue-100'
+               }`}
+@@ -474,7 +485,7 @@ const stopRingtone = () => {
+                 )}
+               </span>
+               <span className="font-medium">{t(link.label)}</span>
+-              {route().current(link.href.replace(/^\//, '')) && (
++              {isLinkActive(link) && (
+                 <span className="ml-auto w-1.5 h-1.5 bg-blue-400 dark:bg-blue-300 rounded-full"></span>
+               )}
+             </Link>
+@@ -546,7 +557,7 @@ const stopRingtone = () => {
+           {/* ── Centre : barre de recherche (desktop uniquement) ── */}
+           <div className="hidden md:flex flex-1 justify-center px-4 min-w-0">
+             <div className="w-full max-w-md">
+-              <GlobalSearch />
++              {!candidateOnly && <GlobalSearch />}
+             </div>
+           </div>
+ 
+diff --git a/resources/js/Pages/Mobile/More/Index.jsx b/resources/js/Pages/Mobile/More/Index.jsx
+index cbe0427..aec4034 100644
+--- a/resources/js/Pages/Mobile/More/Index.jsx
++++ b/resources/js/Pages/Mobile/More/Index.jsx
+@@ -7,6 +7,7 @@ import { unregisterDeviceToken } from '@/Components/PushNotificationManager';
+ const menuLinks = [
+   { href: '/discussions', label: 'discussions', icon: '💬' },
+   { href: '/dashboard', label: 'dashboard', icon: '🏠' },
++  { href: '/quizzes', label: 'quiz', icon: '❓' },
+   { href: '/projects', label: 'projects', icon: '📁' },
+   { href: '/project-users', label: 'members', icon: '👥' },
+   { href: '/sprints', label: 'sprints', icon: '⚡' },
+@@ -64,7 +65,7 @@ export default function MobileMoreIndex() {
+ 
+         {/* Navigation */}
+         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden divide-y divide-gray-100 dark:divide-gray-700">
+-          {menuLinks.map(link => (
++          {(auth?.user?.quiz_candidate_only ? menuLinks.filter((l) => l.href === '/quizzes') : menuLinks).map(link => (
+             <Link
+               key={link.href}
+               href={link.href}
+diff --git a/resources/js/Pages/Quizzes/MyQuizzes.jsx b/resources/js/Pages/Quizzes/MyQuizzes.jsx
+new file mode 100644
+index 0000000..479af36
+--- /dev/null
++++ b/resources/js/Pages/Quizzes/MyQuizzes.jsx
+@@ -0,0 +1,209 @@
++import React, { useMemo, useState } from 'react';
++import { Link } from '@inertiajs/react';
++import AdminLayout from '@/Layouts/AdminLayout';
++import ScoreBadge from '@/Components/Quiz/ScoreBadge';
++import {
++  FaCheckCircle,
++  FaClock,
++  FaEnvelopeOpenText,
++  FaHourglassHalf,
++  FaLock,
++  FaPen,
++  FaPlay,
++  FaQuestionCircle,
++  FaRedo,
++  FaSearch,
++  FaUserCheck,
++} from 'react-icons/fa';
++
++// Statut du quiz pour l'utilisateur connecté (calculé côté serveur).
++const STATUS = {
++  to_take: { label: 'À passer', cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300', cta: 'Commencer', icon: <FaPlay /> },
++  in_progress: { label: 'En cours', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300', cta: 'Reprendre', icon: <FaPlay /> },
++  retake: { label: 'Repassable', cls: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300', cta: 'Ouvrir', icon: <FaRedo /> },
++  completed: { label: 'Terminé', cls: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', cta: 'Ouvrir', icon: <FaCheckCircle /> },
++  closed: { label: 'Clôturé', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400', cta: 'Ouvrir', icon: <FaLock /> },
++  inactive: { label: 'Indisponible', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400', cta: 'Ouvrir', icon: <FaLock /> },
++  draft: { label: 'Brouillon', cls: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300', cta: 'Continuer', icon: <FaPen /> },
++};
++
++const FILTERS = [
++  { key: 'all', label: 'Tous', test: () => true },
++  { key: 'todo', label: 'À passer', test: (q) => ['to_take', 'in_progress', 'retake'].includes(q.status) },
++  { key: 'done', label: 'Terminés', test: (q) => ['completed', 'closed'].includes(q.status) || q.attempts_done > 0 },
++  { key: 'manage', label: 'Que je gère', test: (q) => q.can_manage },
++];
++
++function MyQuizzes({ quizzes = [], candidateOnly = false }) {
++  const [search, setSearch] = useState('');
++  const [filter, setFilter] = useState('all');
++
++  const filters = FILTERS.filter((f) => f.key !== 'manage' || quizzes.some((q) => q.can_manage));
++  const active = filters.find((f) => f.key === filter) || filters[0];
++
++  const visible = useMemo(() => {
++    const needle = search.trim().toLowerCase();
++    return quizzes.filter(
++      (q) => active.test(q) && (!needle || `${q.title} ${q.project?.name || ''}`.toLowerCase().includes(needle))
++    );
++  }, [quizzes, active, search]);
++
++  const counts = useMemo(() => Object.fromEntries(filters.map((f) => [f.key, quizzes.filter(f.test).length])), [quizzes, filters]);
++  const toTake = quizzes.filter((q) => ['to_take', 'in_progress'].includes(q.status)).length;
++
++  return (
++    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 sm:py-8">
++      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
++        {/* En-tête */}
++        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 sm:p-6">
++          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3">
++            <FaQuestionCircle className="text-blue-600" /> {candidateOnly ? 'Mes quiz' : 'Quiz'}
++          </h1>
++          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
++            {candidateOnly
++              ? 'Retrouvez ici les quiz auxquels vous avez été ajouté : passez-les et consultez vos résultats.'
++              : 'Tous vos quiz, tous projets confondus : ceux à passer, vos résultats et ceux que vous gérez.'}
++          </p>
++          {toTake > 0 && (
++            <p className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-sm font-semibold">
++              <FaEnvelopeOpenText /> {toTake} quiz {toTake > 1 ? 'vous attendent' : 'vous attend'}
++            </p>
++          )}
++        </div>
++
++        {/* Recherche et filtres */}
++        {quizzes.length > 0 && (
++          <div className="flex flex-col md:flex-row md:items-center gap-3">
++            <div className="relative flex-1">
++              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
++              <input
++                value={search}
++                onChange={(e) => setSearch(e.target.value)}
++                placeholder="Rechercher un quiz ou un projet…"
++                className="w-full pl-10 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:border-blue-500 focus:ring-blue-500"
++              />
++            </div>
++            <div className="flex flex-wrap gap-2" role="tablist">
++              {filters.map((f) => (
++                <button
++                  key={f.key}
++                  type="button"
++                  role="tab"
++                  aria-selected={active.key === f.key}
++                  onClick={() => setFilter(f.key)}
++                  className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition ${
++                    active.key === f.key
++                      ? 'bg-blue-600 text-white shadow-sm'
++                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-blue-300'
++                  }`}
++                >
++                  {f.label} <span className="opacity-70">({counts[f.key]})</span>
++                </button>
++              ))}
++            </div>
++          </div>
++        )}
++
++        {/* Liste */}
++        {quizzes.length === 0 ? (
++          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-10 sm:p-14 text-center">
++            <FaQuestionCircle className="text-5xl mx-auto mb-4 text-gray-300 dark:text-gray-600" />
++            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Aucun quiz pour le moment</h2>
++            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
++              {candidateOnly
++                ? 'Vous serez notifié dès qu\'un responsable vous ajoutera à un quiz.'
++                : 'Les quiz de vos projets apparaîtront ici.'}
++            </p>
++          </div>
++        ) : visible.length === 0 ? (
++          <p className="text-center text-sm text-gray-500 py-10">Aucun quiz ne correspond à votre recherche.</p>
++        ) : (
++          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
++            {visible.map((q) => (
++              <QuizTile key={q.id} quiz={q} />
++            ))}
++          </div>
++        )}
++      </div>
++    </div>
++  );
++}
++
++function QuizTile({ quiz }) {
++  const status = STATUS[quiz.status] || STATUS.to_take;
++  const showHref = route('projects.quizzes.show', [quiz.project.id, quiz.id]);
++  const canSeeResults = quiz.attempts_done > 0 && quiz.show_results;
++
++  return (
++    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition p-5 flex flex-col justify-between gap-4">
++      <div className="space-y-3">
++        <div className="flex items-start justify-between gap-2">
++          <h3 className="text-base font-bold text-gray-900 dark:text-white line-clamp-2">{quiz.title}</h3>
++          <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${status.cls}`}>{status.label}</span>
++        </div>
++
++        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Projet : {quiz.project.name}</p>
++
++        <div className="flex flex-wrap gap-1.5">
++          {quiz.invited && (
++            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
++              <FaUserCheck /> Vous êtes candidat
++            </span>
++          )}
++          {quiz.validated && (
++            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
++              <FaLock /> Résultats validés
++            </span>
++          )}
++          {quiz.can_manage && quiz.pending_copies > 0 && (
++            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
++              <FaHourglassHalf /> {quiz.pending_copies} copie(s) à corriger
++            </span>
++          )}
++        </div>
++
++        <div className="grid grid-cols-3 gap-2 text-center bg-gray-50 dark:bg-gray-700/40 rounded-xl p-3 text-xs text-gray-500 dark:text-gray-400">
++          <div>
++            <FaClock className="mx-auto mb-1 text-blue-500" />
++            {quiz.duration_minutes} min
++          </div>
++          <div>
++            <FaQuestionCircle className="mx-auto mb-1 text-purple-500" />
++            {quiz.questions_count} question(s)
++          </div>
++          <div>
++            <FaRedo className="mx-auto mb-1 text-emerald-500" />
++            {quiz.attempts_done} / {quiz.max_attempts} essai(s)
++          </div>
++        </div>
++
++        {quiz.attempts_done > 0 && quiz.show_results && (
++          <div className="flex items-center justify-between text-sm">
++            <span className="text-gray-500 dark:text-gray-400">Mon résultat</span>
++            <ScoreBadge score={quiz.score} pending={quiz.score_pending} />
++          </div>
++        )}
++      </div>
++
++      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
++        <Link
++          href={showHref}
++          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition"
++        >
++          {status.icon} {status.cta}
++        </Link>
++        {canSeeResults && (
++          <Link
++            href={route('projects.quizzes.results', [quiz.project.id, quiz.id])}
++            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-semibold transition"
++          >
++            <FaCheckCircle /> Résultats
++          </Link>
++        )}
++      </div>
++    </div>
++  );
++}
++
++MyQuizzes.layout = (page) => <AdminLayout>{page}</AdminLayout>;
++export default MyQuizzes;
+diff --git a/resources/js/Pages/Quizzes/Show.jsx b/resources/js/Pages/Quizzes/Show.jsx
+index 23a4c35..1ed1d8e 100644
+--- a/resources/js/Pages/Quizzes/Show.jsx
++++ b/resources/js/Pages/Quizzes/Show.jsx
+@@ -3,6 +3,7 @@ import { Link, router } from '@inertiajs/react';
+ import AdminLayout from '@/Layouts/AdminLayout';
+ import Avatar from '@/Components/Quiz/Avatar';
+ import ScoreBadge from '@/Components/Quiz/ScoreBadge';
++import CandidatesPanel from '@/Components/Quiz/CandidatesPanel';
+ import {
+   FaClock, FaQuestionCircle, FaPlay, FaArrowLeft, FaTrophy, FaRedo, FaCheckCircle, FaLock, FaChartBar,
+   FaShareAlt, FaCopy, FaCheck, FaExclamationTriangle, FaGavel, FaStar, FaUsers, FaPenFancy, FaShieldAlt,
+@@ -57,7 +58,7 @@ function Stepper({ ev }) {
+ 
+ const actionBtn = 'w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 font-semibold rounded-xl text-sm transition';
+ 
+-function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, canManage, deciders = [], cheatingAttemptsCount = 0, evaluation = null }) {
++function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, canManage, deciders = [], cheatingAttemptsCount = 0, evaluation = null, candidates = [], canViewRanking = true, isProjectMember = true }) {
+   const [copied, setCopied] = useState(false);
+ 
+   const handleLaunch = () => router.post(route('projects.quizzes.launch', [project.id, quiz.id]));
+@@ -81,10 +82,10 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
+     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 sm:py-8">
+       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
+         <Link
+-          href={route('projects.quizzes.index', project.id)}
++          href={isProjectMember ? route('projects.quizzes.index', project.id) : route('quizzes.index')}
+           className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-blue-600 dark:text-gray-400"
+         >
+-          <FaArrowLeft /> Retour à la liste des quiz
++          <FaArrowLeft /> {isProjectMember ? 'Retour à la liste des quiz' : 'Retour à mes quiz'}
+         </Link>
+ 
+         {/* Carte principale */}
+@@ -326,7 +327,7 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
+               </Link>
+             )}
+ 
+-            {(canManage || quiz.show_results) && (
++            {canViewRanking && (
+               <Link
+                 href={route('projects.quizzes.ranking', [project.id, quiz.id])}
+                 className={`${actionBtn} bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200`}
+@@ -363,6 +364,9 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
+             )}
+           </div>
+         </div>
++
++        {/* Candidats : utilisateurs ProJA inscrits à ce quiz */}
++        {canManage && !quiz.is_draft && <CandidatesPanel project={project} quiz={quiz} candidates={candidates} />}
+       </div>
+     </div>
+   );
+diff --git a/resources/js/lang/en/app.json b/resources/js/lang/en/app.json
+index 0901d90..6dfbb06 100644
+--- a/resources/js/lang/en/app.json
++++ b/resources/js/lang/en/app.json
+@@ -73,6 +73,7 @@
+   "add_task": "Add Task",
+   "total_tasks": "Total Tasks",
+   "dashboard": "Dashboard",
++  "quiz": "Quiz",
+   "dashboard_subtitle": "Overview of your projects and tasks",
+   "projects": "Projects",
+   "view_more": "View more",
+diff --git a/resources/js/lang/fon/app.json b/resources/js/lang/fon/app.json
+index 9ad7378..31caba8 100644
+--- a/resources/js/lang/fon/app.json
++++ b/resources/js/lang/fon/app.json
+@@ -1,6 +1,7 @@
+ {
+     "app_name": "ProJA",
+     "dashboard": "Agbaza",
++    "quiz": "Quiz",
+     "recent_activities": "Nuwlanwla yɛyɛ lɛ",
+     "view_all_activities": "Kpɔ nuwlanwla yɛyɛ lɛ bɛ ɖeɖe",
+     "dashboard_subtitle": "Kpɔn tɔn kpodo nukɔn nuwlanwlan tɔn lɛ kpan ɖo nùɖuɖu tɔn mɛ",
+diff --git a/resources/js/lang/fr/app.json b/resources/js/lang/fr/app.json
+index ed11ac7..ec9acbc 100644
+--- a/resources/js/lang/fr/app.json
++++ b/resources/js/lang/fr/app.json
+@@ -3,6 +3,7 @@
+ "priority_label": "Priorité",
+   "app_name": "ProJA",
+   "dashboard": "Tableau de bord",
++  "quiz": "Quiz",
+   "dashboard_subtitle": "Statistiques et activités de mon espace",
+   "projects": "Projets",
+   "view_more": "Voir plus",
+diff --git a/resources/js/lang/yo/app.json b/resources/js/lang/yo/app.json
+index 8d95d31..c80c748 100644
+--- a/resources/js/lang/yo/app.json
++++ b/resources/js/lang/yo/app.json
+@@ -1,6 +1,7 @@
+ {
+     "app_name": "ProJA",
+     "dashboard": "Tábìlì Ìṣakoso",
++    "quiz": "Quiz",
+     "recent_activities": "Àwọn iṣẹ́ tuntun",
+     "view_all_activities": "Wò gbogbo àwọn iṣẹ́",
+     "dashboard_subtitle": "Àwọn ìṣirò àti iṣẹ́-ṣíṣe àyè mi",
+diff --git a/routes/web.php b/routes/web.php
+index 76c8900..042f28d 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -291,9 +291,19 @@
+     Route::resource('sprints', App\Http\Controllers\SprintController::class);
+     Route::resource('projects', App\Http\Controllers\ProjectController::class);
+ 
++    // Rubrique « Quiz » du menu : tous les quiz de l'utilisateur (candidats inclus)
++    Route::get('/quizzes', [\App\Http\Controllers\MyQuizzesController::class, 'index'])->name('quizzes.index');
++
+     // Routes Quiz
+     // scopeBindings : {quiz} doit appartenir à {project}, {question}/{response}/{attempt} au {quiz}.
+     Route::prefix('projects/{project}/quizzes')->name('projects.quizzes.')->scopeBindings()->group(function () {
++        // Candidats du quiz (utilisateurs ProJA inscrits)
++        Route::get('/{quiz}/candidates/search', [\App\Http\Controllers\QuizCandidateController::class, 'search'])->name('candidates.search');
++        Route::post('/{quiz}/candidates', [\App\Http\Controllers\QuizCandidateController::class, 'store'])->name('candidates.store');
++        Route::post('/{quiz}/candidates/members', [\App\Http\Controllers\QuizCandidateController::class, 'addMembers'])->name('candidates.members');
++        Route::put('/{quiz}/candidates/restriction', [\App\Http\Controllers\QuizCandidateController::class, 'restriction'])->name('candidates.restriction');
++        Route::delete('/{quiz}/candidates/{candidate}', [\App\Http\Controllers\QuizCandidateController::class, 'destroy'])->name('candidates.destroy');
++
+         Route::get('/', [\App\Http\Controllers\QuizController::class, 'index'])->name('index');
+         Route::get('/create', [\App\Http\Controllers\QuizController::class, 'create'])->name('create');
+         Route::post('/draft', [\App\Http\Controllers\QuizController::class, 'draft'])->name('draft');
+diff --git a/tests/Feature/Quiz/QuizCandidatesTest.php b/tests/Feature/Quiz/QuizCandidatesTest.php
+new file mode 100644
+index 0000000..d6d50de
+--- /dev/null
++++ b/tests/Feature/Quiz/QuizCandidatesTest.php
+@@ -0,0 +1,196 @@
++<?php
++
++namespace Tests\Feature\Quiz;
++
++use App\Models\Quiz;
++use App\Models\QuizAttempt;
++use App\Models\QuizCandidate;
++use App\Models\User;
++
++class QuizCandidatesTest extends QuizHttpTestCase
++{
++    private User $outsider;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++
++        // Utilisateur inscrit sur ProJA, sans projet
++        $this->outsider = User::factory()->create(['name' => 'Diane Externe']);
++    }
++
++    private function enrol(Quiz $quiz, User $user): void
++    {
++        QuizCandidate::create(['quiz_id' => $quiz->id, 'user_id' => $user->id, 'added_by' => $this->manager1->id]);
++    }
++
++    public function test_manager_adds_a_registered_user_who_then_takes_the_quiz_and_sees_results(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $question = $quiz->questions->first();
++
++        // Recherche : 2 caractères minimum, et on ne propose pas deux fois le même
++        $this->actingAs($this->manager1)->getJson($this->quizUrl($quiz, '/candidates/search?q=D'))->assertOk()->assertJsonCount(0, 'users');
++        $found = $this->actingAs($this->manager1)->getJson($this->quizUrl($quiz, '/candidates/search?q=Diane'))->assertOk();
++        $this->assertSame([$this->outsider->id], array_column($found->json('users'), 'id'));
++        $this->assertFalse($found->json('users.0.is_member'));
++
++        // Ajout + notification
++        $this->actingAs($this->manager1)->post($this->quizUrl($quiz, '/candidates'), ['user_ids' => [$this->outsider->id]])
++            ->assertSessionHas('success');
++        $this->assertSame(1, $this->outsider->notifications()->count());
++        $this->assertStringContainsString('Nouveau quiz', $this->outsider->notifications()->first()->data['title']);
++
++        // Déjà inscrit : n'apparaît plus dans la recherche, et un second ajout ne duplique pas
++        $this->actingAs($this->manager1)->getJson($this->quizUrl($quiz, '/candidates/search?q=Diane'))->assertJsonCount(0, 'users');
++        $this->actingAs($this->manager1)->post($this->quizUrl($quiz, '/candidates'), ['user_ids' => [$this->outsider->id]]);
++        $this->assertSame(1, $quiz->candidates()->count());
++
++        // Rubrique « Quiz » : il voit son quiz et lui seul
++        $outsider = $this->outsider->fresh();
++        $this->assertTrue($outsider->isQuizCandidateOnly());
++        $props = $this->inertia($outsider, '/quizzes')->json('props');
++        $this->assertTrue($props['candidateOnly']);
++        $this->assertCount(1, $props['quizzes']);
++        $this->assertSame('to_take', $props['quizzes'][0]['status']);
++
++        // Il passe le quiz et voit son résultat
++        $this->actingAs($outsider)->post($this->quizUrl($quiz, '/launch'))->assertOk();
++        $attempt = QuizAttempt::where('quiz_id', $quiz->id)->where('user_id', $outsider->id)->firstOrFail();
++        $this->actingAs($outsider)->post($this->quizUrl($quiz, '/submit'), [
++            'attempt_id' => $attempt->id, 'answers' => [$question->id => 0],
++        ])->assertRedirect();
++
++        $results = $this->inertia($outsider, $this->quizUrl($quiz, '/results'))->assertOk()->json('props');
++        $this->assertEquals(100, $results['result']['score']);
++        $r = $this->inertia($outsider, '/quizzes');
++        $this->assertSame('retake', $r->json('props.quizzes.0.status')); // 1 tentative sur 2 utilisée
++        $this->assertEquals(100, $r->json('props.quizzes.0.score'));
++
++        // Mais ni le classement des autres, ni la gestion
++        $this->actingAs($outsider)->get($this->quizUrl($quiz, '/ranking'))->assertForbidden();
++        $this->actingAs($outsider)->getJson($this->quizUrl($quiz, '/candidates/search?q=Al'))->assertForbidden();
++        $this->actingAs($outsider)->post($this->quizUrl($quiz, '/candidates'), ['user_ids' => [$this->outsider->id]])->assertForbidden();
++    }
++
++    public function test_candidate_account_is_confined_to_quiz_pages(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->enrol($quiz, $this->outsider);
++        $candidate = $this->outsider->fresh();
++
++        foreach (['/dashboard', '/projects', "/projects/{$this->project->id}", '/users', '/files', '/tasks', '/activities'] as $url) {
++            $this->actingAs($candidate)->get($url)->assertRedirect(route('quizzes.index'));
++        }
++
++        // Appels XHR : refusés proprement, sans redirection
++        $this->actingAs($candidate)->getJson('/api/search?q=abc')->assertForbidden();
++        $this->actingAs($candidate)->getJson('/api/users/search?q=abc')->assertForbidden();
++
++        // Ce dont il a besoin reste accessible
++        $this->actingAs($candidate)->get('/quizzes')->assertOk();
++        $this->actingAs($candidate)->get('/profile')->assertOk();
++        $this->actingAs($candidate)->get($this->quizUrl($quiz))->assertOk();
++        $this->actingAs($candidate)->post('/logout')->assertRedirect();
++    }
++
++    public function test_user_gets_the_full_application_back_when_added_to_a_project(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->enrol($quiz, $this->outsider);
++        $this->assertTrue($this->outsider->fresh()->isQuizCandidateOnly());
++
++        $this->project->users()->attach($this->outsider->id, ['role' => 'collaborator', 'is_muted' => false]);
++
++        $this->assertFalse($this->outsider->fresh()->isQuizCandidateOnly());
++        $this->actingAs($this->outsider->fresh())->get('/dashboard')->assertOk();
++    }
++
++    public function test_user_who_is_not_enrolled_cannot_reach_the_quiz(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++
++        $this->actingAs($this->outsider)->get($this->quizUrl($quiz))->assertForbidden();
++        $this->actingAs($this->outsider)->post($this->quizUrl($quiz, '/launch'))->assertForbidden();
++        $this->assertCount(0, $this->inertia($this->outsider, '/quizzes')->json('props.quizzes'));
++    }
++
++    public function test_restricted_quiz_is_hidden_from_members_who_are_not_enrolled(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $member = $this->candidate; // membre du projet
++
++        $this->assertCount(1, $this->inertia($member, '/quizzes')->json('props.quizzes'));
++
++        $this->actingAs($this->manager1)->put($this->quizUrl($quiz, '/candidates/restriction'), ['restricted' => true])
++            ->assertSessionHas('success');
++        $this->assertTrue($quiz->refresh()->restricted_to_candidates);
++
++        $this->assertCount(0, $this->inertia($member, '/quizzes')->json('props.quizzes'));
++        // ... ni dans la liste des quiz du projet
++        $this->assertCount(0, $this->inertia($member, "/projects/{$this->project->id}/quizzes")->json('props.quizzes'));
++        $this->actingAs($member)->post($this->quizUrl($quiz, '/launch'))->assertForbidden();
++
++        // Les responsables gardent l'accès ; l'inscription rouvre l'accès au membre
++        $this->assertCount(1, $this->inertia($this->manager2, '/quizzes')->json('props.quizzes'));
++        $this->enrol($quiz, $member);
++        $this->assertCount(1, $this->inertia($member, '/quizzes')->json('props.quizzes'));
++        $this->actingAs($member)->post($this->quizUrl($quiz, '/launch'))->assertOk();
++    }
++
++    public function test_candidates_can_be_removed_only_before_they_start(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->enrol($quiz, $this->outsider);
++        $other = User::factory()->create();
++        $this->enrol($quiz, $other);
++
++        $started = $quiz->candidates()->where('user_id', $this->outsider->id)->firstOrFail();
++        $this->actingAs($this->outsider->fresh())->post($this->quizUrl($quiz, '/launch'))->assertOk();
++
++        $this->actingAs($this->manager1)->delete($this->quizUrl($quiz, "/candidates/{$started->id}"))->assertSessionHas('error');
++        $this->assertSame(2, $quiz->candidates()->count());
++
++        $free = $quiz->candidates()->where('user_id', $other->id)->firstOrFail();
++        $this->actingAs($this->manager1)->delete($this->quizUrl($quiz, "/candidates/{$free->id}"))->assertSessionHas('success');
++        $this->assertSame(1, $quiz->candidates()->count());
++    }
++
++    public function test_only_managers_manage_candidates_and_drafts_are_refused(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->actingAs($this->candidate)->post($this->quizUrl($quiz, '/candidates'), ['user_ids' => [$this->outsider->id]])->assertForbidden();
++
++        $draft = $this->makeQuiz([$this->qcm()], 'Brouillon');
++        $draft->update(['is_draft' => true]);
++        $this->actingAs($this->manager1)->post($this->quizUrl($draft, '/candidates'), ['user_ids' => [$this->outsider->id]])
++            ->assertSessionHas('error');
++        $this->assertSame(0, $draft->candidates()->count());
++    }
++
++    public function test_add_all_project_members_skips_managers(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++
++        $this->actingAs($this->manager1)->post($this->quizUrl($quiz, '/candidates/members'))->assertSessionHas('success');
++
++        $this->assertSame([$this->candidate->id], $quiz->candidates()->pluck('user_id')->all());
++    }
++
++    public function test_manager_sees_the_roster_with_progress_and_drafts_stay_hidden_from_members(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $this->enrol($quiz, $this->outsider);
++        $draft = $this->makeQuiz([$this->qcm()], 'Brouillon');
++        $draft->update(['is_draft' => true]);
++
++        $roster = $this->inertia($this->manager1, $this->quizUrl($quiz))->json('props.candidates');
++        $this->assertCount(1, $roster);
++        $this->assertSame('not_started', $roster[0]['status']);
++        $this->assertFalse($roster[0]['locked']);
++
++        $titles = fn ($user) => array_column($this->inertia($user, '/quizzes')->json('props.quizzes'), 'title');
++        $this->assertContains('Brouillon', $titles($this->manager1));
++        $this->assertNotContains('Brouillon', $titles($this->candidate));
++    }
++}
+diff --git a/tests/Feature/Quiz/QuizHttpTestCase.php b/tests/Feature/Quiz/QuizHttpTestCase.php
+index 894a11a..c5a0c48 100644
+--- a/tests/Feature/Quiz/QuizHttpTestCase.php
++++ b/tests/Feature/Quiz/QuizHttpTestCase.php
+@@ -45,6 +45,12 @@ protected function setUp(): void
+         $this->project->users()->attach($this->candidate->id, ['role' => 'collaborator', 'is_muted' => false]);
+     }
+ 
++    /** Requête « Inertia » : on lit directement les props JSON, sans passer par Vite. */
++    protected function inertia(User $user, string $url)
++    {
++        return $this->actingAs($user)->getJson($url, ['X-Inertia' => 'true']);
++    }
++
+     protected function makeQuiz(array $questions, string $title = 'Quiz test'): Quiz
+     {
+         $quiz = Quiz::create([
+-- 
+2.43.0
+

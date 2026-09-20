@@ -17,6 +17,9 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
+    /** Cache par requête de isQuizCandidateOnly(). */
+    protected ?bool $candidateOnlyCache = null;
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasRoles;
 
@@ -315,6 +318,28 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /** Inscriptions de l'utilisateur comme candidat à des quiz. */
+    public function quizCandidacies(): HasMany
+    {
+        return $this->hasMany(QuizCandidate::class);
+    }
+
+    /**
+     * Compte « candidat » : inscrit à au moins un quiz, mais sans projet et sans droit
+     * d'administration. Il n'accède qu'aux quiz (menu réduit). S'il rejoint un projet plus tard,
+     * il retrouve automatiquement l'application complète.
+     */
+    public function isQuizCandidateOnly(): bool
+    {
+        if ($this->candidateOnlyCache !== null) {
+            return $this->candidateOnlyCache;
+        }
+
+        return $this->candidateOnlyCache = ! $this->hasRole('admin')
+            && ! $this->projects()->exists()
+            && $this->quizCandidacies()->exists();
     }
 
     public function projects() {

@@ -21,6 +21,7 @@ class Quiz extends Model
     public const DELIBERATION_VALIDATED = 'validated';
 
     protected $fillable = [
+        'restricted_to_candidates',
         'project_id',
         'created_by',
         'title',
@@ -40,6 +41,7 @@ class Quiz extends Model
     ];
 
     protected $casts = [
+        'restricted_to_candidates' => 'boolean',
         'is_active' => 'boolean',
         'is_draft' => 'boolean',
         'show_results' => 'boolean',
@@ -104,6 +106,23 @@ class Quiz extends Model
         return $this->hasMany(QuizCumulItem::class);
     }
 
+    /** Bonus de participation attribués dans ce quiz (à ses membres). */
+    public function participationPoints(): HasMany
+    {
+        return $this->hasMany(ParticipationPoint::class);
+    }
+
+    /** Candidats inscrits à ce quiz (utilisateurs ProJA, membres du projet ou non). */
+    public function candidates(): HasMany
+    {
+        return $this->hasMany(QuizCandidate::class);
+    }
+
+    public function isCandidate(User $user): bool
+    {
+        return $this->candidates()->where('user_id', $user->id)->exists();
+    }
+
     public function isValidated(): bool
     {
         return $this->deliberation_status === self::DELIBERATION_VALIDATED;
@@ -138,6 +157,23 @@ class Quiz extends Model
     public function scopeVisibleFor($query, bool $canManage)
     {
         return $canManage ? $query : $query->where('is_draft', false);
+    }
+
+    /**
+     * Comme visibleFor(), mais tient aussi compte des quiz « réservés aux candidats ajoutés » :
+     * un membre du projet non inscrit ne les voit pas.
+     */
+    public function scopeVisibleForUser($query, User $user, bool $canManage)
+    {
+        if ($canManage) {
+            return $query;
+        }
+
+        $enrolled = QuizCandidate::where('user_id', $user->id)->pluck('quiz_id');
+
+        return $query->where('is_draft', false)->where(function ($q) use ($enrolled) {
+            $q->where('restricted_to_candidates', false)->orWhereIn('quizzes.id', $enrolled);
+        });
     }
 
     public function scopeActive($query)

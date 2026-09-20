@@ -17,7 +17,12 @@ const REASONS = [
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
 const signed = (n) => `${n > 0 ? '+' : ''}${fmtNumber(n)}`;
 
-function Participation({ project, members = [], history = [], cap, stepMax }) {
+function Participation({ project, quiz = null, members = [], history = [], cap, stepMax, legacyCount = 0 }) {
+  // Mode quiz : les destinataires sont les MEMBRES DU QUIZ (candidats inscrits), pas les membres du projet.
+  const storeUrl = quiz ? route('projects.quizzes.participation.store', [project.id, quiz.id]) : route('projects.participation.store', project.id);
+  const destroyUrl = (id) => (quiz ? route('projects.quizzes.participation.destroy', [project.id, quiz.id, id]) : route('projects.participation.destroy', [project.id, id]));
+  const backHref = quiz ? route('projects.quizzes.show', [project.id, quiz.id]) : route('projects.quizzes.index', project.id);
+
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('points');
   const [target, setTarget] = useState(null);
@@ -35,7 +40,7 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
   const quick = (m, points) => {
     setQuickBusy(`${m.id}:${points}`);
     router.post(
-      route('projects.participation.store', project.id),
+      storeUrl,
       { user_id: m.id, points },
       { preserveScroll: true, onFinish: () => setQuickBusy(null) }
     );
@@ -51,7 +56,7 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
     e.preventDefault();
     setBusy(true);
     router.post(
-      route('projects.participation.store', project.id),
+      storeUrl,
       { user_id: target.id, ...form },
       {
         preserveScroll: true,
@@ -64,28 +69,42 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
 
   const remove = (entry) => {
     if (window.confirm(`Supprimer l'attribution de ${signed(entry.points)} pt(s) à ${entry.user_name} ?`)) {
-      router.delete(route('projects.participation.destroy', [project.id, entry.id]), { preserveScroll: true });
+      router.delete(destroyUrl(entry.id), { preserveScroll: true });
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-6 sm:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
-        <Link href={route('projects.quizzes.index', project.id)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-blue-600 dark:text-gray-400">
-          <FaArrowLeft /> Retour aux quiz
+        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-blue-600 dark:text-gray-400">
+          <FaArrowLeft /> {quiz ? 'Retour au quiz' : 'Retour aux quiz'}
         </Link>
 
         <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-5 sm:p-6 text-white shadow-md">
-          <span className="text-xs uppercase font-bold tracking-wider text-amber-100">Formations</span>
+          <span className="text-xs uppercase font-bold tracking-wider text-amber-100">{quiz ? `Quiz : ${quiz.title}` : 'Formations · bonus généraux du projet'}</span>
           <h1 className="text-xl sm:text-2xl font-extrabold flex items-center gap-2 mt-1"><FaStar /> Bonus de participation</h1>
           <p className="text-sm text-amber-50 mt-1 max-w-2xl">
-            Récompensez les membres qui s&apos;impliquent lors des échanges. Ces points s&apos;ajoutent à leur note lors de la sélection finale.
+            {quiz
+              ? "Récompensez les membres du quiz qui s'impliquent lors des échanges. Ces points s'ajoutent à leur note finale dans ce quiz."
+              : "Anciens bonus attribués à l'ensemble du projet : ils comptent pour tous les quiz du projet. Pour un nouveau bonus, ouvrez le quiz concerné."}
           </p>
           <p className="mt-3 inline-flex items-start gap-2 text-xs bg-white/15 rounded-xl px-3 py-2">
             <FaInfoCircle className="mt-0.5 flex-shrink-0" />
-            Le bonus total d&apos;un membre est plafonné à {cap} points ; il est ajouté une seule fois à la note finale (100 % maximum), y compris dans les cumuls de quiz.
+            Le bonus total d&apos;un {quiz ? 'membre du quiz' : 'membre'} est plafonné à {cap} points ; il est ajouté une seule fois à la note finale (100 % maximum), y compris dans les cumuls de quiz.
           </p>
         </div>
+
+        {quiz?.validated && (
+          <p className="text-sm rounded-xl px-4 py-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200">
+            Les résultats de ce quiz sont validés : rouvrez la délibération pour modifier les bonus.
+          </p>
+        )}
+        {quiz && legacyCount > 0 && (
+          <p className="text-xs rounded-xl px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300">
+            {legacyCount} ancien(s) bonus général(aux) du projet s&apos;ajoutent aussi aux membres ci-dessous.{' '}
+            <Link href={route('projects.participation.index', project.id)} className="font-semibold text-amber-700 dark:text-amber-300 hover:underline">Les consulter</Link>
+          </p>
+        )}
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
           {/* Membres */}
@@ -93,7 +112,7 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-3 sm:p-4 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <FaSearch className="text-gray-400" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un membre..."
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={quiz ? "Rechercher un membre du quiz..." : "Rechercher un membre..."}
                   className="flex-1 min-w-0 border-0 bg-transparent text-sm focus:ring-0 dark:text-white" />
               </div>
               <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-900/60 rounded-xl text-xs font-semibold">
@@ -105,7 +124,12 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
 
             {members.length === 0 && (
               <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-10 text-center text-sm text-gray-500">
-                Aucun membre à récompenser dans ce projet.
+                {quiz ? (
+                  <>
+                    Ce quiz n&apos;a encore aucun membre. Ajoutez des membres depuis la page du quiz : ce sont eux qui peuvent recevoir un bonus.{' '}
+                    <Link href={backHref} className="font-semibold text-amber-700 dark:text-amber-300 hover:underline">Ouvrir le quiz</Link>
+                  </>
+                ) : 'Aucun membre à récompenser dans ce projet.'}
               </div>
             )}
 
@@ -124,6 +148,9 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
                       <div className="min-w-0 flex-1">
                         <p className="font-bold text-gray-900 dark:text-white truncate">{m.name}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{m.email}</p>
+                        {quiz && m.enrolled === false && (
+                          <p className="text-[11px] text-gray-400">A passé le quiz sans être inscrit</p>
+                        )}
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-black text-amber-600 dark:text-amber-400 leading-none">{fmtNumber(m.effective)}</div>
@@ -212,7 +239,7 @@ function Participation({ project, members = [], history = [], cap, stepMax }) {
                     className="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-amber-500 focus:border-amber-500" />
                 </div>
               </div>
-              {(errors.points || errors.awarded_on) && <p className="text-xs text-red-500">{errors.points || errors.awarded_on}</p>}
+              {(errors.points || errors.awarded_on || errors.user_id) && <p className="text-xs text-red-500">{errors.points || errors.awarded_on || errors.user_id}</p>}
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Motif</label>

@@ -291,9 +291,24 @@ Route::middleware('auth')->group(function () {
     Route::resource('sprints', App\Http\Controllers\SprintController::class);
     Route::resource('projects', App\Http\Controllers\ProjectController::class);
 
+    // Rubrique « Quiz » du menu : tous les quiz de l'utilisateur (candidats inclus)
+    Route::get('/quizzes', [\App\Http\Controllers\MyQuizzesController::class, 'index'])->name('quizzes.index');
+
     // Routes Quiz
     // scopeBindings : {quiz} doit appartenir à {project}, {question}/{response}/{attempt} au {quiz}.
     Route::prefix('projects/{project}/quizzes')->name('projects.quizzes.')->scopeBindings()->group(function () {
+        // Bonus de participation : attribués aux membres du quiz
+        Route::get('/{quiz}/participation', [\App\Http\Controllers\ParticipationPointController::class, 'quizIndex'])->name('participation.index');
+        Route::post('/{quiz}/participation', [\App\Http\Controllers\ParticipationPointController::class, 'quizStore'])->name('participation.store');
+        Route::delete('/{quiz}/participation/{participationPoint}', [\App\Http\Controllers\ParticipationPointController::class, 'quizDestroy'])->name('participation.destroy');
+
+        // Candidats du quiz (utilisateurs ProJA inscrits)
+        Route::get('/{quiz}/candidates/search', [\App\Http\Controllers\QuizCandidateController::class, 'search'])->name('candidates.search');
+        Route::post('/{quiz}/candidates', [\App\Http\Controllers\QuizCandidateController::class, 'store'])->name('candidates.store');
+        Route::post('/{quiz}/candidates/members', [\App\Http\Controllers\QuizCandidateController::class, 'addMembers'])->name('candidates.members');
+        Route::put('/{quiz}/candidates/restriction', [\App\Http\Controllers\QuizCandidateController::class, 'restriction'])->name('candidates.restriction');
+        Route::delete('/{quiz}/candidates/{candidate}', [\App\Http\Controllers\QuizCandidateController::class, 'destroy'])->name('candidates.destroy');
+
         Route::get('/', [\App\Http\Controllers\QuizController::class, 'index'])->name('index');
         Route::get('/create', [\App\Http\Controllers\QuizController::class, 'create'])->name('create');
         Route::post('/draft', [\App\Http\Controllers\QuizController::class, 'draft'])->name('draft');

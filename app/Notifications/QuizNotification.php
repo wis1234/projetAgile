@@ -29,6 +29,7 @@ class QuizNotification extends Notification implements ShouldQueue
     {
         $title = match($this->type) {
             'quiz_created' => 'Nouveau Quiz dans ' . ($this->data['project_name'] ?? 'votre projet'),
+            'quiz_assigned' => 'Nouveau quiz à passer : ' . ($this->data['quiz_title'] ?? 'Quiz'),
             'quiz_graded' => 'Quiz corrigé : ' . ($this->data['quiz_title'] ?? 'Quiz'),
             'deliberation_opened' => 'Délibération ouverte : ' . ($this->data['quiz_title'] ?? 'Quiz'),
             'deliberation_reopened' => 'Délibération rouverte : ' . ($this->data['quiz_title'] ?? 'Quiz'),
@@ -39,6 +40,7 @@ class QuizNotification extends Notification implements ShouldQueue
 
         $message = match($this->type) {
             'quiz_created' => 'Le quiz "' . ($this->data['quiz_title'] ?? '') . '" a été publié par ' . ($this->data['creator_name'] ?? 'un membre') . '.',
+            'quiz_assigned' => ($this->data['actor_name'] ?? 'Un responsable') . ' vous a ajouté aux membres de ce quiz. Ouvrez la rubrique Quiz pour le passer.',
             'quiz_graded' => 'Votre réponse écrite a été notée. Votre score final est de ' . ($this->data['score'] ?? 0) . '%.',
             'deliberation_opened' => ($this->data['actor_name'] ?? 'Un responsable') . ' a ouvert la délibération : votre aval est attendu.',
             'deliberation_reopened' => ($this->data['actor_name'] ?? 'Un responsable') . ' a rouvert la délibération : les avals précédents sont annulés.',

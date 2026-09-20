@@ -45,6 +45,12 @@ abstract class QuizHttpTestCase extends BaseTestCase
         $this->project->users()->attach($this->candidate->id, ['role' => 'collaborator', 'is_muted' => false]);
     }
 
+    /** Requête « Inertia » : on lit directement les props JSON, sans passer par Vite. */
+    protected function inertia(User $user, string $url)
+    {
+        return $this->actingAs($user)->getJson($url, ['X-Inertia' => 'true']);
+    }
+
     protected function makeQuiz(array $questions, string $title = 'Quiz test'): Quiz
     {
         $quiz = Quiz::create([

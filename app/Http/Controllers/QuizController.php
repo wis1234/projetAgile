@@ -11,6 +11,7 @@ use App\Models\QuizAttempt;
 use App\Models\QuizCumul;
 use App\Models\QuizResponse;
 use App\Models\QuizResult;
+use App\Http\Controllers\QuizCandidateController;
 use App\Services\Quiz\QuizBuilderService;
 use App\Services\Quiz\QuizDeliberationService;
 use App\Services\Quiz\QuizScoringService;
@@ -43,7 +44,7 @@ class QuizController extends Controller
         $canManage = $project->userCanManageQuizzes(Auth::user());
 
         $quizzes = Quiz::where('project_id', $project->id)
-            ->visibleFor($canManage)
+            ->visibleForUser(Auth::user(), $canManage)
             ->withCount([
                 'questions',
                 'attempts',
@@ -312,9 +313,14 @@ class QuizController extends Controller
             'deciders' => $deciders,
             'cheatingAttemptsCount' => 0,
             'evaluation' => null,
+            'candidates' => [],
+            // Le classement nominatif n'est pas ouvert aux candidats extérieurs au projet.
+            'canViewRanking' => $canManage || ($quiz->show_results && $project->isMember($user)),
+            'isProjectMember' => $project->isMember($user),
         ];
 
         if ($canManage) {
+            $props['candidates'] = QuizCandidateController::roster($quiz);
             $results = QuizResult::where('quiz_id', $quiz->id);
             $resultsCount = (clone $results)->count();
             $pendingCount = (clone $results)->where('grading_status', QuizResult::STATUS_PENDING)->count();
@@ -494,6 +500,8 @@ class QuizController extends Controller
 
         // Les membres ne voient le classement que si les résultats leur sont ouverts.
         abort_if(!$canManage && !$quiz->show_results, 403, 'Les résultats de ce quiz ne sont pas publics.');
+        // Un candidat extérieur au projet ne voit pas les noms et notes des autres candidats.
+        abort_if(!$canManage && !$project->isMember(Auth::user()), 403, 'Le classement est réservé aux membres du projet.');
 
         $final = $this->scoring->finalResults($quiz, $canManage);
 

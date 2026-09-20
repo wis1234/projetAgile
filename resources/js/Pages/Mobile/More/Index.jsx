@@ -7,6 +7,7 @@ import { unregisterDeviceToken } from '@/Components/PushNotificationManager';
 const menuLinks = [
   { href: '/discussions', label: 'discussions', icon: '💬' },
   { href: '/dashboard', label: 'dashboard', icon: '🏠' },
+  { href: '/quizzes', label: 'quiz', icon: '❓' },
   { href: '/projects', label: 'projects', icon: '📁' },
   { href: '/project-users', label: 'members', icon: '👥' },
   { href: '/sprints', label: 'sprints', icon: '⚡' },
@@ -64,7 +65,7 @@ export default function MobileMoreIndex() {
 
         {/* Navigation */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden divide-y divide-gray-100 dark:divide-gray-700">
-          {menuLinks.map(link => (
+          {(auth?.user?.quiz_candidate_only ? menuLinks.filter((l) => l.href === '/quizzes') : menuLinks).map(link => (
             <Link
               key={link.href}
               href={link.href}

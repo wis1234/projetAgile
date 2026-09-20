@@ -39,6 +39,12 @@ const navLinks = [
   { href: '/tasks', label: 'tasks', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6m9 2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7l5 5v10z" /></svg>
   ) },
+  { href: '/quizzes', label: 'quiz',
+    // actif sur toutes les pages quiz (liste, détail, correction, cumul…)
+    match: (url) => /^\/(quizzes|projects\/\d+\/(quizzes|quiz-cumuls|participation-points))(\/|\?|$)/.test(url || ''),
+    icon: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+  ) },
   { href: '/discussions', label: 'discussions', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /></svg>
   ) },
@@ -117,6 +123,11 @@ const Loader = () => {
 
 export default function AdminLayout({ children }) {
   const { auth, flash = {}, appName } = usePage().props;
+  const { url: currentUrl } = usePage();
+  // Compte candidat (inscrit à des quiz, sans projet) : un seul menu, « Quiz ».
+  const candidateOnly = Boolean(auth?.user?.quiz_candidate_only);
+  const menuLinks = candidateOnly ? navLinks.filter((l) => l.href === '/quizzes') : navLinks;
+  const isLinkActive = (link) => (link.match ? link.match(currentUrl) : route().current(link.href.replace(/^\//, '')));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
@@ -455,13 +466,13 @@ const stopRingtone = () => {
 
         {/* Menu */}
         <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide space-y-1.5">
-          {navLinks.map((link) => (
+          {menuLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 active:scale-[0.98] ${
-                route().current(link.href.replace(/^\//, ''))
+                isLinkActive(link)
                   ? 'bg-white/10 dark:bg-blue-900/50 text-white dark:text-blue-100 shadow-lg'
                   : 'text-white/80 hover:bg-white/5 dark:hover:bg-blue-900/30 hover:text-white dark:hover:text-blue-100'
               }`}
@@ -474,7 +485,7 @@ const stopRingtone = () => {
                 )}
               </span>
               <span className="font-medium">{t(link.label)}</span>
-              {route().current(link.href.replace(/^\//, '')) && (
+              {isLinkActive(link) && (
                 <span className="ml-auto w-1.5 h-1.5 bg-blue-400 dark:bg-blue-300 rounded-full"></span>
               )}
             </Link>
@@ -546,7 +557,7 @@ const stopRingtone = () => {
           {/* ── Centre : barre de recherche (desktop uniquement) ── */}
           <div className="hidden md:flex flex-1 justify-center px-4 min-w-0">
             <div className="w-full max-w-md">
-              <GlobalSearch />
+              {!candidateOnly && <GlobalSearch />}
             </div>
           </div>
 

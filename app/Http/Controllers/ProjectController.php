@@ -310,7 +310,7 @@ class ProjectController extends Controller
 
         $canSeeDrafts = $project->userCanManageQuizzes($currentUser);
         $quizzes = $project->quizzes()
-            ->visibleFor($canSeeDrafts)
+            ->visibleForUser($currentUser, $canSeeDrafts)
             ->withCount(['questions', 'attempts'])
             ->orderBy('created_at', 'desc')
             ->limit(5)
@@ -324,7 +324,7 @@ class ProjectController extends Controller
             'doneTasksCount'    => $doneTasksCount,
             'doneTasksByUser'   => $doneTasksByUser,
             'doneTasksByWeek'   => $doneTasksByWeek,
-            'quizzesCount'      => $project->quizzes()->visibleFor($canSeeDrafts)->count(),
+            'quizzesCount'      => $project->quizzes()->visibleForUser($currentUser, $canSeeDrafts)->count(),
         ]);
 
         return Inertia::render('Projects/Show', [

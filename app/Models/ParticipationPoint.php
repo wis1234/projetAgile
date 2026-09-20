@@ -13,6 +13,7 @@ class ParticipationPoint extends Model
 {
     protected $fillable = [
         'project_id',
+        'quiz_id',
         'user_id',
         'awarded_by',
         'points',
@@ -30,6 +31,11 @@ class ParticipationPoint extends Model
         return $this->belongsTo(Project::class);
     }
 
+    public function quiz(): BelongsTo
+    {
+        return $this->belongsTo(Quiz::class);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -41,11 +47,38 @@ class ParticipationPoint extends Model
     }
 
     /**
-     * Total brut par membre (user_id => somme) pour un projet.
+     * Total brut par membre (user_id => somme) des anciens bonus « généraux » du projet
+     * (attribués avant que le bonus soit rattaché à un quiz : quiz_id NULL).
      */
     public static function totalsForProject(int $projectId): Collection
     {
         return static::where('project_id', $projectId)
+            ->whereNull('quiz_id')
+            ->selectRaw('user_id, SUM(points) as total')
+            ->groupBy('user_id')
+            ->pluck('total', 'user_id')
+            ->map(fn ($v) => (float) $v);
+    }
+
+    /**
+     * Total brut par membre du quiz (user_id => somme) : bonus attribués dans ce quiz,
+     * plus les anciens bonus généraux du projet.
+     */
+    public static function totalsForQuiz(Quiz $quiz): Collection
+    {
+        return static::totalsForQuizzes($quiz->project_id, [$quiz->id]);
+    }
+
+    /**
+     * Idem pour plusieurs quiz (cumuls) : les bonus de tous ces quiz s'additionnent,
+     * les anciens bonus généraux ne sont comptés qu'une fois.
+     *
+     * @param list<int> $quizIds
+     */
+    public static function totalsForQuizzes(int $projectId, array $quizIds): Collection
+    {
+        return static::where('project_id', $projectId)
+            ->where(fn ($q) => $q->whereNull('quiz_id')->orWhereIn('quiz_id', $quizIds))
             ->selectRaw('user_id, SUM(points) as total')
             ->groupBy('user_id')
             ->pluck('total', 'user_id')

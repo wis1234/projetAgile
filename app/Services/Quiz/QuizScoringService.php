@@ -213,7 +213,7 @@ class QuizScoringService
         $attempts = QuizAttempt::whereIn('id', $best->pluck('attempt_id'))->get()->keyBy('id');
         $responses = QuizResponse::whereIn('attempt_id', $best->pluck('attempt_id'))->get()->groupBy('attempt_id');
 
-        $bonusTotals = $withBonus ? ParticipationPoint::totalsForProject($quiz->project_id) : collect();
+        $bonusTotals = $withBonus ? ParticipationPoint::totalsForQuiz($quiz) : collect();
 
         $rows = $best->map(function (QuizResult $r) use ($quiz, $questions, $attempts, $responses, $bonusTotals, $withBonus) {
             $attempt = $attempts->get($r->attempt_id);

@@ -43,6 +43,7 @@ if ($request->user()) {
         'notifications' => $request->user()->notifications()->latest()->take(20)->get(),
         'unreadNotificationsCount' => $request->user()->unreadNotifications()->count(),
         'share_discussions_by_email' => (bool) $request->user()->share_discussions_by_email,
+        'quiz_candidate_only' => $request->user()->isQuizCandidateOnly(),
     ];
 }
 
