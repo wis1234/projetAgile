@@ -4,6 +4,7 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import Avatar from '@/Components/Quiz/Avatar';
 import ScoreBadge from '@/Components/Quiz/ScoreBadge';
 import CandidatesPanel from '@/Components/Quiz/CandidatesPanel';
+import CandidatesExcelImport from '@/Components/Quiz/CandidatesExcelImport';
 import {
   FaClock, FaQuestionCircle, FaPlay, FaArrowLeft, FaTrophy, FaRedo, FaCheckCircle, FaLock, FaChartBar,
   FaShareAlt, FaCopy, FaCheck, FaExclamationTriangle, FaGavel, FaStar, FaUsers, FaPenFancy, FaShieldAlt,
@@ -366,7 +367,12 @@ function Show({ project, quiz, attemptsCount, hasActiveAttempt, latestResult, ca
         </div>
 
         {/* Candidats : utilisateurs ProJA inscrits à ce quiz */}
-        {canManage && !quiz.is_draft && <CandidatesPanel project={project} quiz={quiz} candidates={candidates} />}
+        {canManage && !quiz.is_draft && (
+          <>
+            <CandidatesExcelImport project={project} quiz={quiz} />
+            <CandidatesPanel project={project} quiz={quiz} candidates={candidates} />
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,1227 @@
+From 11028c0f6b7035b3977bf8c1ff1aece2edfbe791 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 20 Sep 2026 13:05:00 +0000
+Subject: [PATCH] =?UTF-8?q?Quiz=20:=20import=20des=20candidats=20par=20fic?=
+ =?UTF-8?q?hier=20Excel/CSV=20(colonne=20email=20d=C3=A9tect=C3=A9e=20auto?=
+ =?UTF-8?q?matiquement)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ .../Controllers/QuizCandidateController.php   | 146 +++++-
+ app/Services/Quiz/CandidateEmailExtractor.php | 318 ++++++++++++
+ .../Components/Quiz/CandidatesExcelImport.jsx | 451 ++++++++++++++++++
+ resources/js/Pages/Quizzes/Show.jsx           |   8 +-
+ routes/web.php                                |   2 +
+ .../Quiz/CandidateEmailExtractorTest.php      |  85 ++++
+ .../Quiz/QuizCandidatesFileImportTest.php     | 106 ++++
+ 7 files changed, 1105 insertions(+), 11 deletions(-)
+ create mode 100644 app/Services/Quiz/CandidateEmailExtractor.php
+ create mode 100644 resources/js/Components/Quiz/CandidatesExcelImport.jsx
+ create mode 100644 tests/Feature/Quiz/CandidateEmailExtractorTest.php
+ create mode 100644 tests/Feature/Quiz/QuizCandidatesFileImportTest.php
+
+diff --git a/app/Http/Controllers/QuizCandidateController.php b/app/Http/Controllers/QuizCandidateController.php
+--- a/app/Http/Controllers/QuizCandidateController.php
++++ b/app/Http/Controllers/QuizCandidateController.php
+@@ -9,9 +9,12 @@ use App\Models\QuizCandidate;
+ use App\Models\QuizResult;
+ use App\Models\User;
+ use App\Notifications\QuizNotification;
++use App\Services\Quiz\CandidateEmailExtractor;
+ use Illuminate\Http\JsonResponse;
+ use Illuminate\Http\Request;
++use Illuminate\Support\Arr;
+ use Illuminate\Support\Facades\Auth;
++use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Facades\Log;
+ use Illuminate\Validation\Rule;
+ 
+@@ -20,6 +23,12 @@ use Illuminate\Validation\Rule;
+  */
+ class QuizCandidateController extends Controller
+ {
++    /** Taille maximale d'un fichier d'import (en Ko). */
++    private const IMPORT_MAX_KB = 5120;
++
++    /** Extensions acceptées pour l'import de fichier. */
++    private const IMPORT_EXTENSIONS = ['xlsx', 'xls', 'csv', 'txt'];
++
+     /** Recherche d'utilisateurs à ajouter (nom ou e-mail, 2 caractères minimum). */
+     public function search(Request $request, Project $project, Quiz $quiz): JsonResponse
+     {
+@@ -137,6 +146,105 @@ class QuizCandidateController extends Controller
+         return $this->enrol($quiz, $ids);
+     }
+ 
++    /**
++     * Import par fichier Excel / CSV : la colonne « email » est détectée automatiquement
++     * (voir CandidateEmailExtractor) et les utilisateurs ProJA dont l'e-mail correspond sont
++     * ajoutés d'office au quiz.
++     *
++     * Répond en JSON avec un compte rendu détaillé : ajoutés, déjà membres, introuvables,
++     * comptes non vérifiés, responsables du projet (ignorés) et valeurs invalides.
++     */
++    public function importExcel(Request $request, Project $project, Quiz $quiz, CandidateEmailExtractor $extractor): JsonResponse
++    {
++        $this->authorize('manage', [Quiz::class, $project]);
++
++        if ($quiz->is_draft) {
++            return response()->json(['message' => 'Publiez d\'abord le quiz avant d\'y ajouter des membres.'], 422);
++        }
++
++        $request->validate([
++            'file' => [
++                'bail', 'required', 'file', 'max:' . self::IMPORT_MAX_KB,
++                function (string $attribute, mixed $file, \Closure $fail) {
++                    // L'extension déclarée suffit ici : le contenu réel est vérifié à la lecture.
++                    if (! in_array(strtolower($file->getClientOriginalExtension()), self::IMPORT_EXTENSIONS, true)) {
++                        $fail('Format non pris en charge : utilisez un fichier .xlsx, .xls ou .csv.');
++                    }
++                },
++            ],
++        ], [
++            'file.required' => 'Sélectionnez un fichier à importer.',
++            'file.file' => 'Le fichier envoyé est invalide.',
++            'file.max' => 'Le fichier est trop volumineux (' . (self::IMPORT_MAX_KB / 1024) . ' Mo maximum).',
++        ]);
++
++        try {
++            $parsed = $extractor->extract($request->file('file'));
++        } catch (\DomainException $e) {
++            return response()->json(['message' => $e->getMessage()], 422);
++        }
++
++        $emails = $parsed['emails'];
++
++        // Correspondance insensible à la casse, par lots pour rester sous la limite de paramètres SQL.
++        $users = collect();
++        foreach (array_chunk($emails, 500) as $chunk) {
++            $users = $users->concat(
++                User::query()
++                    ->whereIn(DB::raw('LOWER(email)'), $chunk)
++                    ->get(['id', 'name', 'email', 'email_verified_at'])
++            );
++        }
++        $byEmail = $users->keyBy(fn (User $u) => mb_strtolower($u->email));
++
++        $managerIds = $project->users()->wherePivot('role', 'manager')->pluck('users.id')->all();
++        $enrolled = array_flip($quiz->candidates()->pluck('user_id')->all());
++
++        $toAdd = [];
++        $already = $notFound = $unverified = $managers = [];
++
++        foreach ($emails as $email) {
++            $user = $byEmail->get($email);
++
++            if (! $user) {
++                $notFound[] = $email;
++            } elseif (! $user->email_verified_at) {
++                // Cohérent avec la recherche : un compte non vérifié ne peut pas se connecter.
++                $unverified[] = $email;
++            } elseif (in_array($user->id, $managerIds, true)) {
++                $managers[] = $email;
++            } elseif (isset($enrolled[$user->id])) {
++                $already[] = $email;
++            } else {
++                $toAdd[$user->id] = ['name' => $user->name, 'email' => $user->email];
++            }
++        }
++
++        if ($toAdd) {
++            $this->attach($quiz, array_keys($toAdd), $request->user(), 'import de fichier');
++        }
++
++        return response()->json([
++            'source' => Arr::only($parsed, ['sheet', 'sheets', 'column', 'header', 'detected_by', 'truncated']),
++            'summary' => [
++                'rows' => $parsed['rows'],
++                'emails' => count($emails),
++                'added' => count($toAdd),
++                'already' => count($already),
++                'not_found' => count($notFound),
++                'unverified' => count($unverified),
++                'managers' => count($managers),
++                'invalid' => $parsed['invalid_count'],
++                'duplicates' => $parsed['duplicates'],
++            ],
++            'added' => array_values($toAdd),
++            'not_found' => $notFound,
++            'unverified' => $unverified,
++            'managers' => $managers,
++            'invalid' => $parsed['invalid'],
++        ]);
++    }
++
+     public function destroy(Project $project, Quiz $quiz, QuizCandidate $candidate)
+     {
+         $this->authorize('manage', [Quiz::class, $project]);
+@@ -187,16 +295,7 @@ class QuizCandidateController extends Controller
+                 : 'Cet utilisateur est déjà membre de ce quiz.');
+         }
+ 
+-        $actor = Auth::user();
+-        foreach ($new as $userId) {
+-            QuizCandidate::create(['quiz_id' => $quiz->id, 'user_id' => $userId, 'added_by' => $actor->id]);
+-        }
+-
+-        $this->notify($quiz, $new, $actor);
+-
+-        if (function_exists('activity_log')) {
+-            activity_log('create', count($new) . " membre(s) ajouté(s) au quiz '{$quiz->title}' par {$actor->name}", $quiz);
+-        }
++        $this->attach($quiz, $new, Auth::user());
+ 
+         // Message explicite : combien ont vraiment été ajoutés, combien étaient déjà membres
+         // (ignorés sans erreur — l'import peut continuer sereinement).
+@@ -212,6 +311,33 @@ class QuizCandidateController extends Controller
+         ]);
+     }
+ 
++    /**
++     * Inscrit les utilisateurs au quiz (atomique et idempotent), les notifie et journalise l'action.
++     * Point d'entrée commun à l'ajout manuel, à l'import de membres du projet et à l'import de fichier.
++     *
++     * @param  list<int>  $userIds  Identifiants pas encore inscrits.
++     * @param  string|null  $origin  Précision pour le journal d'activité (ex. « import de fichier »).
++     */
++    private function attach(Quiz $quiz, array $userIds, User $actor, ?string $origin = null): void
++    {
++        DB::transaction(function () use ($quiz, $userIds, $actor) {
++            foreach ($userIds as $userId) {
++                // firstOrCreate : une inscription simultanée ne fait pas échouer tout le lot.
++                QuizCandidate::firstOrCreate(
++                    ['quiz_id' => $quiz->id, 'user_id' => $userId],
++                    ['added_by' => $actor->id]
++                );
++            }
++        });
++
++        $this->notify($quiz, $userIds, $actor);
++
++        if (function_exists('activity_log')) {
++            $suffix = $origin ? " ({$origin})" : '';
++            activity_log('create', count($userIds) . " membre(s) ajouté(s) au quiz '{$quiz->title}' par {$actor->name}{$suffix}", $quiz);
++        }
++    }
++
+     /** @param list<int> $userIds */
+     private function notify(Quiz $quiz, array $userIds, User $actor): void
+     {
+diff --git a/app/Services/Quiz/CandidateEmailExtractor.php b/app/Services/Quiz/CandidateEmailExtractor.php
+new file mode 100644
+--- /dev/null
++++ b/app/Services/Quiz/CandidateEmailExtractor.php
+@@ -0,0 +1,318 @@
++<?php
++
++namespace App\Services\Quiz;
++
++use Illuminate\Http\UploadedFile;
++use Illuminate\Support\Facades\Log;
++use Illuminate\Support\Str;
++use Maatwebsite\Excel\Concerns\WithCalculatedFormulas;
++use Maatwebsite\Excel\Facades\Excel;
++use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
++
++/**
++ * Extrait les adresses e-mail d'un fichier .xlsx / .xls / .csv, quelle que soit sa structure.
++ *
++ * Stratégie de détection de la colonne :
++ *  1. En-tête : on cherche, dans les premières lignes de chaque feuille, une cellule dont le libellé
++ *     est « email », « e-mail », « mail », « courriel », « adresse e-mail »… (casse, accents,
++ *     tirets et espaces ignorés). Les titres de tableau au-dessus de l'en-tête sont donc tolérés.
++ *  2. Repli sur le contenu : si aucun en-tête n'est reconnu (ou si la colonne est vide), on retient
++ *     la colonne dont la majorité des cellules sont des adresses valides.
++ *
++ * Lève une \DomainException (message affichable tel quel à l'utilisateur) si le fichier est illisible,
++ * ne contient aucune adresse, ou dépasse les limites.
++ */
++class CandidateEmailExtractor
++{
++    /** Lignes lues au maximum par colonne (protège la mémoire et le temps de traitement). */
++    public const MAX_ROWS = 5000;
++
++    /** Adresses distinctes acceptées par import. */
++    public const MAX_EMAILS = 1000;
++
++    /** Nombre de lignes du haut examinées pour trouver l'en-tête. */
++    private const HEADER_SCAN_ROWS = 30;
++
++    /** Nombre d'exemples de valeurs invalides renvoyés. */
++    private const INVALID_SAMPLE = 100;
++
++    /** Libellés d'en-tête reconnus (après normalisation : minuscules, sans accents ni ponctuation). */
++    private const HEADER_ALIASES = [
++        'email', 'emails', 'mail', 'mails', 'courriel', 'courriels',
++        'adresseemail', 'adresseemails', 'adressemail', 'adressesemail',
++        'adresseelectronique', 'emailaddress', 'mailaddress',
++    ];
++
++    /**
++     * @return array{
++     *     sheet:int, sheets:int, column:string, header:?string, detected_by:string,
++     *     rows:int, emails:list<string>, invalid:list<string>, invalid_count:int,
++     *     duplicates:int, truncated:bool
++     * }
++     *
++     * @throws \DomainException
++     */
++    public function extract(UploadedFile $file): array
++    {
++        $sheets = $this->readSheets($file);
++
++        // 1. Par en-tête : le premier libellé reconnu qui mène à de vraies adresses l'emporte.
++        foreach ($this->headerCandidates($sheets) as [$s, $r, $c]) {
++            $col = $this->readColumn($sheets[$s], $c, $r + 1);
++            if ($col['emails']) {
++                return $this->result(count($sheets), $s, $c, $col, 'header', $this->cellText($sheets[$s][$r][$c]));
++            }
++        }
++
++        // 2. Par contenu : aucune colonne « email » exploitable, on cherche des adresses.
++        if ($hit = $this->findByContent($sheets)) {
++            [$s, $c, $col] = $hit;
++
++            return $this->result(count($sheets), $s, $c, $col, 'content', null);
++        }
++
++        throw new \DomainException(
++            'Aucune colonne « email » n\'a été trouvée dans ce fichier. '
++            . 'Ajoutez une colonne intitulée « email » (ou « e-mail », « courriel ») contenant les adresses, puis réessayez.'
++        );
++    }
++
++    /** @return array<int, array<int, array<int, mixed>>> */
++    private function readSheets(UploadedFile $file): array
++    {
++        try {
++            // WithCalculatedFormulas : une cellule construite par formule renvoie sa valeur, pas la formule.
++            $sheets = Excel::toArray(new class implements WithCalculatedFormulas {
++            }, $file);
++        } catch (\Throwable $e) {
++            Log::warning('Candidate import: unreadable file — ' . $e->getMessage());
++
++            throw new \DomainException(
++                'Fichier illisible. Utilisez un fichier .xlsx, .xls ou .csv valide et non protégé par un mot de passe.',
++                0,
++                $e
++            );
++        }
++
++        return $sheets;
++    }
++
++    /**
++     * Cellules d'en-tête plausibles, de la plus sûre (libellé exact) à la moins sûre (libellé
++     * qui contient « mail »), à égalité dans l'ordre de lecture.
++     *
++     * @return list<array{0:int,1:int,2:int}> [feuille, ligne, colonne]
++     */
++    private function headerCandidates(array $sheets): array
++    {
++        $found = [];
++        $seq = 0;
++
++        foreach ($sheets as $s => $rows) {
++            foreach (array_slice($rows, 0, self::HEADER_SCAN_ROWS, true) as $r => $row) {
++                foreach ($row as $c => $cell) {
++                    $tier = $this->headerTier($cell);
++                    if ($tier !== null) {
++                        $found[] = [$tier, $seq++, $s, $r, $c];
++                    }
++                }
++            }
++        }
++
++        usort($found, fn (array $a, array $b) => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
++
++        return array_map(fn (array $f) => [$f[2], $f[3], $f[4]], $found);
++    }
++
++    /** 0 = libellé exact, 1 = libellé court contenant « mail »/« courriel », null = pas un en-tête. */
++    private function headerTier(mixed $cell): ?int
++    {
++        $text = $this->cellText($cell);
++
++        // Une adresse n'est jamais un en-tête (« jean@gmail.com » contient « mail »).
++        if ($text === '' || str_contains($text, '@')) {
++            return null;
++        }
++
++        $key = preg_replace('/[^a-z0-9]/', '', Str::ascii(mb_strtolower($text))) ?? '';
++        if ($key === '') {
++            return null;
++        }
++
++        if (in_array($key, self::HEADER_ALIASES, true)) {
++            return 0;
++        }
++
++        if (strlen($key) <= 40 && (str_contains($key, 'mail') || str_contains($key, 'courriel'))) {
++            return 1;
++        }
++
++        return null;
++    }
++
++    /**
++     * Colonne contenant majoritairement des adresses valides (la plus fournie l'emporte).
++     *
++     * @return array{0:int,1:int,2:array<string,mixed>}|null [feuille, colonne, résultat]
++     */
++    private function findByContent(array $sheets): ?array
++    {
++        $best = null;
++        $bestScore = 0;
++
++        foreach ($sheets as $s => $rows) {
++            if (! $rows) {
++                continue;
++            }
++
++            $head = array_slice($rows, 0, self::MAX_ROWS);
++            $width = max(array_map('count', $head));
++
++            for ($c = 0; $c < $width; $c++) {
++                $col = $this->readColumn($head, $c, 0);
++                $valid = count($col['emails']) + $col['duplicates'];
++
++                if ($valid === 0 || $valid / ($valid + $col['invalid_count']) < 0.5) {
++                    continue;
++                }
++
++                if ($valid > $bestScore) {
++                    $bestScore = $valid;
++                    $best = [$s, $c];
++                }
++            }
++        }
++
++        if (! $best) {
++            return null;
++        }
++
++        [$s, $c] = $best;
++
++        // Première cellule non vide et non valide : c'est un libellé de colonne, on la saute.
++        $first = $this->cellText($sheets[$s][0][$c] ?? null);
++        $from = ($first !== '' && ! $this->emailsIn($first)) ? 1 : 0;
++
++        return [$s, $c, $this->readColumn($sheets[$s], $c, $from)];
++    }
++
++    /**
++     * Lit une colonne à partir d'une ligne donnée.
++     *
++     * @return array{emails:list<string>, invalid:list<string>, invalid_count:int, duplicates:int, rows:int, truncated:bool}
++     */
++    private function readColumn(array $rows, int $col, int $from): array
++    {
++        $slice = array_slice($rows, $from);
++        $truncated = count($slice) > self::MAX_ROWS;
++        if ($truncated) {
++            $slice = array_slice($slice, 0, self::MAX_ROWS);
++        }
++
++        $emails = [];
++        $invalid = [];
++        $invalidCount = 0;
++        $duplicates = 0;
++        $rowsRead = 0;
++
++        foreach ($slice as $row) {
++            $text = $this->cellText($row[$col] ?? null);
++            if ($text === '') {
++                continue;
++            }
++
++            $rowsRead++;
++            $found = $this->emailsIn($text);
++
++            if (! $found) {
++                $invalidCount++;
++                if (count($invalid) < self::INVALID_SAMPLE) {
++                    $invalid[] = Str::limit($text, 80);
++                }
++
++                continue;
++            }
++
++            foreach ($found as $email) {
++                if (isset($emails[$email])) {
++                    $duplicates++;
++                } else {
++                    $emails[$email] = true;
++                }
++            }
++        }
++
++        return [
++            'emails' => array_keys($emails),
++            'invalid' => $invalid,
++            'invalid_count' => $invalidCount,
++            'duplicates' => $duplicates,
++            'rows' => $rowsRead,
++            'truncated' => $truncated,
++        ];
++    }
++
++    /** @param array<string,mixed> $col */
++    private function result(int $sheetsTotal, int $sheet, int $column, array $col, string $by, ?string $header): array
++    {
++        if (count($col['emails']) > self::MAX_EMAILS) {
++            throw new \DomainException(sprintf(
++                'Ce fichier contient %s adresses distinctes ; la limite est de %s par import. Scindez-le en plusieurs fichiers.',
++                number_format(count($col['emails']), 0, ',', ' '),
++                number_format(self::MAX_EMAILS, 0, ',', ' ')
++            ));
++        }
++
++        return [
++            'sheet' => $sheet + 1,
++            'sheets' => $sheetsTotal,
++            'column' => Coordinate::stringFromColumnIndex($column + 1),
++            'header' => $header,
++            'detected_by' => $by,
++            'rows' => $col['rows'],
++            'emails' => $col['emails'],
++            'invalid' => $col['invalid'],
++            'invalid_count' => $col['invalid_count'],
++            'duplicates' => $col['duplicates'],
++            'truncated' => $col['truncated'],
++        ];
++    }
++
++    /** Texte propre d'une cellule (espaces insécables, BOM et caractères invisibles retirés). */
++    private function cellText(mixed $value): string
++    {
++        if ($value === null || is_bool($value)) {
++            return '';
++        }
++
++        if (! is_scalar($value) && ! (is_object($value) && method_exists($value, '__toString'))) {
++            return '';
++        }
++
++        $text = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}\x{00A0}]/u', ' ', (string) $value) ?? (string) $value;
++
++        return trim($text);
++    }
++
++    /**
++     * Adresses valides d'une cellule, en minuscules. Accepte « a@x.fr; b@y.fr », « Nom <a@x.fr> »
++     * ou « mailto:a@x.fr ».
++     *
++     * @return list<string>
++     */
++    private function emailsIn(string $text): array
++    {
++        $tokens = preg_split('/[\s;,<>()\[\]"\']+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
++        $out = [];
++
++        foreach ($tokens as $token) {
++            $token = rtrim(preg_replace('/^mailto:/i', '', $token) ?? $token, '.:');
++
++            if (str_contains($token, '@') && filter_var($token, FILTER_VALIDATE_EMAIL)) {
++                $out[] = mb_strtolower($token);
++            }
++        }
++
++        return $out;
++    }
++}
+diff --git a/resources/js/Components/Quiz/CandidatesExcelImport.jsx b/resources/js/Components/Quiz/CandidatesExcelImport.jsx
+new file mode 100644
+--- /dev/null
++++ b/resources/js/Components/Quiz/CandidatesExcelImport.jsx
+@@ -0,0 +1,451 @@
++import React, { useCallback, useEffect, useRef, useState } from 'react';
++import { createPortal } from 'react-dom';
++import axios from 'axios';
++import { router } from '@inertiajs/react';
++import {
++  FaFileExcel, FaCloudUploadAlt, FaTimes, FaCheck, FaCopy, FaDownload, FaSpinner,
++  FaInfoCircle, FaExclamationTriangle, FaUserPlus,
++} from 'react-icons/fa';
++
++const MAX_MB = 5;
++const MAX_BYTES = MAX_MB * 1024 * 1024;
++const ACCEPT = '.xlsx,.xls,.csv,.txt';
++const ALLOWED = ['xlsx', 'xls', 'csv', 'txt'];
++
++const extOf = (name) => (name.split('.').pop() || '').toLowerCase();
++
++const formatSize = (bytes) =>
++  bytes < 1024 * 1024
++    ? `${Math.max(1, Math.round(bytes / 1024))} Ko`
++    : `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} Mo`;
++
++const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
++
++/** Message lisible pour une réponse d'erreur du serveur. */
++function messageFrom(err) {
++  const status = err.response?.status;
++  const data = err.response?.data;
++  if (data?.errors?.file?.[0]) return data.errors.file[0];
++  if (status === 403) return 'Vous n\u2019avez pas le droit d\u2019ajouter des membres à ce quiz.';
++  if (status === 413) return 'Le fichier est trop volumineux pour le serveur.';
++  if (status === 419) return 'Votre session a expiré. Rechargez la page, puis réessayez.';
++  if (status === 429) return 'Trop de tentatives. Patientez une minute, puis réessayez.';
++  if (data?.message) return data.message;
++  return 'L\u2019import a échoué. Vérifiez votre connexion, puis réessayez.';
++}
++
++function sourceNote(s) {
++  const where = s.sheets > 1 ? `, feuille ${s.sheet}` : '';
++  return s.detected_by === 'header'
++    ? `Colonne « ${s.header} » détectée (colonne ${s.column}${where}).`
++    : `Aucun en-tête « email » trouvé : la colonne ${s.column}${where} a été retenue parce qu\u2019elle contient des adresses e-mail.`;
++}
++
++function downloadTemplate() {
++  const blob = new Blob(['\uFEFFemail\nprenom.nom@exemple.com\n'], { type: 'text/csv;charset=utf-8' });
++  const url = URL.createObjectURL(blob);
++  const a = document.createElement('a');
++  a.href = url;
++  a.download = 'modele-candidats.csv';
++  a.click();
++  URL.revokeObjectURL(url);
++}
++
++const TONES = {
++  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-900/50',
++  blue: 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900/50',
++  amber: 'bg-amber-50 text-amber-800 border-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-900/50',
++  rose: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-900/50',
++  gray: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-700/40 dark:text-gray-300 dark:border-gray-600',
++};
++
++function Stat({ value, label, tone }) {
++  return (
++    <div className={`rounded-xl border px-3 py-2.5 ${TONES[tone]}`}>
++      <span className="block text-xl font-extrabold leading-none">{value}</span>
++      <span className="block text-xs font-semibold mt-1">{label}</span>
++    </div>
++  );
++}
++
++function CopyButton({ items }) {
++  const [copied, setCopied] = useState(false);
++  const copy = async (e) => {
++    e.preventDefault(); // ne pas replier le <details>
++    try {
++      await navigator.clipboard.writeText(items.join('\n'));
++      setCopied(true);
++      setTimeout(() => setCopied(false), 2000);
++    } catch {
++      /* presse-papiers indisponible : rien à faire */
++    }
++  };
++  return (
++    <button type="button" onClick={copy} className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
++      {copied ? <FaCheck /> : <FaCopy />} {copied ? 'Copié' : 'Copier la liste'}
++    </button>
++  );
++}
++
++function Fold({ title, hint, items, tone = 'gray', copyable = false }) {
++  if (!items.length) return null;
++  return (
++    <details className={`rounded-xl border ${TONES[tone]} group`}>
++      <summary className="flex items-center justify-between gap-2 px-3 py-2.5 cursor-pointer text-sm font-semibold select-none">
++        <span>{title} ({items.length})</span>
++        {copyable && <CopyButton items={items} />}
++      </summary>
++      <div className="px-3 pb-3 space-y-2">
++        {hint && <p className="text-xs opacity-80">{hint}</p>}
++        <ul className="max-h-40 overflow-y-auto text-xs font-mono space-y-0.5 break-all">
++          {items.map((it, i) => (
++            <li key={`${it}-${i}`}>{it}</li>
++          ))}
++        </ul>
++      </div>
++    </details>
++  );
++}
++
++function Report({ report }) {
++  const { summary: s, source } = report;
++  const added = s.added > 0;
++
++  return (
++    <div className="space-y-4">
++      <div
++        className={`flex items-start gap-3 rounded-xl border p-4 ${added ? TONES.emerald : TONES.amber}`}
++        role="status"
++      >
++        <span className="mt-0.5 text-lg">{added ? <FaCheck /> : <FaInfoCircle />}</span>
++        <div>
++          <p className="font-bold text-sm">
++            {added
++              ? `${plural(s.added, 'membre ajouté', 'membres ajoutés')} au quiz`
++              : 'Aucun nouveau membre ajouté'}
++          </p>
++          <p className="text-xs mt-0.5 opacity-90">
++            {plural(s.emails, 'adresse distincte lue', 'adresses distinctes lues')} dans le fichier. {sourceNote(source)}
++          </p>
++        </div>
++      </div>
++
++      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
++        <Stat value={s.added} label="Ajoutés" tone="emerald" />
++        <Stat value={s.already} label="Déjà membres" tone="blue" />
++        <Stat value={s.not_found} label="Sans compte ProJA" tone={s.not_found ? 'amber' : 'gray'} />
++        {s.unverified > 0 && <Stat value={s.unverified} label="Compte non vérifié" tone="amber" />}
++        {s.managers > 0 && <Stat value={s.managers} label="Responsables (ignorés)" tone="gray" />}
++        {s.invalid > 0 && <Stat value={s.invalid} label="Valeurs invalides" tone="rose" />}
++        {s.duplicates > 0 && <Stat value={s.duplicates} label="Doublons ignorés" tone="gray" />}
++      </div>
++
++      {source.truncated && (
++        <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
++          <FaExclamationTriangle className="mt-0.5 shrink-0" /> Seules les 5 000 premières lignes ont été lues.
++        </p>
++      )}
++
++      <div className="space-y-2">
++        <Fold
++          title="Ajoutés"
++          tone="emerald"
++          items={report.added.map((u) => `${u.name} — ${u.email}`)}
++        />
++        <Fold
++          title="Sans compte ProJA"
++          tone="amber"
++          hint="Aucun utilisateur ne correspond à ces adresses. Invitez ces personnes à s’inscrire, puis relancez l’import."
++          items={report.not_found}
++          copyable
++        />
++        <Fold
++          title="Comptes non vérifiés"
++          tone="amber"
++          hint="Ces personnes ont un compte mais n’ont pas encore confirmé leur adresse e-mail."
++          items={report.unverified}
++          copyable
++        />
++        <Fold
++          title="Responsables du projet"
++          tone="gray"
++          hint="Les responsables ne passent pas les quiz du projet : ils ont été ignorés."
++          items={report.managers}
++        />
++        <Fold
++          title="Valeurs invalides"
++          tone="rose"
++          hint="Ces cellules de la colonne e-mail ne contiennent pas d’adresse valide."
++          items={report.invalid}
++        />
++      </div>
++    </div>
++  );
++}
++
++export default function CandidatesExcelImport({ project, quiz }) {
++  const [open, setOpen] = useState(false);
++  const [file, setFile] = useState(null);
++  const [dragging, setDragging] = useState(false);
++  const [uploading, setUploading] = useState(false);
++  const [progress, setProgress] = useState(0);
++  const [error, setError] = useState(null);
++  const [report, setReport] = useState(null);
++
++  const triggerRef = useRef(null);
++  const dialogRef = useRef(null);
++  const inputRef = useRef(null);
++
++  const resetState = () => {
++    setFile(null);
++    setError(null);
++    setReport(null);
++    setProgress(0);
++    setDragging(false);
++  };
++
++  const close = useCallback(() => {
++    if (uploading) return;
++    setOpen(false);
++    resetState();
++    triggerRef.current?.focus();
++  }, [uploading]);
++
++  // Modale : défilement de la page bloqué, fermeture avec Échap, focus placé dans la boîte de dialogue.
++  useEffect(() => {
++    if (!open) return undefined;
++    const previous = document.body.style.overflow;
++    document.body.style.overflow = 'hidden';
++    const onKey = (e) => e.key === 'Escape' && close();
++    document.addEventListener('keydown', onKey);
++    dialogRef.current?.focus();
++    return () => {
++      document.body.style.overflow = previous;
++      document.removeEventListener('keydown', onKey);
++    };
++  }, [open, close]);
++
++  const pick = (candidate) => {
++    setReport(null);
++    if (!candidate) return;
++    if (!ALLOWED.includes(extOf(candidate.name))) {
++      setFile(null);
++      setError('Format non pris en charge. Utilisez un fichier .xlsx, .xls ou .csv.');
++    } else if (candidate.size === 0) {
++      setFile(null);
++      setError('Ce fichier est vide.');
++    } else if (candidate.size > MAX_BYTES) {
++      setFile(null);
++      setError(`Ce fichier est trop volumineux (${MAX_MB} Mo maximum).`);
++    } else {
++      setError(null);
++      setFile(candidate);
++    }
++  };
++
++  const submit = async () => {
++    if (!file || uploading) return;
++    setUploading(true);
++    setProgress(0);
++    setError(null);
++
++    const body = new FormData();
++    body.append('file', file);
++
++    try {
++      const { data } = await axios.post(
++        route('projects.quizzes.candidates.import-excel', [project.id, quiz.id]),
++        body,
++        {
++          headers: { Accept: 'application/json' },
++          onUploadProgress: (e) => e.total && setProgress(Math.round((e.loaded / e.total) * 100)),
++        }
++      );
++      setReport(data);
++      // Rafraîchit la liste des candidats de la page sans recharger le reste.
++      router.reload({ only: ['candidates'], preserveScroll: true });
++    } catch (err) {
++      setError(messageFrom(err));
++    } finally {
++      setUploading(false);
++    }
++  };
++
++  const onDrop = (e) => {
++    e.preventDefault();
++    setDragging(false);
++    if (!uploading) pick(e.dataTransfer.files?.[0]);
++  };
++
++  return (
++    <>
++      {/* Carte d'entrée, dans la page du quiz */}
++      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
++        <span className="w-11 h-11 shrink-0 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl">
++          <FaFileExcel />
++        </span>
++        <div className="flex-1 min-w-0">
++          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Importer une liste de candidats</h2>
++          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
++            Déposez un fichier Excel ou CSV avec une colonne « email » : les comptes ProJA correspondants sont ajoutés au quiz.
++          </p>
++        </div>
++        <button
++          ref={triggerRef}
++          type="button"
++          onClick={() => setOpen(true)}
++          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 dark:focus-visible:ring-emerald-900"
++        >
++          <FaUserPlus /> Importer un fichier
++        </button>
++      </div>
++
++      {open &&
++        createPortal(
++          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
++            <div className="absolute inset-0 bg-gray-900/60" onClick={close} aria-hidden="true" />
++
++            <div
++              ref={dialogRef}
++              role="dialog"
++              aria-modal="true"
++              aria-labelledby="excel-import-title"
++              tabIndex={-1}
++              className="relative w-full sm:max-w-2xl max-h-[92vh] flex flex-col bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-xl outline-none"
++            >
++              <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100 dark:border-gray-700">
++                <div>
++                  <h2 id="excel-import-title" className="text-base font-bold text-gray-900 dark:text-white">
++                    Importer des candidats depuis un fichier
++                  </h2>
++                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{quiz.title}</p>
++                </div>
++                <button
++                  type="button"
++                  onClick={close}
++                  disabled={uploading}
++                  aria-label="Fermer"
++                  className="p-2 -m-2 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-40"
++                >
++                  <FaTimes />
++                </button>
++              </div>
++
++              <div className="p-5 overflow-y-auto space-y-4">
++                {report ? (
++                  <Report report={report} />
++                ) : (
++                  <>
++                    <div
++                      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
++                      onDragLeave={() => setDragging(false)}
++                      onDrop={onDrop}
++                      onClick={() => !uploading && inputRef.current?.click()}
++                      className={`rounded-2xl border-2 border-dashed p-6 text-center transition cursor-pointer ${
++                        dragging
++                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
++                          : 'border-gray-300 dark:border-gray-600 hover:border-emerald-400'
++                      }`}
++                    >
++                      <input
++                        ref={inputRef}
++                        type="file"
++                        accept={ACCEPT}
++                        className="sr-only"
++                        onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }}
++                      />
++                      <FaCloudUploadAlt className="mx-auto text-3xl text-gray-400" />
++                      {file ? (
++                        <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white break-all">
++                          {file.name} <span className="font-normal text-gray-500">· {formatSize(file.size)}</span>
++                        </p>
++                      ) : (
++                        <>
++                          <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
++                            Glissez votre fichier ici ou <span className="text-emerald-600 dark:text-emerald-400 underline">parcourez</span>
++                          </p>
++                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">.xlsx, .xls ou .csv · {MAX_MB} Mo maximum</p>
++                        </>
++                      )}
++                    </div>
++
++                    {error && (
++                      <p role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 text-sm p-3">
++                        <FaExclamationTriangle className="mt-0.5 shrink-0" /> {error}
++                      </p>
++                    )}
++
++                    <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
++                      <p>
++                        La colonne des adresses est repérée automatiquement, où qu’elle soit et quel que soit son libellé
++                        (« email », « e-mail », « courriel »…).
++                      </p>
++                      <p>
++                        Seuls les utilisateurs ayant déjà un compte ProJA vérifié sont ajoutés.{' '}
++                        <button type="button" onClick={downloadTemplate} className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 hover:underline">
++                          <FaDownload /> Télécharger un modèle
++                        </button>
++                      </p>
++                    </div>
++
++                    {uploading && (
++                      <div aria-live="polite">
++                        <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
++                          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${progress}%` }} />
++                        </div>
++                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
++                          {progress < 100 ? `Envoi du fichier… ${progress} %` : 'Analyse du fichier et ajout des candidats…'}
++                        </p>
++                      </div>
++                    )}
++                  </>
++                )}
++              </div>
++
++              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 p-4 border-t border-gray-100 dark:border-gray-700">
++                {report ? (
++                  <>
++                    <button
++                      type="button"
++                      onClick={resetState}
++                      className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200"
++                    >
++                      Importer un autre fichier
++                    </button>
++                    <button
++                      type="button"
++                      onClick={close}
++                      className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white"
++                    >
++                      Terminer
++                    </button>
++                  </>
++                ) : (
++                  <>
++                    <button
++                      type="button"
++                      onClick={close}
++                      disabled={uploading}
++                      className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 disabled:opacity-50"
++                    >
++                      Annuler
++                    </button>
++                    <button
++                      type="button"
++                      onClick={submit}
++                      disabled={!file || uploading}
++                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
++                    >
++                      {uploading ? <FaSpinner className="animate-spin" /> : <FaUserPlus />}
++                      {uploading ? 'Import en cours…' : 'Importer et ajouter'}
++                    </button>
++                  </>
++                )}
++              </div>
++            </div>
++          </div>,
++          document.body
++        )}
++    </>
++  );
++}
+diff --git a/resources/js/Pages/Quizzes/Show.jsx b/resources/js/Pages/Quizzes/Show.jsx
+--- a/resources/js/Pages/Quizzes/Show.jsx
++++ b/resources/js/Pages/Quizzes/Show.jsx
+@@ -4,6 +4,7 @@
+ import Avatar from '@/Components/Quiz/Avatar';
+ import ScoreBadge from '@/Components/Quiz/ScoreBadge';
+ import CandidatesPanel from '@/Components/Quiz/CandidatesPanel';
++import CandidatesExcelImport from '@/Components/Quiz/CandidatesExcelImport';
+ import {
+   FaClock, FaQuestionCircle, FaPlay, FaArrowLeft, FaTrophy, FaRedo, FaCheckCircle, FaLock, FaChartBar,
+   FaShareAlt, FaCopy, FaCheck, FaExclamationTriangle, FaGavel, FaStar, FaUsers, FaPenFancy, FaShieldAlt,
+@@ -366,7 +367,12 @@
+         </div>
+ 
+         {/* Candidats : utilisateurs ProJA inscrits à ce quiz */}
+-        {canManage && !quiz.is_draft && <CandidatesPanel project={project} quiz={quiz} candidates={candidates} />}
++        {canManage && !quiz.is_draft && (
++          <>
++            <CandidatesExcelImport project={project} quiz={quiz} />
++            <CandidatesPanel project={project} quiz={quiz} candidates={candidates} />
++          </>
++        )}
+       </div>
+     </div>
+   );
+diff --git a/routes/web.php b/routes/web.php
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -311,2 +311,4 @@
+         Route::delete('/{quiz}/candidates/{candidate}', [\App\Http\Controllers\QuizCandidateController::class, 'destroy'])->name('candidates.destroy');
++        // Import de candidats par fichier Excel / CSV (colonne « email » détectée automatiquement)
++        Route::post('/{quiz}/candidates/import-excel', [\App\Http\Controllers\QuizCandidateController::class, 'importExcel'])->middleware('throttle:10,1')->name('candidates.import-excel');
+ 
+diff --git a/tests/Feature/Quiz/CandidateEmailExtractorTest.php b/tests/Feature/Quiz/CandidateEmailExtractorTest.php
+new file mode 100644
+--- /dev/null
++++ b/tests/Feature/Quiz/CandidateEmailExtractorTest.php
+@@ -0,0 +1,85 @@
++<?php
++
++namespace Tests\Feature\Quiz;
++
++use App\Services\Quiz\CandidateEmailExtractor;
++use Illuminate\Http\UploadedFile;
++use Tests\TestCase;
++
++class CandidateEmailExtractorTest extends TestCase
++{
++    private function extract(string $csv): array
++    {
++        $file = UploadedFile::fake()->createWithContent('candidats.csv', $csv);
++
++        return app(CandidateEmailExtractor::class)->extract($file);
++    }
++
++    /** @dataProvider headerLabels */
++    public function test_detects_the_email_column_whatever_its_label(string $label): void
++    {
++        $r = $this->extract("Nom,{$label}\nAlice,alice@example.com\nBob,BOB@Example.com\n");
++
++        $this->assertSame('header', $r['detected_by']);
++        $this->assertSame('B', $r['column']);
++        $this->assertSame(['alice@example.com', 'bob@example.com'], $r['emails']);
++    }
++
++    public static function headerLabels(): array
++    {
++        return [
++            ['email'], ['E-mail'], ['EMAIL'], ['Mail'], ['Courriel'],
++            ['Adresse e-mail'], ['Adresse mail'], ['Adresse électronique'], ['Email*'], ['Email étudiant'],
++        ];
++    }
++
++    public function test_skips_title_lines_above_the_header(): void
++    {
++        $r = $this->extract("Liste des candidats,\n,\nNom,Email\nAlice,alice@example.com\n");
++
++        $this->assertSame('B', $r['column']);
++        $this->assertSame(['alice@example.com'], $r['emails']);
++    }
++
++    public function test_falls_back_on_content_when_there_is_no_header(): void
++    {
++        $r = $this->extract("Alice,alice@example.com\nBob,bob@example.com\n");
++
++        $this->assertSame('content', $r['detected_by']);
++        $this->assertSame('B', $r['column']);
++        $this->assertCount(2, $r['emails']);
++    }
++
++    public function test_an_address_is_never_mistaken_for_a_header(): void
++    {
++        // « jean@gmail.com » contient « mail » : il ne doit pas être pris pour un en-tête.
++        $r = $this->extract("Jean,jean@gmail.com\nMarie,marie@gmail.com\n");
++
++        $this->assertSame(['jean@gmail.com', 'marie@gmail.com'], $r['emails']);
++    }
++
++    public function test_reports_duplicates_and_invalid_values_and_ignores_blank_cells(): void
++    {
++        $r = $this->extract("Nom,Email\nA,a@x.com\nB,A@X.COM\nC,pas-un-mail\nD,\n");
++
++        $this->assertSame(['a@x.com'], $r['emails']);
++        $this->assertSame(1, $r['duplicates']);
++        $this->assertSame(1, $r['invalid_count']);
++        $this->assertSame(['pas-un-mail'], $r['invalid']);
++    }
++
++    public function test_accepts_several_addresses_in_one_cell(): void
++    {
++        $r = $this->extract("Nom,Email\nA,\"a@x.com; Bob <b@x.com>\"\n");
++
++        $this->assertSame(['a@x.com', 'b@x.com'], $r['emails']);
++    }
++
++    public function test_throws_a_readable_error_when_no_address_is_found(): void
++    {
++        $this->expectException(\DomainException::class);
++        $this->expectExceptionMessage('Aucune colonne « email »');
++
++        $this->extract("Nom,Prénom\nAlice,Martin\n");
++    }
++}
+diff --git a/tests/Feature/Quiz/QuizCandidatesFileImportTest.php b/tests/Feature/Quiz/QuizCandidatesFileImportTest.php
+new file mode 100644
+--- /dev/null
++++ b/tests/Feature/Quiz/QuizCandidatesFileImportTest.php
+@@ -0,0 +1,106 @@
++<?php
++
++namespace Tests\Feature\Quiz;
++
++use App\Models\User;
++use Illuminate\Http\UploadedFile;
++use Illuminate\Support\Arr;
++
++class QuizCandidatesFileImportTest extends QuizHttpTestCase
++{
++    private function upload(string $content, string $name = 'candidats.csv'): UploadedFile
++    {
++        return UploadedFile::fake()->createWithContent($name, $content);
++    }
++
++    private function importUrl($quiz): string
++    {
++        return $this->quizUrl($quiz, '/candidates/import-excel');
++    }
++
++    private function import($user, $quiz, UploadedFile $file)
++    {
++        return $this->actingAs($user)->post($this->importUrl($quiz), ['file' => $file], ['Accept' => 'application/json']);
++    }
++
++    public function test_users_matching_the_email_column_are_enrolled_and_the_report_is_detailed(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        $diane = User::factory()->create(['email' => 'diane@example.com']);
++        User::factory()->create(['email' => 'nonverifie@example.com', 'email_verified_at' => null]);
++
++        // Fichier « à la française » : séparateur « ; », colonne libellée « Adresse e-mail », casse variable.
++        $csv = "Nom;Adresse e-mail\n"
++            . "Diane;DIANE@example.com\n"
++            . "Inconnu;inconnu@example.com\n"
++            . "Non vérifié;nonverifie@example.com\n"
++            . "Responsable;{$this->manager1->email}\n"
++            . "Membre;{$this->candidate->email}\n"
++            . "Doublon;diane@example.com\n"
++            . "Erreur;pas-un-mail\n";
++
++        $res = $this->import($this->manager1, $quiz, $this->upload($csv))->assertOk();
++
++        $res->assertJsonPath('source.detected_by', 'header')->assertJsonPath('source.column', 'B');
++        $this->assertEquals(
++            ['emails' => 5, 'added' => 2, 'already' => 0, 'not_found' => 1, 'unverified' => 1, 'managers' => 1, 'invalid' => 1, 'duplicates' => 1],
++            Arr::only($res->json('summary'), ['emails', 'added', 'already', 'not_found', 'unverified', 'managers', 'invalid', 'duplicates'])
++        );
++        $this->assertSame(['inconnu@example.com'], $res->json('not_found'));
++
++        $this->assertEqualsCanonicalizing(
++            [$diane->id, $this->candidate->id],
++            $quiz->candidates()->pluck('user_id')->all()
++        );
++        $this->assertSame(1, $diane->notifications()->count());
++    }
++
++    public function test_importing_the_same_file_twice_does_not_duplicate_anyone(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        User::factory()->create(['email' => 'diane@example.com']);
++        $csv = "email\ndiane@example.com\n";
++
++        $this->import($this->manager1, $quiz, $this->upload($csv))->assertJsonPath('summary.added', 1);
++        $second = $this->import($this->manager1, $quiz, $this->upload($csv))->assertOk();
++
++        $this->assertSame(0, $second->json('summary.added'));
++        $this->assertSame(1, $second->json('summary.already'));
++        $this->assertSame(1, $quiz->candidates()->count());
++    }
++
++    public function test_a_file_without_any_email_is_refused_with_a_clear_message(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++
++        $res = $this->import($this->manager1, $quiz, $this->upload("Nom,Prénom\nAlice,Martin\n"))->assertStatus(422);
++
++        $this->assertStringContainsString('Aucune colonne « email »', $res->json('message'));
++        $this->assertSame(0, $quiz->candidates()->count());
++    }
++
++    public function test_unsupported_formats_and_missing_files_are_refused(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++
++        $this->import($this->manager1, $quiz, UploadedFile::fake()->create('notes.pdf', 10))
++            ->assertStatus(422)->assertJsonValidationErrors('file');
++
++        $this->actingAs($this->manager1)->post($this->importUrl($quiz), [], ['Accept' => 'application/json'])
++            ->assertStatus(422)->assertJsonValidationErrors('file');
++    }
++
++    public function test_only_managers_can_import_and_drafts_are_refused(): void
++    {
++        $quiz = $this->makeQuiz([$this->qcm()]);
++        User::factory()->create(['email' => 'diane@example.com']);
++        $csv = "email\ndiane@example.com\n";
++
++        $this->import($this->candidate, $quiz, $this->upload($csv))->assertForbidden();
++
++        $draft = $this->makeQuiz([$this->qcm()], 'Brouillon');
++        $draft->update(['is_draft' => true]);
++        $this->import($this->manager1, $draft, $this->upload($csv))->assertStatus(422);
++        $this->assertSame(0, $draft->candidates()->count());
++    }
++}
+-- 
+2.43.0
+

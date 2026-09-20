@@ -9,9 +9,12 @@ use App\Models\QuizCandidate;
 use App\Models\QuizResult;
 use App\Models\User;
 use App\Notifications\QuizNotification;
+use App\Services\Quiz\CandidateEmailExtractor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
@@ -20,6 +23,12 @@ use Illuminate\Validation\Rule;
  */
 class QuizCandidateController extends Controller
 {
+    /** Taille maximale d'un fichier d'import (en Ko). */
+    private const IMPORT_MAX_KB = 5120;
+
+    /** Extensions acceptées pour l'import de fichier. */
+    private const IMPORT_EXTENSIONS = ['xlsx', 'xls', 'csv', 'txt'];
+
     /** Recherche d'utilisateurs à ajouter (nom ou e-mail, 2 caractères minimum). */
     public function search(Request $request, Project $project, Quiz $quiz): JsonResponse
     {
@@ -137,6 +146,105 @@ class QuizCandidateController extends Controller
         return $this->enrol($quiz, $ids);
     }
 
+    /**
+     * Import par fichier Excel / CSV : la colonne « email » est détectée automatiquement
+     * (voir CandidateEmailExtractor) et les utilisateurs ProJA dont l'e-mail correspond sont
+     * ajoutés d'office au quiz.
+     *
+     * Répond en JSON avec un compte rendu détaillé : ajoutés, déjà membres, introuvables,
+     * comptes non vérifiés, responsables du projet (ignorés) et valeurs invalides.
+     */
+    public function importExcel(Request $request, Project $project, Quiz $quiz, CandidateEmailExtractor $extractor): JsonResponse
+    {
+        $this->authorize('manage', [Quiz::class, $project]);
+
+        if ($quiz->is_draft) {
+            return response()->json(['message' => 'Publiez d\'abord le quiz avant d\'y ajouter des membres.'], 422);
+        }
+
+        $request->validate([
+            'file' => [
+                'bail', 'required', 'file', 'max:' . self::IMPORT_MAX_KB,
+                function (string $attribute, mixed $file, \Closure $fail) {
+                    // L'extension déclarée suffit ici : le contenu réel est vérifié à la lecture.
+                    if (! in_array(strtolower($file->getClientOriginalExtension()), self::IMPORT_EXTENSIONS, true)) {
+                        $fail('Format non pris en charge : utilisez un fichier .xlsx, .xls ou .csv.');
+                    }
+                },
+            ],
+        ], [
+            'file.required' => 'Sélectionnez un fichier à importer.',
+            'file.file' => 'Le fichier envoyé est invalide.',
+            'file.max' => 'Le fichier est trop volumineux (' . (self::IMPORT_MAX_KB / 1024) . ' Mo maximum).',
+        ]);
+
+        try {
+            $parsed = $extractor->extract($request->file('file'));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $emails = $parsed['emails'];
+
+        // Correspondance insensible à la casse, par lots pour rester sous la limite de paramètres SQL.
+        $users = collect();
+        foreach (array_chunk($emails, 500) as $chunk) {
+            $users = $users->concat(
+                User::query()
+                    ->whereIn(DB::raw('LOWER(email)'), $chunk)
+                    ->get(['id', 'name', 'email', 'email_verified_at'])
+            );
+        }
+        $byEmail = $users->keyBy(fn (User $u) => mb_strtolower($u->email));
+
+        $managerIds = $project->users()->wherePivot('role', 'manager')->pluck('users.id')->all();
+        $enrolled = array_flip($quiz->candidates()->pluck('user_id')->all());
+
+        $toAdd = [];
+        $already = $notFound = $unverified = $managers = [];
+
+        foreach ($emails as $email) {
+            $user = $byEmail->get($email);
+
+            if (! $user) {
+                $notFound[] = $email;
+            } elseif (! $user->email_verified_at) {
+                // Cohérent avec la recherche : un compte non vérifié ne peut pas se connecter.
+                $unverified[] = $email;
+            } elseif (in_array($user->id, $managerIds, true)) {
+                $managers[] = $email;
+            } elseif (isset($enrolled[$user->id])) {
+                $already[] = $email;
+            } else {
+                $toAdd[$user->id] = ['name' => $user->name, 'email' => $user->email];
+            }
+        }
+
+        if ($toAdd) {
+            $this->attach($quiz, array_keys($toAdd), $request->user(), 'import de fichier');
+        }
+
+        return response()->json([
+            'source' => Arr::only($parsed, ['sheet', 'sheets', 'column', 'header', 'detected_by', 'truncated']),
+            'summary' => [
+                'rows' => $parsed['rows'],
+                'emails' => count($emails),
+                'added' => count($toAdd),
+                'already' => count($already),
+                'not_found' => count($notFound),
+                'unverified' => count($unverified),
+                'managers' => count($managers),
+                'invalid' => $parsed['invalid_count'],
+                'duplicates' => $parsed['duplicates'],
+            ],
+            'added' => array_values($toAdd),
+            'not_found' => $notFound,
+            'unverified' => $unverified,
+            'managers' => $managers,
+            'invalid' => $parsed['invalid'],
+        ]);
+    }
+
     public function destroy(Project $project, Quiz $quiz, QuizCandidate $candidate)
     {
         $this->authorize('manage', [Quiz::class, $project]);
@@ -187,16 +295,7 @@ class QuizCandidateController extends Controller
                 : 'Cet utilisateur est déjà membre de ce quiz.');
         }
 
-        $actor = Auth::user();
-        foreach ($new as $userId) {
-            QuizCandidate::create(['quiz_id' => $quiz->id, 'user_id' => $userId, 'added_by' => $actor->id]);
-        }
-
-        $this->notify($quiz, $new, $actor);
-
-        if (function_exists('activity_log')) {
-            activity_log('create', count($new) . " membre(s) ajouté(s) au quiz '{$quiz->title}' par {$actor->name}", $quiz);
-        }
+        $this->attach($quiz, $new, Auth::user());
 
         // Message explicite : combien ont vraiment été ajoutés, combien étaient déjà membres
         // (ignorés sans erreur — l'import peut continuer sereinement).
@@ -210,6 +309,33 @@ class QuizCandidateController extends Controller
             'skipped' => $skipped,
             'requested' => $requested,
         ]);
+    }
+
+    /**
+     * Inscrit les utilisateurs au quiz (atomique et idempotent), les notifie et journalise l'action.
+     * Point d'entrée commun à l'ajout manuel, à l'import de membres du projet et à l'import de fichier.
+     *
+     * @param  list<int>  $userIds  Identifiants pas encore inscrits.
+     * @param  string|null  $origin  Précision pour le journal d'activité (ex. « import de fichier »).
+     */
+    private function attach(Quiz $quiz, array $userIds, User $actor, ?string $origin = null): void
+    {
+        DB::transaction(function () use ($quiz, $userIds, $actor) {
+            foreach ($userIds as $userId) {
+                // firstOrCreate : une inscription simultanée ne fait pas échouer tout le lot.
+                QuizCandidate::firstOrCreate(
+                    ['quiz_id' => $quiz->id, 'user_id' => $userId],
+                    ['added_by' => $actor->id]
+                );
+            }
+        });
+
+        $this->notify($quiz, $userIds, $actor);
+
+        if (function_exists('activity_log')) {
+            $suffix = $origin ? " ({$origin})" : '';
+            activity_log('create', count($userIds) . " membre(s) ajouté(s) au quiz '{$quiz->title}' par {$actor->name}{$suffix}", $quiz);
+        }
     }
 
     /** @param list<int> $userIds */
