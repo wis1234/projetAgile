@@ -65,19 +65,73 @@ class QuizCandidateController extends Controller
         return $this->enrol($quiz, $data['user_ids']);
     }
 
-    /** Inscrit d'un coup tous les membres du projet (hors responsables). */
-    public function addMembers(Project $project, Quiz $quiz)
+    /**
+     * Liste paginée et cherchable des membres du projet éligibles (ni responsables, ni déjà
+     * membres du quiz), pour l'import en masse avec exclusion manuelle côté interface.
+     */
+    public function importable(Request $request, Project $project, Quiz $quiz): JsonResponse
     {
         $this->authorize('manage', [Quiz::class, $project]);
+
+        $term = trim((string) $request->query('q', ''));
+        $perPage = min(50, max(5, (int) $request->query('per_page', 20)));
+
+        $already = $quiz->candidates()->pluck('user_id');
+
+        $query = $project->users()
+            ->wherePivot('role', '!=', 'manager')
+            ->wherePivot('is_muted', false)
+            ->whereNotIn('users.id', $already)
+            ->when($term !== '', function ($q) use ($term) {
+                $like = '%' . addcslashes($term, '%_\\') . '%';
+                $q->where(fn ($w) => $w->where('name', 'like', $like)->orWhere('email', 'like', $like));
+            })
+            ->orderBy('name');
+
+        $page = $query->paginate($perPage, ['users.id', 'name', 'email', 'profile_photo_path'], 'page')
+            ->withQueryString();
+
+        return response()->json([
+            'data' => collect($page->items())->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'photo' => $u->profile_photo_url,
+            ]),
+            'current_page' => $page->currentPage(),
+            'last_page' => $page->lastPage(),
+            'per_page' => $page->perPage(),
+            // Total réellement éligible (hors responsables, hors déjà-membres, hors filtre courant) :
+            // sert à afficher « Tout sélectionner (N) » sans devoir charger toutes les pages.
+            'total' => $page->total(),
+        ]);
+    }
+
+    /**
+     * Inscrit en masse les membres éligibles du projet (hors responsables, hors muets, hors déjà
+     * membres), à l'exception de ceux explicitement décochés dans l'interface d'import.
+     *
+     * @param  list<int>  $exceptUserIds  Identifiants décochés par le responsable avant l'import.
+     */
+    public function addMembers(Request $request, Project $project, Quiz $quiz)
+    {
+        $this->authorize('manage', [Quiz::class, $project]);
+
+        $data = $request->validate([
+            'except_user_ids' => ['sometimes', 'array'],
+            'except_user_ids.*' => ['integer'],
+        ]);
+        $except = $data['except_user_ids'] ?? [];
 
         $ids = $project->users()
             ->wherePivot('role', '!=', 'manager')
             ->wherePivot('is_muted', false)
+            ->when($except, fn ($q) => $q->whereNotIn('users.id', $except))
             ->pluck('users.id')
             ->all();
 
         if (! $ids) {
-            return back()->with('error', 'Ce projet n\'a aucun membre à ajouter.');
+            return back()->with('error', 'Aucun membre à ajouter : soit le projet n\'en a pas, soit tous ont été exclus ou sont déjà membres du quiz.');
         }
 
         return $this->enrol($quiz, $ids);
@@ -122,11 +176,15 @@ class QuizCandidateController extends Controller
             return back()->with('error', 'Publiez d\'abord le quiz avant d\'y ajouter des membres.');
         }
 
+        $requested = count(array_unique($userIds));
         $already = $quiz->candidates()->pluck('user_id')->all();
         $new = array_values(array_diff($userIds, $already));
+        $skipped = $requested - count($new);
 
         if (! $new) {
-            return back()->with('info', 'Ces utilisateurs sont déjà membres de ce quiz.');
+            return back()->with('info', $requested > 1
+                ? "Ces {$requested} utilisateurs étaient déjà membres de ce quiz : personne n'a été ajouté."
+                : 'Cet utilisateur est déjà membre de ce quiz.');
         }
 
         $actor = Auth::user();
@@ -140,7 +198,18 @@ class QuizCandidateController extends Controller
             activity_log('create', count($new) . " membre(s) ajouté(s) au quiz '{$quiz->title}' par {$actor->name}", $quiz);
         }
 
-        return back()->with('success', count($new) . ' membre(s) ajouté(s) au quiz.');
+        // Message explicite : combien ont vraiment été ajoutés, combien étaient déjà membres
+        // (ignorés sans erreur — l'import peut continuer sereinement).
+        $message = count($new) . ' membre(s) ajouté(s) au quiz.';
+        if ($skipped > 0) {
+            $message .= " {$skipped} étaient déjà membres et ont été ignorés — vous pouvez continuer.";
+        }
+
+        return back()->with('success', $message)->with('import_summary', [
+            'added' => count($new),
+            'skipped' => $skipped,
+            'requested' => $requested,
+        ]);
     }
 
     /** @param list<int> $userIds */

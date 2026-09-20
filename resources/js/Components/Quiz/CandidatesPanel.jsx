@@ -1,8 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { router } from '@inertiajs/react';
 import {
   FaCheckCircle,
+  FaChevronLeft,
+  FaChevronRight,
   FaClock,
   FaHourglassHalf,
   FaLock,
@@ -15,6 +17,7 @@ import {
 } from 'react-icons/fa';
 import Avatar from '@/Components/Quiz/Avatar';
 import ScoreBadge from '@/Components/Quiz/ScoreBadge';
+import ImportMembersModal from '@/Components/Quiz/ImportMembersModal';
 
 const STATUS = {
   not_started: { label: 'Pas commencé', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
@@ -23,9 +26,14 @@ const STATUS = {
   completed: { label: 'Terminé', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' },
 };
 
+const ROSTER_PAGE_SIZE = 8;
+
 /**
- * Candidats d'un quiz : ajout d'utilisateurs ProJA déjà inscrits, suivi de leur avancement,
- * et option « réservé aux candidats ajoutés ».
+ * Membres d'un quiz : ajout individuel ou en masse d'utilisateurs ProJA déjà inscrits, suivi de
+ * leur avancement, et option « réservé aux membres du quiz ».
+ *
+ * Organisation (du plus fréquent au plus rare) : ajouter des membres → réglage de visibilité →
+ * liste des membres déjà ajoutés, filtrable et paginée pour rester lisible même à grande échelle.
  */
 export default function CandidatesPanel({ project, quiz, candidates = [] }) {
   const [query, setQuery] = useState('');
@@ -33,7 +41,13 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState([]); // utilisateurs choisis, pas encore ajoutés
   const [busy, setBusy] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const requestId = useRef(0);
+
+  // Liste des membres déjà ajoutés : filtre local + pagination, pour rester lisible même avec
+  // beaucoup de membres (aucune requête serveur nécessaire, la liste complète tient déjà en mémoire).
+  const [rosterFilter, setRosterFilter] = useState('');
+  const [rosterPage, setRosterPage] = useState(1);
 
   const routeArgs = [project.id, quiz.id];
   const alreadyPicked = new Set(selected.map((u) => u.id));
@@ -82,11 +96,6 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
     );
   };
 
-  const addAllMembers = () => {
-    if (!confirm('Ajouter tous les membres du projet (hors responsables) comme membres de ce quiz ?')) return;
-    router.post(route('projects.quizzes.candidates.members', routeArgs), {}, { preserveScroll: true, onStart: () => setBusy(true), onFinish: () => setBusy(false) });
-  };
-
   const remove = (candidate) => {
     if (!confirm(`Retirer ${candidate.name} des membres de ce quiz ?`)) return;
     router.delete(route('projects.quizzes.candidates.destroy', [...routeArgs, candidate.id]), { preserveScroll: true });
@@ -97,37 +106,46 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
 
   const done = candidates.filter((c) => ['completed', 'pending'].includes(c.status)).length;
 
+  // Filtre local (nom/e-mail/statut) + pagination de la liste des membres déjà ajoutés.
+  const filteredRoster = useMemo(() => {
+    const term = rosterFilter.trim().toLowerCase();
+    if (!term) return candidates;
+    return candidates.filter((c) => {
+      const status = STATUS[c.status]?.label?.toLowerCase() || '';
+      return c.name?.toLowerCase().includes(term) || c.email?.toLowerCase().includes(term) || status.includes(term);
+    });
+  }, [candidates, rosterFilter]);
+
+  const rosterPageCount = Math.max(1, Math.ceil(filteredRoster.length / ROSTER_PAGE_SIZE));
+  const currentRosterPage = Math.min(rosterPage, rosterPageCount);
+  const pagedRoster = filteredRoster.slice((currentRosterPage - 1) * ROSTER_PAGE_SIZE, currentRosterPage * ROSTER_PAGE_SIZE);
+
+  useEffect(() => {
+    setRosterPage(1);
+  }, [rosterFilter, candidates.length]);
+
   return (
     <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 sm:p-6 space-y-5" aria-labelledby="candidates-title">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 id="candidates-title" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <FaUsers className="text-purple-600" /> Membres du quiz
-            <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 text-xs font-bold">{candidates.length}</span>
-          </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Ajoutez des utilisateurs déjà inscrits sur ProJA : ils deviennent membres de ce quiz et le voient dans leur menu « Quiz », sans faire partie du projet. Seuls les membres du quiz peuvent recevoir un bonus de participation.
-            {candidates.length > 0 && ` ${done} / ${candidates.length} ont terminé.`}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={addAllMembers}
-          disabled={busy}
-          className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition disabled:opacity-50"
-        >
-          <FaUserPlus /> Ajouter les membres du projet au quiz
-        </button>
+      {/* En-tête */}
+      <div>
+        <h2 id="candidates-title" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <FaUsers className="text-purple-600" /> Membres du quiz
+          <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 text-xs font-bold">{candidates.length}</span>
+        </h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          Ajoutez des utilisateurs déjà inscrits sur ProJA : ils deviennent membres de ce quiz et le voient dans leur menu « Quiz », sans faire partie du projet. Seuls les membres du quiz peuvent recevoir un bonus de participation.
+          {candidates.length > 0 && ` ${done} / ${candidates.length} ont terminé.`}
+        </p>
       </div>
 
-      {/* Recherche / ajout */}
-      <div className="space-y-3">
+      {/* Ajout : individuel (recherche) à gauche, en masse (import) à droite */}
+      <div className="grid sm:grid-cols-2 gap-3">
         <div className="relative">
           <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher un utilisateur par nom ou e-mail (2 lettres minimum)…"
+            placeholder="Ajouter un membre par nom ou e-mail…"
             className="w-full pl-10 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:border-purple-500 focus:ring-purple-500"
             aria-label="Rechercher un utilisateur à ajouter"
           />
@@ -159,30 +177,38 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
           )}
         </div>
 
-        {selected.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40">
-            {selected.map((u) => (
-              <span key={u.id} className="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-sm">
-                <Avatar name={u.name} src={u.photo} size="xs" />
-                {u.name}
-                <button type="button" onClick={() => setSelected((l) => l.filter((x) => x.id !== u.id))} className="text-gray-400 hover:text-red-500" aria-label={`Retirer ${u.name} de la sélection`}>
-                  <FaTimes className="text-xs" />
-                </button>
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={submit}
-              disabled={busy}
-              className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition disabled:opacity-50"
-            >
-              {busy ? <FaSpinner className="animate-spin" /> : <FaUserPlus />} Ajouter {selected.length} membre(s)
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={() => setImportOpen(true)}
+          className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition"
+        >
+          <FaUserPlus /> Importer des membres du projet…
+        </button>
       </div>
 
-      {/* Quiz réservé */}
+      {selected.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40">
+          {selected.map((u) => (
+            <span key={u.id} className="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-sm">
+              <Avatar name={u.name} src={u.photo} size="xs" />
+              {u.name}
+              <button type="button" onClick={() => setSelected((l) => l.filter((x) => x.id !== u.id))} className="text-gray-400 hover:text-red-500" aria-label={`Retirer ${u.name} de la sélection`}>
+                <FaTimes className="text-xs" />
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy}
+            className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition disabled:opacity-50"
+          >
+            {busy ? <FaSpinner className="animate-spin" /> : <FaUserPlus />} Ajouter {selected.length} membre(s)
+          </button>
+        </div>
+      )}
+
+      {/* Réglage de visibilité */}
       <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
         <input
           type="checkbox"
@@ -198,44 +224,87 @@ export default function CandidatesPanel({ project, quiz, candidates = [] }) {
         </span>
       </label>
 
-      {/* Liste */}
+      {/* Liste des membres déjà ajoutés : filtre + pagination */}
       {candidates.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">Aucun membre ajouté pour l'instant.</p>
       ) : (
-        <ul className="divide-y divide-gray-100 dark:divide-gray-700 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-          {candidates.map((c) => {
-            const st = STATUS[c.status] || STATUS.not_started;
-            return (
-              <li key={c.id} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800">
-                <Avatar name={c.name} src={c.photo} size="md" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.email}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {c.status === 'completed' && c.score !== null && <ScoreBadge score={c.score} size="sm" />}
-                  <span className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.cls}`}>
-                    {c.status === 'completed' && <FaCheckCircle />}
-                    {c.status === 'in_progress' && <FaClock />}
-                    {c.status === 'pending' && <FaHourglassHalf />}
-                    {st.label}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => remove(c)}
-                    disabled={c.locked}
-                    title={c.locked ? 'A déjà commencé le quiz : ne peut plus être retiré' : 'Retirer ce candidat'}
-                    className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-30 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition"
-                    aria-label={`Retirer ${c.name}`}
-                  >
-                    {c.locked ? <FaLock /> : <FaTrash />}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="space-y-2.5">
+          {candidates.length > ROSTER_PAGE_SIZE && (
+            <div className="relative">
+              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+              <input
+                value={rosterFilter}
+                onChange={(e) => setRosterFilter(e.target.value)}
+                placeholder="Filtrer les membres ajoutés par nom, e-mail ou statut…"
+                className="w-full pl-9 py-1.5 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs focus:border-purple-500 focus:ring-purple-500"
+                aria-label="Filtrer la liste des membres"
+              />
+            </div>
+          )}
+
+          {filteredRoster.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">Aucun membre ne correspond à ce filtre.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100 dark:divide-gray-700 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+              {pagedRoster.map((c) => {
+                const st = STATUS[c.status] || STATUS.not_started;
+                return (
+                  <li key={c.id} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800">
+                    <Avatar name={c.name} src={c.photo} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {c.status === 'completed' && c.score !== null && <ScoreBadge score={c.score} size="sm" />}
+                      <span className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.cls}`}>
+                        {c.status === 'completed' && <FaCheckCircle />}
+                        {c.status === 'in_progress' && <FaClock />}
+                        {c.status === 'pending' && <FaHourglassHalf />}
+                        {st.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => remove(c)}
+                        disabled={c.locked}
+                        title={c.locked ? 'A déjà commencé le quiz : ne peut plus être retiré' : 'Retirer ce membre'}
+                        className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-30 disabled:hover:text-gray-400 disabled:hover:bg-transparent transition"
+                        aria-label={`Retirer ${c.name}`}
+                      >
+                        {c.locked ? <FaLock /> : <FaTrash />}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {rosterPageCount > 1 && (
+            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-1">
+              <button
+                type="button"
+                disabled={currentRosterPage <= 1}
+                onClick={() => setRosterPage((p) => p - 1)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <FaChevronLeft /> Précédent
+              </button>
+              <span>Page {currentRosterPage} / {rosterPageCount}</span>
+              <button
+                type="button"
+                disabled={currentRosterPage >= rosterPageCount}
+                onClick={() => setRosterPage((p) => p + 1)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Suivant <FaChevronRight />
+              </button>
+            </div>
+          )}
+        </div>
       )}
+
+      <ImportMembersModal project={project} quiz={quiz} open={importOpen} onClose={() => setImportOpen(false)} />
     </section>
   );
 }

@@ -308,6 +308,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{quiz}/candidates/members', [\App\Http\Controllers\QuizCandidateController::class, 'addMembers'])->name('candidates.members');
         Route::put('/{quiz}/candidates/restriction', [\App\Http\Controllers\QuizCandidateController::class, 'restriction'])->name('candidates.restriction');
         Route::delete('/{quiz}/candidates/{candidate}', [\App\Http\Controllers\QuizCandidateController::class, 'destroy'])->name('candidates.destroy');
+        Route::get('/{quiz}/candidates/importable', [\App\Http\Controllers\QuizCandidateController::class, 'importable'])->name('candidates.importable');
 
         Route::get('/', [\App\Http\Controllers\QuizController::class, 'index'])->name('index');
         Route::get('/create', [\App\Http\Controllers\QuizController::class, 'create'])->name('create');
