@@ -3,15 +3,20 @@ import { Head } from '@inertiajs/react';
 import { FaTasks, FaCalendarAlt, FaEdit, FaVideo, FaQuestionCircle, FaFileAlt, FaComments, FaBolt, FaChevronRight, FaCheckCircle, FaPlus } from 'react-icons/fa';
 import MobileLayout from '@/Layouts/MobileLayout';
 import Avatar from '@/Components/Quiz/Avatar';
-import { MHero, MCard, MPill, MStat, MSectionTitle, MSegmented, MEmpty, MButton, MFab, safeRoute } from '@/Components/Mobile/kit';
+import { MHero, MCard, MPill, MStat, MSectionTitle, MSegmented, MEmpty, MButton, MFab, safeRoute, asList, listTotal } from '@/Components/Mobile/kit';
 
 const TS = { todo: ['À faire', 'slate'], in_progress: ['En cours', 'amber'], done: ['Terminé', 'green'] };
 const PR = { high: ['Haute', 'red'], medium: ['Moyenne', 'amber'], low: ['Basse', 'blue'] };
 const d = (v) => (v ? new Date(v).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—');
 
-export default function MobileProjectShow({ project, tasks = [], sprints = [], quizzes = [], stats = {} }) {
+export default function MobileProjectShow({ project, tasks: tasksProp = [], sprints: sprintsProp = [], quizzes = [], stats = {} }) {
   const [tab, setTab] = useState('tasks');
-  const total = stats.totalTasks ?? tasks.length;
+  // tasks / sprints arrivent paginés ({ data: [...] }) : on travaille sur de vraies listes.
+  const tasks = asList(tasksProp);
+  const sprints = asList(sprintsProp);
+  const tasksTotal = listTotal(tasksProp);
+  const sprintsTotal = listTotal(sprintsProp);
+  const total = stats.totalTasks ?? tasksTotal;
   const done = stats.doneTasksCount ?? tasks.filter((t) => t.status === 'done').length;
   const pct = total ? Math.round((done / total) * 100) : 0;
   const members = project.users || [];
@@ -52,7 +57,7 @@ export default function MobileProjectShow({ project, tasks = [], sprints = [], q
           <MButton href={`/files?project_id=${project.id}`} tone="soft"><FaFileAlt className="text-sky-500" /> Fichiers</MButton>
         </div>
 
-        <MSegmented value={tab} onChange={setTab} options={[{ value: 'tasks', label: 'Tâches', count: tasks.length }, { value: 'sprints', label: 'Sprints', count: sprints.length }]} />
+        <MSegmented value={tab} onChange={setTab} options={[{ value: 'tasks', label: 'Tâches', count: tasksTotal }, { value: 'sprints', label: 'Sprints', count: sprintsTotal }]} />
 
         {tab === 'tasks' ? (
           tasks.length === 0 ? <MEmpty icon={FaTasks} title="Aucune tâche" text="Ce projet n'a pas encore de tâche." /> : (
@@ -72,6 +77,9 @@ export default function MobileProjectShow({ project, tasks = [], sprints = [], q
                   </MCard>
                 );
               })}
+              {tasksTotal > tasks.length && (
+                <MButton href={`/tasks?project_id=${project.id}`} tone="soft" className="w-full">Voir les {tasksTotal} tâches</MButton>
+              )}
             </div>
           )
         ) : sprints.length === 0 ? <MEmpty icon={FaBolt} title="Aucun sprint" /> : (
@@ -83,6 +91,9 @@ export default function MobileProjectShow({ project, tasks = [], sprints = [], q
                   <FaChevronRight className="text-xs text-slate-300" /></div>
               </MCard>
             ))}
+            {sprintsTotal > sprints.length && (
+              <MButton href={`/sprints?project_id=${project.id}`} tone="soft" className="w-full">Voir les {sprintsTotal} sprints</MButton>
+            )}
           </div>
         )}
       </div>

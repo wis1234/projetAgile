@@ -15,6 +15,7 @@ import './lib/globalErrorHandler';
 import './echo';
 import { isNativeApp, initializeNativeApp } from './lib/platform';
 import MobilePageFallback from '@/Components/MobilePageFallback';
+import { withPageBoundary } from '@/Components/Mobile/PageBoundary';
 import { useEffect } from 'react';
 
 
@@ -106,22 +107,23 @@ createInertiaApp({
     resolve: async (name) => {
         // Les pages déjà situées sous Pages/Mobile/... ne repassent pas par le switch.
         if (name.startsWith('Mobile/')) {
-            return (await resolvePageComponent(`./Pages/${name}.jsx`, webPages)).default;
+            return withPageBoundary((await resolvePageComponent(`./Pages/${name}.jsx`, webPages)).default);
         }
 
         // Dans l'APK Capacitor : bascule automatique vers la version Mobile UI si elle existe.
+        // Chaque page mobile est protégée : une erreur de rendu affiche un écran d'erreur, jamais un écran blanc.
         if (isNativeApp() || previewMobileUi()) {
             const mobileKey = mobilePageCandidates(name).find((candidate) => mobilePages[candidate]);
             if (mobileKey) {
-                return (await mobilePages[mobileKey]()).default;
+                return withPageBoundary((await mobilePages[mobileKey]()).default);
             }
 
             // Toute page sans version dédiée reste dans un shell mobile :
             // aucune page desktop ne doit être montée comme layout racine dans Capacitor.
             const page = await resolvePageComponent(`./Pages/${name}.jsx`, webPages);
-            return (props) => (
+            return withPageBoundary((props) => (
                 <MobilePageFallback PageComponent={page.default} pageName={name} {...props} />
-            );
+            ));
         }
 
         // Navigateur : page web habituelle.

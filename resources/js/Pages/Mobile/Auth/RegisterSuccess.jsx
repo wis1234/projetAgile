@@ -13,7 +13,7 @@ export default function MobileRegisterSuccess({ email, emailSent = true, role = 
   const resend = () => { if (sending || cooldown.active) return; router.post(route('register.resend'), {}, { preserveScroll: true, preserveState: true, onStart: () => setSending(true), onSuccess: () => cooldown.start(60), onError: () => toast.error("L'e-mail n'a pas pu être renvoyé."), onFinish: () => setSending(false) }); };
 
   return (
-    <div className={`min-h-[100dvh] ${emailSent ? 'bg-gradient-to-b from-blue-600 to-indigo-800' : 'bg-gradient-to-b from-amber-500 to-orange-700'}`} style={{ paddingTop: 'var(--safe-top)' }}>
+    <div className={`mobile-app-shell min-h-[100dvh] overscroll-contain ${emailSent ? 'bg-gradient-to-b from-blue-600 to-indigo-800' : 'bg-gradient-to-b from-amber-500 to-orange-700'}`} style={{ paddingTop: 'var(--safe-top)' }}>
       <Head title="Compte créé" />
       <div className="px-6 pb-8 pt-14 text-center text-white">
         <span className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/15 text-4xl">{emailSent ? <FaEnvelopeOpenText /> : <FaExclamationTriangle />}</span>

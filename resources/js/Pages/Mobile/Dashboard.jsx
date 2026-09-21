@@ -1,47 +1,68 @@
 // resources/js/Pages/Mobile/Dashboard.jsx
-import React from 'react';
-import { Head, Link } from '@inertiajs/react';
-import MobileLayout from '@/Layouts/MobileLayout';
+import React, { useMemo } from 'react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
-  FaArrowRight, FaCheck, FaClock, FaFileAlt, FaFire, FaProjectDiagram,
-  FaTasks, FaUsers, FaChevronRight, FaDownload, FaUserPlus,
+  FaBell, FaBolt, FaChevronRight, FaComments, FaDownload, FaFileAlt, FaFolderOpen,
+  FaProjectDiagram, FaQuestionCircle, FaTasks, FaUsers, FaColumns, FaPlus,
 } from 'react-icons/fa';
+import MobileLayout from '@/Layouts/MobileLayout';
+import Avatar from '@/Components/Quiz/Avatar';
+import { MEmpty, asList } from '@/Components/Mobile/kit';
 
-const initials = (name = '') =>
-  name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'P';
-
-// ─── Petite pastille de statut avec barre de progression ────────────────────
-const StatusRow = ({ label, count, total, color }) => {
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[13px] font-medium text-slate-600">{label}</span>
-        <span className="text-[13px] font-bold text-slate-900">{count}</span>
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${color}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
+// ─── Libellés et couleurs des statuts de projet (le serveur envoie « en_cours », « termine »…) ───
+const PROJECT_STATUS = {
+  nouveau: { label: 'Nouveau', cls: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', bar: 'from-slate-400 to-slate-500' },
+  demarrage: { label: 'Démarrage', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', bar: 'from-emerald-400 to-teal-500' },
+  en_cours: { label: 'En cours', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', bar: 'from-amber-400 to-orange-500' },
+  avance: { label: 'Avancé', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300', bar: 'from-blue-400 to-indigo-500' },
+  termine: { label: 'Terminé', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', bar: 'from-emerald-500 to-green-600' },
+  suspendu: { label: 'Suspendu', cls: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', bar: 'from-red-400 to-rose-500' },
 };
 
-// ─── Carte de section réutilisable ──────────────────────────────────────────
-const SectionCard = ({ title, action, children, className = '' }) => (
-  <div className={`bg-white rounded-3xl border border-slate-100 shadow-sm p-[18px] ${className}`}>
-    <div className="flex items-center justify-between gap-2 mb-4">
-      <h3 className="text-[15px] font-bold text-slate-900">{title}</h3>
-      {action}
+const greeting = () => {
+  const h = new Date().getHours();
+  if (h < 5) return 'Bonsoir';
+  if (h < 12) return 'Bonjour';
+  if (h < 18) return 'Bon après-midi';
+  return 'Bonsoir';
+};
+
+const todayLabel = () => {
+  const s = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
+// ─── Anneau de progression ──────────────────────────────────────────────────
+function ProgressRing({ pct, size = 88, stroke = 9 }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }} role="img" aria-label={`Avancement ${pct} %`}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,.22)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#fff" strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} style={{ transition: 'stroke-dashoffset .8s ease' }} />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-xl font-black">{pct}<span className="text-xs font-bold text-white/80">%</span></span>
     </div>
+  );
+}
+
+// ─── Blocs réutilisables ────────────────────────────────────────────────────
+const Panel = ({ title, action, children, className = '' }) => (
+  <section className={`rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}>
+    {(title || action) && (
+      <div className="mb-3.5 flex items-center justify-between gap-2">
+        <h3 className="text-[15px] font-bold text-slate-900 dark:text-white">{title}</h3>
+        {action}
+      </div>
+    )}
     {children}
-  </div>
+  </section>
 );
 
-const SeeAllLink = ({ href, label = 'Tout voir' }) => (
-  <Link href={href} className="text-xs font-semibold text-blue-600 inline-flex items-center gap-0.5 active:opacity-60">
+const SeeAll = ({ href, label = 'Tout voir' }) => (
+  <Link href={href} className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 active:opacity-60 dark:text-blue-400">
     {label} <FaChevronRight className="h-2.5 w-2.5" />
   </Link>
 );
@@ -49,276 +70,280 @@ const SeeAllLink = ({ href, label = 'Tout voir' }) => (
 export default function MobileDashboard({
   auth: authProp,
   stats = {},
+  activityByDay = [],
   recentActivities = [],
   recentProjects = [],
   recentFiles = [],
   topUsers = [],
 }) {
-  const auth = authProp || {};
+  const page = usePage();
+  const auth = authProp || page.props.auth || {};
   const user = auth.user || auth;
   const firstName = user?.name?.split(' ')[0] || 'vous';
-  const isAdmin = user?.roles?.includes?.('admin');
+  const unread = Number(user?.unreadNotificationsCount || 0);
 
-  const tasksByStatus = stats.tasksByStatus || { todo: 0, in_progress: 0, done: 0, en_attente: 0 };
-  const totalTasks = tasksByStatus.todo + tasksByStatus.in_progress + tasksByStatus.done + tasksByStatus.en_attente;
+  const by = stats.tasksByStatus || {};
+  const todo = by.todo || 0;
+  const inProgress = by.in_progress || 0;
+  const done = by.done || 0;
+  const waiting = by.en_attente || 0;
+  const totalTasks = todo + inProgress + done + waiting;
+  const pct = totalTasks ? Math.round((done / totalTasks) * 100) : 0;
 
-  const statItems = [
-    { key: 'tasks', label: 'Tâches', icon: FaTasks, tone: 'bg-blue-600', href: '/tasks', show: true },
-    { key: 'projects', label: 'Projets', icon: FaProjectDiagram, tone: 'bg-emerald-600', href: '/projects', show: true },
-    { key: 'members', label: 'Équipe', icon: FaUsers, tone: 'bg-orange-500', href: '/users', show: isAdmin },
-    { key: 'files', label: 'Fichiers', icon: FaFileAlt, tone: 'bg-violet-600', href: '/files', show: true },
-  ].filter((s) => s.show !== false);
+  const projects = asList(recentProjects);
+  const files = asList(recentFiles);
+  const activities = asList(recentActivities);
+  const people = asList(topUsers);
 
+  // Activité des 14 derniers jours (jours sans activité = 0)
+  const activity = useMemo(() => {
+    const counts = new Map(asList(activityByDay).map((d) => [String(d.day).slice(0, 10), Number(d.count) || 0]));
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const dt = new Date();
+      dt.setDate(dt.getDate() - (13 - i));
+      const key = dt.toISOString().slice(0, 10);
+      return { key, count: counts.get(key) || 0, label: dt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }) };
+    });
+    return { days, total: days.reduce((a, d) => a + d.count, 0), max: Math.max(1, ...days.map((d) => d.count)) };
+  }, [activityByDay]);
 
+  const kpis = [
+    { label: 'Tâches', value: stats.tasks ?? totalTasks, icon: FaTasks, tone: 'from-blue-500 to-blue-600', href: '/tasks' },
+    { label: 'Projets', value: stats.projects ?? projects.length, icon: FaProjectDiagram, tone: 'from-emerald-500 to-teal-600', href: '/projects' },
+    { label: 'Équipe', value: stats.members ?? stats.users ?? 0, icon: FaUsers, tone: 'from-orange-400 to-orange-500' },
+    { label: 'Fichiers', value: stats.files ?? files.length, icon: FaFileAlt, tone: 'from-violet-500 to-purple-600', href: '/files' },
+  ];
+
+  const shortcuts = [
+    { label: 'Nouvelle tâche', icon: FaPlus, tone: 'from-blue-500 to-indigo-600', href: '/tasks/create' },
+    { label: 'Suivi', icon: FaColumns, tone: 'from-amber-400 to-orange-500', href: '/kanban' },
+    { label: 'Quiz', icon: FaQuestionCircle, tone: 'from-fuchsia-500 to-purple-600', href: '/quizzes' },
+    { label: 'Discussions', icon: FaComments, tone: 'from-emerald-500 to-teal-600', href: '/discussions' },
+  ];
+
+  const segments = [
+    { label: 'À faire', count: todo, cls: 'bg-blue-500' },
+    { label: 'En cours', count: inProgress, cls: 'bg-amber-500' },
+    { label: 'Terminées', count: done, cls: 'bg-emerald-500' },
+    { label: 'En attente', count: waiting, cls: 'bg-slate-400' },
+  ];
+
+  const empty = !totalTasks && !projects.length;
 
   return (
-    <MobileLayout title="Accueil" subtitle={`Bonjour ${firstName}`} fullBleed>
+    <MobileLayout title="Accueil" fullBleed hideHeader>
       <Head title="Accueil" />
 
-      <div className="min-h-full bg-slate-50 pb-6">
+      <div className="min-h-full shrink-0 pb-6">
+        {/* ─── Bandeau : salutation, notifications, avancement global ─── */}
+        <section
+          className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 px-5 pb-20 text-white"
+          style={{ marginTop: 'calc(-1 * var(--safe-top))', paddingTop: 'calc(var(--safe-top) + 1.25rem)' }}
+        >
+          <div className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10" />
+          <div className="pointer-events-none absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-white/[0.07]" />
 
-        {/* ─── Hero : header avec salutation et stat principale ─── */}
-        <section className="bg-gradient-to-b from-slate-950 to-slate-900 px-5 pb-7 pt-5 text-white rounded-b-[28px]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Votre espace
-              </p>
-              <h2 className="mt-1 text-[22px] font-extrabold tracking-tight leading-tight">
-                Bon retour, {firstName}
-              </h2>
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <Link href="/profile" aria-label="Mon profil" className="flex-shrink-0 active:scale-95 transition-transform">
+                <Avatar name={user?.name} src={user?.profile_photo_url} size="lg" ring="ring-2 ring-white/40" />
+              </Link>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium text-white/70">{todayLabel()}</p>
+                <h1 className="truncate text-xl font-extrabold leading-tight">{greeting()}, {firstName}</h1>
+              </div>
             </div>
-            <Link
-              href="/profile"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-sm font-bold ring-4 ring-white/10 active:scale-95 transition-transform"
-            >
-              {initials(user?.name)}
+            <Link href="/notifications" aria-label={`Notifications${unread ? ` (${unread} non lues)` : ''}`}
+              className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/15 text-base backdrop-blur active:scale-95 transition-transform">
+              <FaBell />
+              {unread > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold ring-2 ring-indigo-600">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
             </Link>
           </div>
 
-          <div className="mt-7 flex items-end justify-between">
-            <div>
-              <p className="text-[13px] text-slate-400">Tâches terminées</p>
-              <p className="mt-1 text-[40px] font-extrabold leading-none tracking-tight">
-                {tasksByStatus.done || 0}
+          <div className="relative mt-6 flex items-center gap-5">
+            <ProgressRing pct={pct} />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white/80">Avancement des tâches</p>
+              <p className="mt-0.5 text-3xl font-black leading-none">
+                {done}<span className="text-base font-semibold text-white/70"> / {totalTasks}</span>
               </p>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3.5 py-2 text-xs font-semibold text-emerald-300">
-              <FaFire className="h-3 w-3" /> Votre rythme
+              <p className="mt-1.5 text-xs text-white/75">{inProgress} en cours · {todo} à faire</p>
             </div>
           </div>
         </section>
 
-        <main className="space-y-5 px-4 pt-5">
+        <div className="relative z-10 -mt-12 space-y-5 px-4">
+          {/* ─── Chiffres clés (carte flottante sur le bandeau) ─── */}
+          <div className="grid grid-cols-4 rounded-3xl bg-white p-1.5 shadow-xl shadow-slate-900/10 ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+            {kpis.map(({ label, value, icon: Icon, tone, href }) => {
+              const body = (
+                <>
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br text-sm text-white shadow-sm ${tone}`}><Icon /></span>
+                  <span className="mt-2 text-lg font-extrabold leading-none text-slate-900 dark:text-white">{value}</span>
+                  <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
+                </>
+              );
+              const cls = 'flex min-w-0 flex-col items-center rounded-2xl px-1 py-3 transition active:bg-slate-50 dark:active:bg-slate-800';
+              return href ? <Link key={label} href={href} className={cls}>{body}</Link> : <div key={label} className={cls}>{body}</div>;
+            })}
+          </div>
 
-          {/* ─── Grille de stats ─── */}
-          <div className="grid grid-cols-2 gap-3">
-            {statItems.map(({ key, label, icon: Icon, tone, href }) => (
-              <Link
-                key={key}
-                href={href}
-                className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm active:scale-[.98] transition-transform"
-              >
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-white ${tone}`}>
-                  <Icon className="text-sm" />
-                </div>
-                <p className="mt-3.5 text-2xl font-extrabold text-slate-950">{stats[key] || 0}</p>
-                <p className="mt-0.5 text-xs font-medium text-slate-500">{label}</p>
+          {/* ─── Raccourcis ─── */}
+          <div className="grid grid-cols-4 gap-2.5">
+            {shortcuts.map(({ label, icon: Icon, tone, href }) => (
+              <Link key={label} href={href} className="flex flex-col items-center gap-2 rounded-2xl py-1 active:scale-95 transition-transform">
+                <span className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br text-lg text-white shadow-md ${tone}`}><Icon /></span>
+                <span className="text-center text-[11px] font-semibold leading-tight text-slate-700 dark:text-slate-300">{label}</span>
               </Link>
             ))}
           </div>
 
-          {/* ─── Répartition des tâches ─── */}
-          {totalTasks > 0 && (
-            <SectionCard title="Répartition des tâches">
-              <div className="space-y-3.5">
-                <StatusRow label="À faire" count={tasksByStatus.todo} total={totalTasks} color="bg-blue-500" />
-                <StatusRow label="En cours" count={tasksByStatus.in_progress} total={totalTasks} color="bg-amber-500" />
-                <StatusRow label="Terminées" count={tasksByStatus.done} total={totalTasks} color="bg-emerald-500" />
-                <StatusRow label="En attente" count={tasksByStatus.en_attente} total={totalTasks} color="bg-slate-400" />
-              </div>
-            </SectionCard>
+          {empty && (
+            <MEmpty icon={FaFolderOpen} title="Bienvenue sur ProJA" text="Créez votre premier projet pour commencer à organiser vos tâches."
+              action={<Link href="/projects/create" className="inline-flex h-11 items-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white">Créer un projet</Link>} />
           )}
 
-          {/* ─── Projets récents ─── */}
-          <div>
-            <div className="mb-3 flex items-center justify-between px-1">
-              <h3 className="text-[15px] font-bold text-slate-900">Projets récents</h3>
-              <SeeAllLink href="/projects" label="Ouvrir" />
-            </div>
-
-            {recentProjects.length > 0 ? (
-              <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-                {recentProjects.map((project) => (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    className="w-[230px] flex-shrink-0 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm active:scale-[.98] transition-transform"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2.5">
-                      <h4 className="font-bold text-sm text-slate-900 truncate min-w-0">{project.name}</h4>
-                      {project.status && (
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 whitespace-nowrap flex-shrink-0">
-                          {project.status}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mb-3.5 line-clamp-2 leading-relaxed">
-                      {project.description || 'Aucune description'}
-                    </p>
-                    <div className="flex items-center justify-between text-xs pt-3 border-t border-slate-50">
-                      {project.manager ? (
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {project.manager.avatar ? (
-                            <img src={project.manager.avatar} alt={project.manager.name} className="w-5 h-5 rounded-full flex-shrink-0" />
-                          ) : (
-                            <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                              <span className="text-[9px] text-slate-500 font-semibold">{initials(project.manager.name)}</span>
-                            </div>
-                          )}
-                          <span className="text-slate-600 truncate font-medium">{project.manager.name}</span>
-                        </div>
-                      ) : <span />}
-                      <span className="text-slate-400 font-medium whitespace-nowrap flex-shrink-0">
-                        {project.task_count || 0} tâches
-                      </span>
-                    </div>
-                  </Link>
+          {/* ─── Répartition des tâches : une seule barre empilée ─── */}
+          {totalTasks > 0 && (
+            <Panel title="Répartition des tâches" action={<SeeAll href="/kanban" label="Suivi" />}>
+              <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="img"
+                aria-label={segments.map((s) => `${s.label} : ${s.count}`).join(', ')}>
+                {segments.filter((s) => s.count > 0).map((s) => (
+                  <div key={s.label} className={`${s.cls} h-full transition-all duration-700`} style={{ width: `${(s.count / totalTasks) * 100}%` }} />
                 ))}
               </div>
-            ) : (
-              <p className="rounded-2xl bg-white border border-slate-100 p-6 text-center text-sm text-slate-400">
-                Aucun projet récent
-              </p>
-            )}
-          </div>
-
-          {/* ─── Membres actifs ─── */}
-          {topUsers.length > 0 && (
-            <SectionCard title="Membres actifs">
-              <div className="space-y-4">
-                {topUsers.map((u, index) => (
-                  <div key={u.id} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative flex-shrink-0">
-                        {u.avatar ? (
-                          <img src={u.avatar} alt={u.name} className="w-9 h-9 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
-                            <span className="text-slate-500 text-xs font-bold">{initials(u.name)}</span>
-                          </div>
-                        )}
-                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{u.name}</p>
-                        <p className="text-xs text-slate-500">{u.count} activités</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-blue-600 flex-shrink-0">#{index + 1}</span>
+              <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                {segments.map((s) => (
+                  <div key={s.label} className="flex items-center gap-2.5">
+                    <span className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${s.cls}`} />
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-slate-600 dark:text-slate-300">{s.label}</span>
+                    <span className="text-[13px] font-bold text-slate-900 dark:text-white">{s.count}</span>
                   </div>
                 ))}
               </div>
-            </SectionCard>
+            </Panel>
           )}
 
-          {/* ─── Bannière CTA ─── */}
-          <section className="rounded-3xl bg-gradient-to-b from-blue-500 to-blue-600 p-5 text-white shadow-lg shadow-blue-600/25">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 flex-shrink-0">
-                <FaClock />
+          {/* ─── Activité des 14 derniers jours ─── */}
+          {activity.total > 0 && (
+            <Panel title="Activité · 14 jours" action={<span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{activity.total} action{activity.total > 1 ? 's' : ''}</span>}>
+              <div className="flex h-24 items-end gap-1" role="img" aria-label={`${activity.total} actions sur 14 jours`}>
+                {activity.days.map((d) => (
+                  <div key={d.key} className="flex h-full flex-1 flex-col justify-end" title={`${d.label} : ${d.count}`}>
+                    <div className={`w-full rounded-t-md ${d.count ? 'bg-gradient-to-t from-blue-500 to-indigo-400' : 'bg-slate-100 dark:bg-slate-800'}`}
+                      style={{ height: d.count ? `${Math.max(12, (d.count / activity.max) * 100)}%` : '6%' }} />
+                  </div>
+                ))}
               </div>
-              <div>
-                <p className="text-[15px] font-bold">Restez organisé</p>
-                <p className="mt-0.5 text-xs text-blue-100">Consultez vos tâches du jour.</p>
+            </Panel>
+          )}
+
+          {/* ─── Projets récents ─── */}
+          {projects.length > 0 && (
+            <div>
+              <div className="mb-3 flex items-center justify-between px-1">
+                <h3 className="text-[15px] font-bold text-slate-900 dark:text-white">Projets récents</h3>
+                <SeeAll href="/projects" label="Ouvrir" />
               </div>
-            </div>
-            <Link
-              href="/tasks"
-              className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl bg-white text-[14px] font-bold text-blue-700 active:scale-[.98] transition-transform"
-            >
-              Voir mes tâches <FaArrowRight className="text-xs" />
-            </Link>
-          </section>
-
-{/* ─── Fichiers récents ─── */}
-{recentFiles.length > 0 && (
-    <SectionCard title="Fichiers récents" action={<SeeAllLink href="/files" />}>
-        <div className="divide-y divide-slate-50">
-            {recentFiles.map((file) => (
-                <div
-                    key={file.id}
-                    className="flex items-center gap-3 py-3 -mx-1.5 px-1.5 rounded-xl"
-                >
-                    <Link
-                        href={`/files/${file.id}`}
-                        className="flex items-center gap-3 min-w-0 flex-1 active:bg-slate-50 transition-colors"
-                    >
-                        <div className="p-2.5 bg-blue-50 rounded-xl flex-shrink-0">
-                            <FaFileAlt className="text-blue-500 text-sm" />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-900 truncate">
-                                {file.name}
-                            </p>
-
-                            <p className="text-xs text-slate-500 truncate">
-                                {file.size} · {file.created_at}
-                            </p>
-                        </div>
-                    </Link>
-
-                    {file.url && (
-                        <a
-                            href={file.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-blue-600 p-2 flex-shrink-0 active:scale-90 transition-transform"
-                            title="Télécharger"
-                        >
-                            <FaDownload className="text-sm" />
-                        </a>
-                    )}
-                </div>
-            ))}
-        </div>
-    </SectionCard>
-)}
-
-          {/* ─── Activité récente ─── */}
-          {recentActivities.length > 0 && (
-            <SectionCard title="Activité récente" action={<SeeAllLink href="/activities" />}>
-              <div className="space-y-4">
-                {recentActivities.slice(0, 5).map((activity) => {
-                  const Wrapper = activity.url ? Link : 'div';
-                  const wrapperProps = activity.url ? { href: activity.url } : {};
+              <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2" data-no-ptr>
+                {projects.map((project) => {
+                  const st = PROJECT_STATUS[project.status] || { label: project.status || '—', cls: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', bar: 'from-slate-400 to-slate-500' };
                   return (
-                    <Wrapper key={activity.id} {...wrapperProps} className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                        {activity.user?.avatar ? (
-                          <img src={activity.user.avatar} alt={activity.user.name} className="w-7 h-7 rounded-full object-cover" />
-                        ) : (
-                          <FaCheck className="text-[10px]" />
-                        )}
+                    <Link key={project.id} href={`/projects/${project.id}`}
+                      className="relative w-[78%] max-w-[280px] flex-shrink-0 snap-start overflow-hidden rounded-3xl border border-slate-100 bg-white p-4 pt-5 shadow-sm active:scale-[.985] transition-transform dark:border-slate-800 dark:bg-slate-900">
+                      <span className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${st.bar}`} />
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="min-w-0 flex-1 truncate text-sm font-bold text-slate-900 dark:text-white">{project.name}</h4>
+                        <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-700 leading-snug break-words">
-                          <span className="font-semibold text-slate-900">
-                            {activity.user?.name || 'Utilisateur'}
-                          </span>{' '}
-                          {activity.description}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-0.5">{activity.created_at}</p>
+                      <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                        {project.description || 'Aucune description'}
+                      </p>
+                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          {project.manager && <Avatar name={project.manager.name} src={project.manager.avatar} size="xs" />}
+                          <span className="truncate font-medium text-slate-600 dark:text-slate-300">{project.manager?.name || '—'}</span>
+                        </span>
+                        <span className="flex-shrink-0 font-semibold text-slate-400"><FaTasks className="mr-1 inline text-[10px]" />{project.task_count || 0}</span>
                       </div>
-                    </Wrapper>
+                    </Link>
                   );
                 })}
               </div>
-            </SectionCard>
+            </div>
           )}
-        </main>
+
+          {/* ─── Activité récente ─── */}
+          {activities.length > 0 && (
+            <Panel title="Activité récente" action={<SeeAll href="/activities" />}>
+              <ul className="space-y-4">
+                {activities.slice(0, 5).map((a) => {
+                  const Wrapper = a.url ? Link : 'div';
+                  return (
+                    <li key={a.id}>
+                      <Wrapper {...(a.url ? { href: a.url } : {})} className="flex items-start gap-3">
+                        <Avatar name={a.user?.name} src={a.user?.avatar} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words text-[13px] leading-snug text-slate-600 dark:text-slate-300">
+                            <span className="font-bold text-slate-900 dark:text-white">{a.user?.name || 'Utilisateur'}</span> {a.description}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-slate-400">{a.created_at}</p>
+                        </div>
+                      </Wrapper>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Panel>
+          )}
+
+          {/* ─── Fichiers récents ─── */}
+          {files.length > 0 && (
+            <Panel title="Fichiers récents" action={<SeeAll href="/files" />}>
+              <ul className="-my-1 divide-y divide-slate-100 dark:divide-slate-800">
+                {files.map((file) => (
+                  <li key={file.id} className="flex items-center gap-3 py-2.5">
+                    <Link href={`/files/${file.id}`} className="flex min-w-0 flex-1 items-center gap-3 active:opacity-70">
+                      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-500 dark:bg-blue-950/40"><FaFileAlt /></span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-slate-900 dark:text-white">{file.name}</span>
+                        <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{[file.size, file.created_at].filter(Boolean).join(' · ')}</span>
+                      </span>
+                    </Link>
+                    {file.url && (
+                      <a href={file.url} target="_blank" rel="noopener noreferrer" aria-label={`Télécharger ${file.name}`}
+                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-blue-600 active:bg-blue-50 dark:text-blue-400 dark:active:bg-blue-950/40">
+                        <FaDownload className="text-sm" />
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          )}
+
+          {/* ─── Membres actifs ─── */}
+          {people.length > 0 && (
+            <Panel title="Membres actifs">
+              <ul className="space-y-3.5">
+                {people.map((u, i) => (
+                  <li key={u.id} className="flex items-center gap-3">
+                    <span className={`w-5 text-center text-xs font-black ${i === 0 ? 'text-amber-500' : 'text-slate-300 dark:text-slate-600'}`}>{i + 1}</span>
+                    <Avatar name={u.name} src={u.avatar} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{u.name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400"><FaBolt className="mr-1 inline text-[10px] text-amber-500" />{u.count} activités</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          )}
+        </div>
       </div>
     </MobileLayout>
   );

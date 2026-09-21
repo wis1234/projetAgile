@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function MobileAuthShell({ eyebrow, title, subtitle, children, footer }) {
   return (
-    <div className="min-h-[100dvh] bg-slate-950 px-5 pb-8 pt-[calc(2rem+var(--safe-top))] text-white">
+    <div className="mobile-app-shell min-h-[100dvh] overscroll-contain bg-slate-950 px-5 pb-8 pt-[calc(2rem+var(--safe-top))] text-white">
       <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-md flex-col">
         <div className="mb-10 flex items-center gap-3">
           <img src="/logo-proja.png" alt="ProJA" className="h-11 w-11 rounded-xl bg-white object-contain p-1.5" />

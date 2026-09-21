@@ -4,6 +4,9 @@ import { Head, Link, router } from '@inertiajs/react';
 import MobileLayout from '@/Layouts/MobileLayout';
 import { FaArrowRight, FaCalendarAlt, FaPlus, FaSearch } from 'react-icons/fa';
 
+// Libellés lisibles : le serveur envoie les codes bruts (todo, in_progress, done…)
+const statusLabels = { todo: 'À faire', in_progress: 'En cours', done: 'Terminée', en_attente: 'En attente' };
+
 const statusColors = {
   todo: 'bg-slate-100 text-slate-600',
   in_progress: 'bg-amber-100 text-amber-700',
@@ -33,7 +36,7 @@ const TaskCardSkeleton = () => (
 );
 
 const TasksSkeleton = () => (
-  <div className="min-h-full bg-slate-50 px-4 pb-5 pt-4">
+  <div className="min-h-full shrink-0 bg-slate-50 px-4 pb-5 pt-4">
     <div className="mb-5 flex items-center justify-between">
       <div className="space-y-2">
         <Pulse className="h-2.5 w-32" />
@@ -201,7 +204,7 @@ export default function MobileTasksIndex() {
                 </div>
                 <div className="mt-4 flex items-center justify-between">
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusColors[task.status] || statusColors.todo}`}>
-                    {task.status || 'À faire'}
+                    {statusLabels[task.status] || task.status || 'À faire'}
                   </span>
                   {task.due_date && (
                     <span className="flex items-center gap-1 text-xs text-slate-400">

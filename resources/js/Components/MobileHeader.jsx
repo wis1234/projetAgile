@@ -20,7 +20,7 @@ export default function MobileHeader({ title, subtitle, onBack, headerRight }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-      ) : <div className="h-10 w-10 flex-shrink-0" />}
+      ) : <div className="h-10 w-2 flex-shrink-0" />}
 
       <div className="min-w-0 flex-1">
         {title && <h1 className="truncate text-base font-bold leading-tight text-gray-900 dark:text-white">{title}</h1>}

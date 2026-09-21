@@ -205,6 +205,13 @@ export function MFab({ href, onClick, children, label, tone = 'from-blue-600 to-
 }
 
 /** Route sûre : évite qu'un nom de route inconnu casse toute la page. */
+/**
+ * Laravel envoie tantôt un tableau, tantôt un paginateur { data: [...], total, ... } :
+ * appeler .map() directement sur un paginateur faisait planter la page (écran blanc).
+ */
+export const asList = (value) => (Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : []);
+export const listTotal = (value) => (Array.isArray(value) ? value.length : (value?.total ?? asList(value).length));
+
 export const safeRoute = (name, params, fallback = '#') => { try { return route(name, params); } catch { return fallback; } };
 
 export const timeAgo = (iso) => {

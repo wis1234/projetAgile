@@ -14,7 +14,7 @@ export default function MobileRegister({ defaultRole = 'user' }) {
   const match = data.password_confirmation && data.password === data.password_confirmation;
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-blue-600 via-blue-700 to-indigo-800" style={{ paddingTop: 'var(--safe-top)' }}>
+    <div className="mobile-app-shell min-h-[100dvh] overscroll-contain bg-gradient-to-b from-blue-600 via-blue-700 to-indigo-800" style={{ paddingTop: 'var(--safe-top)' }}>
       <Head title="Créer un compte" />
       <div className="px-6 pb-6 pt-8 text-white">
         <Link href="/" className="mb-5 flex items-center gap-2.5"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-lg font-black">P</span><span className="text-xl font-extrabold tracking-wide">PROJA</span></Link>

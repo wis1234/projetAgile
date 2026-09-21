@@ -97,6 +97,32 @@ body {
   overflow-y: hidden;
 }
 
+/*
+ * Le contenu d'une page mobile est un enfant direct de <main> (flex-col, hauteur = écran).
+ * Un enfant « flex-shrink: 1 » s'écrase à la hauteur de l'écran quand il a un min-height:100% : son contenu déborde
+ * alors sans que le remplissage bas (barre de navigation) soit compté dans la zone défilable, et le bas de page
+ * (boutons « Annuler », « Enregistrer »…) reste caché sous la barre. Les éléments qui doivent volontairement
+ * occuper l'espace restant (.flex-1) ou défiler eux-mêmes (.overflow-y-auto) gardent leur comportement.
+ */
+.mobile-app-shell > main > :not(.flex-1):not(.overflow-y-auto):not(.overflow-y-scroll) {
+  flex-shrink: 0;
+}
+
+/*
+ * Filet de sécurité : dans l'app native, seul .mobile-app-shell défile (html/body/#app sont verrouillés).
+ * Une page qui n'utilise pas ce shell (écrans invité : inscription, vérification e-mail…) ne pouvait donc
+ * pas défiler. Sans shell dans la page, on rend le défilement au document.
+ */
+html.native-mobile-app:not(:has(.mobile-app-shell)) {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+html.native-mobile-app:not(:has(.mobile-app-shell)) body,
+html.native-mobile-app:not(:has(.mobile-app-shell)) #app {
+  overflow-y: visible;
+}
+
 .native-mobile-app .mobile-native-content {
   color: #0f172a;
 }
