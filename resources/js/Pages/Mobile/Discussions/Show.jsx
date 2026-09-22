@@ -37,14 +37,21 @@ const formatGroupDate = (d) => {
 
 const isSameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
 
-const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉'];
 
-const COMMON_EMOJIS = [
-  '😀','😁','😂','🤣','😍','🥰','😎','🤔','😅','🙏','😊','😭',
-  '😏','🤝','💪','👏','👍','❤️','🔥','🎉','💯','✅','⚡','🚀',
-  '🌟','💎','🎯','✨','😴','🤗','😇','🥳','🤩','😜','👋','🙌',
-];
-
+// ─── Emojis enrichis, groupés par catégorie façon WhatsApp/Messenger ────────
+const EMOJI_CATEGORIES = {
+  'Souriants': ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','🧐'],
+  'Émotions': ['😕','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️'],
+  'Gestes': ['👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🙏','🤝','💪','🤟','🤘','👌','🤏','✌️','🤞','👋','🤙','👆','👇','☝️','✋','🖐️','🖖','👈','👉','🖕','💅'],
+  'Cœurs': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟'],
+  'Animaux': ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🦄','🐝','🦋','🐢','🐍','🐙','🐠','🐳','🐘'],
+  'Nourriture': ['🍏','🍎','🍊','🍋','🍌','🍉','🍇','🍓','🍒','🍑','🥭','🍍','🥝','🍅','🥑','🍕','🍔','🍟','🌭','🥪','🌮','🌯','🍣','🍜','🍝','🍰','🎂','🍩','🍪','🍫','☕','🍵','🍺','🍻','🍷','🥂','🍾'],
+  'Activités': ['⚽','🏀','🏈','⚾','🎾','🏐','🏓','🏸','🎯','🎮','🎲','🎸','🎨','🎬','🎤','🎧','🏆','🥇','🎉','🎊','🎁','🎈'],
+  'Voyage': ['🚗','🚕','🚙','🚌','🚀','✈️','🚁','⛵','🚲','🏍️','🚦','🗺️','🏖️','🏔️','🗽','🎡','🌍','🌙','☀️','⭐','🌈','☔','❄️','🔥'],
+  'Objets': ['💡','📌','📎','📝','📅','📞','💻','📱','⏰','🔒','🔑','💰','💎','🎁','📷','🎵','🔧','🔨','💊','🧠','👀'],
+  'Symboles': ['✨','✅','❌','❓','❗','💯','♻️','🔔','🔇','🚫','⚠️','♥️','🆗','🆕','🔝','🔴','🟢','🔵','⚪','⚫'],
+};
 
 // ─── Résout le chemin d'affichage d'une image (blob local, URL absolue, ou chemin serveur) ───
 const resolveImageSrc = (imagePath) => {
@@ -239,7 +246,7 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
           </span>
         )}
 
-        {/* Réponse citée */}
+        {/* Réponse citée : fonctionne quel que soit le message ciblé, même si c'était déjà une réponse */}
         {comment.parent_id && comment.parent && (
           <button
             type="button"
@@ -251,7 +258,7 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
             }`}
           >
             <p className="font-semibold truncate">{comment.parent.user?.name || 'Message'}</p>
-            <p className="truncate">{comment.parent.content || '…'}</p>
+            <p className="truncate">{comment.parent.content || (comment.parent.image_path ? '📷 Photo' : (comment.parent.audio_path ? '🎙 Message vocal' : '…'))}</p>
           </button>
         )}
 
@@ -267,7 +274,7 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
           {comment.audio_path && (
             <AudioPlayer src={comment.audio_path} isMe={isMe} />
           )}
-          {/* Image */}
+          {/* Image / Sticker */}
           {resolvedImageSrc && (
             <img
               src={resolvedImageSrc}
@@ -342,6 +349,11 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   const [imageLightbox, setImageLightbox] = useState(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [pickerTab, setPickerTab] = useState('emoji'); // 'emoji' | 'stickers'
+
+  // ─── Stickers personnalisés (pack partagé par l'équipe) ─────────────
+  const [stickers, setStickers] = useState([]);
+  const stickerInputRef = useRef(null);
 
   // ─── Ajout : état et fonction pour le partage par email ─────────────
   const [shareDiscussionEmail, setShareDiscussionEmail] = useState(me?.share_discussions_by_email ?? true);
@@ -408,7 +420,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     }, 1600);
   }, []);
 
-  // ─── Aplatit la structure imbriquée (commentaires + leurs replies nichées) ───
+  // ─── Aplatit une éventuelle structure imbriquée reçue de l'API (sécurité, l'API renvoie déjà du plat) ───
   const flattenComments = (raw) => {
     const flat = [];
     const walk = (list) => {
@@ -444,6 +456,19 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
 
   useEffect(() => { loadComments(); }, [loadComments]);
   useEffect(() => { if (!loading) scrollToBottom(); }, [loading, scrollToBottom]);
+
+  // ─── Chargement du pack de stickers partagé ──────────────────────────────
+  const loadStickers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stickers', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      if (!res.ok) throw new Error();
+      setStickers(await res.json());
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => { loadStickers(); }, [loadStickers]);
 
   // ─── Fermer le lightbox avec Échap + bloquer le scroll ───
   useEffect(() => {
@@ -581,6 +606,32 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     setImagePreviewUrl(null);
   };
 
+  // ─── Upload d'un nouveau sticker par l'utilisateur ───────────────────────
+  const handleStickerUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('error', 'Seules les images peuvent devenir des stickers.');
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await fetch('/api/stickers', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': getCsrf() },
+        body: fd,
+      });
+      if (!res.ok) throw new Error();
+      const sticker = await res.json();
+      setStickers(prev => [sticker, ...prev]);
+      showToast('success', 'Sticker ajouté au pack !');
+    } catch {
+      showToast('error', "Impossible d'ajouter ce sticker.");
+    }
+  };
+
     // ─── Réactions ────────────────────────────────────────────────────────────
   const handleReaction = useCallback((commentId, emoji) => {
     if (!commentId) return;
@@ -683,6 +734,47 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
       setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, _pending: false, _failed: true } : c));
     } finally {
       setSending(false);
+    }
+  };
+
+  // ─── Envoi d'un sticker existant du pack (en un tap) ─────────────────────
+  const sendSticker = async (sticker) => {
+    nativeFeedback.tap();
+    const tempId = `temp_${Date.now()}`;
+    const activeReply = replyTo;
+    const optimistic = {
+      _tempId: tempId, id: null, _pending: true, _failed: false,
+      content: '',
+      audio_path: null,
+      image_path: sticker.image_path,
+      created_at: new Date().toISOString(),
+      user: { id: me?.id, name: me?.name, profile_photo_url: me?.profile_photo_url },
+      parent_id: activeReply?.id || null,
+      parent: activeReply || null,
+      reactions_summary: {},
+    };
+
+    setComments(prev => [...prev, optimistic]);
+    setReplyTo(null);
+    setShowEmojiPicker(false);
+    setTimeout(() => scrollToBottom(true), 80);
+
+    try {
+      const fd = new FormData();
+      fd.append('sticker_id', sticker.id);
+      if (activeReply?.id) fd.append('parent_id', activeReply.id);
+
+      const res = await fetch(`/api/tasks/${task.id}/comments`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': getCsrf() },
+        body: fd,
+      });
+      if (!res.ok) throw new Error();
+      const saved = await res.json();
+      const serverComment = saved.comment || saved;
+      setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, ...serverComment, _pending: false, _failed: false } : c));
+    } catch {
+      setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, _pending: false, _failed: true } : c));
     }
   };
 
@@ -874,7 +966,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
                 {replyTo.user?.name || 'Message'}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {replyTo.content || '🎙 Message vocal'}
+                {replyTo.content || (replyTo.image_path ? '📷 Photo' : '🎙 Message vocal')}
               </p>
             </div>
             <button
@@ -931,20 +1023,93 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
           </div>
         )}
 
-        {/* Panneau émojis */}
+        {/* Panneau émojis / stickers */}
         {showEmojiPicker && (
-          <div className="flex-shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-3 py-2 max-h-40 overflow-y-auto">
-            <div className="grid grid-cols-8 gap-1">
-              {COMMON_EMOJIS.map((emoji, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setText(prev => prev + emoji)}
-                  className="text-xl p-1.5 rounded-lg active:bg-gray-100 dark:active:bg-gray-800 flex items-center justify-center"
-                >
-                  {emoji}
-                </button>
-              ))}
+          <div className="flex-shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+            {/* Onglets */}
+            <div className="flex items-center gap-2 px-3 pt-2 pb-1">
+              <button
+                type="button"
+                onClick={() => setPickerTab('emoji')}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                  pickerTab === 'emoji'
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+                    : 'text-gray-400 dark:text-gray-500'
+                }`}
+              >
+                😊 Émojis
+              </button>
+              <button
+                type="button"
+                onClick={() => setPickerTab('stickers')}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                  pickerTab === 'stickers'
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+                    : 'text-gray-400 dark:text-gray-500'
+                }`}
+              >
+                🖼️ Stickers
+              </button>
+            </div>
+
+            <div className="px-3 pb-2 max-h-48 overflow-y-auto">
+              {pickerTab === 'emoji' ? (
+                Object.entries(EMOJI_CATEGORIES).map(([category, emojis]) => (
+                  <div key={category} className="mb-2.5">
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">
+                      {category}
+                    </p>
+                    <div className="grid grid-cols-8 gap-1">
+                      {emojis.map((emoji, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setText(prev => prev + emoji)}
+                          className="text-xl p-1.5 rounded-lg active:bg-gray-100 dark:active:bg-gray-800 flex items-center justify-center"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="grid grid-cols-4 gap-2 pt-1">
+                  {/* Bouton d'ajout : chacun peut créer/uploader son propre sticker */}
+                  <input type="file" ref={stickerInputRef} onChange={handleStickerUpload} accept="image/*" className="hidden" />
+                  <button
+                    type="button"
+                    onClick={() => stickerInputRef.current?.click()}
+                    className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 active:bg-gray-50 dark:active:bg-gray-800 transition-colors"
+                  >
+                    <span className="text-2xl leading-none">＋</span>
+                    <span className="text-[9px] mt-1 font-medium">Ajouter</span>
+                  </button>
+
+                  {stickers.map(sticker => (
+                    <button
+                      key={sticker.id}
+                      type="button"
+                      onClick={() => sendSticker(sticker)}
+                      title={sticker.name || 'Envoyer ce sticker'}
+                      className="aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 active:scale-95 transition-transform"
+                    >
+                      <img
+                        src={resolveImageSrc(sticker.image_path)}
+                        alt={sticker.name || 'Sticker'}
+                        className="w-full h-full object-contain p-1"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+
+                  {stickers.length === 0 && (
+                    <p className="col-span-3 text-xs text-gray-400 dark:text-gray-500 self-center px-2 leading-relaxed">
+                      Aucun sticker pour l'instant. Appuyez sur ＋ pour ajouter le vôtre au pack de l'équipe.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -980,14 +1145,14 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
             <>
               {/* Pilule de saisie : émoji + textarea + trombone, façon WhatsApp/Messenger */}
               <div className="flex-1 flex items-end gap-1 bg-gray-100 dark:bg-gray-800 rounded-3xl pl-1.5 pr-1 py-1 min-h-[42px]">
-                {/* Bouton émojis (intégré à gauche de la pilule) */}
+                {/* Bouton émojis / stickers (intégré à gauche de la pilule) */}
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker(v => !v)}
                   className={`w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full transition-transform active:scale-90 mb-0.5 ${
                     showEmojiPicker ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'
                   }`}
-                  title="Émojis"
+                  title="Émojis et stickers"
                 >
                   <span className="text-xl">😊</span>
                 </button>

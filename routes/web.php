@@ -462,6 +462,12 @@ Route::delete('/files/{file}/access/{user}',        [FileAccessController::class
         Route::post('/tasks/{task}/comments/{comment}/reactions', [TaskCommentReactionController::class, 'toggle']);
         Route::get('/tasks/{task}/comments/{comment}/reactions', [TaskCommentReactionController::class, 'index']);
         
+                // Stickers personnalisés (pack partagé)
+        Route::get('/stickers', [\App\Http\Controllers\StickerController::class, 'index']);
+        Route::post('/stickers', [\App\Http\Controllers\StickerController::class, 'store']);
+        Route::delete('/stickers/{sticker}', [\App\Http\Controllers\StickerController::class, 'destroy']);
+        
+        
         // Commentaires des fichiers
         Route::get('/files/{file}/comments', [\App\Http\Controllers\FileCommentController::class, 'index']);
         Route::post('/files/{file}/comments', [\App\Http\Controllers\FileCommentController::class, 'store']);

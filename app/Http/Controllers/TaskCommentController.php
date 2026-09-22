@@ -3,6 +3,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Task;
 use App\Models\TaskComment;
+use App\Models\Sticker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Notifications\ProjaNotification;
@@ -13,37 +14,21 @@ use App\Notifications\TaskCommentNotification;
 
 class TaskCommentController extends Controller
 {
-    // Liste les commentaires d'une tâche avec leurs réponses et réactions
+    // Liste les commentaires d'une tâche, à plat (façon WhatsApp), avec le message cité (parent) et les réactions
     public function index($taskId)
     {
-        $formatReactions = function ($comment) {
-            $comment->reactions_summary = $comment->reactions
-                ->groupBy('emoji')
-                ->map(fn($group) => [
-                    'count'    => $group->count(),
-                    'user_ids' => $group->pluck('user_id')->toArray(),
-                ])
-                ->toArray();
-            return $comment;
-        };
-
-        $comments = TaskComment::with([
-                'user',
-                'reactions',
-                'mentions',
-                'replies' => function ($query) {
-                    $query->with(['user', 'reactions', 'replies' => function ($q) {
-                        $q->with(['user', 'reactions']);
-                    }])->orderBy('created_at', 'asc');
-                },
-            ])
+        $comments = TaskComment::with(['user', 'reactions', 'mentions', 'parent.user'])
             ->where('task_id', $taskId)
-            ->whereNull('parent_id')
             ->orderBy('created_at', 'asc')
             ->get()
-            ->map(function ($comment) use ($formatReactions) {
-                $formatReactions($comment);
-                $comment->replies->each(fn($reply) => $formatReactions($reply));
+            ->map(function ($comment) {
+                $comment->reactions_summary = $comment->reactions
+                    ->groupBy('emoji')
+                    ->map(fn($group) => [
+                        'count'    => $group->count(),
+                        'user_ids' => $group->pluck('user_id')->toArray(),
+                    ])
+                    ->toArray();
                 return $comment;
             });
 
@@ -54,57 +39,63 @@ class TaskCommentController extends Controller
     // Ajoute un commentaire ou une réponse à une tâche
     public function store(Request $request, $taskId)
     {
-$request->validate([
-    'content' => 'nullable|string|max:2000',
-    'audio' => 'nullable|file|mimes:mp3,wav,ogg,webm|max:10240', // Max 10MB
-    'image' => 'nullable|file|mimes:jpeg,jpg,png,gif,webp|max:8192', // Max 8MB
-    'parent_id' => 'nullable|exists:task_comments,id',
-    'mentioned_user_ids' => 'nullable|array',
-    'mentioned_user_ids.*' => 'exists:users,id',
-]);
+        $request->validate([
+            'content' => 'nullable|string|max:2000',
+            'audio' => 'nullable|file|mimes:mp3,wav,ogg,webm|max:10240', // Max 10MB
+            'image' => 'nullable|file|mimes:jpeg,jpg,png,gif,webp|max:8192', // Max 8MB
+            'sticker_id' => 'nullable|exists:stickers,id',
+            'parent_id' => 'nullable|exists:task_comments,id',
+            'mentioned_user_ids' => 'nullable|array',
+            'mentioned_user_ids.*' => 'exists:users,id',
+        ]);
 
-if (!$request->filled('content') && !$request->hasFile('audio') && !$request->hasFile('image')) {
-    return response()->json(['message' => 'Le contenu, un fichier audio ou une image est requis.'], 422);
-}
-
-        if (!$request->filled('content') && !$request->hasFile('audio')) {
-            return response()->json(['message' => 'Le contenu ou un fichier audio est requis.'], 422);
+        if (
+            !$request->filled('content')
+            && !$request->hasFile('audio')
+            && !$request->hasFile('image')
+            && !$request->filled('sticker_id')
+        ) {
+            return response()->json(['message' => 'Le contenu, un fichier audio, une image ou un sticker est requis.'], 422);
         }
-        
+
         // Vérifier si c'est une réponse à un commentaire
+        // Style WhatsApp : on peut répondre à N'IMPORTE QUEL message, y compris une réponse.
+        // On cite toujours directement le message ciblé (pas de vrai arbre de niveaux) :
+        // "level" ne sert qu'à savoir si c'est une réponse (1) ou un message racine (0).
         $parentComment = null;
         $level = 0;
-        
+
         if ($request->filled('parent_id')) {
-            $parentComment = TaskComment::findOrFail($request->parent_id);
-            // Limiter le niveau d'imbrication à 2 niveaux
-            $level = $parentComment->level + 1;
-            if ($level > 1) {
-                return response()->json(['message' => 'Vous ne pouvez pas répondre à une réponse.'], 422);
-            }
+            $parentComment = TaskComment::where('task_id', $taskId)->findOrFail($request->parent_id);
+            $level = 1;
         }
 
-$audioPath = null;
-if ($request->hasFile('audio')) {
-    $audioPath = $request->file('audio')->store('task_comments/audio', 'public');
-}
+        $audioPath = null;
+        if ($request->hasFile('audio')) {
+            $audioPath = $request->file('audio')->store('task_comments/audio', 'public');
+        }
 
-$imagePath = null;
-if ($request->hasFile('image')) {
-    $imagePath = $request->file('image')->store('task_comments/images', 'public');
-}
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('task_comments/images', 'public');
+        } elseif ($request->filled('sticker_id')) {
+            // Un sticker est une image déjà stockée : on réutilise simplement son chemin,
+            // pas besoin de re-uploader un fichier.
+            $sticker = Sticker::find($request->sticker_id);
+            $imagePath = $sticker?->image_path;
+        }
 
-$comment = TaskComment::create([
-    'task_id' => $taskId,
-    'user_id' => Auth::id(),
-    'content' => $request->content,
-    'audio_path' => $audioPath,
-    'image_path' => $imagePath,
-    'parent_id' => $request->parent_id,
-    'level' => $level,
-]);
+        $comment = TaskComment::create([
+            'task_id' => $taskId,
+            'user_id' => Auth::id(),
+            'content' => $request->content,
+            'audio_path' => $audioPath,
+            'image_path' => $imagePath,
+            'parent_id' => $request->parent_id,
+            'level' => $level,
+        ]);
 
-        
+
         // Enregistrer les mentions et notifier les utilisateurs taggés
         $mentionedIds = collect($request->input('mentioned_user_ids', []))
             ->unique()
@@ -122,25 +113,25 @@ $comment = TaskComment::create([
 
         // Envoyer la notification de commentaire
         $task = \App\Models\Task::with(['project.users', 'assignedUsers'])->findOrFail($taskId);
-        
+
         // Récupérer les utilisateurs à notifier
         $usersToNotify = collect();
-        
+
         // Ajouter les membres du projet
         if ($task->project && $task->project->users) {
             $usersToNotify = $usersToNotify->merge($task->project->users);
         }
-        
+
         // Ajouter l'utilisateur assigné à la tâche s'il existe
         if ($task->assignedUsers && $task->assignedUsers->id) {
             $usersToNotify->push($task->assignedUsers);
         }
-        
+
         // Ajouter l'auteur de la tâche s'il existe et est différent de l'utilisateur assigné
         if ($task->creator && !$usersToNotify->contains('id', $task->creator->id)) {
             $usersToNotify->push($task->creator);
         }
-        
+
         // Éviter les doublons et ne pas notifier l'auteur du commentaire
         $usersToNotify = $usersToNotify->unique('id')
             ->filter(function ($user) use ($comment) {
@@ -149,39 +140,38 @@ $comment = TaskComment::create([
 
 
 
-$author = auth()->user();
+        $author = auth()->user();
 
 
 
 
-        
         // Envoyer la notification à chaque utilisateur concerné
-foreach ($usersToNotify as $user) {
+        foreach ($usersToNotify as $user) {
 
-    // Notification interne
-    $user->notify(
-        new ProjaNotification(
-            'Nouveau commentaire',
-            $author->name.' a commenté la tâche "'.$task->title.'"',
-            '/tasks/'.$task->id,
-            null,
-            'task_comment'
-        )
-    );
+            // Notification interne
+            $user->notify(
+                new ProjaNotification(
+                    'Nouveau commentaire',
+                    $author->name.' a commenté la tâche "'.$task->title.'"',
+                    '/tasks/'.$task->id,
+                    null,
+                    'task_comment'
+                )
+            );
 
-    // Email uniquement si l'auteur l'autorise
-    if ($author->share_discussions_by_email) {
+            // Email uniquement si l'auteur l'autorise
+            if ($author->share_discussions_by_email) {
 
-        $user->notify(
-            new TaskCommentNotification(
-                $task,
-                $comment
-            )
-        );
+                $user->notify(
+                    new TaskCommentNotification(
+                        $task,
+                        $comment
+                    )
+                );
 
-    }
+            }
 
-}
+        }
 
         // Notification dédiée pour les utilisateurs explicitement mentionnés (@)
         if ($mentionedIds->isNotEmpty()) {
@@ -199,7 +189,7 @@ foreach ($usersToNotify as $user) {
             }
         }
 
-        
+
         // Retourner la réponse avec le commentaire créé
         return response()->json([
             'message' => $request->filled('parent_id') ? 'Réponse ajoutée avec succès' : 'Commentaire ajouté avec succès',
