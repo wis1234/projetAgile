@@ -6,6 +6,7 @@ use App\Models\TaskComment;
 use App\Models\Sticker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Notifications\ProjaNotification;
 use App\Events\TaskCommentPosted;
 use App\Events\TaskCommentDeleted;
@@ -43,7 +44,7 @@ class TaskCommentController extends Controller
             'content' => 'nullable|string|max:2000',
             'audio' => 'nullable|file|mimes:mp3,wav,ogg,webm|max:10240', // Max 10MB
             'image' => 'nullable|file|mimes:jpeg,jpg,png,gif,webp|max:8192', // Max 8MB
-            'sticker_id' => 'nullable|exists:stickers,id',
+            'sticker_id' => 'nullable|integer',
             'parent_id' => 'nullable|exists:task_comments,id',
             'mentioned_user_ids' => 'nullable|array',
             'mentioned_user_ids.*' => 'exists:users,id',
@@ -62,11 +63,10 @@ class TaskCommentController extends Controller
         // Style WhatsApp : on peut répondre à N'IMPORTE QUEL message, y compris une réponse.
         // On cite toujours directement le message ciblé (pas de vrai arbre de niveaux) :
         // "level" ne sert qu'à savoir si c'est une réponse (1) ou un message racine (0).
-        $parentComment = null;
         $level = 0;
 
         if ($request->filled('parent_id')) {
-            $parentComment = TaskComment::where('task_id', $taskId)->findOrFail($request->parent_id);
+            TaskComment::where('task_id', $taskId)->findOrFail($request->parent_id);
             $level = 1;
         }
 
@@ -75,22 +75,40 @@ class TaskCommentController extends Controller
             $audioPath = $request->file('audio')->store('task_comments/audio', 'public');
         }
 
+        // ── Médias : image / vidéo / sticker ─────────────────────────────
+        // Jusqu'ici seuls audio_path et image_path existaient. On gère maintenant aussi
+        // video_path (vidéos courtes façon "sticker dansant") et is_sticker (rendu spécial côté front).
         $imagePath = null;
+        $videoPath = null;
+        $isSticker = false;
+
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('task_comments/images', 'public');
         } elseif ($request->filled('sticker_id')) {
-            // Un sticker est une image déjà stockée : on réutilise simplement son chemin,
-            // pas besoin de re-uploader un fichier.
             $sticker = Sticker::find($request->sticker_id);
-            $imagePath = $sticker?->image_path;
+
+            if (!$sticker) {
+                return response()->json(['message' => 'Ce sticker n\'existe plus.'], 422);
+            }
+
+            $isSticker = true;
+            if ($sticker->type === 'video') {
+                $videoPath = $sticker->image_path;
+            } else {
+                $imagePath = $sticker->image_path;
+            }
         }
 
         $comment = TaskComment::create([
             'task_id' => $taskId,
             'user_id' => Auth::id(),
-            'content' => $request->content,
+            // La colonne 'content' est NOT NULL en base : un sticker n'envoie pas de texte,
+            // donc $request->content est null dans ce cas → on force une chaîne vide.
+            'content' => $request->content ?? '',
             'audio_path' => $audioPath,
             'image_path' => $imagePath,
+            'video_path' => $videoPath,
+            'is_sticker' => $isSticker,
             'parent_id' => $request->parent_id,
             'level' => $level,
         ]);
@@ -109,84 +127,85 @@ class TaskCommentController extends Controller
         $comment->load('user', 'parent.user', 'mentions');
 
         // ── Diffusion temps réel (WebSocket via Pusher) ──────────────────
-        event(new TaskCommentPosted($comment, (int) $taskId));
-
-        // Envoyer la notification de commentaire
-        $task = \App\Models\Task::with(['project.users', 'assignedUsers'])->findOrFail($taskId);
-
-        // Récupérer les utilisateurs à notifier
-        $usersToNotify = collect();
-
-        // Ajouter les membres du projet
-        if ($task->project && $task->project->users) {
-            $usersToNotify = $usersToNotify->merge($task->project->users);
+        // Le commentaire est déjà enregistré en base à ce stade : si la diffusion échoue
+        // (Pusher mal configuré, timeout réseau...), on logue l'erreur SANS faire échouer
+        // toute la requête, pour que l'utilisateur ne voie pas un "échec" pour un message
+        // en réalité bien envoyé.
+        try {
+            event(new TaskCommentPosted($comment, (int) $taskId));
+        } catch (\Throwable $e) {
+            Log::error('Erreur diffusion temps réel (comment.posted)', [
+                'comment_id' => $comment->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
-        // Ajouter l'utilisateur assigné à la tâche s'il existe
-        if ($task->assignedUsers && $task->assignedUsers->id) {
-            $usersToNotify->push($task->assignedUsers);
-        }
+        // Envoyer la notification de commentaire — également isolé pour ne jamais faire
+        // échouer l'enregistrement du commentaire lui-même.
+        try {
+            $task = \App\Models\Task::with(['project.users', 'assignedUsers'])->findOrFail($taskId);
 
-        // Ajouter l'auteur de la tâche s'il existe et est différent de l'utilisateur assigné
-        if ($task->creator && !$usersToNotify->contains('id', $task->creator->id)) {
-            $usersToNotify->push($task->creator);
-        }
+            $usersToNotify = collect();
 
-        // Éviter les doublons et ne pas notifier l'auteur du commentaire
-        $usersToNotify = $usersToNotify->unique('id')
-            ->filter(function ($user) use ($comment) {
-                return $user && $user->id !== $comment->user_id;
-            });
-
-
-
-        $author = auth()->user();
-
-
-
-
-        // Envoyer la notification à chaque utilisateur concerné
-        foreach ($usersToNotify as $user) {
-
-            // Notification interne
-            $user->notify(
-                new ProjaNotification(
-                    'Nouveau commentaire',
-                    $author->name.' a commenté la tâche "'.$task->title.'"',
-                    '/tasks/'.$task->id,
-                    null,
-                    'task_comment'
-                )
-            );
-
-            // Email uniquement si l'auteur l'autorise
-            if ($author->share_discussions_by_email) {
-
-                $user->notify(
-                    new TaskCommentNotification(
-                        $task,
-                        $comment
-                    )
-                );
-
+            if ($task->project && $task->project->users) {
+                $usersToNotify = $usersToNotify->merge($task->project->users);
             }
 
-        }
+            if ($task->assignedUsers && $task->assignedUsers->id) {
+                $usersToNotify->push($task->assignedUsers);
+            }
 
-        // Notification dédiée pour les utilisateurs explicitement mentionnés (@)
-        if ($mentionedIds->isNotEmpty()) {
-            $mentionedUsers = \App\Models\User::whereIn('id', $mentionedIds)->get();
-            foreach ($mentionedUsers as $mentionedUser) {
-                $mentionedUser->notify(
+            if ($task->creator && !$usersToNotify->contains('id', $task->creator->id)) {
+                $usersToNotify->push($task->creator);
+            }
+
+            $usersToNotify = $usersToNotify->unique('id')
+                ->filter(function ($user) use ($comment) {
+                    return $user && $user->id !== $comment->user_id;
+                });
+
+            $author = auth()->user();
+
+            foreach ($usersToNotify as $user) {
+                $user->notify(
                     new ProjaNotification(
-                        'Vous avez été mentionné',
-                        $author->name.' vous a mentionné dans un commentaire sur la tâche "'.$task->title.'"',
+                        'Nouveau commentaire',
+                        $author->name.' a commenté la tâche "'.$task->title.'"',
                         '/tasks/'.$task->id,
                         null,
-                        'task_comment_mention'
+                        'task_comment'
                     )
                 );
+
+                if ($author->share_discussions_by_email) {
+                    $user->notify(
+                        new TaskCommentNotification(
+                            $task,
+                            $comment
+                        )
+                    );
+                }
             }
+
+            if ($mentionedIds->isNotEmpty()) {
+                $mentionedUsers = \App\Models\User::whereIn('id', $mentionedIds)->get();
+                foreach ($mentionedUsers as $mentionedUser) {
+                    $mentionedUser->notify(
+                        new ProjaNotification(
+                            'Vous avez été mentionné',
+                            $author->name.' vous a mentionné dans un commentaire sur la tâche "'.$task->title.'"',
+                            '/tasks/'.$task->id,
+                            null,
+                            'task_comment_mention'
+                        )
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('Erreur notifications commentaire', [
+                'comment_id' => $comment->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
 

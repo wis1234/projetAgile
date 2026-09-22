@@ -7,7 +7,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TaskComment extends Model
 {
-    protected $fillable = ['task_id', 'user_id', 'content', 'audio_path', 'image_path', 'parent_id', 'level'];
+    protected $fillable = [
+        'task_id', 'user_id', 'content', 'audio_path', 'image_path',
+        'video_path', 'is_sticker', 'parent_id', 'level',
+    ];
+
+    protected $casts = [
+        'is_sticker' => 'boolean',
+    ];
 
     public function user(): BelongsTo
     {
@@ -15,9 +22,9 @@ class TaskComment extends Model
     }
 
     public function mentions()
-{
-    return $this->belongsToMany(User::class, 'comment_mentions', 'task_comment_id', 'user_id');
-}
+    {
+        return $this->belongsToMany(User::class, 'comment_mentions', 'task_comment_id', 'user_id');
+    }
 
     public function task(): BelongsTo
     {
@@ -41,7 +48,7 @@ class TaskComment extends Model
 
     public function allRepliesWithUser()
     {
-        return $this->replies()->with(['user', 'replies' => function($q) {
+        return $this->replies()->with(['user', 'replies' => function ($q) {
             $q->with('user');
         }]);
     }
