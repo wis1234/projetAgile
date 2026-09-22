@@ -203,6 +203,7 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
     : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl rounded-bl-sm border border-gray-100 dark:border-gray-700 shadow-sm';
 
   const resolvedImageSrc = resolveImageSrc(comment.image_path);
+  const resolvedVideoSrc = resolveImageSrc(comment.video_path);
 
   return (
     <div
@@ -258,45 +259,82 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
             }`}
           >
             <p className="font-semibold truncate">{comment.parent.user?.name || 'Message'}</p>
-            <p className="truncate">{comment.parent.content || (comment.parent.image_path ? '📷 Photo' : (comment.parent.audio_path ? '🎙 Message vocal' : '…'))}</p>
+            <p className="truncate">{comment.parent.content || (comment.parent.is_sticker ? '🎨 Sticker' : (comment.parent.video_path ? '🎬 Vidéo' : (comment.parent.image_path ? '📷 Photo' : (comment.parent.audio_path ? '🎙 Message vocal' : '…'))))}</p>
           </button>
         )}
 
-        <div
-          className={`px-3.5 py-2 ${bubbleClass} ${comment._pending ? 'opacity-70' : ''} ${comment._failed ? 'opacity-50 border-red-400' : ''}`}
-        >
-          {/* Contenu texte */}
-          {comment.content && !comment.audio_path && (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words"
-               dangerouslySetInnerHTML={{ __html: comment.content }} />
-          )}
-          {/* Vocal */}
-          {comment.audio_path && (
-            <AudioPlayer src={comment.audio_path} isMe={isMe} />
-          )}
-          {/* Image / Sticker */}
-          {resolvedImageSrc && (
-            <img
-              src={resolvedImageSrc}
-              alt="Photo"
-              className="max-w-full rounded-xl mt-1 max-h-64 object-cover cursor-pointer"
-              loading="lazy"
-              onClick={() => onImageClick?.(resolvedImageSrc)}
-            />
-          )}
-          {/* Horodatage */}
-          <div className={`flex items-center gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-end'}`}>
-            {comment._failed && <span className="text-[10px] text-red-300">⚠ Échec</span>}
-            <span className={`text-[10px] ${isMe ? 'text-blue-200' : 'text-gray-400 dark:text-gray-500'}`}>
-              {formatTime(comment.created_at)}
-            </span>
-            {isMe && (
-              <svg className={`w-3 h-3 ${comment._pending ? 'text-blue-300' : 'text-blue-200'}`} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0z" clipRule="evenodd" />
-              </svg>
+        {comment.is_sticker ? (
+          /* ─── Sticker (image ou vidéo courte) : pas de bulle, juste le média qui "flotte" ─── */
+          <div className={`relative ${comment._pending ? 'opacity-70' : ''} ${comment._failed ? 'opacity-50' : ''}`}>
+            {resolvedVideoSrc ? (
+              <video
+                src={resolvedVideoSrc}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-32 h-32 max-w-[45vw] max-h-[45vw] object-contain"
+              />
+            ) : (
+              <img
+                src={resolvedImageSrc}
+                alt="Sticker"
+                className="w-32 h-32 max-w-[45vw] max-h-[45vw] object-contain cursor-pointer"
+                loading="lazy"
+                onClick={() => onImageClick?.(resolvedImageSrc)}
+              />
             )}
+            <div className={`flex items-center gap-1 mt-0.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
+              {comment._failed && <span className="text-[10px] text-red-500 font-medium">⚠ Échec</span>}
+              <span className="text-[10px] text-gray-400 dark:text-gray-500">{formatTime(comment.created_at)}</span>
+              {isMe && (
+                <svg className={`w-3 h-3 ${comment._pending ? 'text-gray-300' : 'text-blue-400'}`} fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div
+            className={`px-3.5 py-2 ${bubbleClass} ${comment._pending ? 'opacity-70' : ''} ${comment._failed ? 'opacity-50 border-red-400' : ''}`}
+          >
+            {/* Contenu texte */}
+            {comment.content && !comment.audio_path && (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words"
+                 dangerouslySetInnerHTML={{ __html: comment.content }} />
+            )}
+            {/* Vocal */}
+            {comment.audio_path && (
+              <AudioPlayer src={comment.audio_path} isMe={isMe} />
+            )}
+            {/* Vidéo classique (hors sticker) */}
+            {resolvedVideoSrc && (
+              <video src={resolvedVideoSrc} controls className="max-w-full rounded-xl mt-1 max-h-64" />
+            )}
+            {/* Image */}
+            {resolvedImageSrc && (
+              <img
+                src={resolvedImageSrc}
+                alt="Photo"
+                className="max-w-full rounded-xl mt-1 max-h-64 object-cover cursor-pointer"
+                loading="lazy"
+                onClick={() => onImageClick?.(resolvedImageSrc)}
+              />
+            )}
+            {/* Horodatage */}
+            <div className={`flex items-center gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-end'}`}>
+              {comment._failed && <span className="text-[10px] text-red-300">⚠ Échec</span>}
+              <span className={`text-[10px] ${isMe ? 'text-blue-200' : 'text-gray-400 dark:text-gray-500'}`}>
+                {formatTime(comment.created_at)}
+              </span>
+              {isMe && (
+                <svg className={`w-3 h-3 ${comment._pending ? 'text-blue-300' : 'text-blue-200'}`} fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Réactions */}
         {comment.reactions_summary && Object.keys(comment.reactions_summary).length > 0 && (
@@ -606,15 +644,23 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
     setImagePreviewUrl(null);
   };
 
-  // ─── Upload d'un nouveau sticker par l'utilisateur ───────────────────────
+  // ─── Upload d'un nouveau sticker par l'utilisateur (image OU courte vidéo) ───
   const handleStickerUpload = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      showToast('error', 'Seules les images peuvent devenir des stickers.');
+
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) {
+      showToast('error', 'Seules les images et les courtes vidéos peuvent devenir des stickers.');
       return;
     }
+    if (file.size > 6 * 1024 * 1024) {
+      showToast('error', 'Fichier trop lourd (6 Mo max) — choisissez une vidéo plus courte.');
+      return;
+    }
+
     try {
       const fd = new FormData();
       fd.append('image', file);
@@ -623,12 +669,17 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': getCsrf() },
         body: fd,
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        let msg = "Impossible d'ajouter ce sticker.";
+        try { const errData = await res.json(); msg = errData.message || msg; } catch {}
+        throw new Error(msg);
+      }
       const sticker = await res.json();
       setStickers(prev => [sticker, ...prev]);
-      showToast('success', 'Sticker ajouté au pack !');
-    } catch {
-      showToast('error', "Impossible d'ajouter ce sticker.");
+      showToast('success', isVideo ? 'Sticker vidéo ajouté au pack !' : 'Sticker ajouté au pack !');
+    } catch (err) {
+      console.error('Erreur upload sticker:', err);
+      showToast('error', err.message || "Impossible d'ajouter ce sticker.");
     }
   };
 
@@ -726,27 +777,36 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': getCsrf() },
         body: fd,
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        let msg = `Erreur ${res.status}`;
+        try { const errData = await res.json(); msg = errData.message || (errData.errors ? Object.values(errData.errors).flat().join(' ') : msg); } catch {}
+        throw new Error(msg);
+      }
       const saved = await res.json();
       const serverComment = saved.comment || saved;
       setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, ...serverComment, _pending: false, _failed: false } : c));
-    } catch {
+    } catch (err) {
+      console.error('Erreur envoi message:', err);
+      showToast('error', err.message || "Échec de l'envoi du message.");
       setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, _pending: false, _failed: true } : c));
     } finally {
       setSending(false);
     }
   };
 
-  // ─── Envoi d'un sticker existant du pack (en un tap) ─────────────────────
+  // ─── Envoi d'un sticker existant du pack (en un tap, image ou vidéo) ─────
   const sendSticker = async (sticker) => {
     nativeFeedback.tap();
     const tempId = `temp_${Date.now()}`;
     const activeReply = replyTo;
+    const isVideo = sticker.type === 'video';
     const optimistic = {
       _tempId: tempId, id: null, _pending: true, _failed: false,
       content: '',
       audio_path: null,
-      image_path: sticker.image_path,
+      image_path: isVideo ? null : sticker.image_path,
+      video_path: isVideo ? sticker.image_path : null,
+      is_sticker: true,
       created_at: new Date().toISOString(),
       user: { id: me?.id, name: me?.name, profile_photo_url: me?.profile_photo_url },
       parent_id: activeReply?.id || null,
@@ -769,11 +829,17 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': getCsrf() },
         body: fd,
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        let msg = `Erreur ${res.status}`;
+        try { const errData = await res.json(); msg = errData.message || (errData.errors ? Object.values(errData.errors).flat().join(' ') : msg); } catch {}
+        throw new Error(msg);
+      }
       const saved = await res.json();
       const serverComment = saved.comment || saved;
       setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, ...serverComment, _pending: false, _failed: false } : c));
-    } catch {
+    } catch (err) {
+      console.error('Erreur envoi sticker:', err);
+      showToast('error', err.message || "Échec de l'envoi du sticker.");
       setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, _pending: false, _failed: true } : c));
     }
   };
@@ -966,7 +1032,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
                 {replyTo.user?.name || 'Message'}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {replyTo.content || (replyTo.image_path ? '📷 Photo' : '🎙 Message vocal')}
+                {replyTo.content || (replyTo.is_sticker ? '🎨 Sticker' : (replyTo.video_path ? '🎬 Vidéo' : (replyTo.image_path ? '📷 Photo' : '🎙 Message vocal')))}
               </p>
             </div>
             <button
@@ -1075,15 +1141,21 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
                 ))
               ) : (
                 <div className="grid grid-cols-4 gap-2 pt-1">
-                  {/* Bouton d'ajout : chacun peut créer/uploader son propre sticker */}
-                  <input type="file" ref={stickerInputRef} onChange={handleStickerUpload} accept="image/*" className="hidden" />
+                  {/* Bouton d'ajout : chacun peut créer/uploader son propre sticker (image ou courte vidéo) */}
+                  <input
+                    type="file"
+                    ref={stickerInputRef}
+                    onChange={handleStickerUpload}
+                    accept="image/*,video/mp4,video/webm,video/quicktime"
+                    className="hidden"
+                  />
                   <button
                     type="button"
                     onClick={() => stickerInputRef.current?.click()}
                     className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 active:bg-gray-50 dark:active:bg-gray-800 transition-colors"
                   >
                     <span className="text-2xl leading-none">＋</span>
-                    <span className="text-[9px] mt-1 font-medium">Ajouter</span>
+                    <span className="text-[9px] mt-1 font-medium text-center leading-tight">Ajouter<br/>photo/vidéo</span>
                   </button>
 
                   {stickers.map(sticker => (
@@ -1092,20 +1164,34 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
                       type="button"
                       onClick={() => sendSticker(sticker)}
                       title={sticker.name || 'Envoyer ce sticker'}
-                      className="aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 active:scale-95 transition-transform"
+                      className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 active:scale-95 transition-transform"
                     >
-                      <img
-                        src={resolveImageSrc(sticker.image_path)}
-                        alt={sticker.name || 'Sticker'}
-                        className="w-full h-full object-contain p-1"
-                        loading="lazy"
-                      />
+                      {sticker.type === 'video' ? (
+                        <video
+                          src={resolveImageSrc(sticker.image_path)}
+                          className="w-full h-full object-contain p-1"
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={resolveImageSrc(sticker.image_path)}
+                          alt={sticker.name || 'Sticker'}
+                          className="w-full h-full object-contain p-1"
+                          loading="lazy"
+                        />
+                      )}
+                      {sticker.type === 'video' && (
+                        <span className="absolute bottom-0.5 right-0.5 text-[8px] bg-black/60 text-white rounded px-1 leading-tight">🎥</span>
+                      )}
                     </button>
                   ))}
 
                   {stickers.length === 0 && (
                     <p className="col-span-3 text-xs text-gray-400 dark:text-gray-500 self-center px-2 leading-relaxed">
-                      Aucun sticker pour l'instant. Appuyez sur ＋ pour ajouter le vôtre au pack de l'équipe.
+                      Aucun sticker pour l'instant. Appuyez sur ＋ pour ajouter une image ou une courte vidéo au pack de l'équipe.
                     </p>
                   )}
                 </div>

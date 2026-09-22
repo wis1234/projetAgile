@@ -7,10 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Sticker extends Model
 {
-    protected $fillable = ['user_id', 'name', 'image_path'];
+    protected $fillable = ['user_id', 'name', 'image_path', 'type'];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function isVideo(): bool
+    {
+        return $this->type === 'video';
     }
 }
