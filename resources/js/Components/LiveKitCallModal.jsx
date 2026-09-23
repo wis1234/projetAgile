@@ -3,7 +3,7 @@ import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
   FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
   FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck, FaImage, FaAdjust,
-  FaEllipsisV, FaUserSlash
+  FaEllipsisV, FaUserSlash, FaThumbtack
 } from 'react-icons/fa';
 import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';
 
@@ -28,6 +28,120 @@ const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '�
 const OUTGOING_RINGTONE_SRC = '/sounds/outgoing-call.mp3'; // tonalité "ça sonne chez l'autre"
 const INCOMING_RINGTONE_SRC = 'https://proja.kemtcenter.org/storage/public/files/incoming-call_old.mp3'; // vraie sonnerie d'appel entrant
 
+const initialsOf = (name = '') => {
+  const w = String(name).trim().split(/\s+/);
+  if (!w[0]) return '?';
+  return w.length === 1 ? w[0].slice(0, 2).toUpperCase() : (w[0][0] + w[w.length - 1][0]).toUpperCase();
+};
+
+const photoOf = (p) => {
+  if (!p?.metadata) return null;
+  try {
+    const meta = JSON.parse(p.metadata);
+    return meta.profile_photo_url || meta.avatar || meta.photo || null;
+  } catch {
+    return null;
+  }
+};
+
+function AvatarCircle({ name, photoUrl, size = 'w-28 h-28 text-3xl' }) {
+  const [imgError, setImgError] = useState(false);
+  if (photoUrl && !imgError) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name}
+        onError={() => setImgError(true)}
+        className={`${size} rounded-full object-cover shadow-xl flex-shrink-0 border-2 border-white/10`}
+      />
+    );
+  }
+  return (
+    <div className={`${size} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-xl flex-shrink-0`}>
+      {initialsOf(name)}
+    </div>
+  );
+}
+
+// Une vignette = un participant (local ou distant). Elle attache sa propre caméra,
+// se met à jour toute seule et affiche l'anneau quand la personne parle.
+function ParticipantTile({
+  participant, mirror = false, className = '', avatarSize = 'w-12 h-12 text-sm',
+  photoUrl, label = '', handRaised = false, onClick, children,
+}) {
+  const videoRef = useRef(null);
+  const [, setVersion] = useState(0);
+  const [speaking, setSpeaking] = useState(!!participant?.isSpeaking);
+
+  useEffect(() => {
+    if (!participant) return;
+    const refresh = () => setVersion(v => v + 1);
+    const onSpeaking = (value) => setSpeaking(!!value);
+    const events = ['trackSubscribed', 'trackUnsubscribed', 'trackMuted', 'trackUnmuted', 'localTrackPublished', 'localTrackUnpublished'];
+    events.forEach(evt => participant.on(evt, refresh));
+    participant.on('isSpeakingChanged', onSpeaking);
+    setSpeaking(!!participant.isSpeaking);
+    return () => {
+      events.forEach(evt => participant.off(evt, refresh));
+      participant.off('isSpeakingChanged', onSpeaking);
+    };
+  }, [participant]);
+
+  const camPub = participant
+    ? [...participant.videoTrackPublications.values()].find(pub => pub.source === 'camera')
+    : null;
+  const track = camPub?.track || null;
+  const hasVideo = !!track && !camPub.isMuted;
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !track || !hasVideo) return;
+    track.attach(el);
+    return () => { track.detach(el); };
+  }, [track, hasVideo]);
+
+  const name = participant?.isLocal ? 'Vous' : (participant?.name || participant?.identity || '');
+  const photo = photoUrl !== undefined ? photoUrl : photoOf(participant);
+
+  return (
+    <div className={`relative overflow-hidden bg-slate-900 ${className}`} onClick={onClick}>
+      {hasVideo ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 w-full h-full object-cover bg-black"
+          style={mirror ? { transform: 'scaleX(-1)' } : undefined}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
+          <div className={`rounded-full ${speaking ? 'speaking-avatar' : ''}`}>
+            <AvatarCircle name={name} photoUrl={photo} size={avatarSize} />
+          </div>
+        </div>
+      )}
+
+      {speaking && hasVideo && (
+        <div className="speaking-ring absolute inset-0 z-[5] pointer-events-none" style={{ borderRadius: 'inherit' }} />
+      )}
+
+      {label && (
+        <span className="absolute bottom-1 left-1 z-10 max-w-[85%] text-[10px] text-white bg-black/50 px-1.5 rounded flex items-center gap-1">
+          <span className="truncate">{label}</span>
+          {participant && !participant.isMicrophoneEnabled && <FaMicrophoneSlash className="w-2 h-2 text-red-400 flex-shrink-0" />}
+        </span>
+      )}
+      {handRaised && (
+        <div className="absolute top-1 right-1 z-10 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
+          <FaHandPaper className="w-2.5 h-2.5 text-amber-900" />
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
 export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndpoint, isHost, title, callerName, callerPhotoUrl = '', myAvatarUrl = '', onClose, onAnswered, skipIncomingScreen = false, inviteLink = '' }) {
   const [room, setRoom] = useState(null);
   const [livekitLib, setLivekitLib] = useState(null);
@@ -51,6 +165,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   const [activeSpeaker, setActiveSpeaker] = useState(null);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [pipPos, setPipPos] = useState(null);
+  const [pinnedId, setPinnedId] = useState(null);
 
   // ─── Décroché / pas décroché — état 100% LOCAL à cet utilisateur ───
   // C'est la clé du correctif : l'hôte (celui qui lance l'appel) est
@@ -278,20 +393,23 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
         });
         setRoom(activeRoom);
 
-        activeRoom.on(RoomEvent.TrackSubscribed, () => {
-          setParticipants([...activeRoom.remoteParticipants.values()]);
-        });
-        activeRoom.on(RoomEvent.ParticipantConnected, () => {
-          setParticipants([...activeRoom.remoteParticipants.values()]);
-        });
+        const refreshParticipants = () => setParticipants([...activeRoom.remoteParticipants.values()]);
+        [
+          RoomEvent.TrackSubscribed, RoomEvent.TrackUnsubscribed,
+          RoomEvent.TrackMuted, RoomEvent.TrackUnmuted,
+          RoomEvent.ParticipantConnected,
+        ].forEach(evt => activeRoom.on(evt, refreshParticipants));
+
         activeRoom.on(RoomEvent.ParticipantDisconnected, (p) => {
-          setParticipants([...activeRoom.remoteParticipants.values()]);
+          refreshParticipants();
+          setPinnedId(prev => (prev === p.identity ? null : prev));
           setRaisedHands(prev => {
             const copy = { ...prev };
             delete copy[p.identity];
             return copy;
           });
         });
+
         activeRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
           setConnectionState(state);
         });
@@ -320,10 +438,10 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
           } catch (e) { /* ignore malformed payload */ }
         });
 
+        // On ne retient que les AUTRES : ta propre voix ne doit jamais prendre la grande vue
         activeRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-          if (speakers.length > 0) {
-            setActiveSpeaker(speakers[0].identity);
-          }
+          const remoteSpeaker = speakers.find(s => !s.isLocal);
+          if (remoteSpeaker) setActiveSpeaker(remoteSpeaker.identity);
         });
 
         await activeRoom.connect(url, token);
@@ -432,33 +550,31 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   const TrackSourceScreenShare = livekitLib?.Track?.Source?.ScreenShare || 'screen_share';
   const TrackSourceCamera = livekitLib?.Track?.Source?.Camera || 'camera';
 
-  const initialsOf = (name = '') => {
-    const w = String(name).trim().split(/\s+/);
-    if (!w[0]) return '?';
-    return w.length === 1 ? w[0].slice(0, 2).toUpperCase() : (w[0][0] + w[w.length - 1][0]).toUpperCase();
-  };
   const otherName = (p) => p?.name || p?.identity || 'Participant';
-  const photoOf = (p) => {
-    if (!p?.metadata) return null;
-    try {
-      const meta = JSON.parse(p.metadata);
-      return meta.profile_photo_url || meta.avatar || meta.photo || null;
-    } catch {
-      return null;
-    }
-  };
 
-  const pipDragRef = useRef({ dragging: false, offsetX: 0, offsetY: 0 });
+  const pipDragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
   const handlePipPointerDown = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    pipDragRef.current = { dragging: true, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top };
+    pipDragRef.current = {
+      dragging: true, moved: false, startX: e.clientX, startY: e.clientY,
+      offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
+    };
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
   const handlePipPointerMove = (e) => {
-    if (!pipDragRef.current.dragging) return;
-    setPipPos({ x: e.clientX - pipDragRef.current.offsetX, y: e.clientY - pipDragRef.current.offsetY });
+    const d = pipDragRef.current;
+    if (!d.dragging) return;
+    if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
+    d.moved = true;
+    setPipPos({ x: e.clientX - d.offsetX, y: e.clientY - d.offsetY });
   };
-  const handlePipPointerUp = () => { pipDragRef.current.dragging = false; };
+  // Un simple tap (sans déplacement) échange la bulle avec la grande vue
+  const handlePipPointerUp = (onTap) => {
+    const d = pipDragRef.current;
+    const wasTap = d.dragging && !d.moved;
+    d.dragging = false;
+    if (wasTap) onTap?.();
+  };
 
   // Détecte si quelqu'un (local ou distant) partage son écran
   const remoteScreenShare = participants
@@ -471,15 +587,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     ? [...soleParticipant.videoTrackPublications.values()].some(pub => (pub.source === TrackSourceCamera || pub.source === 'camera') && pub.track)
     : false;
 
-  // ─── Attacher la caméra LOCALE — se déclenche après chaque rendu concerné ───
-  useEffect(() => {
-    if (!room || !camEnabled) return;
-    const camPub = [...room.localParticipant.videoTrackPublications.values()]
-      .find(pub => pub.source === TrackSourceCamera || pub.source === 'camera');
-    if (camPub?.track && localVideoRef.current) {
-      camPub.track.attach(localVideoRef.current);
-    }
-  }, [camEnabled, room, isScreenSharingAnyone, callStarted]);
+
 
   // ─── Attacher le partage d'écran LOCAL — même principe ───
   useEffect(() => {
@@ -491,17 +599,15 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     }
   }, [screenSharing, room]);
 
-  // ─── Attacher les flux DISTANTS (caméra + audio) — relancé aussi au changement de mise en page ───
+  // Audio distant uniquement (la vidéo est gérée par ParticipantTile).
+  // On n'attache qu'une fois par piste, sinon le son se dédouble.
   useEffect(() => {
     participants.forEach(p => {
-      const camPub = [...p.videoTrackPublications.values()].find(pub => (pub.source === TrackSourceCamera || pub.source === 'camera') && pub.track);
-      const el = remoteVideoRefs.current[p.identity];
-      if (camPub?.track && el) camPub.track.attach(el);
-
-      const audioPub = [...p.audioTrackPublications.values()].find(pub => pub.track);
-      if (audioPub?.track) audioPub.track.attach();
+      [...p.audioTrackPublications.values()].forEach(pub => {
+        if (pub.track && pub.track.attachedElements.length === 0) pub.track.attach();
+      });
     });
-  }, [participants, isScreenSharingAnyone, callStarted, connecting]);
+  }, [participants]);
 
   // ─── Attacher le partage d'écran DISTANT ───
   useEffect(() => {
@@ -511,31 +617,21 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   }, [remoteScreenShare, screenSharing]);
 
   // ─── Attacher le Main Speaker (façon Google Meet) ───
-  const activeIdentity = activeSpeaker || (participants.length > 0 ? participants[0].identity : room?.localParticipant?.identity);
-  const isLocalMain = activeIdentity === room?.localParticipant?.identity || (!participants.length);
+  // ─── Qui est affiché en grand ? ───
+  const localP = room?.localParticipant || null;
+  const allParticipants = localP ? [localP, ...participants] : [...participants];
+  const hasCamera = (p) => [...p.videoTrackPublications.values()]
+    .some(pub => pub.source === 'camera' && pub.track && !pub.isMuted);
 
-  useEffect(() => {
-    if (isScreenSharingAnyone || !room) return;
-    
-    let track = null;
-    if (isLocalMain) {
-      if (camEnabled) {
-         const camPub = [...room.localParticipant.videoTrackPublications.values()]
-           .find(pub => pub.source === (livekitLib?.Track?.Source?.Camera || 'camera') || pub.source === 'camera');
-         track = camPub?.track;
-      }
-    } else {
-      const p = participants.find(p => p.identity === activeIdentity);
-      if (p) {
-        const camPub = [...p.videoTrackPublications.values()].find(pub => (pub.source === (livekitLib?.Track?.Source?.Camera || 'camera') || pub.source === 'camera') && pub.track);
-        track = camPub?.track;
-      }
-    }
-
-    if (track && mainVideoRef.current) {
-      track.attach(mainVideoRef.current);
-    }
-  }, [activeIdentity, participants, camEnabled, isScreenSharingAnyone, room]);
+  // Priorité : personne épinglée > dernier autre qui a parlé > premier autre avec caméra > premier autre > soi
+  const mainId =
+    (pinnedId && allParticipants.some(p => p.identity === pinnedId) && pinnedId) ||
+    (activeSpeaker && participants.some(p => p.identity === activeSpeaker) && activeSpeaker) ||
+    participants.find(hasCamera)?.identity ||
+    participants[0]?.identity ||
+    localP?.identity;
+  const mainP = allParticipants.find(p => p.identity === mainId) || localP;
+  const otherTiles = allParticipants.filter(p => p.identity !== mainP?.identity);
 
   const blurProcessorRef = useRef(null); // conservé pour compat, plus vraiment utilisé
   const fileInputRef = useRef(null);
@@ -904,24 +1000,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     );
   }
 
-  const AvatarCircle = ({ name, photoUrl, size = 'w-28 h-28 text-3xl' }) => {
-    const [imgError, setImgError] = useState(false);
-    if (photoUrl && !imgError) {
-      return (
-        <img
-          src={photoUrl}
-          alt={name}
-          onError={() => setImgError(true)}
-          className={`${size} rounded-full object-cover shadow-xl flex-shrink-0 border-2 border-white/10`}
-        />
-      );
-    }
-    return (
-      <div className={`${size} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-xl flex-shrink-0`}>
-        {initialsOf(name)}
-      </div>
-    );
-  };
+
 
   const statusLabel = connecting
     ? 'Connexion…'
@@ -1018,6 +1097,12 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
         .panel-in { animation: panelIn 0.2s ease-out; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { scrollbar-width: none; }
+        @keyframes speakingPulse {
+          0%, 100% { box-shadow: 0 0 0 3px rgba(52,211,153,.95), 0 0 0 8px rgba(52,211,153,.25); }
+          50%      { box-shadow: 0 0 0 4px rgba(52,211,153,1),   0 0 0 16px rgba(52,211,153,.10); }
+        }
+        .speaking-avatar { animation: speakingPulse 1.1s ease-in-out infinite; }
+        .speaking-ring { box-shadow: inset 0 0 0 4px #34d399; }
       `}</style>
 
       {/* ─── ZONE VIDÉO — plein écran, comme Meet/WhatsApp ─── */}
@@ -1028,15 +1113,15 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
             <p className="text-white/70 text-sm">Connexion en cours…</p>
           </div>
         ) : !callStarted ? (
-          // ── Personne d'autre encore : aperçu de soi plein écran, comme la salle d'attente Meet ──
+          // ── Salle d'attente : aperçu de soi plein écran ──
           <div className="relative h-full w-full">
-            {camEnabled ? (
-              <video ref={localVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover bg-black" style={mirrorStyle} />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
-                <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-32 h-32 text-4xl" />
-              </div>
-            )}
+            <ParticipantTile
+              participant={room?.localParticipant}
+              mirror
+              photoUrl={myAvatarUrl}
+              avatarSize="w-32 h-32 text-4xl"
+              className="absolute inset-0"
+            />
             <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 pb-40 pointer-events-none">
               <div className="flex items-center gap-2 text-white/90 bg-black/40 backdrop-blur px-4 py-2 rounded-full text-sm">
                 <span className="relative flex h-2.5 w-2.5">
@@ -1048,6 +1133,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
             </div>
           </div>
         ) : isScreenSharingAnyone ? (
+          // ── Partage d'écran ──
           <div className="relative h-full w-full">
             <video ref={screenVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-contain bg-black" />
             <div
@@ -1058,101 +1144,33 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
               {screenSharing ? 'Vous partagez votre écran' : `${remoteScreenShare?.p?.name || 'Un participant'} partage son écran`}
             </div>
             <div className="absolute inset-x-0 bottom-24 z-10 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide">
-              <div className="w-24 h-16 rounded-xl overflow-hidden bg-slate-800 ring-1 ring-white/10 flex-shrink-0 relative flex items-center justify-center">
-                {camEnabled ? (
-                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
-                ) : (
-                  <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-8 h-8 text-[10px]" />
-                )}
-                <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded">Vous</span>
-              </div>
-              {participants.map(p => (
-                <div key={p.identity} className="w-24 h-16 rounded-xl overflow-hidden bg-black ring-1 ring-white/10 flex-shrink-0 relative">
-                  <video
-                    ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                    autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
-                  />
-                  <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
-                    {p.name || p.identity}
-                  </span>
-                </div>
+              {allParticipants.map(p => (
+                <ParticipantTile
+                  key={p.identity}
+                  participant={p}
+                  mirror={p.isLocal}
+                  photoUrl={p.isLocal ? myAvatarUrl : undefined}
+                  label={p.isLocal ? 'Vous' : otherName(p)}
+                  avatarSize="w-8 h-8 text-[10px]"
+                  className="w-24 h-16 rounded-xl ring-1 ring-white/10 flex-shrink-0"
+                />
               ))}
-            </div>
-          </div>
-        ) : isOneOnOne ? (
-          // ─── 1 à 1 : plein écran + bulle flottante déplaçable, exactement comme WhatsApp ───
-          <div className="relative h-full w-full">
-            {soleParticipant ? (
-              remoteHasCamera ? (
-                <video ref={mainVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover bg-black" />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
-                  <AvatarCircle name={otherName(soleParticipant)} photoUrl={photoOf(soleParticipant)} size="w-32 h-32 text-4xl" />
-                </div>
-              )
-            ) : camEnabled ? (
-              <video ref={mainVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover bg-black" style={mirrorStyle} />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
-                <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-32 h-32 text-4xl" />
-              </div>
-            )}
-
-            {!!soleParticipant && raisedHands[soleParticipant.identity] && (
-              <div
-                className="absolute z-10 w-9 h-9 rounded-full bg-amber-400 flex items-center justify-center animate-bounce"
-                style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', right: '1rem' }}
-              >
-                <FaHandPaper className="w-4 h-4 text-amber-900" />
-              </div>
-            )}
-
-            {!!soleParticipant && (
-              <div
-                className="absolute z-10 px-3 py-1.5 bg-black/40 backdrop-blur text-white text-sm font-semibold rounded-full"
-                style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', left: '1rem' }}
-              >
-                {otherName(soleParticipant)}
-              </div>
-            )}
-
-            {/* Bulle « moi » flottante et déplaçable — le geste WhatsApp par excellence */}
-            <div
-              onPointerDown={handlePipPointerDown}
-              onPointerMove={handlePipPointerMove}
-              onPointerUp={handlePipPointerUp}
-              onPointerCancel={handlePipPointerUp}
-              className="absolute z-20 w-24 h-36 sm:w-28 sm:h-40 rounded-2xl overflow-hidden shadow-2xl ring-2 ring-white/20 bg-slate-800 touch-none cursor-grab active:cursor-grabbing"
-              style={
-                pipPos
-                  ? { left: pipPos.x, top: pipPos.y }
-                  : { right: '1rem', bottom: 'calc(7.5rem + var(--safe-bottom, 0px))' }
-              }
-            >
-              {camEnabled ? (
-                <video ref={soleParticipant ? localVideoRef : mainVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900">
-                  <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-12 h-12 text-sm" />
-                </div>
-              )}
-              {handRaised && (
-                <div className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
-                  <FaHandPaper className="w-3 h-3 text-amber-900" />
-                </div>
-              )}
-              {!micEnabled && (
-                <div className="absolute bottom-1.5 left-1.5 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
-                  <FaMicrophoneSlash className="w-3 h-3 text-red-400" />
-                </div>
-              )}
             </div>
           </div>
         ) : (
-          // ─── Groupe (3+) : caméra principale + bandeau de vignettes, façon Meet ───
+          // ── 1 à 1 ET groupe : grande vue + vignettes, tout le monde est cliquable ──
           <div className="relative h-full w-full">
-            <video ref={mainVideoRef} autoPlay playsInline muted={isLocalMain} className="absolute inset-0 w-full h-full object-cover bg-black" style={isLocalMain ? mirrorStyle : {}} />
-            {!isLocalMain && raisedHands[activeIdentity] && (
+            <ParticipantTile
+              key={mainP.identity}
+              participant={mainP}
+              mirror={mainP.isLocal}
+              photoUrl={mainP.isLocal ? myAvatarUrl : undefined}
+              avatarSize="w-32 h-32 text-4xl"
+              className="absolute inset-0"
+              onClick={() => setPinnedId(null)}
+            />
+
+            {(mainP.isLocal ? handRaised : !!raisedHands[mainP.identity]) && (
               <div
                 className="absolute z-10 w-9 h-9 rounded-full bg-amber-400 flex items-center justify-center animate-bounce"
                 style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', right: '1rem' }}
@@ -1160,64 +1178,76 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                 <FaHandPaper className="w-4 h-4 text-amber-900" />
               </div>
             )}
+
             <div
-              className="absolute z-10 px-3 py-1.5 bg-black/40 backdrop-blur text-white text-sm font-semibold rounded-full flex items-center gap-2"
+              className="absolute z-10 px-3 py-1.5 bg-black/40 backdrop-blur text-white text-sm font-semibold rounded-full flex items-center gap-2 pointer-events-none"
               style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', left: '1rem' }}
             >
-              {isLocalMain ? 'Vous' : (participants.find(p => p.identity === activeIdentity)?.name || activeIdentity)}
-              {isLocalMain && isHost && <FaCrown className="w-3.5 h-3.5 text-amber-400" />}
+              {mainP.isLocal ? 'Vous' : otherName(mainP)}
+              {mainP.isLocal && isHost && <FaCrown className="w-3.5 h-3.5 text-amber-400" />}
+              {pinnedId === mainP.identity && <FaThumbtack className="w-3 h-3 text-blue-300" />}
             </div>
 
-            <div className="absolute inset-x-0 bottom-24 z-10 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide">
-              <div className="w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden bg-slate-800 ring-1 ring-white/10 flex-shrink-0 relative flex items-center justify-center">
-                {camEnabled ? (
-                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
-                ) : (
-                  <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-9 h-9 text-xs" />
-                )}
-                {handRaised && (
-                  <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
-                    <FaHandPaper className="w-2.5 h-2.5 text-amber-900" />
-                  </div>
-                )}
-                <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded flex items-center gap-1">
-                  Vous {!micEnabled && <FaMicrophoneSlash className="w-2 h-2 text-red-400" />}
-                </span>
+            {isOneOnOne && otherTiles[0] ? (
+              // Bulle déplaçable : un tap l'échange avec la grande vue
+              <div
+                onPointerDown={handlePipPointerDown}
+                onPointerMove={handlePipPointerMove}
+                onPointerUp={() => handlePipPointerUp(() => setPinnedId(otherTiles[0].identity))}
+                onPointerCancel={() => { pipDragRef.current.dragging = false; }}
+                className="absolute z-20 w-24 h-36 sm:w-28 sm:h-40 rounded-2xl overflow-hidden shadow-2xl ring-2 ring-white/20 touch-none cursor-grab active:cursor-grabbing"
+                style={
+                  pipPos
+                    ? { left: pipPos.x, top: pipPos.y }
+                    : { right: '1rem', bottom: 'calc(7.5rem + var(--safe-bottom, 0px))' }
+                }
+              >
+                <ParticipantTile
+                  participant={otherTiles[0]}
+                  mirror={otherTiles[0].isLocal}
+                  photoUrl={otherTiles[0].isLocal ? myAvatarUrl : undefined}
+                  handRaised={otherTiles[0].isLocal ? handRaised : !!raisedHands[otherTiles[0].identity]}
+                  avatarSize="w-12 h-12 text-sm"
+                  className="w-full h-full"
+                />
               </div>
-              {participants.map(p => (
-                <div key={p.identity} className="w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden bg-black ring-1 ring-white/10 flex-shrink-0 relative group">
-                  <video
-                    ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                    autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
-                  />
-                  {raisedHands[p.identity] && (
-                    <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
-                      <FaHandPaper className="w-2.5 h-2.5 text-amber-900" />
-                    </div>
-                  )}
-                  <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
-                    {p.name || p.identity}
-                  </span>
-                  {isHost && (
-                    <div className="absolute top-1 left-1 hidden group-hover:flex items-center gap-1">
-                      <button onClick={() => muteRemote(p, 'audio')} title="Couper le micro" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
-                        <FaMicrophoneSlash className="w-2.5 h-2.5 text-white" />
-                      </button>
-                      <button onClick={() => muteRemote(p, 'video')} title="Couper la caméra" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
-                        <FaVideoSlash className="w-2.5 h-2.5 text-white" />
-                      </button>
-                      {kickEndpoint && (
-                        <button onClick={() => kickRemote(p)} title="Retirer de l'appel" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
-                          <FaUserSlash className="w-2.5 h-2.5 text-white" />
+            ) : (
+              // Groupe : clic sur une vignette = l'afficher en grand
+              <div className="absolute inset-x-0 bottom-24 z-10 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide">
+                {otherTiles.map(p => (
+                  <ParticipantTile
+                    key={p.identity}
+                    participant={p}
+                    mirror={p.isLocal}
+                    photoUrl={p.isLocal ? myAvatarUrl : undefined}
+                    label={p.isLocal ? 'Vous' : otherName(p)}
+                    handRaised={p.isLocal ? handRaised : !!raisedHands[p.identity]}
+                    avatarSize="w-9 h-9 text-xs"
+                    onClick={() => setPinnedId(p.identity)}
+                    className="group w-24 h-16 sm:w-28 sm:h-20 rounded-xl ring-1 ring-white/10 flex-shrink-0 cursor-pointer"
+                  >
+                    {isHost && !p.isLocal && (
+                      <div className="absolute top-1 left-1 z-10 hidden group-hover:flex items-center gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); muteRemote(p, 'audio'); }} title="Couper le micro" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                          <FaMicrophoneSlash className="w-2.5 h-2.5 text-white" />
                         </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                        <button onClick={(e) => { e.stopPropagation(); muteRemote(p, 'video'); }} title="Couper la caméra" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                          <FaVideoSlash className="w-2.5 h-2.5 text-white" />
+                        </button>
+                        {kickEndpoint && (
+                          <button onClick={(e) => { e.stopPropagation(); kickRemote(p); }} title="Retirer de l'appel" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                            <FaUserSlash className="w-2.5 h-2.5 text-white" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </ParticipantTile>
+                ))}
+              </div>
+            )}
           </div>
         )}
+
 
         {/* ─── Réactions façon Google Meet : flottent vers le haut ─── */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-full overflow-hidden z-10">
