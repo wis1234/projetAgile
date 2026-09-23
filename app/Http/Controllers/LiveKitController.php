@@ -26,6 +26,7 @@ class LiveKitController extends Controller
         $tokenOptions = (new AccessTokenOptions())
             ->setIdentity((string) $user->id)
             ->setName($user->name)
+            ->setMetadata(json_encode(['profile_photo_url' => $user->profile_photo_url]))
             ->setTtl(3600); // durée de validité en secondes
 
         $videoGrant = (new VideoGrant())
@@ -54,6 +55,7 @@ class LiveKitController extends Controller
         $tokenOptions = (new AccessTokenOptions())
             ->setIdentity((string) $user->id)
             ->setName($user->name)
+            ->setMetadata(json_encode(['profile_photo_url' => $user->profile_photo_url]))
             ->setTtl(3600);
 
         $videoGrant = (new VideoGrant())

@@ -28,7 +28,7 @@ const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉', '😮', '🙌', '�
 const OUTGOING_RINGTONE_SRC = '/sounds/outgoing-call.mp3'; // tonalité "ça sonne chez l'autre"
 const INCOMING_RINGTONE_SRC = 'https://proja.kemtcenter.org/storage/public/files/incoming-call_old.mp3'; // vraie sonnerie d'appel entrant
 
-export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndpoint, isHost, title, callerName, onClose, onAnswered, skipIncomingScreen = false, inviteLink = '' }) {
+export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndpoint, isHost, title, callerName, callerPhotoUrl = '', myAvatarUrl = '', onClose, onAnswered, skipIncomingScreen = false, inviteLink = '' }) {
   const [room, setRoom] = useState(null);
   const [livekitLib, setLivekitLib] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -438,6 +438,15 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     return w.length === 1 ? w[0].slice(0, 2).toUpperCase() : (w[0][0] + w[w.length - 1][0]).toUpperCase();
   };
   const otherName = (p) => p?.name || p?.identity || 'Participant';
+  const photoOf = (p) => {
+    if (!p?.metadata) return null;
+    try {
+      const meta = JSON.parse(p.metadata);
+      return meta.profile_photo_url || meta.avatar || meta.photo || null;
+    } catch {
+      return null;
+    }
+  };
 
   const pipDragRef = useRef({ dragging: false, offsetX: 0, offsetY: 0 });
   const handlePipPointerDown = (e) => {
@@ -895,11 +904,24 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     );
   }
 
-  const AvatarCircle = ({ name, size = 'w-28 h-28 text-3xl' }) => (
-    <div className={`${size} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-xl flex-shrink-0`}>
-      {initialsOf(name)}
-    </div>
-  );
+  const AvatarCircle = ({ name, photoUrl, size = 'w-28 h-28 text-3xl' }) => {
+    const [imgError, setImgError] = useState(false);
+    if (photoUrl && !imgError) {
+      return (
+        <img
+          src={photoUrl}
+          alt={name}
+          onError={() => setImgError(true)}
+          className={`${size} rounded-full object-cover shadow-xl flex-shrink-0 border-2 border-white/10`}
+        />
+      );
+    }
+    return (
+      <div className={`${size} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-xl flex-shrink-0`}>
+        {initialsOf(name)}
+      </div>
+    );
+  };
 
   const statusLabel = connecting
     ? 'Connexion…'
@@ -935,7 +957,11 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Participants ({totalCount})</h4>
       <div className="space-y-1.5">
         <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-white/5">
-          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">Moi</div>
+          {myAvatarUrl ? (
+            <img src={myAvatarUrl} alt="Vous" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">Moi</div>
+          )}
           <span className="text-sm text-white truncate flex items-center gap-1.5 flex-1">
             Vous {isHost && <FaCrown className="w-3 h-3 text-amber-400" />}
           </span>
@@ -946,9 +972,13 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
         </div>
         {participants.map(p => (
           <div key={p.identity} className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 group">
-            <div className="w-9 h-9 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-              {initialsOf(otherName(p))}
-            </div>
+            {photoOf(p) ? (
+              <img src={photoOf(p)} alt={otherName(p)} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                {initialsOf(otherName(p))}
+              </div>
+            )}
             <span className="text-sm text-slate-200 truncate flex-1">{otherName(p)}</span>
             {raisedHands[p.identity] && <FaHandPaper className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
             {isHost && (
@@ -1004,7 +1034,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
               <video ref={localVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover bg-black" style={mirrorStyle} />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
-                <AvatarCircle name="Vous" size="w-32 h-32 text-4xl" />
+                <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-32 h-32 text-4xl" />
               </div>
             )}
             <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 pb-40 pointer-events-none">
@@ -1032,7 +1062,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                 {camEnabled ? (
                   <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
                 ) : (
-                  <AvatarCircle name="Vous" size="w-8 h-8 text-[10px]" />
+                  <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-8 h-8 text-[10px]" />
                 )}
                 <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded">Vous</span>
               </div>
@@ -1057,14 +1087,14 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                 <video ref={mainVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover bg-black" />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
-                  <AvatarCircle name={otherName(soleParticipant)} size="w-32 h-32 text-4xl" />
+                  <AvatarCircle name={otherName(soleParticipant)} photoUrl={photoOf(soleParticipant)} size="w-32 h-32 text-4xl" />
                 </div>
               )
             ) : camEnabled ? (
               <video ref={mainVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover bg-black" style={mirrorStyle} />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
-                <AvatarCircle name="Vous" size="w-32 h-32 text-4xl" />
+                <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-32 h-32 text-4xl" />
               </div>
             )}
 
@@ -1103,7 +1133,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                 <video ref={soleParticipant ? localVideoRef : mainVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900">
-                  <AvatarCircle name="Vous" size="w-12 h-12 text-sm" />
+                  <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-12 h-12 text-sm" />
                 </div>
               )}
               {handRaised && (
@@ -1143,7 +1173,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                 {camEnabled ? (
                   <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
                 ) : (
-                  <AvatarCircle name="Vous" size="w-9 h-9 text-xs" />
+                  <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-9 h-9 text-xs" />
                 )}
                 {handRaised && (
                   <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">

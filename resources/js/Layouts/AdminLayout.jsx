@@ -900,6 +900,7 @@ const stopRingtone = () => {
           inviteLink={liveKitInvite.inviteUrl || ''}
           title={liveKitInvite.projectName}
           callerName={liveKitInvite.initiatorName}
+          myAvatarUrl={avatarUrl}
           isHost={false}
           skipIncomingScreen={true}
           muteEndpoint={`/projects/${liveKitInvite.projectId}/livekit-call/mute-participant`}
