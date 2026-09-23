@@ -795,7 +795,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   // TOUTES les vidéos caméra (locale + distantes) — jamais au partage d'écran.
   const mirrorStyle = { transform: 'scaleX(-1)' };
 
-  // ─── Écran d'appel entrant (invité n'ayant pas encore décroché) ─────
+// ─── Écran d'appel entrant (invité n'ayant pas encore décroché) ─────
   if (!isHost && !hasAnswered) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col justify-between text-white overflow-hidden bg-slate-900">
@@ -803,7 +803,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
         <div className="absolute inset-0 z-0 opacity-40">
           <div className="w-full h-full bg-gradient-to-b from-blue-900/40 to-slate-950 backdrop-blur-3xl" />
         </div>
-        
+
         {/* Effet d'ondes autour de l'avatar */}
         <style>{`
           @keyframes callPulse {
@@ -815,25 +815,31 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
           .slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
           @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         `}</style>
-        
-        <div className="relative z-10 flex flex-col items-center pt-24 slide-up">
+
+        <div
+          className="relative z-10 flex flex-col items-center slide-up"
+          style={{ paddingTop: 'calc(4rem + var(--safe-top, 0px))' }}
+        >
           <p className="text-sm font-medium tracking-widest uppercase text-white/70 mb-8">
             Appel ProJA Meet
           </p>
-          
+
           <div className="relative">
             <div className="w-36 h-36 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-5xl font-bold incoming-avatar-pulse shadow-2xl border-4 border-white/20">
               {(callerName || title || 'ProJA').slice(0, 2).toUpperCase()}
             </div>
           </div>
-          
+
           <h2 className="text-3xl font-semibold mt-8 text-center text-white drop-shadow-md px-6">
             {callerName || title}
           </h2>
           <p className="text-lg text-white/80 mt-2">Appel entrant...</p>
         </div>
 
-        <div className="relative z-10 flex justify-between items-center px-12 pb-20 slide-up w-full max-w-md mx-auto">
+        <div
+          className="relative z-10 flex justify-between items-center px-12 slide-up w-full max-w-md mx-auto"
+          style={{ paddingBottom: 'calc(5rem + var(--safe-bottom, 0px))' }}
+        >
           {/* Bouton Refuser */}
           <div className="flex flex-col items-center gap-3">
             <button
@@ -862,8 +868,85 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     );
   }
 
+  const AvatarCircle = ({ name, size = 'w-28 h-28 text-3xl' }) => (
+    <div className={`${size} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-xl flex-shrink-0`}>
+      {initialsOf(name)}
+    </div>
+  );
+
+  const statusLabel = connecting
+    ? 'Connexion…'
+    : callStarted
+    ? formatElapsed(elapsedSeconds)
+    : 'En attente de participants…';
+
+  // Défini une seule fois et injecté à deux endroits (panneau bureau / feuille mobile) : une simple
+  // valeur JSX, jamais un composant imbriqué, pour ne jamais démonter le champ du lien (perte du
+  // focus/de la sélection) à chaque re-rendu du parent (le chrono tourne toutes les secondes).
+  const participantsListContent = (
+    <>
+      {inviteLink && (
+        <div className="mb-4 p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20">
+          <p className="text-[10px] uppercase tracking-wider text-blue-400 font-bold mb-1.5">Lien d'invitation</p>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="text"
+              readOnly
+              value={inviteLink}
+              className="flex-1 text-[11px] bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-300 truncate focus:outline-none"
+              onClick={(e) => e.target.select()}
+            />
+            <button onClick={handleCopyLink} className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center flex-shrink-0 transition active:scale-90" title="Copier">
+              {linkCopied ? <FaCheck className="w-3 h-3 text-white" /> : <FaCopy className="w-3 h-3 text-white" />}
+            </button>
+            <button onClick={handleShareLink} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition active:scale-90" title="Partager">
+              <FaShareAlt className="w-3 h-3 text-white" />
+            </button>
+          </div>
+        </div>
+      )}
+      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Participants ({totalCount})</h4>
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-white/5">
+          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">Moi</div>
+          <span className="text-sm text-white truncate flex items-center gap-1.5 flex-1">
+            Vous {isHost && <FaCrown className="w-3 h-3 text-amber-400" />}
+          </span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {handRaised && <FaHandPaper className="w-3.5 h-3.5 text-amber-400" />}
+            {!micEnabled && <FaMicrophoneSlash className="w-3.5 h-3.5 text-red-400" />}
+          </div>
+        </div>
+        {participants.map(p => (
+          <div key={p.identity} className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 group">
+            <div className="w-9 h-9 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+              {initialsOf(otherName(p))}
+            </div>
+            <span className="text-sm text-slate-200 truncate flex-1">{otherName(p)}</span>
+            {raisedHands[p.identity] && <FaHandPaper className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
+            {isHost && (
+              <div className="flex items-center gap-1 flex-shrink-0 md:hidden md:group-hover:flex">
+                <button onClick={() => muteRemote(p, 'audio')} title="Couper le micro" className="w-7 h-7 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center active:scale-90">
+                  <FaMicrophoneSlash className="w-3.5 h-3.5 text-white" />
+                </button>
+                <button onClick={() => muteRemote(p, 'video')} title="Couper la caméra" className="w-7 h-7 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center active:scale-90">
+                  <FaVideoSlash className="w-3.5 h-3.5 text-white" />
+                </button>
+                {kickEndpoint && (
+                  <button onClick={() => kickRemote(p)} title="Retirer de l'appel" className="w-7 h-7 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center active:scale-90">
+                    <FaUserSlash className="w-3.5 h-3.5 text-white" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
   return (
-    <div ref={containerRef} className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
+    <div ref={containerRef} className="fixed inset-0 z-50 bg-black overflow-hidden select-none">
       <style>{`
         @keyframes floatUpMeet {
           0% { transform: translateY(0) scale(0.5); opacity: 0; }
@@ -872,139 +955,205 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
           100% { transform: translateY(-70vh) scale(1); opacity: 0; }
         }
         .float-reaction { animation: floatUpMeet 3s ease-out forwards; }
+        @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .sheet-up { animation: sheetUp 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes panelIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .panel-in { animation: panelIn 0.2s ease-out; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { scrollbar-width: none; }
       `}</style>
 
-      {/* ─── HEADER — bleu ProJA ─── */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex-shrink-0 shadow-md">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="font-semibold truncate">ProJA Meet — {title}</span>
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-blue-100 bg-white/10 px-2 py-1 rounded-full">
-            <FaCircle className={`w-1.5 h-1.5 ${connectionState === 'connected' && callStarted ? 'text-emerald-400' : 'text-amber-300 animate-pulse'}`} />
-            {connecting
-              ? 'Connexion…'
-              : callStarted
-              ? formatElapsed(elapsedSeconds)
-              : 'En attente de participants…'}
-          </span>
-          {isHost && (
-            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-bold bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
-              <FaCrown className="w-3 h-3" /> Hôte
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowParticipants(v => !v)}
-            className="flex items-center gap-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition"
-          >
-            <FaUsers className="w-3.5 h-3.5" /> {totalCount}
-          </button>
-          {inviteLink && (
-            <>
-              <button
-                onClick={handleCopyLink}
-                title={linkCopied ? 'Lien copié !' : 'Copier le lien d\'invitation'}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition ${
-                  linkCopied
-                    ? 'bg-emerald-500/20 text-emerald-300'
-                    : 'bg-white/10 hover:bg-white/20 text-white'
-                }`}
-              >
-                {linkCopied ? <FaCheck className="w-3 h-3" /> : <FaCopy className="w-3 h-3" />}
-                <span className="hidden sm:inline">{linkCopied ? 'Copié !' : 'Copier le lien'}</span>
-              </button>
-              <button
-                onClick={handleShareLink}
-                title="Partager le lien d'invitation"
-                className="flex items-center gap-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition"
-              >
-                <FaShareAlt className="w-3 h-3" />
-                <span className="hidden sm:inline">Partager</span>
-              </button>
-            </>
-          )}
-          <button onClick={toggleFullscreen} className="text-white/90 hover:text-white p-1.5">
-            {isFullscreen ? <FaCompress className="w-4 h-4" /> : <FaExpand className="w-4 h-4" />}
-          </button>
-          <button onClick={handleLeave} className="text-white/90 hover:text-white p-1.5">
-            <FaTimes className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div className="mx-4 mt-3 rounded-xl border border-red-300 bg-red-50 text-red-700 px-3 py-2 text-sm flex-shrink-0">
-          {error}
-        </div>
-      )}
-
-      {/* ─── ZONE VIDÉO ─── */}
-      <div className="flex-1 flex overflow-hidden">
-        {showParticipants && (
-          <div className="w-64 bg-slate-900 border-r border-slate-800 p-3 overflow-y-auto flex-shrink-0 hidden sm:block">
-            {inviteLink && (
-              <div className="mb-4 p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20">
-                <p className="text-[10px] uppercase tracking-wider text-blue-400 font-bold mb-1.5">Lien d'invitation</p>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    readOnly
-                    value={inviteLink}
-                    className="flex-1 text-[11px] bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-300 truncate focus:outline-none"
-                    onClick={(e) => e.target.select()}
-                  />
-                  <button
-                    onClick={handleCopyLink}
-                    className="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center flex-shrink-0 transition"
-                    title="Copier"
-                  >
-                    {linkCopied ? <FaCheck className="w-3 h-3 text-white" /> : <FaCopy className="w-3 h-3 text-white" />}
-                  </button>
-                </div>
+      {/* ─── ZONE VIDÉO — plein écran, comme Meet/WhatsApp ─── */}
+      <div className="absolute inset-0 bg-black">
+        {connecting ? (
+          <div className="h-full flex flex-col items-center justify-center gap-4 text-white">
+            <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+            <p className="text-white/70 text-sm">Connexion en cours…</p>
+          </div>
+        ) : !callStarted ? (
+          // ── Personne d'autre encore : aperçu de soi plein écran, comme la salle d'attente Meet ──
+          <div className="relative h-full w-full">
+            {camEnabled ? (
+              <video ref={localVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover bg-black" style={mirrorStyle} />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
+                <AvatarCircle name="Vous" size="w-32 h-32 text-4xl" />
               </div>
             )}
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Participants ({totalCount})</h4>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5">
-                <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">Moi</div>
-                <span className="text-sm text-white truncate flex items-center gap-1">
-                  Vous {isHost && <FaCrown className="w-3 h-3 text-amber-400" />}
+            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 pb-40 pointer-events-none">
+              <div className="flex items-center gap-2 text-white/90 bg-black/40 backdrop-blur px-4 py-2 rounded-full text-sm">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
                 </span>
-                <div className="ml-auto flex items-center gap-1.5">
-                  {handRaised && <FaHandPaper className="w-3 h-3 text-amber-400" />}
-                  {!micEnabled && <FaMicrophoneSlash className="w-3 h-3 text-red-400" />}
-                </div>
+                En attente que quelqu'un rejoigne…
+              </div>
+            </div>
+          </div>
+        ) : isScreenSharingAnyone ? (
+          <div className="relative h-full w-full">
+            <video ref={screenVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-contain bg-black" />
+            <div
+              className="absolute z-10 px-2.5 py-1 bg-black/60 text-white text-xs rounded-full flex items-center gap-1.5"
+              style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', left: '1rem' }}
+            >
+              <FaDesktop className="w-3 h-3" />
+              {screenSharing ? 'Vous partagez votre écran' : `${remoteScreenShare?.p?.name || 'Un participant'} partage son écran`}
+            </div>
+            <div className="absolute inset-x-0 bottom-24 z-10 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide">
+              <div className="w-24 h-16 rounded-xl overflow-hidden bg-slate-800 ring-1 ring-white/10 flex-shrink-0 relative flex items-center justify-center">
+                {camEnabled ? (
+                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
+                ) : (
+                  <AvatarCircle name="Vous" size="w-8 h-8 text-[10px]" />
+                )}
+                <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded">Vous</span>
               </div>
               {participants.map(p => (
-                <div key={p.identity} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 group">
-                  <div className="w-7 h-7 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    {(p.name || p.identity).slice(0, 2).toUpperCase()}
+                <div key={p.identity} className="w-24 h-16 rounded-xl overflow-hidden bg-black ring-1 ring-white/10 flex-shrink-0 relative">
+                  <video
+                    ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
+                    autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
+                  />
+                  <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
+                    {p.name || p.identity}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : isOneOnOne ? (
+          // ─── 1 à 1 : plein écran + bulle flottante déplaçable, exactement comme WhatsApp ───
+          <div className="relative h-full w-full">
+            {soleParticipant ? (
+              remoteHasCamera ? (
+                <video ref={mainVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover bg-black" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
+                  <AvatarCircle name={otherName(soleParticipant)} size="w-32 h-32 text-4xl" />
+                </div>
+              )
+            ) : camEnabled ? (
+              <video ref={mainVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover bg-black" style={mirrorStyle} />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
+                <AvatarCircle name="Vous" size="w-32 h-32 text-4xl" />
+              </div>
+            )}
+
+            {!!soleParticipant && raisedHands[soleParticipant.identity] && (
+              <div
+                className="absolute z-10 w-9 h-9 rounded-full bg-amber-400 flex items-center justify-center animate-bounce"
+                style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', right: '1rem' }}
+              >
+                <FaHandPaper className="w-4 h-4 text-amber-900" />
+              </div>
+            )}
+
+            {!!soleParticipant && (
+              <div
+                className="absolute z-10 px-3 py-1.5 bg-black/40 backdrop-blur text-white text-sm font-semibold rounded-full"
+                style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', left: '1rem' }}
+              >
+                {otherName(soleParticipant)}
+              </div>
+            )}
+
+            {/* Bulle « moi » flottante et déplaçable — le geste WhatsApp par excellence */}
+            <div
+              onPointerDown={handlePipPointerDown}
+              onPointerMove={handlePipPointerMove}
+              onPointerUp={handlePipPointerUp}
+              onPointerCancel={handlePipPointerUp}
+              className="absolute z-20 w-24 h-36 sm:w-28 sm:h-40 rounded-2xl overflow-hidden shadow-2xl ring-2 ring-white/20 bg-slate-800 touch-none cursor-grab active:cursor-grabbing"
+              style={
+                pipPos
+                  ? { left: pipPos.x, top: pipPos.y }
+                  : { right: '1rem', bottom: 'calc(7.5rem + var(--safe-bottom, 0px))' }
+              }
+            >
+              {camEnabled ? (
+                <video ref={soleParticipant ? localVideoRef : mainVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900">
+                  <AvatarCircle name="Vous" size="w-12 h-12 text-sm" />
+                </div>
+              )}
+              {handRaised && (
+                <div className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
+                  <FaHandPaper className="w-3 h-3 text-amber-900" />
+                </div>
+              )}
+              {!micEnabled && (
+                <div className="absolute bottom-1.5 left-1.5 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
+                  <FaMicrophoneSlash className="w-3 h-3 text-red-400" />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          // ─── Groupe (3+) : caméra principale + bandeau de vignettes, façon Meet ───
+          <div className="relative h-full w-full">
+            <video ref={mainVideoRef} autoPlay playsInline muted={isLocalMain} className="absolute inset-0 w-full h-full object-cover bg-black" style={isLocalMain ? mirrorStyle : {}} />
+            {!isLocalMain && raisedHands[activeIdentity] && (
+              <div
+                className="absolute z-10 w-9 h-9 rounded-full bg-amber-400 flex items-center justify-center animate-bounce"
+                style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', right: '1rem' }}
+              >
+                <FaHandPaper className="w-4 h-4 text-amber-900" />
+              </div>
+            )}
+            <div
+              className="absolute z-10 px-3 py-1.5 bg-black/40 backdrop-blur text-white text-sm font-semibold rounded-full flex items-center gap-2"
+              style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', left: '1rem' }}
+            >
+              {isLocalMain ? 'Vous' : (participants.find(p => p.identity === activeIdentity)?.name || activeIdentity)}
+              {isLocalMain && isHost && <FaCrown className="w-3.5 h-3.5 text-amber-400" />}
+            </div>
+
+            <div className="absolute inset-x-0 bottom-24 z-10 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide">
+              <div className="w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden bg-slate-800 ring-1 ring-white/10 flex-shrink-0 relative flex items-center justify-center">
+                {camEnabled ? (
+                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
+                ) : (
+                  <AvatarCircle name="Vous" size="w-9 h-9 text-xs" />
+                )}
+                {handRaised && (
+                  <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
+                    <FaHandPaper className="w-2.5 h-2.5 text-amber-900" />
                   </div>
-                  <span className="text-sm text-slate-200 truncate flex-1">{p.name || p.identity}</span>
-                  {raisedHands[p.identity] && <FaHandPaper className="w-3 h-3 text-amber-400 flex-shrink-0" />}
+                )}
+                <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded flex items-center gap-1">
+                  Vous {!micEnabled && <FaMicrophoneSlash className="w-2 h-2 text-red-400" />}
+                </span>
+              </div>
+              {participants.map(p => (
+                <div key={p.identity} className="w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden bg-black ring-1 ring-white/10 flex-shrink-0 relative group">
+                  <video
+                    ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
+                    autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
+                  />
+                  {raisedHands[p.identity] && (
+                    <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
+                      <FaHandPaper className="w-2.5 h-2.5 text-amber-900" />
+                    </div>
+                  )}
+                  <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
+                    {p.name || p.identity}
+                  </span>
                   {isHost && (
-                    <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => muteRemote(p, 'audio')}
-                        title="Couper le micro"
-                        className="w-6 h-6 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center"
-                      >
-                        <FaMicrophoneSlash className="w-3 h-3 text-white" />
+                    <div className="absolute top-1 left-1 hidden group-hover:flex items-center gap-1">
+                      <button onClick={() => muteRemote(p, 'audio')} title="Couper le micro" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                        <FaMicrophoneSlash className="w-2.5 h-2.5 text-white" />
                       </button>
-                      <button
-                        onClick={() => muteRemote(p, 'video')}
-                        title="Couper la caméra"
-                        className="w-6 h-6 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center"
-                      >
-                        <FaVideoSlash className="w-3 h-3 text-white" />
+                      <button onClick={() => muteRemote(p, 'video')} title="Couper la caméra" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                        <FaVideoSlash className="w-2.5 h-2.5 text-white" />
                       </button>
-                      <button
-                        onClick={() => kickRemote(p)}
-                        title="Bannir de l'appel"
-                        className="w-6 h-6 rounded-full bg-white/10 hover:bg-red-600 flex items-center justify-center"
-                      >
-                        <FaTimes className="w-3 h-3 text-white" />
-                      </button>
+                      {kickEndpoint && (
+                        <button onClick={() => kickRemote(p)} title="Retirer de l'appel" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                          <FaUserSlash className="w-2.5 h-2.5 text-white" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1013,142 +1162,89 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
           </div>
         )}
 
-        <div className="flex-1 relative overflow-hidden">
-          {connecting ? (
-            <div className="h-full flex items-center justify-center text-white">Connexion en cours…</div>
-          ) : !callStarted ? (
-            <div className="h-full flex flex-col items-center justify-center gap-4 text-white">
-              <div className="w-40 h-40 rounded-2xl overflow-hidden bg-slate-800 border border-slate-700 relative flex items-center justify-center">
-                {camEnabled ? (
-                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
-                ) : (
-                  <FaVideoSlash className="text-slate-500 text-3xl" />
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-slate-300">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                </span>
-                Appel en cours… en attente que quelqu’un rejoigne
-              </div>
+        {/* ─── Réactions façon Google Meet : flottent vers le haut ─── */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-full overflow-hidden z-10">
+          {floatingReactions.map(r => (
+            <div key={r.id} className="float-reaction absolute bottom-24 text-4xl drop-shadow-lg" style={{ left: `${r.left}%` }}>
+              {r.emoji}
             </div>
-          ) : isScreenSharingAnyone ? (
-            <div className="h-full flex flex-col p-3 gap-3">
-              <div className="flex-1 rounded-2xl overflow-hidden bg-black border border-slate-800 relative">
-                <video ref={screenVideoRef} autoPlay playsInline className="w-full h-full object-contain bg-black" />
-                <div className="absolute top-2 left-2 px-2.5 py-1 bg-black/60 text-white text-xs rounded-full flex items-center gap-1.5">
-                  <FaDesktop className="w-3 h-3" />
-                  {screenSharing ? 'Vous partagez votre écran' : `${remoteScreenShare?.p?.name || 'Un participant'} partage son écran`}
-                </div>
-              </div>
-              <div className="flex gap-2 overflow-x-auto flex-shrink-0 pb-1">
-                <div className="w-32 h-20 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex-shrink-0 relative flex items-center justify-center">
-                  {camEnabled ? (
-                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
-                  ) : (
-                    <FaVideoSlash className="text-slate-500 text-lg" />
-                  )}
-                  <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded">Vous</span>
-                </div>
-                {participants.map(p => (
-                  <div key={p.identity} className="w-32 h-20 rounded-xl overflow-hidden bg-black border border-slate-700 flex-shrink-0 relative">
-                    <video
-                      ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                      autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
-                    />
-                    <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
-                      {p.name || p.identity}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex flex-col p-3 gap-3">
-              <div className="flex-1 rounded-2xl overflow-hidden bg-black border border-slate-800 relative flex items-center justify-center">
-                <video ref={mainVideoRef} autoPlay playsInline muted={isLocalMain} className="w-full h-full object-contain bg-black" style={isLocalMain ? mirrorStyle : {}} />
-                {!isLocalMain && raisedHands[activeIdentity] && (
-                  <div className="absolute top-2 right-2 w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
-                    <FaHandPaper className="w-4 h-4 text-amber-900" />
-                  </div>
-                )}
-                <div className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/60 text-white text-sm font-semibold rounded-lg flex items-center gap-2">
-                  {isLocalMain ? 'Vous' : (participants.find(p => p.identity === activeIdentity)?.name || activeIdentity)}
-                  {isLocalMain && isHost && <FaCrown className="w-3.5 h-3.5 text-amber-400" />}
-                </div>
-              </div>
-              <div className="flex gap-2 overflow-x-auto flex-shrink-0 pb-1">
-                <div className="w-32 h-20 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex-shrink-0 relative flex items-center justify-center">
-                  {camEnabled ? (
-                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
-                  ) : (
-                    <FaVideoSlash className="text-slate-500 text-lg" />
-                  )}
-                  {handRaised && (
-                    <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
-                      <FaHandPaper className="w-2.5 h-2.5 text-amber-900" />
-                    </div>
-                  )}
-                  <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded flex items-center gap-1">
-                    Vous {!micEnabled && <FaMicrophoneSlash className="w-2 h-2 text-red-400" />}
-                  </span>
-                </div>
-                {participants.map(p => (
-                  <div key={p.identity} className="w-32 h-20 rounded-xl overflow-hidden bg-black border border-slate-700 flex-shrink-0 relative group">
-                    <video
-                      ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                      autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
-                    />
-                    {raisedHands[p.identity] && (
-                      <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
-                        <FaHandPaper className="w-2.5 h-2.5 text-amber-900" />
-                      </div>
-                    )}
-                    <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
-                      {p.name || p.identity}
-                    </span>
-                    {isHost && (
-                      <div className="absolute top-1 left-1 hidden group-hover:flex items-center gap-1">
-                        <button onClick={() => muteRemote(p, 'audio')} title="Couper le micro" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
-                          <FaMicrophoneSlash className="w-2.5 h-2.5 text-white" />
-                        </button>
-                        <button onClick={() => muteRemote(p, 'video')} title="Couper la caméra" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
-                          <FaVideoSlash className="w-2.5 h-2.5 text-white" />
-                        </button>
-                        <button onClick={() => kickRemote(p)} title="Bannir de l'appel" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
-                          <FaTimes className="w-2.5 h-2.5 text-white" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ─── Réactions façon Google Meet : flottent vers le haut ─── */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-full overflow-hidden">
-            {floatingReactions.map(r => (
-              <div
-                key={r.id}
-                className="float-reaction absolute bottom-16 text-4xl drop-shadow-lg"
-                style={{ left: `${r.left}%` }}
-              >
-                {r.emoji}
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
 
+      {/* ─── En-tête flottant, translucide — se fond dans la vidéo comme Meet/WhatsApp ─── */}
+      <div
+        className="absolute top-0 inset-x-0 z-30 flex items-center justify-between gap-2 px-3 sm:px-4 pb-6 bg-gradient-to-b from-black/70 via-black/25 to-transparent text-white"
+        style={{ paddingTop: 'calc(0.625rem + var(--safe-top, 0px))' }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex items-center gap-1.5 text-xs font-semibold bg-black/30 backdrop-blur px-2.5 py-1.5 rounded-full">
+            <FaCircle className={`w-1.5 h-1.5 ${connectionState === 'connected' && callStarted ? 'text-emerald-400' : 'text-amber-300 animate-pulse'}`} />
+            {statusLabel}
+          </span>
+          {isHost && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-bold bg-amber-400 text-amber-900 px-2 py-1 rounded-full flex-shrink-0">
+              <FaCrown className="w-3 h-3" /> Hôte
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            onClick={() => setShowParticipants(v => !v)}
+            className="flex items-center gap-1.5 text-xs font-semibold bg-black/30 hover:bg-black/50 backdrop-blur px-3 py-1.5 rounded-full transition active:scale-95"
+          >
+            <FaUsers className="w-3.5 h-3.5" /> {totalCount}
+          </button>
+          {inviteLink && (
+            <>
+              <button
+                onClick={handleCopyLink}
+                title={linkCopied ? 'Lien copié !' : "Copier le lien d'invitation"}
+                className={`hidden md:flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition backdrop-blur ${
+                  linkCopied ? 'bg-emerald-500/30 text-emerald-300' : 'bg-black/30 hover:bg-black/50 text-white'
+                }`}
+              >
+                {linkCopied ? <FaCheck className="w-3 h-3" /> : <FaCopy className="w-3 h-3" />}
+                {linkCopied ? 'Copié !' : 'Copier le lien'}
+              </button>
+              <button
+                onClick={handleShareLink}
+                title="Partager le lien d'invitation"
+                className="hidden md:flex items-center gap-1.5 text-xs font-semibold bg-black/30 hover:bg-black/50 backdrop-blur px-3 py-1.5 rounded-full transition"
+              >
+                <FaShareAlt className="w-3 h-3" /> Partager
+              </button>
+            </>
+          )}
+          <button onClick={toggleFullscreen} className="hidden md:flex text-white/90 hover:text-white p-2 rounded-full hover:bg-white/10">
+            {isFullscreen ? <FaCompress className="w-4 h-4" /> : <FaExpand className="w-4 h-4" />}
+          </button>
+          <button onClick={handleLeave} className="text-white/90 hover:text-white p-2 rounded-full hover:bg-white/10 active:scale-90" title="Quitter l'appel">
+            <FaTimes className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div
+          className="absolute z-30 left-3 right-3 rounded-xl border border-red-300 bg-red-50 text-red-700 px-3 py-2 text-sm shadow-lg"
+          style={{ top: 'calc(4.25rem + var(--safe-top, 0px))' }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* ─── Réactions rapides — bulle flottante au-dessus du bouton, comme Meet ─── */}
       {showReactions && (
-        <div className="flex items-center justify-center gap-2 py-2 bg-slate-900 border-t border-slate-800 flex-shrink-0">
+        <div
+          className="absolute z-30 right-3 sm:right-6 flex items-center gap-1 bg-slate-900/95 backdrop-blur rounded-full px-2 py-2 shadow-2xl ring-1 ring-white/10"
+          style={{ bottom: 'calc(6.25rem + var(--safe-bottom, 0px))' }}
+        >
           {REACTIONS.map(emoji => (
             <button
               key={emoji}
-              onClick={() => sendReaction(emoji)}
-              className="text-2xl w-10 h-10 flex items-center justify-center hover:scale-125 hover:bg-white/10 rounded-full transition-transform"
+              onClick={() => { sendReaction(emoji); setShowReactions(false); }}
+              className="text-2xl w-10 h-10 flex items-center justify-center active:scale-125 hover:bg-white/10 rounded-full transition-transform"
             >
               {emoji}
             </button>
@@ -1156,33 +1252,174 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
         </div>
       )}
 
-      <div className="flex items-center justify-center gap-3 py-4 bg-slate-900 flex-shrink-0 flex-wrap px-4">
-        <button onClick={toggleMic} title={micEnabled ? 'Couper le micro' : 'Activer le micro'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${micEnabled ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}>
+      {/* ─── Barre de contrôle flottante — une seule ligne, jamais de retour à la ligne ─── */}
+      <div
+        className="absolute bottom-0 inset-x-0 z-30 flex items-center justify-center gap-2 sm:gap-3 px-3 pt-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
+        style={{ paddingBottom: 'calc(1.1rem + var(--safe-bottom, 0px))' }}
+      >
+        <button
+          onClick={toggleMic}
+          title={micEnabled ? 'Couper le micro' : 'Activer le micro'}
+          className={`w-12 h-12 sm:w-[3.25rem] sm:h-[3.25rem] rounded-full flex items-center justify-center transition active:scale-90 ${
+            micEnabled ? 'bg-white/15 hover:bg-white/25 text-white' : 'bg-red-600 hover:bg-red-700 text-white'
+          }`}
+        >
           {micEnabled ? <FaMicrophone /> : <FaMicrophoneSlash />}
         </button>
-        <button onClick={toggleCam} title={camEnabled ? 'Couper la caméra' : 'Activer la caméra'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${camEnabled ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}>
+        <button
+          onClick={toggleCam}
+          title={camEnabled ? 'Couper la caméra' : 'Activer la caméra'}
+          className={`w-12 h-12 sm:w-[3.25rem] sm:h-[3.25rem] rounded-full flex items-center justify-center transition active:scale-90 ${
+            camEnabled ? 'bg-white/15 hover:bg-white/25 text-white' : 'bg-red-600 hover:bg-red-700 text-white'
+          }`}
+        >
           {camEnabled ? <FaVideoIcon /> : <FaVideoSlash />}
         </button>
-        <button onClick={toggleBlur} title={bgMode === 'blur' ? 'Désactiver le flou' : 'Activer le flou'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${bgMode === 'blur' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+
+        {/* Contrôles secondaires — toujours visibles à partir de md, regroupés dans « Plus » sur mobile */}
+        <button
+          onClick={toggleBlur}
+          title={bgMode === 'blur' ? 'Désactiver le flou' : 'Activer le flou'}
+          className={`hidden md:flex w-12 h-12 rounded-full items-center justify-center transition active:scale-90 ${
+            bgMode === 'blur' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
+          }`}
+        >
           <FaAdjust />
         </button>
-        <button onClick={() => fileInputRef.current?.click()} title={bgMode === 'image' ? "Changer l'image de fond" : 'Fond visuel (image)'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${bgMode === 'image' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          title={bgMode === 'image' ? "Changer l'image de fond" : 'Fond visuel (image)'}
+          className={`hidden md:flex w-12 h-12 rounded-full items-center justify-center transition active:scale-90 ${
+            bgMode === 'image' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
+          }`}
+        >
           <FaImage />
         </button>
         <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
-        <button onClick={toggleScreenShare} title={screenSharing ? 'Arrêter le partage' : 'Partager l’écran'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${screenSharing ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+        <button
+          onClick={toggleScreenShare}
+          title={screenSharing ? 'Arrêter le partage' : "Partager l'écran"}
+          className={`hidden md:flex w-12 h-12 rounded-full items-center justify-center transition active:scale-90 ${
+            screenSharing ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
+          }`}
+        >
           <FaDesktop />
         </button>
-        <button onClick={toggleRaiseHand} title={handRaised ? 'Baisser la main' : 'Lever la main'} className={`w-11 h-11 rounded-full flex items-center justify-center transition ${handRaised ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+        <button
+          onClick={toggleRaiseHand}
+          title={handRaised ? 'Baisser la main' : 'Lever la main'}
+          className={`hidden md:flex w-12 h-12 rounded-full items-center justify-center transition active:scale-90 ${
+            handRaised ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
+          }`}
+        >
           <FaHandPaper />
         </button>
-        <button onClick={() => setShowReactions(v => !v)} title="Réactions" className={`w-11 h-11 rounded-full flex items-center justify-center transition ${showReactions ? 'bg-amber-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+
+        <button
+          onClick={() => setShowReactions(v => !v)}
+          title="Réactions"
+          className={`w-12 h-12 sm:w-[3.25rem] sm:h-[3.25rem] rounded-full flex items-center justify-center transition active:scale-90 ${
+            showReactions ? 'bg-amber-500 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
+          }`}
+        >
           <FaSmile />
         </button>
-        <button onClick={handleLeave} className="px-5 h-11 rounded-full bg-red-600 hover:bg-red-700 text-white font-semibold transition">
-          Quitter
+
+        {/* « Plus » — regroupe flou / fond / partage d'écran / main levée sur mobile */}
+        <button
+          onClick={() => { nativeFeedback.tap(); setShowMoreSheet(true); }}
+          title="Plus d'options"
+          className={`flex md:hidden w-12 h-12 rounded-full items-center justify-center transition active:scale-90 relative ${
+            handRaised || bgMode !== 'none' || screenSharing ? 'bg-blue-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
+          }`}
+        >
+          <FaEllipsisV />
+          {(handRaised || bgMode !== 'none' || screenSharing) && (
+            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 ring-2 ring-slate-900" />
+          )}
+        </button>
+
+        <button
+          onClick={handleLeave}
+          title="Quitter l'appel"
+          className="w-12 h-12 sm:w-14 sm:h-[3.25rem] rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-lg shadow-red-600/30 transition active:scale-90 ml-1"
+        >
+          <FaPhoneSlash className="w-5 h-5" />
         </button>
       </div>
+
+      {/* ─── Feuille « Plus d'options » — mobile uniquement ─── */}
+      {showMoreSheet && (
+        <div className="fixed inset-0 z-40 md:hidden" onClick={() => setShowMoreSheet(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="sheet-up absolute bottom-0 inset-x-0 bg-slate-900 rounded-t-3xl px-4 pt-3 shadow-2xl"
+            style={{ paddingBottom: 'calc(1.5rem + var(--safe-bottom, 0px))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1.5 rounded-full bg-white/20 mx-auto mb-4" />
+            <h4 className="text-white/60 text-xs font-bold uppercase tracking-wide mb-3 px-1">Plus d'options</h4>
+            <div className="grid grid-cols-4 gap-3 pb-2">
+              {[
+                { key: 'blur', label: 'Flou', icon: FaAdjust, active: bgMode === 'blur', onClick: () => { toggleBlur(); setShowMoreSheet(false); } },
+                { key: 'bg', label: 'Fond', icon: FaImage, active: bgMode === 'image', onClick: () => { fileInputRef.current?.click(); setShowMoreSheet(false); } },
+                { key: 'share', label: screenSharing ? 'Arrêter' : 'Partager écran', icon: FaDesktop, active: screenSharing, onClick: () => { toggleScreenShare(); setShowMoreSheet(false); } },
+                { key: 'hand', label: handRaised ? 'Main levée' : 'Lever la main', icon: FaHandPaper, active: handRaised, onClick: () => { toggleRaiseHand(); setShowMoreSheet(false); } },
+              ].map(({ key, label, icon: Icon, active, onClick }) => (
+                <button key={key} onClick={onClick} className="flex flex-col items-center gap-2 py-2">
+                  <span className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl transition active:scale-90 ${active ? 'bg-blue-600 text-white' : 'bg-white/10 text-white'}`}>
+                    <Icon />
+                  </span>
+                  <span className="text-[11px] text-white/80 text-center leading-tight">{label}</span>
+                </button>
+              ))}
+            </div>
+            {inviteLink && (
+              <div className="mt-2 pt-3 border-t border-white/10 flex items-center gap-2">
+                <button onClick={handleCopyLink} className="flex-1 flex items-center justify-center gap-2 h-12 rounded-2xl bg-white/10 text-white text-sm font-semibold active:scale-95">
+                  {linkCopied ? <FaCheck className="text-emerald-400" /> : <FaCopy />} {linkCopied ? 'Copié !' : 'Copier le lien'}
+                </button>
+                <button onClick={handleShareLink} className="flex-1 flex items-center justify-center gap-2 h-12 rounded-2xl bg-white/10 text-white text-sm font-semibold active:scale-95">
+                  <FaShareAlt /> Partager
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => { toggleFullscreen(); setShowMoreSheet(false); }}
+              className="mt-3 w-full flex items-center justify-center gap-2 h-12 rounded-2xl bg-white/10 text-white text-sm font-semibold active:scale-95"
+            >
+              {isFullscreen ? <FaCompress /> : <FaExpand />} {isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Participants — panneau latéral (bureau) ou feuille du bas (mobile), façon WhatsApp ─── */}
+      {showParticipants && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowParticipants(false)}>
+          <div className="absolute inset-0 bg-black/50 md:bg-black/30" />
+
+          {/* Bureau : panneau latéral */}
+          <div
+            className="panel-in hidden md:flex md:flex-col absolute right-0 top-0 bottom-0 w-80 bg-slate-900 border-l border-slate-800 p-4 overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {participantsListContent}
+          </div>
+
+          {/* Mobile : feuille du bas */}
+          <div
+            className="sheet-up md:hidden absolute bottom-0 inset-x-0 max-h-[80vh] bg-slate-900 rounded-t-3xl px-4 pt-3 flex flex-col"
+            style={{ paddingBottom: 'calc(1.5rem + var(--safe-bottom, 0px))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1.5 rounded-full bg-white/20 mx-auto mb-3 flex-shrink-0" />
+            <div className="overflow-y-auto">
+              {participantsListContent}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
