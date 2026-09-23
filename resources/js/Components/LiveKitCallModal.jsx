@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
   FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
-  FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck, FaImage, FaAdjust
+  FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck, FaImage, FaAdjust,
+  FaEllipsisV, FaUserSlash
 } from 'react-icons/fa';
 import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';
 
@@ -48,6 +49,8 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   const [raisedHands, setRaisedHands] = useState({}); // { identity: name }
   const [linkCopied, setLinkCopied] = useState(false);
   const [activeSpeaker, setActiveSpeaker] = useState(null);
+  const [showMoreSheet, setShowMoreSheet] = useState(false);
+  const [pipPos, setPipPos] = useState(null);
 
   // ─── Décroché / pas décroché — état 100% LOCAL à cet utilisateur ───
   // C'est la clé du correctif : l'hôte (celui qui lance l'appel) est
@@ -429,11 +432,35 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   const TrackSourceScreenShare = livekitLib?.Track?.Source?.ScreenShare || 'screen_share';
   const TrackSourceCamera = livekitLib?.Track?.Source?.Camera || 'camera';
 
+  const initialsOf = (name = '') => {
+    const w = String(name).trim().split(/\s+/);
+    if (!w[0]) return '?';
+    return w.length === 1 ? w[0].slice(0, 2).toUpperCase() : (w[0][0] + w[w.length - 1][0]).toUpperCase();
+  };
+  const otherName = (p) => p?.name || p?.identity || 'Participant';
+
+  const pipDragRef = useRef({ dragging: false, offsetX: 0, offsetY: 0 });
+  const handlePipPointerDown = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    pipDragRef.current = { dragging: true, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const handlePipPointerMove = (e) => {
+    if (!pipDragRef.current.dragging) return;
+    setPipPos({ x: e.clientX - pipDragRef.current.offsetX, y: e.clientY - pipDragRef.current.offsetY });
+  };
+  const handlePipPointerUp = () => { pipDragRef.current.dragging = false; };
+
   // Détecte si quelqu'un (local ou distant) partage son écran
   const remoteScreenShare = participants
     .map(p => ({ p, pub: [...p.videoTrackPublications.values()].find(pub => (pub.source === TrackSourceScreenShare || pub.source === 'screen_share') && pub.track) }))
     .find(x => x.pub);
   const isScreenSharingAnyone = screenSharing || !!remoteScreenShare;
+  const isOneOnOne = participants.length === 1 && !isScreenSharingAnyone;
+  const soleParticipant = participants[0] || null;
+  const remoteHasCamera = soleParticipant
+    ? [...soleParticipant.videoTrackPublications.values()].some(pub => (pub.source === TrackSourceCamera || pub.source === 'camera') && pub.track)
+    : false;
 
   // ─── Attacher la caméra LOCALE — se déclenche après chaque rendu concerné ───
   useEffect(() => {
@@ -1327,7 +1354,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
 
         {/* « Plus » — regroupe flou / fond / partage d'écran / main levée sur mobile */}
         <button
-          onClick={() => { nativeFeedback.tap(); setShowMoreSheet(true); }}
+          onClick={() => setShowMoreSheet(true)}
           title="Plus d'options"
           className={`flex md:hidden w-12 h-12 rounded-full items-center justify-center transition active:scale-90 relative ${
             handRaised || bgMode !== 'none' || screenSharing ? 'bg-blue-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
