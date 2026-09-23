@@ -10,34 +10,29 @@ import {
   FaEdit, FaTrash, FaInfoCircle, FaArrowLeft, FaExternalLinkAlt,
 } from 'react-icons/fa';
 
-// ─── Constantes Réactions & Stickers ────────────────────────────────────────
+// ─── Constantes Réactions & Émojis ──────────────────────────────────────────
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉'];
 
-const COMMON_EMOJIS = [
-  '😀','😁','😂','🤣','😍','🥰','😎','🤔','😅','🙏','😊','😭',
-  '😏','🤝','💪','👏','👍','❤️','🔥','🎉','💯','✅','⚡','🚀',
-  '🌟','💎','🎯','✨','😴','🤗','😇','🥳','🤩','😜','👋','🙌',
-  '💬','📌','⏰','🛠️','💡','🔑','📱','💻','🎁','🏆'
-];
+// ─── Émojis enrichis, groupés par catégorie façon WhatsApp/Messenger ────────
+const EMOJI_CATEGORIES = {
+  'Souriants': ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','🧐'],
+  'Émotions': ['😕','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️'],
+  'Gestes': ['👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🙏','🤝','💪','🤟','🤘','👌','🤏','✌️','🤞','👋','🤙','👆','👇','☝️','✋','🖐️','🖖','👈','👉','🖕','💅'],
+  'Cœurs': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟'],
+  'Animaux': ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🦄','🐝','🦋','🐢','🐍','🐙','🐠','🐳','🐘'],
+  'Nourriture': ['🍏','🍎','🍊','🍋','🍌','🍉','🍇','🍓','🍒','🍑','🥭','🍍','🥝','🍅','🥑','🍕','🍔','🍟','🌭','🥪','🌮','🌯','🍣','🍜','🍝','🍰','🎂','🍩','🍪','🍫','☕','🍵','🍺','🍻','🍷','🥂','🍾'],
+  'Activités': ['⚽','🏀','🏈','⚾','🎾','🏐','🏓','🏸','🎯','🎮','🎲','🎸','🎨','🎬','🎤','🎧','🏆','🥇','🎉','🎊','🎁','🎈'],
+  'Voyage': ['🚗','🚕','🚙','🚌','🚀','✈️','🚁','⛵','🚲','🏍️','🚦','🗺️','🏖️','🏔️','🗽','🎡','🌍','🌙','☀️','⭐','🌈','☔','❄️','🔥'],
+  'Objets': ['💡','📌','📎','📝','📅','📞','💻','📱','⏰','🔒','🔑','💰','💎','🎁','📷','🎵','🔧','🔨','💊','🧠','👀'],
+  'Symboles': ['✨','✅','❌','❓','❗','💯','♻️','🔔','🔇','🚫','⚠️','♥️','🆗','🆕','🔝','🔴','🟢','🔵','⚪','⚫'],
+};
 
-const STICKERS = [
-  { id: 'st_1', emoji: '🚀', title: 'En cours', bg: 'bg-blue-500 text-white shadow-blue-500/30' },
-  { id: 'st_2', emoji: '✅', title: 'Validé', bg: 'bg-emerald-500 text-white shadow-emerald-500/30' },
-  { id: 'st_3', emoji: '🔥', title: 'Urgent', bg: 'bg-rose-500 text-white shadow-rose-500/30' },
-  { id: 'st_4', emoji: '💡', title: 'Idée', bg: 'bg-amber-500 text-white shadow-amber-500/30' },
-  { id: 'st_5', emoji: '👏', title: 'Bravo !', bg: 'bg-purple-500 text-white shadow-purple-500/30' },
-  { id: 'st_6', emoji: '🙏', title: 'Merci', bg: 'bg-indigo-500 text-white shadow-indigo-500/30' },
-  { id: 'st_7', emoji: '❓', title: 'Question', bg: 'bg-orange-500 text-white shadow-orange-500/30' },
-  { id: 'st_8', emoji: '🎯', title: 'Objectif', bg: 'bg-teal-500 text-white shadow-teal-500/30' },
-  { id: 'st_9', emoji: '⭐', title: 'Favori', bg: 'bg-yellow-500 text-white shadow-yellow-500/30' },
-  { id: 'st_10', emoji: '📌', title: 'Important', bg: 'bg-red-600 text-white shadow-red-600/30' },
-  { id: 'st_11', emoji: '⚡', title: 'Express', bg: 'bg-cyan-500 text-white shadow-cyan-500/30' },
-  { id: 'st_12', emoji: '🎉', title: 'Félicitations', bg: 'bg-pink-500 text-white shadow-pink-500/30' },
-  { id: 'st_13', emoji: '🏆', title: 'Succès', bg: 'bg-yellow-600 text-white shadow-yellow-600/30' },
-  { id: 'st_14', emoji: '🛠️', title: 'En révision', bg: 'bg-slate-600 text-white shadow-slate-600/30' },
-  { id: 'st_15', emoji: '💻', title: 'Dev / Code', bg: 'bg-violet-600 text-white shadow-violet-600/30' },
-  { id: 'st_16', emoji: '🎁', title: 'Bonus', bg: 'bg-fuchsia-500 text-white shadow-fuchsia-500/30' },
-];
+// ─── Résout le chemin d'affichage d'un média (blob local, URL absolue, ou chemin serveur) ───
+const resolveMediaSrc = (path) => {
+  if (!path) return null;
+  if (path.startsWith('blob:') || path.startsWith('http')) return path;
+  return `/storage/public/${path}`;
+};
 
 const VoiceMessagePlayer = ({ src }) => (
   <audio controls preload="metadata" src={src} className="h-9 w-full min-w-[200px] max-w-[240px]" />
@@ -142,9 +137,15 @@ const ReactionPicker = ({ commentId, isMe, onReact, onClose }) => {
 
 /**
  * Page Discussions/Show : fil de discussion complet d'une tâche (messages, audio,
- * photos, réactions, mentions, présence en ligne, indicateur de frappe, accusés
- * de lecture). Rendue par TaskController::discussion() via la route tasks.discussion
- * (/tasks/{task}/discussion), avec `task` et `projectMembers` en props Inertia.
+ * photos, stickers, réactions, mentions, présence en ligne, indicateur de frappe,
+ * accusés de lecture). Rendue par TaskController::discussion() via la route
+ * tasks.discussion (/tasks/{task}/discussion), avec `task` et `projectMembers`
+ * en props Inertia.
+ *
+ * L'API /api/tasks/{task}/comments renvoie désormais une liste À PLAT (plus de
+ * `replies` imbriquées) : chaque réponse porte simplement `parent_id` + `parent`
+ * (le message cité), exactement comme sur WhatsApp — on peut répondre à une
+ * réponse sans limite de profondeur.
  */
 export default function Show({ task, projectMembers = [], headerLeftSlot = null }) {
   const { t } = useTranslation();
@@ -195,6 +196,10 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
   const [activeReactionPicker, setActiveReactionPicker] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activePickerTab, setActivePickerTab] = useState('emojis');
+
+  // ─── Stickers personnalisés (pack partagé par l'équipe, image ou vidéo courte) ───
+  const [stickers, setStickers] = useState([]);
+  const stickerInputRef = useRef(null);
 
   const [reactions, setReactions] = useState(() => {
     if (typeof window === 'undefined') return {};
@@ -312,18 +317,15 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
     } catch { return 'Date inconnue'; }
   };
 
+  // ─── Carte des réactions (liste à plat désormais) ───
   const buildReactionsMap = (commentsList) => {
     const map = {};
-    const walk = (list) => {
-      list.forEach(c => {
-        if (c.reactions_summary && Object.keys(c.reactions_summary).length > 0) {
-          map[c.id] = {};
-          Object.entries(c.reactions_summary).forEach(([emoji, data]) => { map[c.id][emoji] = data.user_ids; });
-        }
-        if (c.replies?.length) walk(c.replies);
-      });
-    };
-    walk(commentsList);
+    commentsList.forEach(c => {
+      if (c.reactions_summary && Object.keys(c.reactions_summary).length > 0) {
+        map[c.id] = {};
+        Object.entries(c.reactions_summary).forEach(([emoji, data]) => { map[c.id][emoji] = data.user_ids; });
+      }
+    });
     return map;
   };
 
@@ -348,6 +350,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
     }
   }, [readComments, task.id]);
 
+  // ─── Chargement des commentaires : l'API renvoie une liste À PLAT, triée du plus ancien au plus récent ───
   const loadComments = useCallback(async () => {
     try {
       setLoadingComments(true);
@@ -355,13 +358,10 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
       if (!response.ok) throw new Error('Erreur lors du chargement des commentaires');
 
       const raw = await response.json();
-      const sorted = [...raw].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const sorted = [...raw].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       const processed = sorted.map(comment => ({
         ...comment,
         user: comment.user || { name: 'Utilisateur inconnu', profile_photo_url: null },
-        replies: (comment.replies || [])
-          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-          .map(reply => ({ ...reply, user: reply.user || { name: 'Utilisateur inconnu', profile_photo_url: null }, formatted_date: formatDate(reply.created_at) })),
         formatted_date: formatDate(comment.created_at),
       }));
 
@@ -380,7 +380,40 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
 
   useEffect(() => { loadComments(); }, [loadComments]);
 
-  // ─── Envoi optimiste ───
+  // ─── Chargement du pack de stickers partagé ──────────────────────────────
+  const loadStickers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stickers', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      if (!res.ok) throw new Error();
+      setStickers(await res.json());
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => { loadStickers(); }, [loadStickers]);
+
+  const scrollMessagesToBottom = () => {
+    setTimeout(() => {
+      const container = document.getElementById('chat-messages-container');
+      if (container) container.scrollTop = container.scrollHeight;
+    }, 50);
+  };
+
+  const findCommentById = (commentsList, id) =>
+    commentsList.find(c => String(c.id || c._tempId) === String(id)) || null;
+
+  const buildParentSnapshot = (parentComment) => parentComment ? {
+    id: parentComment.id || parentComment._tempId,
+    user: parentComment.user,
+    content: parentComment.content,
+    is_sticker: parentComment.is_sticker,
+    image_path: parentComment.image_path,
+    video_path: parentComment.video_path,
+    audio_path: parentComment.audio_path,
+  } : null;
+
+  // ─── Envoi optimiste d'un message texte / audio / photo ───
   const handleCommentSubmit = async (e, textOverride = null) => {
     if (e?.preventDefault) { e.preventDefault(); e.stopPropagation(); }
 
@@ -392,18 +425,6 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
 
     const tempId = generateTempId();
     const now = new Date().toISOString();
-
-    // ─── Résout le commentaire parent (pour l'aperçu cité), où qu'il soit ───
-    const findCommentById = (commentsList, id) => {
-      for (const c of commentsList) {
-        if (String(c.id || c._tempId) === String(id)) return c;
-        if (c.replies?.length) {
-          const found = findCommentById(c.replies, id);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
     const parentComment = replyingTo ? findCommentById(comments, replyingTo) : null;
 
     const optimisticComment = {
@@ -414,6 +435,8 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
       content: textToSend || (audioBlob ? 'Message audio enregistré et sauvegardé' : (imageFile ? 'Photo partagée' : '')),
       audio_path: audioBlob ? audioUrl : null,
       image_path: imageFile ? imagePreviewUrl : null,
+      video_path: null,
+      is_sticker: false,
       created_at: now,
       updated_at: now,
       user: {
@@ -423,12 +446,11 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
         role: auth.user.role,
       },
       parent_id: replyingTo || null,
-      parent: parentComment ? { id: parentComment.id || parentComment._tempId, content: parentComment.content } : null,
-      replies: [],
+      parent: buildParentSnapshot(parentComment),
     };
 
-    // ─── Toujours ajouté en bas (racine), comme un message normal ───
-    setComments(prev => [optimisticComment, ...prev]);
+    // ─── Toujours ajouté à la fin (le plus récent en bas), comme un message normal ───
+    setComments(prev => [...prev, optimisticComment]);
 
     const savedContent = textToSend;
     const savedAudioBlob = audioBlob;
@@ -444,10 +466,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
     setError('');
     emitStopTyping();
 
-    setTimeout(() => {
-      const container = document.getElementById('chat-messages-container');
-      if (container) container.scrollTop = container.scrollHeight;
-    }, 50);
+    scrollMessagesToBottom();
 
     try {
       const formData = new FormData();
@@ -467,39 +486,145 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Erreur serveur');
+        let msg = 'Erreur serveur';
+        try {
+          const errorData = await res.json();
+          msg = errorData.message || (errorData.errors ? Object.values(errorData.errors).flat().join(' ') : msg);
+        } catch {}
+        throw new Error(msg);
       }
 
       const newComment = await res.json();
       const serverComment = newComment.comment || newComment;
 
-      const replaceOptimistic = (list) => list.map(c => {
-        if (c._tempId === tempId) return { ...c, ...serverComment, _pending: false, _failed: false, _tempId: tempId, replies: c.replies || [] };
-        if (c.replies?.length > 0) return { ...c, replies: replaceOptimistic(c.replies) };
-        return c;
-      });
-
-      setComments(prev => replaceOptimistic(prev));
+      setComments(prev => prev.map(c => c._tempId === tempId
+        ? { ...c, ...serverComment, _pending: false, _failed: false, _tempId: tempId }
+        : c));
     } catch (err) {
       console.error('Erreur envoi commentaire:', err);
-      const markFailed = (list) => list.map(c => {
-        if (c._tempId === tempId) return { ...c, _pending: false, _failed: true };
-        if (c.replies?.length > 0) return { ...c, replies: markFailed(c.replies) };
-        return c;
-      });
-      setComments(prev => markFailed(prev));
+      setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, _pending: false, _failed: true } : c));
       setError(err.message || 'Échec de l\'envoi. Appuyez sur "Réessayer".');
     }
   };
 
+  // ─── Envoi d'un sticker existant du pack (en un clic, image ou vidéo) ─────
+  const sendSticker = async (sticker) => {
+    const tempId = generateTempId();
+    const now = new Date().toISOString();
+    const isVideo = sticker.type === 'video';
+    const parentComment = replyingTo ? findCommentById(comments, replyingTo) : null;
+
+    const optimisticComment = {
+      _tempId: tempId,
+      id: null,
+      _pending: true,
+      _failed: false,
+      content: '',
+      audio_path: null,
+      image_path: isVideo ? null : sticker.image_path,
+      video_path: isVideo ? sticker.image_path : null,
+      is_sticker: true,
+      created_at: now,
+      updated_at: now,
+      user: {
+        id: auth.user.id,
+        name: auth.user.name,
+        profile_photo_url: auth.user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth.user.name || '')}`,
+        role: auth.user.role,
+      },
+      parent_id: replyingTo || null,
+      parent: buildParentSnapshot(parentComment),
+    };
+
+    setComments(prev => [...prev, optimisticComment]);
+    const savedReplyingTo = replyingTo;
+    setReplyingTo(null);
+    setShowEmojiPicker(false);
+    setError('');
+    scrollMessagesToBottom();
+
+    try {
+      const fd = new FormData();
+      fd.append('sticker_id', sticker.id);
+      if (savedReplyingTo) fd.append('parent_id', savedReplyingTo);
+
+      const res = await fetch(`/api/tasks/${task.id}/comments`, {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: fd,
+      });
+
+      if (!res.ok) {
+        let msg = `Erreur ${res.status}`;
+        try {
+          const errorData = await res.json();
+          msg = errorData.message || (errorData.errors ? Object.values(errorData.errors).flat().join(' ') : msg);
+        } catch {}
+        throw new Error(msg);
+      }
+
+      const saved = await res.json();
+      const serverComment = saved.comment || saved;
+      setComments(prev => prev.map(c => c._tempId === tempId
+        ? { ...c, ...serverComment, _pending: false, _failed: false, _tempId: tempId }
+        : c));
+    } catch (err) {
+      console.error('Erreur envoi sticker:', err);
+      setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, _pending: false, _failed: true } : c));
+      setError(err.message || "Échec de l'envoi du sticker.");
+    }
+  };
+
+  // ─── Upload d'un nouveau sticker par l'utilisateur (image OU courte vidéo) ───
+  const handleStickerUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) {
+      setError('Seules les images et les courtes vidéos peuvent devenir des stickers.');
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setError('Fichier trop lourd (6 Mo max) — choisissez une vidéo plus courte.');
+      return;
+    }
+
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await fetch('/api/stickers', {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: fd,
+      });
+      if (!res.ok) {
+        let msg = "Impossible d'ajouter ce sticker.";
+        try { const errData = await res.json(); msg = errData.message || msg; } catch {}
+        throw new Error(msg);
+      }
+      const sticker = await res.json();
+      setStickers(prev => [sticker, ...prev]);
+      setError('');
+    } catch (err) {
+      console.error('Erreur upload sticker:', err);
+      setError(err.message || "Impossible d'ajouter ce sticker.");
+    }
+  };
+
+  // ─── Ré-essaye un message texte/audio/photo qui a échoué ───
+  // (Un sticker qui échoue est simplement retiré : il suffit de re-cliquer dessus dans le pack.)
   const retryComment = async (failedComment) => {
-    const removeOptimistic = (list) => list.filter(c => {
-      if (c._tempId === failedComment._tempId) return false;
-      if (c.replies) c.replies = removeOptimistic(c.replies);
-      return true;
-    });
-    setComments(prev => removeOptimistic(prev));
+    setComments(prev => prev.filter(c => c._tempId !== failedComment._tempId));
+    if (failedComment.is_sticker) return;
     setCommentContent(failedComment.content === 'Message audio enregistré et sauvegardé' ? '' : failedComment.content);
     if (failedComment.parent_id) setReplyingTo(failedComment.parent_id);
   };
@@ -521,14 +646,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
       });
 
       if (res.ok) {
-        setComments(prev => {
-          const removeComment = (list) => list.reduce((acc, comment) => {
-            if (comment.id === commentToDeleteId) return acc;
-            if (comment.replies?.length > 0) return [...acc, { ...comment, replies: removeComment(comment.replies) }];
-            return [...acc, comment];
-          }, []);
-          return removeComment(prev);
-        });
+        setComments(prev => prev.filter(c => c.id !== commentToDeleteId));
         setShowConfirmDeleteCommentModal(false);
         setCommentToDeleteId(null);
       } else {
@@ -752,7 +870,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
     setImagePreviewUrl(null);
   };
 
-  // ─── Temps réel : commentaires ───
+  // ─── Temps réel : commentaires (liste à plat) ───
   useEffect(() => {
     if (!window.Echo || !task?.id) return;
     const channel = window.Echo.private(`task.${task.id}.comments`);
@@ -761,12 +879,11 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
       const incoming = e.comment;
       if (!incoming) return;
 
-      const withMeta = { ...incoming, formatted_date: formatDate(incoming.created_at), replies: incoming.replies || [] };
+      const withMeta = { ...incoming, formatted_date: formatDate(incoming.created_at) };
 
       setComments(prev => {
         const incId = String(withMeta.id);
-        const existsRec = (l) => l.some(c => String(c.id) === incId || (c.replies?.length && existsRec(c.replies)));
-        if (existsRec(prev)) return prev;
+        if (prev.some(c => String(c.id) === incId)) return prev;
 
         // Si c'est mon propre message et qu'une bulle optimiste (envoyée par ce même
         // appareil, encore en attente de confirmation) existe déjà, on la met à jour
@@ -781,31 +898,20 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
               _pending: false,
               _failed: false,
               _tempId: next[pendingIdx]._tempId,
-              replies: next[pendingIdx].replies || [],
             };
             return next;
           }
         }
 
-        // Toujours ajouté en haut (racine), comme un message normal
-        return [withMeta, ...prev];
+        // Toujours ajouté à la fin (le plus récent en bas), comme un message normal
+        return [...prev, withMeta];
       });
 
-      setTimeout(() => {
-        const container = document.getElementById('chat-messages-container');
-        if (container) container.scrollTop = container.scrollHeight;
-      }, 50);
+      scrollMessagesToBottom();
     });
 
     channel.listen('.comment.deleted', (e) => {
-      setComments(prev => {
-        const removeComment = (list) => list.reduce((acc, c) => {
-          if (c.id === e.commentId) return acc;
-          if (c.replies?.length) return [...acc, { ...c, replies: removeComment(c.replies) }];
-          return [...acc, c];
-        }, []);
-        return removeComment(prev);
-      });
+      setComments(prev => prev.filter(c => c.id !== e.commentId));
     });
 
     channel.listen('.comment.updated', (e) => {
@@ -919,6 +1025,8 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
   }, [auth.user.id]);
 
   // ─── Marque les messages des autres comme lus dès qu'ils sont visibles ───
+  // (Fonctionne maintenant aussi pour les réponses, qui sont des messages à part
+  // entière dans la liste à plat, et non plus cachées dans un sous-thread.)
   useEffect(() => {
     const container = document.getElementById('chat-messages-container');
     if (!container) return;
@@ -942,6 +1050,17 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
     container.querySelectorAll('[data-comment-id]').forEach(node => observer.observe(node));
     return () => observer.disconnect();
   }, [comments, auth.user.id]);
+
+  // ─── Aperçu texte du message cité, dans la barre "en train de répondre à" ───
+  const replyPreviewLabel = () => {
+    const parent = findCommentById(comments, replyingTo);
+    if (!parent) return '...';
+    if (parent.content) return parent.content.substring(0, 60);
+    if (parent.is_sticker) return '🎨 Sticker';
+    if (parent.video_path) return '🎬 Vidéo';
+    if (parent.image_path) return '📷 Photo';
+    return '🎙 Message vocal';
+  };
 
   return (
     <>
@@ -1035,12 +1154,14 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
               <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">{t('task_details.no_discussion_yet')}</p>
             </div>
           ) : (
-            [...comments].reverse().map(comment => {
+            comments.map(comment => {
               const isMe = comment.user?.id === auth.user.id;
               const isPending = comment._pending === true;
               const hasFailed = comment._failed === true;
               const commentReactions = reactions[comment.id] || {};
               const reactionEntries = Object.entries(commentReactions).filter(([, userIds]) => userIds && userIds.length > 0);
+              const resolvedImageSrc = resolveMediaSrc(comment.image_path);
+              const resolvedVideoSrc = resolveMediaSrc(comment.video_path);
 
               return (
                 <div
@@ -1063,28 +1184,74 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                       </div>
                     )}
 
-                    <div className={`relative px-3.5 py-2.5 shadow-sm ${comment.audio_path ? 'min-w-[220px]' : 'min-w-[120px]'} ${isPending ? 'bubble-pending' : ''} ${
-                      isMe
-                        ? `bubble-right ${hasFailed ? 'bg-red-100 dark:bg-red-900/40 text-red-900' : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'}`
-                        : 'bubble-left bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-100'
-                    }`}>
+                    <div className={
+                      comment.is_sticker
+                        ? `relative ${isPending ? 'opacity-70' : ''} ${hasFailed ? 'opacity-50' : ''}`
+                        : `relative px-3.5 py-2.5 shadow-sm ${comment.audio_path ? 'min-w-[220px]' : 'min-w-[120px]'} ${isPending ? 'bubble-pending' : ''} ${
+                            isMe
+                              ? `bubble-right ${hasFailed ? 'bg-red-100 dark:bg-red-900/40 text-red-900' : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'}`
+                              : 'bubble-left bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-100'
+                          }`
+                    }>
                       {activeReactionPicker === comment.id && (
                         <ReactionPicker commentId={comment.id} isMe={isMe} onReact={handleReaction} onClose={() => setActiveReactionPicker(null)} />
                       )}
 
-                      {!isMe && comment.user?.name && (
+                      {!isMe && !comment.is_sticker && comment.user?.name && (
                         <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 mb-0.5">{comment.user.name}</p>
                       )}
 
+                      {/* ─── Réponse citée : fonctionne pour n'importe quel message ciblé, même une réponse ─── */}
                       {comment.parent && (
-                        <div className={`mb-2 px-2.5 py-1.5 rounded-lg text-xs border-l-3 ${
-                          isMe ? 'border-white/80 bg-white/15 text-white/90' : 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-gray-600 dark:text-gray-300'
-                        }`}>
-                          <p className="truncate opacity-80">{comment.parent.content}</p>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const el = document.querySelector(`[data-comment-id="${comment.parent_id}"]`);
+                            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }}
+                          className={`mb-2 px-2.5 py-1.5 rounded-lg text-xs border-l-3 w-full text-left block ${
+                            isMe ? 'border-white/80 bg-white/15 text-white/90' : 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-gray-600 dark:text-gray-300'
+                          }`}
+                        >
+                          <p className="font-semibold truncate opacity-90">{comment.parent.user?.name || 'Message'}</p>
+                          <p className="truncate opacity-80">
+                            {comment.parent.content || (comment.parent.is_sticker ? '🎨 Sticker' : (comment.parent.video_path ? '🎬 Vidéo' : (comment.parent.image_path ? '📷 Photo' : (comment.parent.audio_path ? '🎙 Message vocal' : '…'))))}
+                          </p>
+                        </button>
                       )}
 
-                      {editingId === comment.id ? (
+                      {comment.is_sticker ? (
+                        <>
+                          {resolvedVideoSrc ? (
+                            <video src={resolvedVideoSrc} autoPlay loop muted playsInline className="w-36 h-36 object-contain" />
+                          ) : (
+                            <img
+                              src={resolvedImageSrc}
+                              alt="Sticker"
+                              className="w-36 h-36 object-contain cursor-pointer"
+                              loading="lazy"
+                              onClick={() => setImageLightbox(resolvedImageSrc)}
+                            />
+                          )}
+                          <div className="flex items-center gap-1 mt-1 justify-end tick text-gray-400 dark:text-gray-500">
+                            <span>{new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            {isMe && (
+                              hasFailed
+                                ? <span className="text-red-500 text-xs">✕</span>
+                                : isPending
+                                ? <span className="text-gray-400">⏳</span>
+                                : <span className="text-blue-500 font-bold">✓✓</span>
+                            )}
+                          </div>
+                          {hasFailed && (
+                            <p className="text-xs text-red-500 mt-1 font-medium">
+                              Échec de l'envoi.
+                              <button onClick={() => retryComment(comment)} className="ml-1 underline hover:no-underline font-semibold">Réessayer</button>
+                            </p>
+                          )}
+                        </>
+                      ) : editingId === comment.id ? (
                         <form onSubmit={handleUpdateComment} className="min-w-[200px]">
                           <textarea
                             value={editContent}
@@ -1118,14 +1285,20 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                             />
                           )}
 
-                          {comment.image_path && (
+                          {resolvedImageSrc && (
                             <div className="mt-1.5 max-w-full overflow-hidden rounded-xl">
                               <img
-                                src={comment.image_path.startsWith('blob:') || comment.image_path.startsWith('http') ? comment.image_path : `/storage/public/${comment.image_path}`}
+                                src={resolvedImageSrc}
                                 alt="Photo partagée"
                                 className="max-w-full max-h-72 rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => setImageLightbox(comment.image_path.startsWith('blob:') || comment.image_path.startsWith('http') ? comment.image_path : `/storage/public/${comment.image_path}`)}
+                                onClick={() => setImageLightbox(resolvedImageSrc)}
                               />
+                            </div>
+                          )}
+
+                          {resolvedVideoSrc && (
+                            <div className="mt-1.5 max-w-full overflow-hidden rounded-xl">
+                              <video src={resolvedVideoSrc} controls className="max-w-full max-h-72 rounded-xl" />
                             </div>
                           )}
 
@@ -1185,9 +1358,11 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                         )}
                         {isMe && (
                           <>
-                            <button onClick={() => handleEditComment(comment)} className="text-gray-500 hover:text-blue-500 p-1 rounded-full transition-colors" title={t('edit')}>
-                              <FaEdit className="w-3.5 h-3.5" />
-                            </button>
+                            {!comment.is_sticker && (
+                              <button onClick={() => handleEditComment(comment)} className="text-gray-500 hover:text-blue-500 p-1 rounded-full transition-colors" title={t('edit')}>
+                                <FaEdit className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             <button onClick={() => handleDeleteComment(comment.id)} className="text-gray-500 hover:text-red-500 p-1 rounded-full transition-colors" title={t('delete')}>
                               <FaTrash className="w-3.5 h-3.5" />
                             </button>
@@ -1212,45 +1387,6 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                             <button type="button" onClick={() => setReactionViewer({ commentId: comment.id, emoji })} className="px-1.5 py-0.5 border-l border-current/20 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" title="Voir qui a réagi">
                               <FaInfoCircle className="w-2.5 h-2.5 opacity-70" />
                             </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {comment.replies && comment.replies.length > 0 && (
-                    <div className={`flex flex-col gap-1 mt-1 ${isMe ? 'items-end pr-2' : 'items-start pl-9'}`}>
-                      {[...comment.replies].reverse().map(reply => {
-                        const isReplyMe = reply.user?.id === auth.user.id;
-                        return (
-                          <div key={reply.id} className={`flex items-end gap-1.5 max-w-[75%] ${isReplyMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                            {!isReplyMe && (
-                              <img
-                                src={reply.user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user?.name || '')}&background=1D9E75&color=fff`}
-                                alt={reply.user?.name}
-                                title={reply.user?.name || ''}
-                                className="w-5 h-5 rounded-full flex-shrink-0 mb-0.5 object-cover"
-                              />
-                            )}
-                            <div className={`px-3 py-1.5 shadow-xs text-sm ${reply.audio_path ? 'min-w-[220px]' : 'min-w-[100px]'} ${
-                              isReplyMe ? 'bg-blue-500 dark:bg-blue-700 text-white bubble-right' : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-600 bubble-left'
-                            }`}>
-                              <p className="whitespace-pre-wrap break-words leading-relaxed" dangerouslySetInnerHTML={{ __html: linkifyText(reply.content, isReplyMe) }} />
-                              {reply.audio_path && (
-                                <div className="mt-1 max-w-full overflow-hidden">
-                                  <AudioPlayer src={reply.audio_path} isMe={isReplyMe} />
-                                </div>
-                              )}
-                              <div className={`flex items-center gap-1 mt-0.5 justify-end tick ${isReplyMe ? 'text-white/70' : 'text-gray-400'}`}>
-                                <span>{new Date(reply.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-                                {isReplyMe && <span>✓✓</span>}
-                                {isReplyMe && (
-                                  <button onClick={() => handleDeleteComment(reply.id)} className="ml-1 text-white/50 hover:text-white/80">
-                                    <FaTrash className="w-2.5 h-2.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
                           </div>
                         );
                       })}
@@ -1283,10 +1419,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                 <FaReply className="w-3 h-3" /> {t('task_details.reply_to_comment')}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-300 truncate font-medium">
-                {(() => {
-                  const parent = comments.find(c => c.id === replyingTo) || comments.flatMap(c => c.replies || []).find(r => r.id === replyingTo);
-                  return parent?.content?.substring(0, 60) || '...';
-                })()}
+                {replyPreviewLabel()}
               </p>
             </div>
             <button onClick={cancelReply} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full">
@@ -1296,8 +1429,8 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
         )}
 
         {showEmojiPicker && (
-          <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3 shadow-lg max-h-56 overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2 mb-2">
+          <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3 shadow-lg max-h-64 overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2 mb-2 sticky top-0 bg-white dark:bg-gray-800">
               <div className="flex gap-2">
                 <button type="button" onClick={() => setActivePickerTab('emojis')} className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${activePickerTab === 'emojis' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
                   Émojis
@@ -1312,26 +1445,74 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
             </div>
 
             {activePickerTab === 'emojis' ? (
-              <div className="grid grid-cols-10 gap-1.5">
-                {COMMON_EMOJIS.map((emoji, idx) => (
-                  <button key={idx} type="button" onClick={() => setCommentContent(prev => prev + emoji)} className="text-xl hover:scale-125 transition-transform p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center">
-                    {emoji}
-                  </button>
+              <div>
+                {Object.entries(EMOJI_CATEGORIES).map(([category, emojis]) => (
+                  <div key={category} className="mb-3">
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">{category}</p>
+                    <div className="grid grid-cols-10 gap-1.5">
+                      {emojis.map((emoji, idx) => (
+                        <button key={idx} type="button" onClick={() => setCommentContent(prev => prev + emoji)} className="text-xl hover:scale-125 transition-transform p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center">
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {STICKERS.map(sticker => (
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                <input
+                  type="file"
+                  ref={stickerInputRef}
+                  onChange={handleStickerUpload}
+                  accept="image/*,video/mp4,video/webm,video/quicktime"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => stickerInputRef.current?.click()}
+                  className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <span className="text-2xl leading-none">＋</span>
+                  <span className="text-[9px] mt-1 font-medium text-center leading-tight">Ajouter<br/>photo/vidéo</span>
+                </button>
+
+                {stickers.map(sticker => (
                   <button
                     key={sticker.id}
                     type="button"
-                    onClick={() => { setCommentContent(prev => (prev ? prev + ' ' : '') + `${sticker.emoji} ${sticker.title}`); setShowEmojiPicker(false); }}
-                    className={`flex items-center gap-2 p-2 rounded-xl border text-xs font-bold transition-all hover:scale-102 hover:shadow-md ${sticker.bg}`}
+                    onClick={() => sendSticker(sticker)}
+                    title={sticker.name || 'Envoyer ce sticker'}
+                    className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 hover:scale-105 transition-transform"
                   >
-                    <span className="text-xl">{sticker.emoji}</span>
-                    <span>{sticker.title}</span>
+                    {sticker.type === 'video' ? (
+                      <video
+                        src={resolveMediaSrc(sticker.image_path)}
+                        className="w-full h-full object-contain p-1"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                      />
+                    ) : (
+                      <img
+                        src={resolveMediaSrc(sticker.image_path)}
+                        alt={sticker.name || 'Sticker'}
+                        className="w-full h-full object-contain p-1"
+                        loading="lazy"
+                      />
+                    )}
+                    {sticker.type === 'video' && (
+                      <span className="absolute bottom-0.5 right-0.5 text-[8px] bg-black/60 text-white rounded px-1 leading-tight">🎥</span>
+                    )}
                   </button>
                 ))}
+
+                {stickers.length === 0 && (
+                  <p className="col-span-4 sm:col-span-6 text-xs text-gray-400 dark:text-gray-500 px-2 py-4 text-center leading-relaxed">
+                    Aucun sticker pour l'instant. Cliquez sur ＋ pour ajouter une image ou une courte vidéo au pack de l'équipe.
+                  </p>
+                )}
               </div>
             )}
           </div>
