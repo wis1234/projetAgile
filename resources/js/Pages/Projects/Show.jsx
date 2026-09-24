@@ -334,6 +334,79 @@ const CommentStatsModal = ({ show, onClose, commentsByMember = [] }) => {
   );
 };
 
+// Sélection des membres à appeler : seuls les membres cochés verront leur téléphone sonner.
+const CallMemberSelectModal = ({ show, onClose, members = [], currentUserId, onStart, loading }) => {
+  const [selected, setSelected] = useState([]);
+
+  useEffect(() => {
+    if (show) setSelected([]);
+  }, [show]);
+
+  const callable = members.filter(u => u.id !== currentUserId);
+
+  const toggle = (id) => {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleAll = () => {
+    setSelected(prev => prev.length === callable.length ? [] : callable.map(u => u.id));
+  };
+
+  return (
+    <Modal show={show} onClose={onClose} maxWidth="md">
+      <div className="p-6">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-1">
+          <FaVideo className="text-blue-500" /> Qui souhaitez-vous appeler ?
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Seuls les membres sélectionnés verront leur téléphone sonner. Les autres ne seront pas dérangés.
+        </p>
+
+        {callable.length === 0 ? (
+          <p className="text-sm text-gray-400 italic py-6 text-center">Aucun autre membre sur ce projet.</p>
+        ) : (
+          <>
+            <button onClick={toggleAll} className="text-xs font-semibold text-blue-600 hover:underline mb-3">
+              {selected.length === callable.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+            </button>
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {callable.map(user => (
+                <label
+                  key={user.id}
+                  className="flex items-center gap-3 p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(user.id)}
+                    onChange={() => toggle(user.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  <MemberAvatar user={user} size="md" />
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-100 flex-1 truncate">{user.name}</span>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={onClose} disabled={loading} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+            Annuler
+          </button>
+          <button
+            onClick={() => onStart(selected)}
+            disabled={loading || selected.length === 0}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+          >
+            {loading ? <FaSpinner className="animate-spin" /> : <FaVideo />}
+            {loading ? 'Démarrage…' : `Appeler (${selected.length})`}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // ── Composant principal ─────────────────────────────────────────────────────
 function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp, stats = {} }) {
   const { t, i18n } = useTranslation();
@@ -350,6 +423,8 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
   const [inviteLink, setInviteLink] = useState('');
   const [showScheduledModal, setShowScheduledModal] = useState(false);
   const [csrfToken, setCsrfToken] = useState('');
+  const [showMemberSelectModal, setShowMemberSelectModal] = useState(false);
+  const [startingCall, setStartingCall] = useState(false);
 
   // Fetch CSRF for the modal early
   useEffect(() => {
@@ -494,6 +569,33 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
     });
   };
 
+  // Démarre l'appel en n'appelant QUE les membres sélectionnés dans la modale.
+  const handleStartCallWithMembers = async (memberIds) => {
+    setStartingCall(true);
+    setShowLiveKitCall(true);
+    const token = csrfToken || await getFreshCsrfToken();
+    try {
+      const res = await fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': token,
+        },
+        body: JSON.stringify({ member_ids: memberIds }),
+      });
+      const data = await res.json();
+      setCallActive(true);
+      setIsCallInitiator(!!data.isInitiator);
+      if (data.inviteUrl) setInviteLink(data.inviteUrl);
+    } catch (err) {
+      console.error('Erreur appel:', err);
+    } finally {
+      setStartingCall(false);
+      setShowMemberSelectModal(false);
+    }
+  };
+
   // Graphique
   const last30Days = Array.from({ length: 30 }, (_, i) => {
     const date = new Date();
@@ -617,22 +719,28 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
                 </button>
                 <button
                   onClick={async () => {
-                    setShowLiveKitCall(true);
-                    const token = csrfToken || await getFreshCsrfToken();
-                    fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
-                      method: 'POST',
-                      headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': token,
-                      },
-                    })
-                      .then(res => res.json())
-                      .then(data => {
-                        setCallActive(true);
-                        setIsCallInitiator(!!data.isInitiator);
-                        if (data.inviteUrl) setInviteLink(data.inviteUrl);
+                    // Un appel est déjà en cours : on le rejoint simplement, pas de sélection à faire.
+                    if (callActive) {
+                      setShowLiveKitCall(true);
+                      const token = csrfToken || await getFreshCsrfToken();
+                      fetch(`/projects/${project.id}/livekit-call/join-or-start`, {
+                        method: 'POST',
+                        headers: {
+                          'X-Requested-With': 'XMLHttpRequest',
+                          'X-CSRF-TOKEN': token,
+                        },
                       })
-                      .catch(err => console.error('Erreur appel:', err));
+                        .then(res => res.json())
+                        .then(data => {
+                          setCallActive(true);
+                          setIsCallInitiator(!!data.isInitiator);
+                          if (data.inviteUrl) setInviteLink(data.inviteUrl);
+                        })
+                        .catch(err => console.error('Erreur appel:', err));
+                      return;
+                    }
+                    // Nouvel appel : on choisit d'abord qui sonner.
+                    setShowMemberSelectModal(true);
                   }}
                   className={`inline-flex items-center gap-1.5 px-3 py-2 text-white text-sm font-medium rounded-lg transition ${
                     callActive ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
@@ -1086,6 +1194,15 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
           <ZoomMeeting project={project} />
         </div>
       </Modal>
+      <CallMemberSelectModal
+        show={showMemberSelectModal}
+        onClose={() => setShowMemberSelectModal(false)}
+        members={project.users || []}
+        currentUserId={auth?.user?.id}
+        onStart={handleStartCallWithMembers}
+        loading={startingCall}
+      />
+
       <ScheduledCallsModal
         show={showScheduledModal}
         onClose={() => setShowScheduledModal(false)}

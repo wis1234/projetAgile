@@ -127,7 +127,7 @@ class LiveKitController extends Controller
     }
 
 
-    private function sendNativeCallNotifications(\App\Models\Project $project, $initiator, string $inviteUrl): void
+    private function sendNativeCallNotifications(\App\Models\Project $project, $initiator, string $inviteUrl, ?array $targetIds = null): void
     {
         $call = [
             'projectId' => $project->id,
@@ -136,9 +136,14 @@ class LiveKitController extends Controller
             'inviteUrl' => $inviteUrl,
         ];
 
-        $project->users()
-            ->where('users.id', '!=', $initiator->id)
-            ->get()
+        $query = $project->users()->where('users.id', '!=', $initiator->id);
+
+        // Si une liste de membres ciblés est fournie, on ne notifie qu'eux.
+        if ($targetIds !== null) {
+            $query->whereIn('users.id', $targetIds);
+        }
+
+        $query->get()
             ->each(fn ($member) => app(FcmService::class)->sendCallNotification($member, $call));
     }
 
@@ -188,7 +193,17 @@ class LiveKitController extends Controller
             ->latest('started_at')
             ->first();
 
-        $memberIds = $project->users()->pluck('users.id')->toArray();
+        $projectMemberIds = $project->users()->pluck('users.id')->toArray();
+
+        // Si l'appelant a choisi des membres précis à sonner, on ne cible qu'eux
+        // (jamais tout le projet). On filtre sur les vrais membres du projet par sécurité.
+        $requestedIds = collect($request->input('member_ids', []))
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => in_array($id, $projectMemberIds, true))
+            ->values()
+            ->all();
+
+        $memberIds = !empty($requestedIds) ? $requestedIds : $projectMemberIds;
         $isNewCall = false;
 
         if (!$session) {
@@ -211,7 +226,7 @@ class LiveKitController extends Controller
                 $project->id, $project->name, $user->id, $user->name, $memberIds, $session->getInviteUrl()
             ));
 
-            $this->sendNativeCallNotifications($project, $user, $session->getInviteUrl());
+            $this->sendNativeCallNotifications($project, $user, $session->getInviteUrl(), $memberIds);
             activity_log('call_started', "{$user->name} a démarré un appel ProJA Meet sur « {$project->name} »", $project);
         } else {
             // L'appel existe déjà : ce membre le rejoint (décrochage ou intégration en retard)
