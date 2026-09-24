@@ -3,7 +3,7 @@ import {
   FaTimes, FaMicrophone, FaMicrophoneSlash, FaVideo as FaVideoIcon, FaVideoSlash,
   FaDesktop, FaSmile, FaUsers, FaExpand, FaCompress, FaCircle, FaHandPaper, FaCrown,
   FaPhone, FaPhoneSlash, FaLink, FaCopy, FaShareAlt, FaCheck, FaImage, FaAdjust,
-  FaEllipsisV, FaUserSlash
+  FaEllipsisV, FaUserSlash, FaComments, FaPaperPlane
 } from 'react-icons/fa';
 import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';
 
@@ -48,9 +48,30 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHands, setRaisedHands] = useState({}); // { identity: name }
   const [linkCopied, setLinkCopied] = useState(false);
-  const [activeSpeaker, setActiveSpeaker] = useState(null);
+  const [activeSpeakers, setActiveSpeakers] = useState(() => new Set());
+  const [pinnedIdentity, setPinnedIdentity] = useState(null);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [pipPos, setPipPos] = useState(null);
+
+  // ─── Chat éphémère de l'appel (façon Meet) — transite par le canal de données
+  // LiveKit, exactement comme les réactions et la main levée déjà en place.
+  // Jamais persisté en base : il vit uniquement en mémoire de ce composant et
+  // disparaît dès qu'on quitte l'appel (démontage du composant).
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [unreadChat, setUnreadChat] = useState(0);
+  const showChatRef = useRef(false);
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    showChatRef.current = showChat;
+    if (showChat) setUnreadChat(0);
+  }, [showChat]);
+
+  useEffect(() => {
+    if (showChat) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, showChat]);
 
   // ─── Décroché / pas décroché — état 100% LOCAL à cet utilisateur ───
   // C'est la clé du correctif : l'hôte (celui qui lance l'appel) est
@@ -317,13 +338,22 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                 return copy;
               });
             }
+
+            if (data.type === 'chat' && participant) {
+              setChatMessages(prev => [...prev, {
+                id: data.id || `${Date.now()}_${Math.random()}`,
+                senderIdentity: participant.identity,
+                senderName: data.name || participant.name || 'Participant',
+                text: data.text,
+                ts: Date.now(),
+              }]);
+              if (!showChatRef.current) setUnreadChat(u => u + 1);
+            }
           } catch (e) { /* ignore malformed payload */ }
         });
 
         activeRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-          if (speakers.length > 0) {
-            setActiveSpeaker(speakers[0].identity);
-          }
+          setActiveSpeakers(new Set(speakers.map(s => s.identity)));
         });
 
         await activeRoom.connect(url, token);
@@ -510,9 +540,18 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     }
   }, [remoteScreenShare, screenSharing]);
 
-  // ─── Attacher le Main Speaker (façon Google Meet) ───
-  const activeIdentity = activeSpeaker || (participants.length > 0 ? participants[0].identity : room?.localParticipant?.identity);
+  // ─── Détermine qui afficher en grand : épinglage manuel > personne qui parle > premier participant ───
+  // (façon Google Meet — cliquer sur n'importe quelle vignette l'épingle ; sans épinglage, ça suit la parole)
+  const remoteSpeakerIdentity = participants.find(p => activeSpeakers.has(p.identity))?.identity || null;
+  const autoIdentity = remoteSpeakerIdentity
+    || (participants.length > 0 ? participants[0].identity : room?.localParticipant?.identity);
+  const pinnedIsValid = pinnedIdentity && (
+    pinnedIdentity === room?.localParticipant?.identity || participants.some(p => p.identity === pinnedIdentity)
+  );
+  const activeIdentity = pinnedIsValid ? pinnedIdentity : autoIdentity;
   const isLocalMain = activeIdentity === room?.localParticipant?.identity || (!participants.length);
+  const isSpeaking = (identity) => activeSpeakers.has(identity);
+  const togglePin = (identity) => setPinnedIdentity(prev => (prev === identity ? null : identity));
 
   useEffect(() => {
     if (isScreenSharingAnyone || !room) return;
@@ -816,6 +855,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     stopRingtone();
     clearInterval(timerIntervalRef.current);
     room?.disconnect();
+    setChatMessages([]); // la discussion de l'appel ne doit jamais survivre à l'appel
     onClose();
   };
 
@@ -904,24 +944,100 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
     );
   }
 
-  const AvatarCircle = ({ name, photoUrl, size = 'w-28 h-28 text-3xl' }) => {
+  const AvatarCircle = ({ name, photoUrl, speaking = false, size = 'w-28 h-28 text-3xl' }) => {
     const [imgError, setImgError] = useState(false);
+    const ringClass = speaking ? 'ring-4 ring-emerald-400 speaking-ring' : 'border-2 border-white/10';
     if (photoUrl && !imgError) {
       return (
         <img
           src={photoUrl}
           alt={name}
           onError={() => setImgError(true)}
-          className={`${size} rounded-full object-cover shadow-xl flex-shrink-0 border-2 border-white/10`}
+          className={`${size} rounded-full object-cover shadow-xl flex-shrink-0 ${ringClass}`}
         />
       );
     }
     return (
-      <div className={`${size} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-xl flex-shrink-0`}>
+      <div className={`${size} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-xl flex-shrink-0 ${ringClass}`}>
         {initialsOf(name)}
       </div>
     );
   };
+
+  const sendChatMessage = () => {
+    const text = chatInput.trim();
+    if (!text || !room) return;
+
+    const id = `${Date.now()}_${Math.random()}`;
+    const payload = new TextEncoder().encode(JSON.stringify({
+      type: 'chat', id, text, name: room.localParticipant.name || 'Vous',
+    }));
+    room.localParticipant.publishData(payload, { reliable: true });
+
+    setChatMessages(prev => [...prev, {
+      id,
+      senderIdentity: room.localParticipant.identity,
+      senderName: 'Vous',
+      text,
+      ts: Date.now(),
+    }]);
+    setChatInput('');
+  };
+
+  const chatPanelContent = (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+          <FaComments className="w-3.5 h-3.5" /> Discussion
+        </h4>
+        <button onClick={() => setShowChat(false)} className="text-slate-400 hover:text-white p-1">
+          <FaTimes className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
+        {chatMessages.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-8">
+            Aucun message pour l'instant.<br />Cette discussion disparaît à la fin de l'appel.
+          </p>
+        ) : (
+          chatMessages.map(m => {
+            const isMe = m.senderIdentity === room?.localParticipant?.identity;
+            return (
+              <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                {!isMe && <span className="text-[10px] text-slate-400 font-semibold mb-0.5 px-1">{m.senderName}</span>}
+                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm break-words ${
+                  isMe ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white/10 text-slate-100 rounded-bl-sm'
+                }`}>
+                  {m.text}
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={chatEndRef} />
+      </div>
+
+      <div className="flex items-center gap-2 pt-3 mt-2 border-t border-white/10 flex-shrink-0">
+        <input
+          type="text"
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); } }}
+          placeholder="Écrire un message…"
+          maxLength={500}
+          className="flex-1 bg-slate-800 border border-slate-700 rounded-full px-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <button
+          onClick={sendChatMessage}
+          disabled={!chatInput.trim()}
+          className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 flex items-center justify-center flex-shrink-0 transition active:scale-90"
+        >
+          <FaPaperPlane className="w-3.5 h-3.5 text-white" />
+        </button>
+      </div>
+    </div>
+  );
 
   const statusLabel = connecting
     ? 'Connexion…'
@@ -1018,6 +1134,12 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
         .panel-in { animation: panelIn 0.2s ease-out; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { scrollbar-width: none; }
+        @keyframes speakingPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.65); }
+          50% { box-shadow: 0 0 0 5px rgba(52, 211, 153, 0.35); }
+        }
+        .speaking-ring { animation: speakingPulse 1.4s ease-in-out infinite; }
+        .pin-target { cursor: pointer; }
       `}</style>
 
       {/* ─── ZONE VIDÉO — plein écran, comme Meet/WhatsApp ─── */}
@@ -1067,10 +1189,12 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                 <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded">Vous</span>
               </div>
               {participants.map(p => (
-                <div key={p.identity} className="w-24 h-16 rounded-xl overflow-hidden bg-black ring-1 ring-white/10 flex-shrink-0 relative">
+                <div key={p.identity} className={`w-24 h-16 rounded-xl overflow-hidden bg-black ring-1 flex-shrink-0 relative transition-all ${
+                  isSpeaking(p.identity) ? 'ring-emerald-400 speaking-ring' : 'ring-white/10'
+                }`}>
                   <video
                     ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                    autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
+                    autoPlay playsInline className="w-full h-full object-cover bg-black"
                   />
                   <span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1.5 rounded truncate max-w-[80%]">
                     {p.name || p.identity}
@@ -1087,7 +1211,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                 <video ref={mainVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover bg-black" />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
-                  <AvatarCircle name={otherName(soleParticipant)} photoUrl={photoOf(soleParticipant)} size="w-32 h-32 text-4xl" />
+                  <AvatarCircle name={otherName(soleParticipant)} photoUrl={photoOf(soleParticipant)} speaking={isSpeaking(soleParticipant.identity)} size="w-32 h-32 text-4xl" />
                 </div>
               )
             ) : camEnabled ? (
@@ -1109,7 +1233,9 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
 
             {!!soleParticipant && (
               <div
-                className="absolute z-10 px-3 py-1.5 bg-black/40 backdrop-blur text-white text-sm font-semibold rounded-full"
+                className={`absolute z-10 px-3 py-1.5 backdrop-blur text-white text-sm font-semibold rounded-full transition-all ${
+                  isSpeaking(soleParticipant.identity) ? 'bg-emerald-500/70 speaking-ring' : 'bg-black/40'
+                }`}
                 style={{ top: 'calc(4.5rem + var(--safe-top, 0px))', left: '1rem' }}
               >
                 {otherName(soleParticipant)}
@@ -1122,7 +1248,9 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
               onPointerMove={handlePipPointerMove}
               onPointerUp={handlePipPointerUp}
               onPointerCancel={handlePipPointerUp}
-              className="absolute z-20 w-24 h-36 sm:w-28 sm:h-40 rounded-2xl overflow-hidden shadow-2xl ring-2 ring-white/20 bg-slate-800 touch-none cursor-grab active:cursor-grabbing"
+              className={`absolute z-20 w-24 h-36 sm:w-28 sm:h-40 rounded-2xl overflow-hidden shadow-2xl ring-2 bg-slate-800 touch-none cursor-grab active:cursor-grabbing transition-all ${
+                isSpeaking(room?.localParticipant?.identity) ? 'ring-emerald-400 speaking-ring' : 'ring-white/20'
+              }`}
               style={
                 pipPos
                   ? { left: pipPos.x, top: pipPos.y }
@@ -1169,11 +1297,17 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
             </div>
 
             <div className="absolute inset-x-0 bottom-24 z-10 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide">
-              <div className="w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden bg-slate-800 ring-1 ring-white/10 flex-shrink-0 relative flex items-center justify-center">
+              <div
+                onClick={() => togglePin(room?.localParticipant?.identity)}
+                title="Cliquez pour épingler / désépingler"
+                className={`w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden bg-slate-800 ring-1 flex-shrink-0 relative flex items-center justify-center pin-target transition-all ${
+                  isSpeaking(room?.localParticipant?.identity) ? 'ring-emerald-400 speaking-ring' : 'ring-white/10'
+                } ${pinnedIdentity === room?.localParticipant?.identity ? 'ring-2 ring-blue-400' : ''}`}
+              >
                 {camEnabled ? (
                   <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle} />
                 ) : (
-                  <AvatarCircle name="Vous" photoUrl={myAvatarUrl} size="w-9 h-9 text-xs" />
+                  <AvatarCircle name="Vous" photoUrl={myAvatarUrl} speaking={isSpeaking(room?.localParticipant?.identity)} size="w-9 h-9 text-xs" />
                 )}
                 {handRaised && (
                   <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
@@ -1185,10 +1319,17 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                 </span>
               </div>
               {participants.map(p => (
-                <div key={p.identity} className="w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden bg-black ring-1 ring-white/10 flex-shrink-0 relative group">
+                <div
+                  key={p.identity}
+                  onClick={() => togglePin(p.identity)}
+                  title="Cliquez pour épingler / désépingler"
+                  className={`w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden bg-black ring-1 flex-shrink-0 relative group pin-target transition-all ${
+                    isSpeaking(p.identity) ? 'ring-emerald-400 speaking-ring' : 'ring-white/10'
+                  } ${pinnedIdentity === p.identity ? 'ring-2 ring-blue-400' : ''}`}
+                >
                   <video
                     ref={(el) => { if (el) remoteVideoRefs.current[p.identity] = el; }}
-                    autoPlay playsInline className="w-full h-full object-cover bg-black" style={mirrorStyle}
+                    autoPlay playsInline className="w-full h-full object-cover bg-black"
                   />
                   {raisedHands[p.identity] && (
                     <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center animate-bounce">
@@ -1200,14 +1341,14 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
                   </span>
                   {isHost && (
                     <div className="absolute top-1 left-1 hidden group-hover:flex items-center gap-1">
-                      <button onClick={() => muteRemote(p, 'audio')} title="Couper le micro" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                      <button onClick={(e) => { e.stopPropagation(); muteRemote(p, 'audio'); }} title="Couper le micro" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
                         <FaMicrophoneSlash className="w-2.5 h-2.5 text-white" />
                       </button>
-                      <button onClick={() => muteRemote(p, 'video')} title="Couper la caméra" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                      <button onClick={(e) => { e.stopPropagation(); muteRemote(p, 'video'); }} title="Couper la caméra" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
                         <FaVideoSlash className="w-2.5 h-2.5 text-white" />
                       </button>
                       {kickEndpoint && (
-                        <button onClick={() => kickRemote(p)} title="Retirer de l'appel" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
+                        <button onClick={(e) => { e.stopPropagation(); kickRemote(p); }} title="Retirer de l'appel" className="w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center">
                           <FaUserSlash className="w-2.5 h-2.5 text-white" />
                         </button>
                       )}
@@ -1247,7 +1388,7 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <button
-            onClick={() => setShowParticipants(v => !v)}
+            onClick={() => { setShowParticipants(v => !v); setShowChat(false); }}
             className="flex items-center gap-1.5 text-xs font-semibold bg-black/30 hover:bg-black/50 backdrop-blur px-3 py-1.5 rounded-full transition active:scale-95"
           >
             <FaUsers className="w-3.5 h-3.5" /> {totalCount}
@@ -1382,6 +1523,21 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
           <FaSmile />
         </button>
 
+        <button
+          onClick={() => { setShowChat(v => !v); setShowParticipants(false); }}
+          title="Discussion de l'appel"
+          className={`relative w-12 h-12 sm:w-[3.25rem] sm:h-[3.25rem] rounded-full flex items-center justify-center transition active:scale-90 ${
+            showChat ? 'bg-blue-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
+          }`}
+        >
+          <FaComments />
+          {unreadChat > 0 && !showChat && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+              {unreadChat > 9 ? '9+' : unreadChat}
+            </span>
+          )}
+        </button>
+
         {/* « Plus » — regroupe flou / fond / partage d'écran / main levée sur mobile */}
         <button
           onClick={() => setShowMoreSheet(true)}
@@ -1474,6 +1630,31 @@ export default function LiveKitCallModal({ tokenEndpoint, muteEndpoint, kickEndp
             <div className="overflow-y-auto">
               {participantsListContent}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Discussion de l'appel — éphémère, disparaît dès qu'on quitte l'appel ─── */}
+      {showChat && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowChat(false)}>
+          <div className="absolute inset-0 bg-black/50 md:bg-black/30" />
+
+          {/* Bureau : panneau latéral */}
+          <div
+            className="panel-in hidden md:flex md:flex-col absolute right-0 top-0 bottom-0 w-80 bg-slate-900 border-l border-slate-800 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {chatPanelContent}
+          </div>
+
+          {/* Mobile : feuille du bas */}
+          <div
+            className="sheet-up md:hidden absolute bottom-0 inset-x-0 h-[75vh] bg-slate-900 rounded-t-3xl px-4 pt-3 flex flex-col"
+            style={{ paddingBottom: 'calc(0.75rem + var(--safe-bottom, 0px))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1.5 rounded-full bg-white/20 mx-auto mb-3 flex-shrink-0" />
+            {chatPanelContent}
           </div>
         </div>
       )}
