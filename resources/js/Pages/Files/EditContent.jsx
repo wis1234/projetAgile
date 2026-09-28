@@ -26,8 +26,27 @@ import { Color } from '@tiptap/extension-color';
 import { Image } from '@tiptap/extension-image';
 import FontFamily from '@tiptap/extension-font-family';
 import FontSize from '@tiptap/extension-font-size';
-import TrackChanges from '@/Components/Editor/extensions/track-changes';
 import axios from 'axios';
+import * as Y from 'yjs';
+import { Awareness } from 'y-protocols/awareness';
+import { Collaboration, isChangeOrigin } from '@tiptap/extension-collaboration';
+import { CollaborationCaret } from '@tiptap/extension-collaboration-caret';
+import { prosemirrorToYDoc } from '@tiptap/y-tiptap';
+import { DOMParser as PMDOMParser } from '@tiptap/pm/model';
+import { PusherYjsProvider, toBase64, fromBase64 } from '@/lib/yjsPusherProvider';
+
+/* ── Style des curseurs collaboratifs ── */
+if (typeof document !== 'undefined' && !document.getElementById('collab-caret-style')) {
+  const st = document.createElement('style');
+  st.id = 'collab-caret-style';
+  st.textContent = `
+    .collaboration-carets__caret { position: relative; margin-left: -1px; margin-right: -1px; border-left: 1px solid #0d0d0d; border-right: 1px solid #0d0d0d; word-break: normal; pointer-events: none; }
+    .collaboration-carets__label { position: absolute; top: -1.4em; left: -1px; font-size: 11px; font-weight: 600; line-height: normal; padding: 0.1rem 0.35rem; border-radius: 3px 3px 3px 0; color: #fff; white-space: nowrap; user-select: none; pointer-events: none; }
+  `;
+  document.head.appendChild(st);
+}
+
+const COLLAB_COLORS = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#4d7c0f'];
 
 /* ── Design tokens ───────────────────────────────────────────
    Canvas   #F4F5F7   Papier  #FFFFFF
@@ -470,6 +489,19 @@ const EditContent = ({
   const isReadOnly = myPermission === 'view' || myPermission === 'none';
   const canRestore = myPermission === 'admin';
 
+  /* ── Collaboration temps réel (Yjs + Pusher) ── */
+  const ydoc      = useMemo(() => new Y.Doc(), [file.id]);
+  const awareness = useMemo(() => new Awareness(ydoc), [ydoc]);
+  const providerRef  = useRef(null);
+  const reloadingRef = useRef(false);
+  const [collabReady, setCollabReady] = useState(false);
+  const collabUser = useMemo(() => ({
+    id: auth.user.id,
+    name: auth.user.name,
+    color: COLLAB_COLORS[Math.abs(Number(auth.user.id) || 0) % COLLAB_COLORS.length],
+  }), [auth.user.id, auth.user.name]);
+  useEffect(() => () => awareness.destroy(), [awareness]);
+
   /* ── Toast helpers ── */
   const addToast = useCallback((msg, type = 'success') => {
     const id = Date.now();
@@ -481,7 +513,7 @@ const EditContent = ({
   const editor = useEditor({
     editable: !isReadOnly,
     extensions: [
-      StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'code-block' } }, underline: false, link: false, heading: false }),
+      StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'code-block' } }, underline: false, link: false, heading: false, undoRedo: false }),
       Heading.configure({ levels: [1, 2, 3] }),
       TextStyle, FontFamily,
       FontSize.configure({ types: ['textStyle'] }),
@@ -489,37 +521,69 @@ const EditContent = ({
       TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left','center','right','justify'], defaultAlignment: 'left' }),
       Link.configure({ openOnClick: false, HTMLAttributes: { class: 'editor-link' }, validate: h => /^https?:\/\//.test(h), autolink: true, linkOnPaste: true }),
       Highlight.configure({ multicolor: true, HTMLAttributes: { class: 'highlight' } }),
-      TrackChanges,
       Color,
       Image.configure({ inline: true, allowBase64: true }),
+      Collaboration.configure({ document: ydoc }),
+      CollaborationCaret.configure({ provider: { awareness }, user: collabUser }),
     ],
-    content: '',
-    onUpdate: ({ editor }) => {
-      setIsDirty(true);
+    onUpdate: ({ editor, transaction }) => {
       const text = editor.getText().trim();
       setWordCount(text ? text.split(/\s+/).length : 0);
+      // Les changements venant des autres collaborateurs ou du chargement ne sont pas "non sauvegardés"
+      if (isReadOnly || isChangeOrigin(transaction)) return;
+      setIsDirty(true);
     },
-  });
+  }, [ydoc]);
 
-  /* ── Load initial content ── */
+  /* ── Chargement initial du document Yjs ── */
   useEffect(() => {
     if (!editor) return;
-    const content = file?.content;
-    if (content) {
-      editor.commands.setContent(content, false);
-    } else {
-      fetch(`/storage/${file.file_path}`)
-        .then(r => r.ok ? r.text() : Promise.reject())
-        .then(text => { if (!editor.isDestroyed) editor.commands.setContent(text, false); })
-        .catch(() => {});
-    }
-  }, [editor, file]);
+    let cancelled = false;
 
-  /* ── Real-time Collaboration (Pusher/Echo) ── */
+    (async () => {
+      try {
+        if (file.yjs_state) {
+          // Le document a déjà un état collaboratif enregistré
+          Y.applyUpdate(ydoc, fromBase64(file.yjs_state), 'init');
+        } else if ((file.content || '').trim()) {
+          // Première ouverture : on construit l'état à partir du HTML, dans un document temporaire
+          const holder = document.createElement('div');
+          holder.innerHTML = file.content;
+          const node = PMDOMParser.fromSchema(editor.schema).parse(holder);
+          const seed = toBase64(Y.encodeStateAsUpdate(prosemirrorToYDoc(node, 'default')));
+          try {
+            // Le serveur garde le premier état reçu : tout le monde part de la même base (pas de doublon)
+            const { data } = await axios.post(
+              route('files.init-yjs-state', file.id),
+              { state: seed },
+              { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content } }
+            );
+            Y.applyUpdate(ydoc, fromBase64(data.state), 'init');
+          } catch {
+            // Lecture seule ou réseau : affichage local uniquement
+            Y.applyUpdate(ydoc, fromBase64(seed), 'init');
+          }
+        }
+      } catch (e) {
+        console.error('Initialisation collaborative impossible', e);
+      } finally {
+        if (!cancelled) {
+          setIsDirty(false);
+          setCollabReady(true);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [editor, ydoc]);
+
+  /* ── Temps réel : présence + synchronisation Yjs via Pusher ── */
   useEffect(() => {
-    if (!file?.id || typeof window.Echo === 'undefined') return;
+    if (!editor || !collabReady || !file?.id || typeof window.Echo === 'undefined') return;
 
-    const channel = window.Echo.join(`presence-document.${file.id}`)
+    const channelName = `presence-document.${file.id}`;
+
+    const channel = window.Echo.join(channelName)
       .here((users) => {
         setPresenceUsers(users);
       })
@@ -532,20 +596,55 @@ const EditContent = ({
       })
       .leaving((user) => {
         setPresenceUsers(prev => prev.filter(u => u.id !== user.id));
-      })
-      .listen('.FileContentUpdated', (e) => {
-        // If another user updated the content, fetch the latest file data (or reload content)
-        if (e.user_id !== auth.user.id) {
-           addToast('Le document a été mis à jour par un autre collaborateur', 'success');
-           // In a full CRDT (Yjs) setup, this is handled by Yjs.
-           // Since this is a simple save/load flow, we just warn the user.
-        }
       });
 
+    const provider = new PusherYjsProvider({
+      doc: ydoc,
+      awareness,
+      readOnly: isReadOnly,
+      onReload: () => {
+        reloadingRef.current = true;
+        addToast('Le document a été restauré par un collaborateur. Rechargement…', 'success');
+        setTimeout(() => window.location.reload(), 1200);
+      },
+    });
+    provider.attach(channel);
+    providerRef.current = provider;
+
     return () => {
-      window.Echo.leave(`presence-document.${file.id}`);
+      provider.destroy();
+      providerRef.current = null;
+      window.Echo.leave(channelName);
     };
-  }, [file?.id, auth.user.id, addToast]);
+  }, [editor, collabReady, file?.id, ydoc, awareness, isReadOnly, addToast]);
+
+  /* ── Sauvegarde de l'état Yjs sur le serveur (debounce 2,5 s) ── */
+  useEffect(() => {
+    if (!editor || !collabReady || isReadOnly) return;
+    let timer = null;
+
+    const persist = () => {
+      timer = null;
+      if (reloadingRef.current) return;
+      axios.put(
+        route('files.update-yjs-state', file.id),
+        { state: toBase64(Y.encodeStateAsUpdate(ydoc)) },
+        { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content } }
+      ).catch(() => { /* réessayé à la prochaine modification */ });
+    };
+
+    const onUpdate = (_u, origin) => {
+      if (origin === 'init' || origin === providerRef.current) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(persist, 2500);
+    };
+
+    ydoc.on('update', onUpdate);
+    return () => {
+      ydoc.off('update', onUpdate);
+      if (timer) { clearTimeout(timer); persist(); }
+    };
+  }, [editor, collabReady, isReadOnly, ydoc, file.id]);
 
   /* ── Word count once content settles ── */
   useEffect(() => {
@@ -553,23 +652,6 @@ const EditContent = ({
     const text = editor.getText().trim();
     setWordCount(text ? text.split(/\s+/).length : 0);
   }, [editor, file?.content]);
-
-  /* ── Restore from localStorage ── */
-  useEffect(() => {
-    if (!file?.id || !editor) return;
-    const saved = localStorage.getItem(`file_autosave_${file.id}`);
-    if (!saved) return;
-    try {
-      const { content, timestamp } = JSON.parse(saved);
-      if (window.confirm(`Sauvegarde locale du ${fmtDate(timestamp)} trouvée. La charger ?`)) {
-        editor.commands.setContent(content);
-        setIsDirty(true);
-      }
-    } catch {/* ignore */}
-    finally {
-      localStorage.removeItem(`file_autosave_${file.id}`);
-    }
-  }, [file?.id, editor]);
 
   /* ── Save handler ── */
   const handleSave = useCallback(async () => {
@@ -866,7 +948,11 @@ const EditContent = ({
                 fileId={file.id}
                 recentVersions={recentVersions}
                 canRestore={canRestore}
-                onRestore={() => window.location.reload()}
+                onRestore={() => {
+                  reloadingRef.current = true;
+                  providerRef.current?.notifyReload();
+                  setTimeout(() => window.location.reload(), 500);
+                }}
               />
             )}
             {sidePanel === 'access' && (

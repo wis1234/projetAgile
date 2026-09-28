@@ -376,6 +376,8 @@ Route::middleware('auth')->group(function () {
 
       Route::put('/files/{file}/yjs-state', [App\Http\Controllers\FileController::class, 'updateYjsState'])
     ->name('files.update-yjs-state');
+      Route::post('/files/{file}/yjs-init', [App\Http\Controllers\FileController::class, 'initYjsState'])
+    ->name('files.init-yjs-state');
 
 
     

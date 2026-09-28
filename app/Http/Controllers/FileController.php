@@ -859,6 +859,22 @@ $oldVersionIds = $file->versions()
     return response()->json(['success' => true, 'message' => 'Le contenu a été sauvegardé avec succès.']);
 }
 
+public function initYjsState(Request $request, File $file)
+{
+    $this->authorize('update', $file);
+
+    $request->validate(['state' => 'required|string']);
+
+    // Le premier état reçu gagne : tous les clients partent de la même base (pas de doublon)
+    File::whereKey($file->id)->whereNull('yjs_state')->update([
+        'yjs_state' => $request->input('state'),
+    ]);
+
+    return response()->json([
+        'state' => File::whereKey($file->id)->value('yjs_state'),
+    ]);
+}
+
 public function updateYjsState(Request $request, File $file)
 {
     $this->authorize('update', $file); // même policy que updateContent

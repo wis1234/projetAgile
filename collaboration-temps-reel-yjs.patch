@@ -1,0 +1,614 @@
+diff --git a/app/Http/Controllers/FileController.php b/app/Http/Controllers/FileController.php
+index 96a3fbd..0c80451 100644
+--- a/app/Http/Controllers/FileController.php
++++ b/app/Http/Controllers/FileController.php
+@@ -859,6 +859,22 @@ public function updateContent(Request $request, File $file)
+     return response()->json(['success' => true, 'message' => 'Le contenu a été sauvegardé avec succès.']);
+ }
+ 
++public function initYjsState(Request $request, File $file)
++{
++    $this->authorize('update', $file);
++
++    $request->validate(['state' => 'required|string']);
++
++    // Le premier état reçu gagne : tous les clients partent de la même base (pas de doublon)
++    File::whereKey($file->id)->whereNull('yjs_state')->update([
++        'yjs_state' => $request->input('state'),
++    ]);
++
++    return response()->json([
++        'state' => File::whereKey($file->id)->value('yjs_state'),
++    ]);
++}
++
+ public function updateYjsState(Request $request, File $file)
+ {
+     $this->authorize('update', $file); // même policy que updateContent
+diff --git a/app/Http/Controllers/FileVersionController.php b/app/Http/Controllers/FileVersionController.php
+index 295a9a6..831fca6 100644
+--- a/app/Http/Controllers/FileVersionController.php
++++ b/app/Http/Controllers/FileVersionController.php
+@@ -93,6 +93,7 @@ public function restore(File $file, FileVersion $version)
+         $file->update([
+             'size'             => \Storage::disk('public')->size($path),
+             'last_modified_by' => auth()->id(),
++            'yjs_state'        => null,
+             'updated_at'       => now(),
+         ]);
+ 
+diff --git a/package.json b/package.json
+index a1c73a2..6d71ce1 100644
+--- a/package.json
++++ b/package.json
+@@ -59,6 +59,8 @@
+         "@tiptap/extension-code": "^3.0.9",
+         "@tiptap/extension-code-block": "^3.0.9",
+         "@tiptap/extension-code-block-lowlight": "^3.0.9",
++        "@tiptap/extension-collaboration": "3.20.0",
++        "@tiptap/extension-collaboration-caret": "3.20.0",
+         "@tiptap/extension-color": "^3.0.9",
+         "@tiptap/extension-document": "^3.0.9",
+         "@tiptap/extension-font-family": "^3.0.9",
+@@ -79,6 +81,7 @@
+         "@tiptap/pm": "^3.0.9",
+         "@tiptap/react": "^3.0.9",
+         "@tiptap/starter-kit": "^3.0.9",
++        "@tiptap/y-tiptap": "^3.0.7",
+         "@types/react-datepicker": "^6.2.0",
+         "@zoom/meetingsdk": "^4.0.7",
+         "@zoom/videosdk": "^2.2.12",
+@@ -109,6 +112,8 @@
+         "react-quill": "^0.0.2",
+         "react-toastify": "^11.0.5",
+         "xlsx": "^0.18.5",
++        "y-protocols": "^1.0.7",
++        "yjs": "^13.6.33",
+         "ziggy-js": "^2.5.3"
+     }
+ }
+diff --git a/resources/js/Pages/Files/EditContent.jsx b/resources/js/Pages/Files/EditContent.jsx
+index e66a569..47fd2f8 100644
+--- a/resources/js/Pages/Files/EditContent.jsx
++++ b/resources/js/Pages/Files/EditContent.jsx
+@@ -26,8 +26,27 @@ import { Color } from '@tiptap/extension-color';
+ import { Image } from '@tiptap/extension-image';
+ import FontFamily from '@tiptap/extension-font-family';
+ import FontSize from '@tiptap/extension-font-size';
+-import TrackChanges from '@/Components/Editor/extensions/track-changes';
+ import axios from 'axios';
++import * as Y from 'yjs';
++import { Awareness } from 'y-protocols/awareness';
++import { Collaboration, isChangeOrigin } from '@tiptap/extension-collaboration';
++import { CollaborationCaret } from '@tiptap/extension-collaboration-caret';
++import { prosemirrorToYDoc } from '@tiptap/y-tiptap';
++import { DOMParser as PMDOMParser } from '@tiptap/pm/model';
++import { PusherYjsProvider, toBase64, fromBase64 } from '@/lib/yjsPusherProvider';
++
++/* ── Style des curseurs collaboratifs ── */
++if (typeof document !== 'undefined' && !document.getElementById('collab-caret-style')) {
++  const st = document.createElement('style');
++  st.id = 'collab-caret-style';
++  st.textContent = `
++    .collaboration-carets__caret { position: relative; margin-left: -1px; margin-right: -1px; border-left: 1px solid #0d0d0d; border-right: 1px solid #0d0d0d; word-break: normal; pointer-events: none; }
++    .collaboration-carets__label { position: absolute; top: -1.4em; left: -1px; font-size: 11px; font-weight: 600; line-height: normal; padding: 0.1rem 0.35rem; border-radius: 3px 3px 3px 0; color: #fff; white-space: nowrap; user-select: none; pointer-events: none; }
++  `;
++  document.head.appendChild(st);
++}
++
++const COLLAB_COLORS = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#4d7c0f'];
+ 
+ /* ── Design tokens ───────────────────────────────────────────
+    Canvas   #F4F5F7   Papier  #FFFFFF
+@@ -470,6 +489,19 @@ const EditContent = ({
+   const isReadOnly = myPermission === 'view' || myPermission === 'none';
+   const canRestore = myPermission === 'admin';
+ 
++  /* ── Collaboration temps réel (Yjs + Pusher) ── */
++  const ydoc      = useMemo(() => new Y.Doc(), [file.id]);
++  const awareness = useMemo(() => new Awareness(ydoc), [ydoc]);
++  const providerRef  = useRef(null);
++  const reloadingRef = useRef(false);
++  const [collabReady, setCollabReady] = useState(false);
++  const collabUser = useMemo(() => ({
++    id: auth.user.id,
++    name: auth.user.name,
++    color: COLLAB_COLORS[Math.abs(Number(auth.user.id) || 0) % COLLAB_COLORS.length],
++  }), [auth.user.id, auth.user.name]);
++  useEffect(() => () => awareness.destroy(), [awareness]);
++
+   /* ── Toast helpers ── */
+   const addToast = useCallback((msg, type = 'success') => {
+     const id = Date.now();
+@@ -481,7 +513,7 @@ const EditContent = ({
+   const editor = useEditor({
+     editable: !isReadOnly,
+     extensions: [
+-      StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'code-block' } }, underline: false, link: false, heading: false }),
++      StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'code-block' } }, underline: false, link: false, heading: false, undoRedo: false }),
+       Heading.configure({ levels: [1, 2, 3] }),
+       TextStyle, FontFamily,
+       FontSize.configure({ types: ['textStyle'] }),
+@@ -489,37 +521,69 @@ const EditContent = ({
+       TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left','center','right','justify'], defaultAlignment: 'left' }),
+       Link.configure({ openOnClick: false, HTMLAttributes: { class: 'editor-link' }, validate: h => /^https?:\/\//.test(h), autolink: true, linkOnPaste: true }),
+       Highlight.configure({ multicolor: true, HTMLAttributes: { class: 'highlight' } }),
+-      TrackChanges,
+       Color,
+       Image.configure({ inline: true, allowBase64: true }),
++      Collaboration.configure({ document: ydoc }),
++      CollaborationCaret.configure({ provider: { awareness }, user: collabUser }),
+     ],
+-    content: '',
+-    onUpdate: ({ editor }) => {
+-      setIsDirty(true);
++    onUpdate: ({ editor, transaction }) => {
+       const text = editor.getText().trim();
+       setWordCount(text ? text.split(/\s+/).length : 0);
++      // Les changements venant des autres collaborateurs ou du chargement ne sont pas "non sauvegardés"
++      if (isReadOnly || isChangeOrigin(transaction)) return;
++      setIsDirty(true);
+     },
+-  });
++  }, [ydoc]);
+ 
+-  /* ── Load initial content ── */
++  /* ── Chargement initial du document Yjs ── */
+   useEffect(() => {
+     if (!editor) return;
+-    const content = file?.content;
+-    if (content) {
+-      editor.commands.setContent(content, false);
+-    } else {
+-      fetch(`/storage/${file.file_path}`)
+-        .then(r => r.ok ? r.text() : Promise.reject())
+-        .then(text => { if (!editor.isDestroyed) editor.commands.setContent(text, false); })
+-        .catch(() => {});
+-    }
+-  }, [editor, file]);
++    let cancelled = false;
++
++    (async () => {
++      try {
++        if (file.yjs_state) {
++          // Le document a déjà un état collaboratif enregistré
++          Y.applyUpdate(ydoc, fromBase64(file.yjs_state), 'init');
++        } else if ((file.content || '').trim()) {
++          // Première ouverture : on construit l'état à partir du HTML, dans un document temporaire
++          const holder = document.createElement('div');
++          holder.innerHTML = file.content;
++          const node = PMDOMParser.fromSchema(editor.schema).parse(holder);
++          const seed = toBase64(Y.encodeStateAsUpdate(prosemirrorToYDoc(node, 'default')));
++          try {
++            // Le serveur garde le premier état reçu : tout le monde part de la même base (pas de doublon)
++            const { data } = await axios.post(
++              route('files.init-yjs-state', file.id),
++              { state: seed },
++              { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content } }
++            );
++            Y.applyUpdate(ydoc, fromBase64(data.state), 'init');
++          } catch {
++            // Lecture seule ou réseau : affichage local uniquement
++            Y.applyUpdate(ydoc, fromBase64(seed), 'init');
++          }
++        }
++      } catch (e) {
++        console.error('Initialisation collaborative impossible', e);
++      } finally {
++        if (!cancelled) {
++          setIsDirty(false);
++          setCollabReady(true);
++        }
++      }
++    })();
++
++    return () => { cancelled = true; };
++  }, [editor, ydoc]);
+ 
+-  /* ── Real-time Collaboration (Pusher/Echo) ── */
++  /* ── Temps réel : présence + synchronisation Yjs via Pusher ── */
+   useEffect(() => {
+-    if (!file?.id || typeof window.Echo === 'undefined') return;
++    if (!editor || !collabReady || !file?.id || typeof window.Echo === 'undefined') return;
+ 
+-    const channel = window.Echo.join(`presence-document.${file.id}`)
++    const channelName = `presence-document.${file.id}`;
++
++    const channel = window.Echo.join(channelName)
+       .here((users) => {
+         setPresenceUsers(users);
+       })
+@@ -532,20 +596,55 @@ const EditContent = ({
+       })
+       .leaving((user) => {
+         setPresenceUsers(prev => prev.filter(u => u.id !== user.id));
+-      })
+-      .listen('.FileContentUpdated', (e) => {
+-        // If another user updated the content, fetch the latest file data (or reload content)
+-        if (e.user_id !== auth.user.id) {
+-           addToast('Le document a été mis à jour par un autre collaborateur', 'success');
+-           // In a full CRDT (Yjs) setup, this is handled by Yjs.
+-           // Since this is a simple save/load flow, we just warn the user.
+-        }
+       });
+ 
++    const provider = new PusherYjsProvider({
++      doc: ydoc,
++      awareness,
++      readOnly: isReadOnly,
++      onReload: () => {
++        reloadingRef.current = true;
++        addToast('Le document a été restauré par un collaborateur. Rechargement…', 'success');
++        setTimeout(() => window.location.reload(), 1200);
++      },
++    });
++    provider.attach(channel);
++    providerRef.current = provider;
++
+     return () => {
+-      window.Echo.leave(`presence-document.${file.id}`);
++      provider.destroy();
++      providerRef.current = null;
++      window.Echo.leave(channelName);
+     };
+-  }, [file?.id, auth.user.id, addToast]);
++  }, [editor, collabReady, file?.id, ydoc, awareness, isReadOnly, addToast]);
++
++  /* ── Sauvegarde de l'état Yjs sur le serveur (debounce 2,5 s) ── */
++  useEffect(() => {
++    if (!editor || !collabReady || isReadOnly) return;
++    let timer = null;
++
++    const persist = () => {
++      timer = null;
++      if (reloadingRef.current) return;
++      axios.put(
++        route('files.update-yjs-state', file.id),
++        { state: toBase64(Y.encodeStateAsUpdate(ydoc)) },
++        { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content } }
++      ).catch(() => { /* réessayé à la prochaine modification */ });
++    };
++
++    const onUpdate = (_u, origin) => {
++      if (origin === 'init' || origin === providerRef.current) return;
++      if (timer) clearTimeout(timer);
++      timer = setTimeout(persist, 2500);
++    };
++
++    ydoc.on('update', onUpdate);
++    return () => {
++      ydoc.off('update', onUpdate);
++      if (timer) { clearTimeout(timer); persist(); }
++    };
++  }, [editor, collabReady, isReadOnly, ydoc, file.id]);
+ 
+   /* ── Word count once content settles ── */
+   useEffect(() => {
+@@ -554,23 +653,6 @@ const EditContent = ({
+     setWordCount(text ? text.split(/\s+/).length : 0);
+   }, [editor, file?.content]);
+ 
+-  /* ── Restore from localStorage ── */
+-  useEffect(() => {
+-    if (!file?.id || !editor) return;
+-    const saved = localStorage.getItem(`file_autosave_${file.id}`);
+-    if (!saved) return;
+-    try {
+-      const { content, timestamp } = JSON.parse(saved);
+-      if (window.confirm(`Sauvegarde locale du ${fmtDate(timestamp)} trouvée. La charger ?`)) {
+-        editor.commands.setContent(content);
+-        setIsDirty(true);
+-      }
+-    } catch {/* ignore */}
+-    finally {
+-      localStorage.removeItem(`file_autosave_${file.id}`);
+-    }
+-  }, [file?.id, editor]);
+-
+   /* ── Save handler ── */
+   const handleSave = useCallback(async () => {
+     if (!editor || isSaving || isReadOnly) return;
+@@ -866,7 +948,11 @@ const EditContent = ({
+                 fileId={file.id}
+                 recentVersions={recentVersions}
+                 canRestore={canRestore}
+-                onRestore={() => window.location.reload()}
++                onRestore={() => {
++                  reloadingRef.current = true;
++                  providerRef.current?.notifyReload();
++                  setTimeout(() => window.location.reload(), 500);
++                }}
+               />
+             )}
+             {sidePanel === 'access' && (
+diff --git a/resources/js/lib/yjsPusherProvider.js b/resources/js/lib/yjsPusherProvider.js
+new file mode 100644
+index 0000000..ef945e4
+--- /dev/null
++++ b/resources/js/lib/yjsPusherProvider.js
+@@ -0,0 +1,254 @@
++/**
++ * Provider Yjs qui transporte les mises à jour via les "whispers" (client events)
++ * d'un canal de présence Laravel Echo / Pusher.
++ *
++ * Prérequis : "Enable client events" activé dans le tableau de bord Pusher.
++ * Limites Pusher respectées : 10 messages / seconde / client, 10 Ko / message.
++ */
++import * as Y from 'yjs';
++import {
++  encodeAwarenessUpdate,
++  applyAwarenessUpdate,
++  removeAwarenessStates,
++} from 'y-protocols/awareness';
++
++const CHUNK_SIZE = 6000;      // caractères base64 par message (< 10 Ko)
++const SEND_INTERVAL = 110;    // ms entre deux messages (~9 msg/s max)
++const FLUSH_DELAY = 120;      // regroupement des mises à jour locales
++const AWARENESS_DELAY = 250;  // regroupement des curseurs
++
++export const toBase64 = (u8) => {
++  let s = '';
++  const step = 0x8000;
++  for (let i = 0; i < u8.length; i += step) {
++    s += String.fromCharCode.apply(null, u8.subarray(i, i + step));
++  }
++  return btoa(s);
++};
++
++export const fromBase64 = (b64) => {
++  const s = atob(b64);
++  const u8 = new Uint8Array(s.length);
++  for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
++  return u8;
++};
++
++const rid = () => Math.random().toString(36).slice(2, 10);
++
++export class PusherYjsProvider {
++  constructor({ doc, awareness, readOnly = false, onReload = null }) {
++    this.doc = doc;
++    this.awareness = awareness;
++    this.readOnly = readOnly;
++    this.onReload = onReload;
++
++    this.channel = null;
++    this.ready = false;
++    this.hereCount = 0;
++    this.destroyed = false;
++
++    this.queue = [];
++    this.pending = [];
++    this.buffers = new Map();
++    this.pendingSync = new Map();
++    this.awChanged = new Set();
++    this.flushTimer = null;
++    this.sendTimer = null;
++    this.awTimer = null;
++    this.gcTimer = null;
++
++    this._onDocUpdate = (update, origin) => {
++      if (this.readOnly || this.destroyed) return;
++      if (origin === this || origin === 'init') return;
++      this.pending.push(update);
++      if (!this.flushTimer) {
++        this.flushTimer = setTimeout(() => this._flush(), FLUSH_DELAY);
++      }
++    };
++
++    this._onAwarenessUpdate = ({ added, updated, removed }, origin) => {
++      if (origin === this || this.destroyed) return;
++      [...added, ...updated, ...removed].forEach((id) => this.awChanged.add(id));
++      if (!this.awTimer) {
++        this.awTimer = setTimeout(() => this._flushAwareness(), AWARENESS_DELAY);
++      }
++    };
++  }
++
++  /** Branche le provider sur un canal de présence Echo (déjà obtenu via Echo.join). */
++  attach(channel) {
++    this.channel = channel;
++
++    channel
++      .here((users) => {
++        this.hereCount += 1;
++        this.ready = true;
++        if (this.hereCount > 1 && !this.readOnly) {
++          // Reconnexion : renvoyer notre état complet (Yjs est idempotent)
++          this._send('yjs-sync', toBase64(Y.encodeStateAsUpdate(this.doc)), rid());
++        }
++        if (users.length > 1) this._requestSync();
++        this._sendOwnAwareness();
++        this._pump();
++      })
++      .joining(() => this._sendOwnAwareness())
++      .leaving((user) => {
++        const ids = [];
++        this.awareness.getStates().forEach((state, clientId) => {
++          if (state?.user?.id === user.id && clientId !== this.doc.clientID) ids.push(clientId);
++        });
++        if (ids.length) removeAwarenessStates(this.awareness, ids, this);
++      });
++
++    channel.listenForWhisper('yjs-update', (m) => this._recv('yjs-update', m));
++    channel.listenForWhisper('yjs-sync', (m) => this._recv('yjs-sync', m));
++    channel.listenForWhisper('yjs-sync-req', (m) => this._recv('yjs-sync-req', m));
++    channel.listenForWhisper('yjs-aw', (m) => this._recv('yjs-aw', m));
++    channel.listenForWhisper('yjs-reload', (m) => this._recv('yjs-reload', m));
++
++    this.doc.on('update', this._onDocUpdate);
++    this.awareness.on('update', this._onAwarenessUpdate);
++
++    this.gcTimer = setInterval(() => {
++      const now = Date.now();
++      this.buffers.forEach((b, id) => { if (now - b.t > 30000) this.buffers.delete(id); });
++    }, 15000);
++  }
++
++  /** Prévient les autres collaborateurs qu'ils doivent recharger (ex. après restauration). */
++  notifyReload() {
++    this._send('yjs-reload', 'x');
++  }
++
++  destroy() {
++    this.destroyed = true;
++    this.doc.off('update', this._onDocUpdate);
++    this.awareness.off('update', this._onAwarenessUpdate);
++    [this.flushTimer, this.sendTimer, this.awTimer].forEach((t) => t && clearTimeout(t));
++    this.pendingSync.forEach((t) => clearTimeout(t));
++    if (this.gcTimer) clearInterval(this.gcTimer);
++    this.pendingSync.clear();
++    this.buffers.clear();
++    this.queue = [];
++    try {
++      ['yjs-update', 'yjs-sync', 'yjs-sync-req', 'yjs-aw', 'yjs-reload'].forEach((e) =>
++        this.channel?.stopListeningForWhisper(e)
++      );
++    } catch { /* ignore */ }
++  }
++
++  /* ───────────────────────── envoi ───────────────────────── */
++
++  _flush() {
++    this.flushTimer = null;
++    if (!this.pending.length) return;
++    const merged = this.pending.length === 1 ? this.pending[0] : Y.mergeUpdates(this.pending);
++    this.pending = [];
++    this._send('yjs-update', toBase64(merged));
++  }
++
++  _flushAwareness() {
++    this.awTimer = null;
++    const ids = [...this.awChanged];
++    this.awChanged.clear();
++    if (!ids.length) return;
++    this._send('yjs-aw', toBase64(encodeAwarenessUpdate(this.awareness, ids)));
++  }
++
++  _sendOwnAwareness() {
++    if (this.awareness.getLocalState() == null) return;
++    this._send('yjs-aw', toBase64(encodeAwarenessUpdate(this.awareness, [this.doc.clientID])));
++  }
++
++  _requestSync() {
++    this._send('yjs-sync-req', 'x', rid());
++  }
++
++  _send(event, data, r) {
++    const id = rid();
++    const n = Math.max(1, Math.ceil(data.length / CHUNK_SIZE));
++    for (let i = 0; i < n; i++) {
++      const payload = { id, i, n, d: data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE) };
++      if (r) payload.r = r;
++      this.queue.push({ event, payload });
++    }
++    this._pump();
++  }
++
++  _pump() {
++    if (this.destroyed || !this.ready || this.sendTimer || !this.queue.length) return;
++    const { event, payload } = this.queue.shift();
++    try {
++      this.channel.whisper(event, payload);
++    } catch (e) {
++      console.warn('[yjs] whisper impossible', e);
++    }
++    this.sendTimer = setTimeout(() => {
++      this.sendTimer = null;
++      this._pump();
++    }, SEND_INTERVAL);
++  }
++
++  /* ─────────────────────── réception ─────────────────────── */
++
++  _recv(event, m) {
++    if (this.destroyed || !m || typeof m.d !== 'string') return;
++
++    let data = m.d;
++    if (m.n > 1) {
++      let b = this.buffers.get(m.id);
++      if (!b) {
++        b = { parts: new Array(m.n), got: 0, t: Date.now() };
++        this.buffers.set(m.id, b);
++      }
++      if (b.parts[m.i] === undefined) {
++        b.parts[m.i] = m.d;
++        b.got += 1;
++      }
++      if (b.got < m.n) return;
++      this.buffers.delete(m.id);
++      data = b.parts.join('');
++    }
++
++    try {
++      switch (event) {
++        case 'yjs-update':
++          Y.applyUpdate(this.doc, fromBase64(data), this);
++          break;
++
++        case 'yjs-sync':
++          if (m.r && this.pendingSync.has(m.r)) {
++            clearTimeout(this.pendingSync.get(m.r));
++            this.pendingSync.delete(m.r);
++          }
++          Y.applyUpdate(this.doc, fromBase64(data), this);
++          break;
++
++        case 'yjs-sync-req': {
++          if (!m.r || this.pendingSync.has(m.r)) break;
++          const t = setTimeout(() => {
++            this.pendingSync.delete(m.r);
++            if (this.destroyed) return;
++            this._send('yjs-sync', toBase64(Y.encodeStateAsUpdate(this.doc)), m.r);
++            this._sendOwnAwareness();
++          }, 50 + Math.random() * 450);
++          this.pendingSync.set(m.r, t);
++          break;
++        }
++
++        case 'yjs-aw':
++          applyAwarenessUpdate(this.awareness, fromBase64(data), this);
++          break;
++
++        case 'yjs-reload':
++          this.onReload?.();
++          break;
++
++        default:
++          break;
++      }
++    } catch (e) {
++      console.warn('[yjs] message ignoré', event, e);
++    }
++  }
++}
+diff --git a/routes/channels.php b/routes/channels.php
+index 216d48d..26691d7 100644
+--- a/routes/channels.php
++++ b/routes/channels.php
+@@ -53,11 +53,8 @@
+     if (!$file) return false;
+ 
+     $hasAccess = $file->canUser($user, 'view');
+-    if (!$hasAccess && $file->task) {
+-        $assignedUsers = $file->task->assignedUsers;
+-        if ($assignedUsers && $assignedUsers->contains('id', $user->id)) {
+-            $hasAccess = true;
+-        }
++    if (!$hasAccess && $file->task && $file->task->isAssignedTo($user)) {
++        $hasAccess = true;
+     }
+     
+     if (!$hasAccess) return false;
+diff --git a/routes/web.php b/routes/web.php
+index adffc24..941218c 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -376,6 +376,8 @@
+ 
+       Route::put('/files/{file}/yjs-state', [App\Http\Controllers\FileController::class, 'updateYjsState'])
+     ->name('files.update-yjs-state');
++      Route::post('/files/{file}/yjs-init', [App\Http\Controllers\FileController::class, 'initYjsState'])
++    ->name('files.init-yjs-state');
+ 
+ 
+     

@@ -53,11 +53,8 @@ Broadcast::channel('presence-document.{fileId}', function ($user, $fileId) {
     if (!$file) return false;
 
     $hasAccess = $file->canUser($user, 'view');
-    if (!$hasAccess && $file->task) {
-        $assignedUsers = $file->task->assignedUsers;
-        if ($assignedUsers && $assignedUsers->contains('id', $user->id)) {
-            $hasAccess = true;
-        }
+    if (!$hasAccess && $file->task && $file->task->isAssignedTo($user)) {
+        $hasAccess = true;
     }
     
     if (!$hasAccess) return false;

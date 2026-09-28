@@ -93,6 +93,7 @@ class FileVersionController extends Controller
         $file->update([
             'size'             => \Storage::disk('public')->size($path),
             'last_modified_by' => auth()->id(),
+            'yjs_state'        => null,
             'updated_at'       => now(),
         ]);
 
