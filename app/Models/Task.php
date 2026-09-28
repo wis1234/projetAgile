@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 use App\Models\TaskComment;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Collection;
 
 
 class Task extends Model
@@ -151,6 +152,18 @@ class Task extends Model
     {
         return $this->belongsTo(User::class, 'assigned_to')->withDefault();
     }
+
+    public function isAssignedTo(User $user): bool
+{
+    $assigned = $this->assignedUsers;
+
+    if ($assigned instanceof Collection) {
+        return $assigned->contains('id', $user->id);
+    }
+
+    // Un seul modèle (belongsTo / hasOne) ou null
+    return $assigned !== null && $assigned->id === $user->id;
+}
 
 /**
  * Dernier message posté dans la tâche (commentaire racine OU réponse),

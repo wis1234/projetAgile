@@ -280,7 +280,9 @@ public function store(Request $request)
             $project = Project::with('users')->find($validated['project_id']);
             $task = null;
             
-            if ($validated['task_id'] ?? null) {
+            $usersToNotify = collect();
+
+if ($validated['task_id'] ?? null) {
                 $task = \App\Models\Task::with(['assignedUsers', 'project.users'])->find($validated['task_id']);
                 
                 // Si le fichier est lié à une tâche, utiliser la notification personnalisée
@@ -448,13 +450,10 @@ public function show(File $file)
     $isUnlocked = $user ? $file->isUnlockedForUser($user) : false;
     
     // Un utilisateur assigné à la tâche a le droit d'éditer
-    $canEditAsAssignee = false;
-    if ($user && $file->task) {
-        $assignedUsers = clone $file->task->assignedUsers; // Relation belongsToMany à charger (déjà dispo ou on assume dispo/appel dynamique)
-        if ($assignedUsers && $assignedUsers->contains('id', $user->id)) {
-            $canEditAsAssignee = true;
-        }
-    }
+$canEditAsAssignee = false;
+if ($user && $file->task) {
+    $canEditAsAssignee = $file->task->isAssignedTo($user);
+}
 
     return Inertia::render('Files/Show', [
         'file' => $file,
@@ -738,14 +737,12 @@ public function editContent(File $file)
     $currentUser = auth()->user();
     $myPermission = $file->accessFor($currentUser);
 
-    if ($myPermission !== 'admin' && $myPermission !== 'edit') {
-        if ($file->task) {
-            $assignedUsers = clone $file->task->assignedUsers;
-            if ($assignedUsers && $assignedUsers->contains('id', $currentUser->id)) {
-                $myPermission = 'edit';
-            }
-        }
+if ($myPermission !== 'admin' && $myPermission !== 'edit') {
+    if ($file->task && $file->task->isAssignedTo($currentUser)) {
+        $myPermission = 'edit';
     }
+}
+    
 
     // Collaborateurs actifs (accès non-expiré, non-none)
     $collaborators = $file->accesses
