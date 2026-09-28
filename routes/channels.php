@@ -52,7 +52,15 @@ Broadcast::channel('presence-document.{fileId}', function ($user, $fileId) {
     $file = File::find($fileId);
     if (!$file) return false;
 
-    if (!$file->canUser($user, 'view')) return false; // 'none' exclu automatiquement
+    $hasAccess = $file->canUser($user, 'view');
+    if (!$hasAccess && $file->task) {
+        $assignedUsers = $file->task->assignedUsers;
+        if ($assignedUsers && $assignedUsers->contains('id', $user->id)) {
+            $hasAccess = true;
+        }
+    }
+    
+    if (!$hasAccess) return false;
 
     return [
         'id'                => $user->id,

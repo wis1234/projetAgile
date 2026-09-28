@@ -515,6 +515,38 @@ const EditContent = ({
     }
   }, [editor, file]);
 
+  /* ── Real-time Collaboration (Pusher/Echo) ── */
+  useEffect(() => {
+    if (!file?.id || typeof window.Echo === 'undefined') return;
+
+    const channel = window.Echo.join(`presence-document.${file.id}`)
+      .here((users) => {
+        setPresenceUsers(users);
+      })
+      .joining((user) => {
+        setPresenceUsers(prev => {
+          if (prev.find(u => u.id === user.id)) return prev;
+          addToast(`${user.name} a rejoint le document`, 'success');
+          return [...prev, user];
+        });
+      })
+      .leaving((user) => {
+        setPresenceUsers(prev => prev.filter(u => u.id !== user.id));
+      })
+      .listen('.FileContentUpdated', (e) => {
+        // If another user updated the content, fetch the latest file data (or reload content)
+        if (e.user_id !== auth.user.id) {
+           addToast('Le document a été mis à jour par un autre collaborateur', 'success');
+           // In a full CRDT (Yjs) setup, this is handled by Yjs.
+           // Since this is a simple save/load flow, we just warn the user.
+        }
+      });
+
+    return () => {
+      window.Echo.leave(`presence-document.${file.id}`);
+    };
+  }, [file?.id, auth.user.id, addToast]);
+
   /* ── Word count once content settles ── */
   useEffect(() => {
     if (!editor) return;
@@ -634,23 +666,23 @@ const EditContent = ({
     <AdminLayout>
       <Head title={`Édition — ${docTitle}`} />
 
-      <div className="flex flex-col h-screen bg-[#F4F5F7] dark:bg-slate-900 overflow-hidden">
+      <div className="flex flex-col h-[calc(100vh-64px)] md:h-screen bg-[#F4F5F7] dark:bg-slate-900 overflow-hidden relative">
 
         {/* ══ TITLE BAR ══ */}
         <div className="flex-shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200/70 dark:border-slate-700 z-40">
 
           {/* Breadcrumb */}
           {(project || task) && (
-            <div className="flex items-center gap-1.5 px-5 pt-2 text-[11px] text-slate-400">
-              {project && <span className="hover:text-[#3454D1] transition-colors cursor-default">{project.name}</span>}
-              {project && task && <FaAngleRight className="text-[8px] text-slate-300" />}
-              {task && <span className="hover:text-[#3454D1] transition-colors cursor-default">{task.title ?? task.name}</span>}
-              <FaAngleRight className="text-[8px] text-slate-300" />
+            <div className="flex items-center gap-1.5 px-3 sm:px-5 pt-2 text-[11px] text-slate-400 overflow-x-auto whitespace-nowrap scrollbar-hide">
+              {project && <span className="hover:text-[#3454D1] transition-colors cursor-default truncate">{project.name}</span>}
+              {project && task && <FaAngleRight className="text-[8px] text-slate-300 flex-shrink-0" />}
+              {task && <span className="hover:text-[#3454D1] transition-colors cursor-default truncate max-w-[150px] sm:max-w-xs">{task.title ?? task.name}</span>}
+              <FaAngleRight className="text-[8px] text-slate-300 flex-shrink-0" />
               <span className="text-slate-500 font-medium">Fichier de suivi</span>
             </div>
           )}
 
-          <div className="flex items-center gap-3 px-5 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-5 py-2.5">
             <div className="flex items-center gap-2.5 flex-1 min-w-0">
               <div className="w-8 h-8 bg-[#EEF1FC] dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FaFileAlt className="text-[#3454D1] text-[13px]" />
@@ -661,15 +693,16 @@ const EditContent = ({
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                     isSaving ? 'bg-[#3454D1] animate-pulse' : isDirty ? 'bg-amber-400' : 'bg-emerald-400'
                   }`} />
-                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 flex items-center gap-1 truncate">
                     {isSaving
-                      ? 'Enregistrement en cours…'
+                      ? 'Enregistrement…'
                       : isDirty
                         ? 'Modifications non enregistrées'
                         : (
                           <>
-                            <FaGoogleDrive className="text-[10px] text-slate-300" />
-                            {lastSaved ? `Toutes les modifications sont enregistrées à ${fmtDateShort(lastSaved)}` : 'Toutes les modifications sont enregistrées'}
+                            <FaGoogleDrive className="text-[10px] text-slate-300 hidden sm:block" />
+                            {lastSaved ? <span className="hidden sm:inline">Enregistré à {fmtDateShort(lastSaved)}</span> : <span className="hidden sm:inline">Modifications enregistrées</span>}
+                            <span className="sm:hidden">Enregistré</span>
                           </>
                         )}
                   </span>
@@ -677,96 +710,98 @@ const EditContent = ({
               </div>
             </div>
 
-            {presenceUsers.length > 0 && (
-              <div className="flex -space-x-1.5">
-                {presenceUsers.slice(0, 4).map(u => <Avatar key={u.id} user={u} size={7} />)}
-                {presenceUsers.length > 4 && (
-                  <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-600 ring-2 ring-white dark:ring-slate-800 flex items-center justify-center text-[10px] font-semibold text-slate-500 dark:text-slate-300">
-                    +{presenceUsers.length - 4}
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+              {presenceUsers.length > 0 && (
+                <div className="flex -space-x-1.5">
+                  {presenceUsers.slice(0, 4).map(u => <Avatar key={u.id} user={u} size={7} />)}
+                  {presenceUsers.length > 4 && (
+                    <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-600 ring-2 ring-white dark:ring-slate-800 flex items-center justify-center text-[10px] font-semibold text-slate-500 dark:text-slate-300">
+                      +{presenceUsers.length - 4}
+                    </div>
+                  )}
+                </div>
+              )}
 
-            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 dark:bg-slate-700 ${permInfo?.color}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${permDot(myPermission)}`} />
-              {permInfo?.label}
-            </span>
+              <span className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 dark:bg-slate-700 ${permInfo?.color}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${permDot(myPermission)}`} />
+                {permInfo?.label}
+              </span>
 
-            {/* Panel switcher — segmented control */}
-            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-0.5">
-              <button
-                onClick={() => setSidePanel(p => p === 'history' ? null : 'history')}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-all
-                  ${sidePanel === 'history'
-                    ? 'bg-white dark:bg-slate-800 text-[#1E2129] dark:text-slate-100 shadow-sm'
-                    : 'text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200'
-                  }`}
-              >
-                <FaHistory className="text-[10px]" />
-                <span className="hidden md:inline">Historique</span>
-              </button>
-              <button
-                onClick={() => setSidePanel(p => p === 'access' ? null : 'access')}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-all
-                  ${sidePanel === 'access'
-                    ? 'bg-white dark:bg-slate-800 text-[#1E2129] dark:text-slate-100 shadow-sm'
-                    : 'text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200'
-                  }`}
-              >
-                <FaUsers className="text-[10px]" />
-                <span className="hidden md:inline">Partager</span>
-                {collaborators.length > 0 && <span className="text-[10px] text-slate-400">{collaborators.length}</span>}
-              </button>
-              <button
-                onClick={() => setTrackingOpen(true)}
-                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200 transition-all"
-              >
-                <FaUserEdit className="text-[10px]" />
-                <span className="hidden md:inline">Suivi</span>
-                {pendingCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#3454D1] text-white text-[9px] font-semibold flex items-center justify-center">
-                    {pendingCount}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {!isReadOnly && (
-              <div className="flex items-center gap-1">
-                {isDirty && !showSummary && (
-                  <button
-                    onClick={() => setShowSummary(true)}
-                    className="p-2 rounded-lg text-slate-400 hover:text-[#1E2129] dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                    title="Ajouter une note à cette version"
-                  >
-                    <FaTag className="text-[11px]" />
-                  </button>
-                )}
+              {/* Panel switcher — segmented control */}
+              <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-0.5">
                 <button
-                  onClick={handleSave}
-                  disabled={isSaving || !isDirty}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[12.5px] font-medium transition-colors
-                    ${isSaving || !isDirty
-                      ? 'bg-slate-50 dark:bg-slate-700 text-slate-300 dark:text-slate-500 cursor-not-allowed'
-                      : 'bg-[#3454D1] hover:bg-[#2c47b8] text-white'
+                  onClick={() => setSidePanel(p => p === 'history' ? null : 'history')}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all
+                    ${sidePanel === 'history'
+                      ? 'bg-white dark:bg-slate-800 text-[#1E2129] dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200'
                     }`}
                 >
-                  {isSaving ? <FaSpinner className="animate-spin text-[10px]" /> : <FaSave className="text-[10px]" />}
-                  {isSaving ? 'Sauvegarde…' : 'Enregistrer'}
+                  <FaHistory className="text-[10px]" />
+                  <span className="hidden lg:inline">Historique</span>
+                </button>
+                <button
+                  onClick={() => setSidePanel(p => p === 'access' ? null : 'access')}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all
+                    ${sidePanel === 'access'
+                      ? 'bg-white dark:bg-slate-800 text-[#1E2129] dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200'
+                    }`}
+                >
+                  <FaUsers className="text-[10px]" />
+                  <span className="hidden lg:inline">Partager</span>
+                  {collaborators.length > 0 && <span className="text-[10px] text-slate-400 hidden lg:inline">{collaborators.length}</span>}
+                </button>
+                <button
+                  onClick={() => setTrackingOpen(true)}
+                  className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200 transition-all"
+                >
+                  <FaUserEdit className="text-[10px]" />
+                  <span className="hidden lg:inline">Suivi</span>
+                  {pendingCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#3454D1] text-white text-[9px] font-semibold flex items-center justify-center">
+                      {pendingCount}
+                    </span>
+                  )}
                 </button>
               </div>
-            )}
 
-            <button
-              onClick={() => {
-                if (isDirty && !window.confirm('Des modifications non sauvegardées seront perdues. Quitter ?')) return;
-                window.history.back();
-              }}
-              className="p-2 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              <FaTimes className="text-sm" />
-            </button>
+              {!isReadOnly && (
+                <div className="flex items-center gap-1">
+                  {isDirty && !showSummary && (
+                    <button
+                      onClick={() => setShowSummary(true)}
+                      className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-[#1E2129] dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                      title="Ajouter une note à cette version"
+                    >
+                      <FaTag className="text-[11px]" />
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving || !isDirty}
+                    className={`flex items-center gap-1.5 px-2 sm:px-4 py-1.5 rounded-lg text-[12px] sm:text-[12.5px] font-medium transition-colors
+                      ${isSaving || !isDirty
+                        ? 'bg-slate-50 dark:bg-slate-700 text-slate-300 dark:text-slate-500 cursor-not-allowed'
+                        : 'bg-[#3454D1] hover:bg-[#2c47b8] text-white'
+                      }`}
+                  >
+                    {isSaving ? <FaSpinner className="animate-spin text-[10px]" /> : <FaSave className="text-[10px]" />}
+                    <span className="hidden sm:inline">{isSaving ? 'Sauvegarde…' : 'Enregistrer'}</span>
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  if (isDirty && !window.confirm('Des modifications non sauvegardées seront perdues. Quitter ?')) return;
+                  window.history.back();
+                }}
+                className="p-1.5 sm:p-2 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <FaTimes className="text-sm" />
+              </button>
+            </div>
           </div>
 
           {showSummary && (
@@ -798,20 +833,20 @@ const EditContent = ({
         </div>
 
         {/* ══ BODY ══ */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative">
           <div className="flex-1 overflow-y-auto">
-            <div className="max-w-[840px] mx-auto px-4 sm:px-0 py-8">
+            <div className="max-w-[840px] mx-auto px-4 sm:px-0 py-4 sm:py-8">
 
               {/* Floating toolbar — same width as the page, not the screen */}
               {!isReadOnly && editor && (
-                <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-2 mb-6 bg-white/95 dark:bg-slate-800/95 backdrop-blur border border-slate-200/80 dark:border-slate-700 rounded-xl shadow-sm shadow-black/[0.03] overflow-x-auto">
+                <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-2 mb-4 sm:mb-6 bg-white/95 dark:bg-slate-800/95 backdrop-blur border border-slate-200/80 dark:border-slate-700 rounded-xl shadow-sm shadow-black/[0.03] overflow-x-auto scrollbar-hide">
                   <MenuBar editor={editor} />
                 </div>
               )}
 
               {/* Paper */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_rgba(30,33,41,0.06)] border border-slate-200/60 dark:border-slate-700 min-h-[calc(100vh-260px)]">
-                <div className="px-10 py-12 sm:px-16">
+              <div className="bg-white dark:bg-slate-800 sm:rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_rgba(30,33,41,0.06)] border border-slate-200/60 dark:border-slate-700 min-h-[calc(100vh-260px)]">
+                <div className="px-4 py-6 sm:px-10 sm:py-12 lg:px-16">
                   <EditorContent
                     editor={editor}
                     className="prose prose-slate dark:prose-invert font-serif max-w-none min-h-96 focus:outline-none prose-p:leading-relaxed"
@@ -822,7 +857,10 @@ const EditContent = ({
           </div>
 
           {/* Side panel */}
-          <div className={`flex-shrink-0 ${sidePanel ? 'w-80' : 'w-0'} overflow-hidden transition-[width] duration-200 border-l border-slate-200/70 dark:border-slate-700 bg-white dark:bg-slate-800`}>
+          {sidePanel && (
+            <div className="lg:hidden fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={() => setSidePanel(null)} />
+          )}
+          <div className={`fixed inset-y-0 right-0 z-50 lg:static flex-shrink-0 ${sidePanel ? 'w-full sm:w-80' : 'w-0'} overflow-hidden transition-[width] duration-200 border-l border-slate-200/70 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl lg:shadow-none`}>
             {sidePanel === 'history' && (
               <VersionPanel
                 fileId={file.id}
@@ -843,17 +881,18 @@ const EditContent = ({
 
         {/* ══ FOOTER ══ */}
         <div className="flex-shrink-0 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700/60 px-5 py-1.5">
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
             <span className="flex items-center gap-3">
               <span className="flex items-center gap-1.5">
                 <Avatar user={auth.user} size={4} ring={false} />
-                <span>Connecté en tant que <span className="font-medium text-slate-600 dark:text-slate-300">{auth.user.name}</span></span>
+                <span className="hidden sm:inline">Connecté en tant que <span className="font-medium text-slate-600 dark:text-slate-300">{auth.user.name}</span></span>
+                <span className="sm:hidden font-medium text-slate-600 dark:text-slate-300">{auth.user.name}</span>
               </span>
               <span className="text-slate-300">·</span>
               <span>{wordCount} mot{wordCount !== 1 ? 's' : ''}</span>
             </span>
             {lastModifiedBy && (
-              <span>
+              <span className="hidden sm:inline">
                 Dernière modification par <span className="font-medium text-slate-600 dark:text-slate-300">{lastModifiedBy.name}</span> — {fmtDate(lastModifiedBy.timestamp)}
               </span>
             )}

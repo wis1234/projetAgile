@@ -446,6 +446,15 @@ public function show(File $file)
 
     $canBypassLock = $user ? $file->isUnlockedFor($user) : false; // ← remplace l'ancien calcul
     $isUnlocked = $user ? $file->isUnlockedForUser($user) : false;
+    
+    // Un utilisateur assigné à la tâche a le droit d'éditer
+    $canEditAsAssignee = false;
+    if ($user && $file->task) {
+        $assignedUsers = clone $file->task->assignedUsers; // Relation belongsToMany à charger (déjà dispo ou on assume dispo/appel dynamique)
+        if ($assignedUsers && $assignedUsers->contains('id', $user->id)) {
+            $canEditAsAssignee = true;
+        }
+    }
 
     return Inertia::render('Files/Show', [
         'file' => $file,
@@ -454,6 +463,7 @@ public function show(File $file)
         'canManageFile' => $canManageFile,
         'canBypassLock' => $canBypassLock, // ← nouveau prop, remplace isLockOwner
         'isUnlocked' => $isUnlocked,
+        'canEditAsAssignee' => $canEditAsAssignee,
     ]);
 }
 
@@ -728,6 +738,15 @@ public function editContent(File $file)
     $currentUser = auth()->user();
     $myPermission = $file->accessFor($currentUser);
 
+    if ($myPermission !== 'admin' && $myPermission !== 'edit') {
+        if ($file->task) {
+            $assignedUsers = clone $file->task->assignedUsers;
+            if ($assignedUsers && $assignedUsers->contains('id', $currentUser->id)) {
+                $myPermission = 'edit';
+            }
+        }
+    }
+
     // Collaborateurs actifs (accès non-expiré, non-none)
     $collaborators = $file->accesses
         ->filter(fn($a) => $a->effectivePermission() !== 'none')
@@ -837,6 +856,8 @@ $oldVersionIds = $file->versions()
         ->causedBy(auth()->user())
         ->performedOn($file)
         ->log('Contenu du fichier mis à jour');
+        
+    broadcast(new \App\Events\FileContentUpdated($file->id, auth()->id()))->toOthers();
 
     return response()->json(['success' => true, 'message' => 'Le contenu a été sauvegardé avec succès.']);
 }

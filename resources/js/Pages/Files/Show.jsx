@@ -726,7 +726,11 @@ const handlePasswordSaved = (isNowProtected) => {
                   <h2 className="text-lg font-semibold text-gray-900">Commentaires</h2>
                 </div>
                 <div className="p-6">
-                  <CommentsSection fileId={currentFile.id} currentUser={currentUser} />
+                  <CommentsSection 
+                    fileId={currentFile.id} 
+                    currentUserId={currentUser?.id} 
+                    projectMembers={currentFile.project?.users || []}
+                  />
                 </div>
               </motion.div>
             </div>

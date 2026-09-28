@@ -66,9 +66,8 @@ foreach ($projectUsers as $user) {
             'file-comment'
         ));
     }
-}
 
-        
+        broadcast(new \App\Events\FileCommentPosted($comment, $fileId))->toOthers();
 
         return response()->json($comment, 201);
     }
@@ -81,6 +80,9 @@ foreach ($projectUsers as $user) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
         $comment->delete();
+        
+        broadcast(new \App\Events\FileCommentDeleted($commentId, $fileId))->toOthers();
+        
         return response()->json(['success' => true]);
     }
 
@@ -97,6 +99,9 @@ foreach ($projectUsers as $user) {
         $comment->content = $request->content;
         $comment->save();
         $comment->load('user');
+        
+        broadcast(new \App\Events\FileCommentUpdated($comment, $fileId))->toOthers();
+        
         return response()->json($comment);
     }
 } 
