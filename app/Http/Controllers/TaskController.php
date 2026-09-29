@@ -392,6 +392,11 @@ public function store(Request $request)
 
 <hr>
 <p><em>Ce document est partagé avec tous les membres du projet <strong>{$project->name}</strong>. Toutes les modifications sont enregistrées automatiquement.</em></p>
+<p>
+  <em>
+    Vous pouvez supprimer ce contenu par défaut et commencer à zéro.
+  </em>
+</p>
 HTML;
 
         Storage::disk('public')->put($filePath, $htmlContent);
