@@ -1152,7 +1152,6 @@ const EditContent = ({
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 ml-auto">
-              {project && <DocCallButton project={project} auth={auth} />}
               {presenceUsers.length > 0 && (
                 <div className="flex -space-x-1.5">
                   {presenceUsers.slice(0, 4).map(u => <Avatar key={u.id} user={u} size={7} />)}
@@ -1228,24 +1227,11 @@ const EditContent = ({
                     <button
                       onClick={() => setShowSummary(true)}
                       className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-[#1E2129] hover:bg-slate-50 transition-colors"
-                      title="Ajouter une note à cette version"
+                      title="Enregistrer une version avec une note (l'enregistrement automatique est déjà actif)"
                     >
                       <FaTag className="text-[11px]" />
                     </button>
                   )}
-                  <button
-                    onClick={handleSave}
-                    disabled={isSaving || !needsVersion}
-                    title="Enregistrer et créer une version dans l'historique (l'enregistrement automatique est déjà actif)"
-                    className={`flex items-center gap-1.5 px-2 sm:px-4 py-1.5 rounded-lg text-[12px] sm:text-[12.5px] font-medium transition-colors
-                      ${isSaving || !needsVersion
-                        ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
-                        : 'bg-[#3454D1] hover:bg-[#2c47b8] text-white'
-                      }`}
-                  >
-                    {isSaving ? <FaSpinner className="animate-spin text-[10px]" /> : <FaSave className="text-[10px]" />}
-                    <span className="hidden sm:inline">{isSaving ? 'Sauvegarde…' : 'Enregistrer'}</span>
-                  </button>
                 </div>
               )}
 
@@ -1297,6 +1283,7 @@ const EditContent = ({
                 fullWidth={fullWidth}
                 commentsOpen={sidePanel === 'comments'}
                 suggesting={suggesting}
+                rightSlot={project ? <DocCallButton project={project} auth={auth} compact /> : null}
               />
             </div>
           )}

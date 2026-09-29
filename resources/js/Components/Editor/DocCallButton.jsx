@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FaVideo } from 'react-icons/fa';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import CallMemberSelectModal from '@/Components/CallMemberSelectModal';
@@ -37,7 +38,7 @@ const postJson = async (url, body) => {
  *  - pas d'appel en cours  → on choisit d'abord QUI appeler, puis l'appel démarre ;
  *  - appel en cours        → on le rejoint directement.
  */
-export default function DocCallButton({ project, auth }) {
+export default function DocCallButton({ project, auth, compact = false, label = 'ProJA Meet' }) {
   const [callActive, setCallActive] = useState(false);
   const [showCall, setShowCall] = useState(false);
   const [showSelect, setShowSelect] = useState(false);
@@ -132,14 +133,16 @@ export default function DocCallButton({ project, auth }) {
         type="button"
         onClick={handleClick}
         title={callActive ? 'Un appel est en cours : rejoindre' : 'Lancer un appel ProJA Meet avec les membres du projet'}
-        className={`flex items-center gap-2 h-9 pl-3 pr-3 md:pr-4 rounded-full text-[13px] font-medium border transition-colors flex-shrink-0 ${
+        className={`flex items-center rounded-full font-medium border transition-colors flex-shrink-0 whitespace-nowrap ${
+          compact ? 'gap-1.5 h-7 px-2.5 sm:px-3 text-[12.5px]' : 'gap-2 h-9 px-3 md:px-4 text-[13px]'
+        } ${
           callActive
             ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
             : 'bg-white text-[#1a73e8] border-slate-300 hover:bg-[#e8f0fe]'
         }`}
       >
-        <FaVideo className="text-[13px]" />
-        {/*!<span className="hidden md:inline">{callActive ? 'Rejoindre l’appel' : 'Appel ProJA'}</span> */}
+        <FaVideo className={compact ? 'text-[12px]' : 'text-[13px]'} />
+        <span className="hidden sm:inline">{label}</span>
         {callActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
       </button>
 
@@ -152,7 +155,7 @@ export default function DocCallButton({ project, auth }) {
         loading={starting}
       />
 
-      {showCall && (
+      {showCall && createPortal(
         <LiveKitCallModal
           tokenEndpoint={`/projects/${projectId}/livekit-token`}
           inviteLink={inviteLink}
@@ -179,7 +182,8 @@ export default function DocCallButton({ project, auth }) {
               }).catch(() => {});
             }
           }}
-        />
+        />,
+        document.body
       )}
     </>
   );

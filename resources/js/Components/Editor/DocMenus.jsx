@@ -44,7 +44,7 @@ const TopMenu = ({ label, items, open, onToggle, onHover, onClose }) => (
   </div>
 );
 
-const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, commentsOpen = false, suggesting = false }) => {
+const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, commentsOpen = false, suggesting = false, rightSlot = null }) => {
   const [openKey, setOpenKey] = useState(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const fileInput = useRef(null);
@@ -85,7 +85,7 @@ const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, 
 
   const menus = editor ? [
     ['Fichier', [
-      { label: 'Enregistrer', shortcut: 'Ctrl+S', onClick: actions.save, disabled: ro },
+      { label: 'Enregistrer une version', shortcut: 'Ctrl+S', onClick: actions.save, disabled: ro },
       { label: 'Renommer', onClick: actions.rename, disabled: ro },
       { type: 'sep' },
       { type: 'heading', label: 'Télécharger' },
@@ -191,9 +191,9 @@ const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, 
         ))}
         <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
 
-        {/* Mode : Édition / Suggestion (comme Google Docs) */}
+        {/* Côté droit de la barre de menus : mode Édition / Suggestion + bouton ProJA Meet */}
+        <div className="ml-auto flex items-center gap-2 flex-shrink-0 pl-3">
         {!isReadOnly && actions.toggleSuggesting && (
-          <div className="ml-auto flex items-center flex-shrink-0 pl-3">
             <div className="flex items-center rounded-full bg-[#f1f3f4] p-0.5 text-[12px] font-medium">
               <button
                 type="button"
@@ -212,8 +212,9 @@ const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, 
                 Suggestion
               </button>
             </div>
-          </div>
         )}
+        {rightSlot}
+        </div>
       </div>
 
       {showShortcuts && (

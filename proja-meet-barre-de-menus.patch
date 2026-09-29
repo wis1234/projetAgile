@@ -1,0 +1,149 @@
+diff --git a/resources/js/Components/Editor/DocCallButton.jsx b/resources/js/Components/Editor/DocCallButton.jsx
+index 069237f..b86900a 100644
+--- a/resources/js/Components/Editor/DocCallButton.jsx
++++ b/resources/js/Components/Editor/DocCallButton.jsx
+@@ -1,4 +1,5 @@
+ import React, { useCallback, useEffect, useMemo, useState } from 'react';
++import { createPortal } from 'react-dom';
+ import { FaVideo } from 'react-icons/fa';
+ import LiveKitCallModal from '@/Components/LiveKitCallModal';
+ import CallMemberSelectModal from '@/Components/CallMemberSelectModal';
+@@ -37,7 +38,7 @@ const postJson = async (url, body) => {
+  *  - pas d'appel en cours  → on choisit d'abord QUI appeler, puis l'appel démarre ;
+  *  - appel en cours        → on le rejoint directement.
+  */
+-export default function DocCallButton({ project, auth }) {
++export default function DocCallButton({ project, auth, compact = false, label = 'ProJA Meet' }) {
+   const [callActive, setCallActive] = useState(false);
+   const [showCall, setShowCall] = useState(false);
+   const [showSelect, setShowSelect] = useState(false);
+@@ -132,14 +133,16 @@ export default function DocCallButton({ project, auth }) {
+         type="button"
+         onClick={handleClick}
+         title={callActive ? 'Un appel est en cours : rejoindre' : 'Lancer un appel ProJA Meet avec les membres du projet'}
+-        className={`flex items-center gap-2 h-9 pl-3 pr-3 md:pr-4 rounded-full text-[13px] font-medium border transition-colors flex-shrink-0 ${
++        className={`flex items-center rounded-full font-medium border transition-colors flex-shrink-0 whitespace-nowrap ${
++          compact ? 'gap-1.5 h-7 px-2.5 sm:px-3 text-[12.5px]' : 'gap-2 h-9 px-3 md:px-4 text-[13px]'
++        } ${
+           callActive
+             ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+             : 'bg-white text-[#1a73e8] border-slate-300 hover:bg-[#e8f0fe]'
+         }`}
+       >
+-        <FaVideo className="text-[13px]" />
+-        {/*!<span className="hidden md:inline">{callActive ? 'Rejoindre l’appel' : 'Appel ProJA'}</span> */}
++        <FaVideo className={compact ? 'text-[12px]' : 'text-[13px]'} />
++        <span className="hidden sm:inline">{label}</span>
+         {callActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+       </button>
+ 
+@@ -152,7 +155,7 @@ export default function DocCallButton({ project, auth }) {
+         loading={starting}
+       />
+ 
+-      {showCall && (
++      {showCall && createPortal(
+         <LiveKitCallModal
+           tokenEndpoint={`/projects/${projectId}/livekit-token`}
+           inviteLink={inviteLink}
+@@ -179,7 +182,8 @@ export default function DocCallButton({ project, auth }) {
+               }).catch(() => {});
+             }
+           }}
+-        />
++        />,
++        document.body
+       )}
+     </>
+   );
+diff --git a/resources/js/Components/Editor/DocMenus.jsx b/resources/js/Components/Editor/DocMenus.jsx
+index 6027a8b..7c1c308 100644
+--- a/resources/js/Components/Editor/DocMenus.jsx
++++ b/resources/js/Components/Editor/DocMenus.jsx
+@@ -44,7 +44,7 @@ const TopMenu = ({ label, items, open, onToggle, onHover, onClose }) => (
+   </div>
+ );
+ 
+-const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, commentsOpen = false, suggesting = false }) => {
++const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, commentsOpen = false, suggesting = false, rightSlot = null }) => {
+   const [openKey, setOpenKey] = useState(null);
+   const [showShortcuts, setShowShortcuts] = useState(false);
+   const fileInput = useRef(null);
+@@ -85,7 +85,7 @@ const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true,
+ 
+   const menus = editor ? [
+     ['Fichier', [
+-      { label: 'Enregistrer', shortcut: 'Ctrl+S', onClick: actions.save, disabled: ro },
++      { label: 'Enregistrer une version', shortcut: 'Ctrl+S', onClick: actions.save, disabled: ro },
+       { label: 'Renommer', onClick: actions.rename, disabled: ro },
+       { type: 'sep' },
+       { type: 'heading', label: 'Télécharger' },
+@@ -191,9 +191,9 @@ const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true,
+         ))}
+         <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
+ 
+-        {/* Mode : Édition / Suggestion (comme Google Docs) */}
++        {/* Côté droit de la barre de menus : mode Édition / Suggestion + bouton ProJA Meet */}
++        <div className="ml-auto flex items-center gap-2 flex-shrink-0 pl-3">
+         {!isReadOnly && actions.toggleSuggesting && (
+-          <div className="ml-auto flex items-center flex-shrink-0 pl-3">
+             <div className="flex items-center rounded-full bg-[#f1f3f4] p-0.5 text-[12px] font-medium">
+               <button
+                 type="button"
+@@ -212,8 +212,9 @@ const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true,
+                 Suggestion
+               </button>
+             </div>
+-          </div>
+         )}
++        {rightSlot}
++        </div>
+       </div>
+ 
+       {showShortcuts && (
+diff --git a/resources/js/Pages/Files/EditContent.jsx b/resources/js/Pages/Files/EditContent.jsx
+index 00852c2..644d904 100644
+--- a/resources/js/Pages/Files/EditContent.jsx
++++ b/resources/js/Pages/Files/EditContent.jsx
+@@ -1152,7 +1152,6 @@ const EditContent = ({
+             </div>
+ 
+             <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+-              {project && <DocCallButton project={project} auth={auth} />}
+               {presenceUsers.length > 0 && (
+                 <div className="flex -space-x-1.5">
+                   {presenceUsers.slice(0, 4).map(u => <Avatar key={u.id} user={u} size={7} />)}
+@@ -1228,24 +1227,11 @@ const EditContent = ({
+                     <button
+                       onClick={() => setShowSummary(true)}
+                       className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-[#1E2129] hover:bg-slate-50 transition-colors"
+-                      title="Ajouter une note à cette version"
++                      title="Enregistrer une version avec une note (l'enregistrement automatique est déjà actif)"
+                     >
+                       <FaTag className="text-[11px]" />
+                     </button>
+                   )}
+-                  <button
+-                    onClick={handleSave}
+-                    disabled={isSaving || !needsVersion}
+-                    title="Enregistrer et créer une version dans l'historique (l'enregistrement automatique est déjà actif)"
+-                    className={`flex items-center gap-1.5 px-2 sm:px-4 py-1.5 rounded-lg text-[12px] sm:text-[12.5px] font-medium transition-colors
+-                      ${isSaving || !needsVersion
+-                        ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+-                        : 'bg-[#3454D1] hover:bg-[#2c47b8] text-white'
+-                      }`}
+-                  >
+-                    {isSaving ? <FaSpinner className="animate-spin text-[10px]" /> : <FaSave className="text-[10px]" />}
+-                    <span className="hidden sm:inline">{isSaving ? 'Sauvegarde…' : 'Enregistrer'}</span>
+-                  </button>
+                 </div>
+               )}
+ 
+@@ -1297,6 +1283,7 @@ const EditContent = ({
+                 fullWidth={fullWidth}
+                 commentsOpen={sidePanel === 'comments'}
+                 suggesting={suggesting}
++                rightSlot={project ? <DocCallButton project={project} auth={auth} compact /> : null}
+               />
+             </div>
+           )}
