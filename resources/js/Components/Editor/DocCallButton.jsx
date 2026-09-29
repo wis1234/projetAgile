@@ -139,7 +139,7 @@ export default function DocCallButton({ project, auth }) {
         }`}
       >
         <FaVideo className="text-[13px]" />
-        <span className="hidden md:inline">{callActive ? 'Rejoindre l’appel' : 'Appel ProJA'}</span>
+        {/*!<span className="hidden md:inline">{callActive ? 'Rejoindre l’appel' : 'Appel ProJA'}</span> */}
         {callActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
       </button>
 
