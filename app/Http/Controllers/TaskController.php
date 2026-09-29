@@ -347,9 +347,25 @@ public function store(Request $request)
         $assigneeName    = $assignee?->name ?? 'Non assigné';
         $taskDescription = $task->description ?? 'Aucune description fournie.';
 
+        // Citation motivante affichée sous le titre (une citation différente selon la tâche)
+        $quotes = [
+            ['Just Do It !', 'Nike'],
+            ['Le succès est la somme de petits efforts répétés jour après jour.', 'Robert Collier'],
+            ['La discipline est le pont entre les objectifs et les accomplissements.', 'Jim Rohn'],
+            ['Ce n\'est pas la montagne que nous conquérons, mais nous-mêmes.', 'Edmund Hillary'],
+            ['Impossible n\'est pas un fait, c\'est une opinion.', 'Muhammad Ali'],
+            ['La meilleure façon de prédire l\'avenir, c\'est de le créer.', 'Peter Drucker'],
+            ['Petit à petit, l\'oiseau fait son nid.', 'Proverbe'],
+            ['Fais-le maintenant : parfois « plus tard » devient « jamais ».', 'Proverbe'],
+        ];
+        [$quoteText, $quoteAuthor] = $quotes[$task->id % count($quotes)];
+        $quoteBlock = '<blockquote><p>' . e($quoteText) . '</p><p>— ' . e($quoteAuthor) . '</p></blockquote>';
+
         // Document HTML riche — structure Google Docs
         $htmlContent = <<<HTML
 <h1>{$task->title}</h1>
+
+{$quoteBlock}
 
 <p><strong>📁 Projet :</strong> {$project->name}<br>
 <strong>👤 Créé par :</strong> {$creator->name}<br>

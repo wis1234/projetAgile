@@ -9,7 +9,7 @@ import {
   FaAngleRight, FaAngleLeft, FaAngleDown, FaUndo,
   FaTag, FaPlus, FaTrash, FaExclamationTriangle, FaClock,
   FaUserSlash, FaShare, FaChevronDown, FaSearch, FaCheck,
-  FaUser, FaMinus, FaFileAlt, FaGoogleDrive, FaPen,
+  FaUser, FaMinus, FaFileAlt, FaGoogleDrive, FaPen, FaCommentMedical,
 } from 'react-icons/fa';
 import { isPdfFile } from '@/utils/fileUtils';
 import MenuBar from '@/Components/Editor/MenuBar';
@@ -34,6 +34,17 @@ import { CollaborationCaret } from '@tiptap/extension-collaboration-caret';
 import { prosemirrorToYDoc } from '@tiptap/y-tiptap';
 import { DOMParser as PMDOMParser } from '@tiptap/pm/model';
 import { PusherYjsProvider, toBase64, fromBase64 } from '@/lib/yjsPusherProvider';
+import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
+import Subscript from '@tiptap/extension-subscript';
+import Superscript from '@tiptap/extension-superscript';
+import { TaskList, TaskItem } from '@tiptap/extension-list';
+import { CommentMark } from '@/Components/Editor/extensions/comment-mark';
+import { SearchHighlight } from '@/Components/Editor/extensions/search-highlight';
+import { LineHeight } from '@/Components/Editor/extensions/line-height';
+import DocMenus from '@/Components/Editor/DocMenus';
+import FindReplaceBar from '@/Components/Editor/FindReplaceBar';
+import CommentsPanel from '@/Components/Editor/CommentsPanel';
+import '@/Components/Editor/editorStyles';
 
 /* ── Style des curseurs collaboratifs ── */
 if (typeof document !== 'undefined' && !document.getElementById('collab-caret-style')) {
@@ -57,11 +68,11 @@ const COLLAB_COLORS = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#
 ──────────────────────────────────────────────────────────── */
 
 const PERMISSIONS = [
-  { value: 'none',    label: 'Aucun accès', icon: <FaUserSlash />,  dot: 'bg-red-400',     color: 'text-red-600 dark:text-red-400'       },
-  { value: 'view',    label: 'Lecture',      icon: <FaEye />,        dot: 'bg-slate-400',   color: 'text-slate-600 dark:text-slate-300'   },
-  { value: 'comment', label: 'Commentaire',  icon: <FaComments />,   dot: 'bg-sky-400',     color: 'text-sky-600 dark:text-sky-400'       },
-  { value: 'edit',    label: 'Éditeur',      icon: <FaEdit />,       dot: 'bg-emerald-400', color: 'text-emerald-600 dark:text-emerald-400'},
-  { value: 'admin',   label: 'Admin',        icon: <FaShieldAlt />,  dot: 'bg-violet-400',  color: 'text-violet-600 dark:text-violet-400' },
+  { value: 'none',    label: 'Aucun accès', icon: <FaUserSlash />,  dot: 'bg-red-400',     color: 'text-red-600'       },
+  { value: 'view',    label: 'Lecture',      icon: <FaEye />,        dot: 'bg-slate-400',   color: 'text-slate-600'   },
+  { value: 'comment', label: 'Commentaire',  icon: <FaComments />,   dot: 'bg-sky-400',     color: 'text-sky-600'       },
+  { value: 'edit',    label: 'Éditeur',      icon: <FaEdit />,       dot: 'bg-emerald-400', color: 'text-emerald-600'},
+  { value: 'admin',   label: 'Admin',        icon: <FaShieldAlt />,  dot: 'bg-violet-400',  color: 'text-violet-600' },
 ];
 
 const permLabel = (v) => PERMISSIONS.find(p => p.value === v)?.label ?? v;
@@ -84,8 +95,8 @@ const Avatar = ({ user, size = 7, ring = true }) => {
   const color  = colors[(user?.id ?? 0) % colors.length];
   const sz     = `w-${size} h-${size}`;
   return user?.profile_photo_url
-    ? <img src={user.profile_photo_url} alt={user.name} className={`${sz} rounded-full object-cover ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`} />
-    : <div className={`${sz} rounded-full ${color} flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`}>{initials}</div>;
+    ? <img src={user.profile_photo_url} alt={user.name} className={`${sz} rounded-full object-cover ${ring ? 'ring-2 ring-white' : ''}`} />
+    : <div className={`${sz} rounded-full ${color} flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 ${ring ? 'ring-2 ring-white' : ''}`}>{initials}</div>;
 };
 
 const Toast = ({ message, type = 'success', onClose }) => (
@@ -101,10 +112,10 @@ const Toast = ({ message, type = 'success', onClose }) => (
 /* Section header used inside the side panels — a left accent bar
    replaces the uppercase/tracking-widest label pattern. */
 const PanelHeader = ({ children, right }) => (
-  <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
+  <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100">
     <div className="flex items-center gap-2">
       <span className="w-1 h-4 rounded-full bg-[#3454D1]" />
-      <span className="text-[13px] font-semibold text-[#1E2129] dark:text-slate-100">{children}</span>
+      <span className="text-[13px] font-semibold text-[#1E2129]">{children}</span>
     </div>
     {right}
   </div>
@@ -156,11 +167,11 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
 
       {preview ? (
         <div className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-slate-700/60 bg-[#EEF1FC] dark:bg-slate-800">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 bg-[#EEF1FC]">
             <button onClick={() => setPreview(null)} className="text-[#3454D1] hover:opacity-70 transition-opacity">
               <FaAngleLeft className="text-xs" />
             </button>
-            <span className="text-xs font-semibold text-[#1E2129] dark:text-slate-200">
+            <span className="text-xs font-semibold text-[#1E2129]">
               Aperçu — version {preview.version_number}
             </span>
             {canRestore && (
@@ -175,7 +186,7 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
             )}
           </div>
           <div
-            className="flex-1 overflow-y-auto p-5 prose prose-sm max-w-none font-serif text-[#1E2129] dark:text-slate-300 text-[13px] leading-relaxed"
+            className="flex-1 overflow-y-auto p-5 prose prose-sm max-w-none font-serif text-[#1E2129] text-[13px] leading-relaxed"
             dangerouslySetInnerHTML={{ __html: preview.content }}
           />
         </div>
@@ -187,7 +198,7 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
           {versions.map((v, i) => (
             <div
               key={v.id}
-              className="group px-4 py-3 border-b border-slate-100 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+              className="group px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors"
             >
               <div className="flex items-start gap-2.5">
                 <div className="flex-shrink-0 mt-0.5">
@@ -195,16 +206,16 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[12px] font-semibold text-[#1E2129] dark:text-slate-200">
+                    <span className="text-[12px] font-semibold text-[#1E2129]">
                       Version {v.version_number}
                     </span>
                     {v.label && (
-                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-violet-50 text-violet-600">
                         {v.label}
                       </span>
                     )}
                     {i === 0 && (
-                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-600">
                         Actuelle
                       </span>
                     )}
@@ -226,7 +237,7 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
                   <button
                     onClick={() => handleRestore(v)}
                     disabled={!!restoring}
-                    className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200 transition-colors"
+                    className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-[#1E2129] transition-colors"
                   >
                     {restoring === v.id ? <FaSpinner className="animate-spin text-[9px]" /> : <FaUndo className="text-[9px]" />}
                     Restaurer
@@ -334,7 +345,7 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
       )}
 
       {canManage && (
-        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/60">
+        <div className="px-4 py-3 border-b border-slate-100">
           <div className="relative">
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-[11px]" />
             <input
@@ -342,18 +353,18 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Ajouter une personne par nom ou e-mail"
-              className="w-full pl-8 pr-3 py-2 text-[12px] bg-slate-50 dark:bg-slate-700/50 border border-transparent rounded-lg text-[#1E2129] dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#3454D1]/40 focus:ring-2 focus:ring-[#3454D1]/15 transition"
+              className="w-full pl-8 pr-3 py-2 text-[12px] bg-slate-50 border border-transparent rounded-lg text-[#1E2129] placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#3454D1]/40 focus:ring-2 focus:ring-[#3454D1]/15 transition"
             />
             {searching && <FaSpinner className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-300 text-[11px]" />}
           </div>
 
           {results.length > 0 && (
-            <div className="mt-2 rounded-xl border border-slate-100 dark:border-slate-700 overflow-hidden shadow-sm shadow-black/5">
+            <div className="mt-2 rounded-xl border border-slate-100 overflow-hidden shadow-sm shadow-black/5">
               {results.slice(0, 5).map(user => (
-                <div key={user.id} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-b border-slate-50 dark:border-slate-700 last:border-0">
+                <div key={user.id} className="flex items-center gap-2 px-3 py-2 bg-white border-b border-slate-50 last:border-0">
                   <Avatar user={user} size={6} ring={false} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-medium text-[#1E2129] dark:text-slate-100 truncate">{user.name}</p>
+                    <p className="text-[12px] font-medium text-[#1E2129] truncate">{user.name}</p>
                     <p className="text-[10.5px] text-slate-400 truncate">{user.email}</p>
                   </div>
                   {['view','comment','edit'].map(p => (
@@ -362,7 +373,7 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
                       onClick={() => grantAccess(user, p)}
                       disabled={adding}
                       title={permLabel(p)}
-                      className={`p-1.5 rounded-md transition-colors text-[11px] ${permColor(p)} hover:bg-slate-100 dark:hover:bg-slate-700`}
+                      className={`p-1.5 rounded-md transition-colors text-[11px] ${permColor(p)} hover:bg-slate-100`}
                     >
                       {PERMISSIONS.find(x => x.value === p)?.icon}
                     </button>
@@ -386,10 +397,10 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
           </div>
         )}
         {accesses.map(a => (
-          <div key={a.id} className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
+          <div key={a.id} className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 transition-colors group">
             <Avatar user={a} size={7} ring={false} />
             <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-medium text-[#1E2129] dark:text-slate-100 truncate">{a.name}</p>
+              <p className="text-[12px] font-medium text-[#1E2129] truncate">{a.name}</p>
               <p className="text-[10.5px] text-slate-400 truncate">{a.email}</p>
             </div>
             {canManage ? (
@@ -397,7 +408,7 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
                 <select
                   value={a.permission}
                   onChange={e => updatePermission(a.id, e.target.value)}
-                  className="text-[11px] font-medium bg-slate-50 dark:bg-slate-700 border-0 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#3454D1]/25 text-[#1E2129] dark:text-slate-200"
+                  className="text-[11px] font-medium bg-slate-50 border-0 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#3454D1]/25 text-[#1E2129]"
                 >
                   {PERMISSIONS.map(p => (
                     <option key={p.value} value={p.value}>{p.label}</option>
@@ -405,7 +416,7 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
                 </select>
                 <button
                   onClick={() => revokeAccess(a.id, a.name)}
-                  className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
                   title="Révoquer"
                 >
                   <FaTrash className="text-[9px]" />
@@ -441,7 +452,7 @@ const EditableTitle = ({ value, onRename, readOnly }) => {
   };
 
   if (readOnly) {
-    return <p className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 truncate leading-tight">{value}</p>;
+    return <p className="text-[14px] font-semibold text-[#1E2129] truncate leading-tight">{value}</p>;
   }
 
   return editing ? (
@@ -451,7 +462,7 @@ const EditableTitle = ({ value, onRename, readOnly }) => {
       onChange={e => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
-      className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 leading-tight bg-[#EEF1FC] dark:bg-slate-700 rounded px-1.5 py-0.5 -mx-1.5 focus:outline-none focus:ring-2 focus:ring-[#3454D1]/30 min-w-0 w-full"
+      className="text-[14px] font-semibold text-[#1E2129] leading-tight bg-[#EEF1FC] rounded px-1.5 py-0.5 -mx-1.5 focus:outline-none focus:ring-2 focus:ring-[#3454D1]/30 min-w-0 w-full"
     />
   ) : (
     <button
@@ -459,7 +470,7 @@ const EditableTitle = ({ value, onRename, readOnly }) => {
       className="group flex items-center gap-1.5 min-w-0 text-left"
       title="Renommer le document"
     >
-      <p className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 truncate leading-tight">{value}</p>
+      <p className="text-[14px] font-semibold text-[#1E2129] truncate leading-tight">{value}</p>
       <FaPen className="text-[9px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
     </button>
   );
@@ -494,6 +505,7 @@ const EditContent = ({
   const awareness = useMemo(() => new Awareness(ydoc), [ydoc]);
   const providerRef  = useRef(null);
   const reloadingRef = useRef(false);
+  const commentClickRef = useRef(null);
   const [collabReady, setCollabReady] = useState(false);
   const collabUser = useMemo(() => ({
     id: auth.user.id,
@@ -523,9 +535,20 @@ const EditContent = ({
       Highlight.configure({ multicolor: true, HTMLAttributes: { class: 'highlight' } }),
       Color,
       Image.configure({ inline: true, allowBase64: true }),
+      Subscript, Superscript, LineHeight,
+      Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
+      TaskList, TaskItem.configure({ nested: true }),
+      CommentMark, SearchHighlight,
       Collaboration.configure({ document: ydoc }),
       CollaborationCaret.configure({ provider: { awareness }, user: collabUser }),
     ],
+    editorProps: {
+      handleClick: (_view, _pos, event) => {
+        const el = event.target?.closest?.('[data-comment-id]');
+        if (el) commentClickRef.current?.(el.getAttribute('data-comment-id'));
+        return false;
+      },
+    },
     onUpdate: ({ editor, transaction }) => {
       const text = editor.getText().trim();
       setWordCount(text ? text.split(/\s+/).length : 0);
@@ -731,6 +754,197 @@ const EditContent = ({
     }
   }, [docTitle, file.id, addToast]);
 
+  /* ── Commentaires (stockés dans le Y.Map "comments" du document, donc temps réel) ── */
+  const commentsMap = useMemo(() => ydoc.getMap('comments'), [ydoc]);
+  const [comments, setComments] = useState([]);
+  const [activeCommentId, setActiveCommentId] = useState(null);
+  const [pendingComment, setPendingComment] = useState(null); // { from, to, quote }
+  const pendingRef = useRef(null);
+  const startCommentRef = useRef(null);
+  const [selBtn, setSelBtn] = useState(null);
+  const [findOpen, setFindOpen] = useState(false);
+  const [fullWidth, setFullWidth] = useState(true);
+  const canComment = !isReadOnly;
+
+  useEffect(() => { pendingRef.current = pendingComment; }, [pendingComment]);
+
+  useEffect(() => {
+    const sync = () => setComments(Array.from(commentsMap.values()));
+    sync();
+    commentsMap.observe(sync);
+    return () => commentsMap.unobserve(sync);
+  }, [commentsMap]);
+
+  commentClickRef.current = (id) => { setActiveCommentId(id); setSidePanel('comments'); };
+
+  // Bouton flottant « Commenter » près de la sélection + suivi de la plage en attente
+  useEffect(() => {
+    if (!editor) return undefined;
+    const update = () => {
+      if (editor.isDestroyed) return;
+      const { to, empty } = editor.state.selection;
+      if (isReadOnly || empty || !editor.isFocused) { setSelBtn(null); return; }
+      const c = editor.view.coordsAtPos(to);
+      setSelBtn({ top: c.bottom + 6, left: Math.max(8, Math.min(c.right + 6, window.innerWidth - 150)) });
+    };
+    const hide = () => setSelBtn(null);
+    const track = ({ transaction }) => {
+      const p = pendingRef.current;
+      if (!p || !transaction.docChanged) return;
+      const from = transaction.mapping.map(p.from);
+      const to = transaction.mapping.map(p.to);
+      if (from !== p.from || to !== p.to) setPendingComment({ ...p, from, to });
+    };
+    editor.on('selectionUpdate', update);
+    editor.on('focus', update);
+    editor.on('blur', hide);
+    editor.on('transaction', track);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      editor.off('selectionUpdate', update);
+      editor.off('focus', update);
+      editor.off('blur', hide);
+      editor.off('transaction', track);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [editor, isReadOnly]);
+
+  const startComment = useCallback(() => {
+    if (!editor || isReadOnly) return;
+    const { from, to, empty } = editor.state.selection;
+    if (empty) { addToast('Sélectionnez d\u2019abord le passage à commenter', 'error'); return; }
+    setPendingComment({ from, to, quote: editor.state.doc.textBetween(from, to, ' ').slice(0, 300) });
+    setSidePanel('comments');
+    setSelBtn(null);
+  }, [editor, isReadOnly, addToast]);
+  startCommentRef.current = startComment;
+
+  const newId = (prefix) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+
+  const addComment = useCallback((text) => {
+    const p = pendingRef.current;
+    if (!p || !editor) return;
+    const id = newId('c');
+    const max = editor.state.doc.content.size;
+    const from = Math.max(1, Math.min(p.from, max));
+    const to = Math.max(from, Math.min(p.to, max));
+    editor.chain().setTextSelection({ from, to }).setMark('comment', { commentId: id }).run();
+    commentsMap.set(id, {
+      id, kind: 'comment', userId: auth.user.id, userName: auth.user.name,
+      text, quote: p.quote, createdAt: Date.now(), resolved: false,
+    });
+    setPendingComment(null);
+    setActiveCommentId(id);
+  }, [editor, commentsMap, auth.user.id, auth.user.name]);
+
+  const replyComment = useCallback((parentId, text) => {
+    const id = newId('r');
+    commentsMap.set(id, { id, kind: 'reply', parentId, userId: auth.user.id, userName: auth.user.name, text, createdAt: Date.now() });
+  }, [commentsMap, auth.user.id, auth.user.name]);
+
+  const toggleResolveComment = useCallback((id) => {
+    const c = commentsMap.get(id);
+    if (!c) return;
+    commentsMap.set(id, { ...c, resolved: !c.resolved });
+    if (!c.resolved) setActiveCommentId((cur) => (cur === id ? null : cur));
+  }, [commentsMap]);
+
+  const deleteComment = useCallback((id) => {
+    const c = commentsMap.get(id);
+    if (!c || !editor) return;
+    if (c.kind === 'comment') {
+      ydoc.transact(() => {
+        Array.from(commentsMap.values()).filter((x) => x.kind === 'reply' && x.parentId === id).forEach((r) => commentsMap.delete(r.id));
+        commentsMap.delete(id);
+      });
+      const { state, view } = editor;
+      const type = state.schema.marks.comment;
+      const tr = state.tr;
+      state.doc.descendants((node, pos) => {
+        node.marks.forEach((m) => { if (m.type === type && m.attrs.commentId === id) tr.removeMark(pos, pos + node.nodeSize, m); });
+      });
+      if (tr.docChanged) view.dispatch(tr);
+      setActiveCommentId((cur) => (cur === id ? null : cur));
+    } else {
+      commentsMap.delete(id);
+    }
+  }, [commentsMap, editor, ydoc]);
+
+  const selectComment = useCallback((id) => {
+    setActiveCommentId(id);
+    if (!editor) return;
+    let from = null; let to = null;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.marks.some((m) => m.type.name === 'comment' && m.attrs.commentId === id)) {
+        if (from === null) from = pos;
+        to = pos + node.nodeSize;
+      }
+    });
+    if (from !== null) editor.chain().setTextSelection({ from, to }).scrollIntoView().run();
+  }, [editor]);
+
+  const openCommentCount = comments.filter((c) => c.kind === 'comment' && !c.resolved).length;
+  const commentCss = useMemo(() => {
+    const safe = (id) => /^[\w-]+$/.test(String(id));
+    const css = comments
+      .filter((c) => c.kind === 'comment' && !c.resolved && safe(c.id))
+      .map((c) => `.doc-editor span[data-comment-id="${c.id}"]{background:rgba(255,212,0,.35);border-bottom:2px solid #f9ab00}`)
+      .join('');
+    const act = activeCommentId && safe(activeCommentId)
+      ? `.doc-editor span[data-comment-id="${activeCommentId}"]{background:rgba(255,193,7,.7)}` : '';
+    return css + act;
+  }, [comments, activeCommentId]);
+
+  /* ── Menus : téléchargements, plein écran, raccourcis ── */
+  const baseName = (docTitle || 'document').replace(/[\\/:*?"<>|]+/g, '-');
+  const downloadBlob = (name, mime, content) => {
+    const url = URL.createObjectURL(new Blob([content], { type: mime }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const wrapHtml = (body) => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${baseName}</title></head><body>${body}</body></html>`;
+
+  const menuActions = {
+    save: () => saveRef.current?.(),
+    rename: () => {
+      const n = window.prompt('Renommer le document', docTitle);
+      if (n && n.trim() && n.trim() !== docTitle) handleRename(n.trim());
+    },
+    downloadHtml: () => downloadBlob(`${baseName}.html`, 'text/html;charset=utf-8', wrapHtml(editor.getHTML())),
+    downloadDoc: () => downloadBlob(`${baseName}.doc`, 'application/msword',
+      `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${baseName}</title></head><body>${editor.getHTML()}</body></html>`),
+    downloadTxt: () => downloadBlob(`${baseName}.txt`, 'text/plain;charset=utf-8', editor.getText({ blockSeparator: '\n' })),
+    history: () => setSidePanel('history'),
+    share: () => setSidePanel('access'),
+    print: () => window.print(),
+    close: () => {
+      if (isDirty && !window.confirm('Des modifications non sauvegardées seront perdues. Quitter ?')) return;
+      window.history.back();
+    },
+    find: () => setFindOpen(true),
+    toggleFullWidth: () => setFullWidth((v) => !v),
+    toggleFullscreen: () => {
+      if (document.fullscreenElement) document.exitFullscreen?.();
+      else document.documentElement.requestFullscreen?.();
+    },
+    toggleComments: () => setSidePanel((p) => (p === 'comments' ? null : 'comments')),
+    comment: () => startCommentRef.current?.(),
+    tracking: () => setTrackingOpen(true),
+  };
+
+  useEffect(() => {
+    const fn = (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'h' && !e.altKey) { e.preventDefault(); setFindOpen(true); }
+      else if (k === 'm' && e.altKey) { e.preventDefault(); startCommentRef.current?.(); }
+    };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, []);
+
   /* ── Tracking modal handlers (à brancher sur l'API de suivi réelle) ── */
   const [changes, setChanges] = useState(pendingChanges);
   const handleAcceptChange = useCallback((id) => setChanges(prev => prev.map(c => c.id === id ? { ...c, status: 'accepted' } : c)), []);
@@ -748,10 +962,11 @@ const EditContent = ({
     <AdminLayout>
       <Head title={`Édition — ${docTitle}`} />
 
-      <div className="flex flex-col h-[calc(100vh-64px)] md:h-screen bg-[#F4F5F7] dark:bg-slate-900 overflow-hidden relative">
+      <div className="flex flex-col h-[calc(100vh-64px)] md:h-screen bg-[#F9FBFD] overflow-hidden relative">
+        <style>{commentCss}</style>
 
         {/* ══ TITLE BAR ══ */}
-        <div className="flex-shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200/70 dark:border-slate-700 z-40">
+        <div className="flex-shrink-0 bg-white border-b border-slate-200/70 z-40">
 
           {/* Breadcrumb */}
           {(project || task) && (
@@ -766,7 +981,7 @@ const EditContent = ({
 
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-5 py-2.5">
             <div className="flex items-center gap-2.5 flex-1 min-w-0">
-              <div className="w-8 h-8 bg-[#EEF1FC] dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 bg-[#EEF1FC] rounded-lg flex items-center justify-center flex-shrink-0">
                 <FaFileAlt className="text-[#3454D1] text-[13px]" />
               </div>
               <div className="min-w-0 flex-1">
@@ -775,7 +990,7 @@ const EditContent = ({
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                     isSaving ? 'bg-[#3454D1] animate-pulse' : isDirty ? 'bg-amber-400' : 'bg-emerald-400'
                   }`} />
-                  <span className="text-[10px] sm:text-[11px] text-slate-400 flex items-center gap-1 truncate">
+                  <span className="text-[11px] sm:text-[12px] text-slate-500 flex items-center gap-1 truncate">
                     {isSaving
                       ? 'Enregistrement…'
                       : isDirty
@@ -797,26 +1012,40 @@ const EditContent = ({
                 <div className="flex -space-x-1.5">
                   {presenceUsers.slice(0, 4).map(u => <Avatar key={u.id} user={u} size={7} />)}
                   {presenceUsers.length > 4 && (
-                    <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-600 ring-2 ring-white dark:ring-slate-800 flex items-center justify-center text-[10px] font-semibold text-slate-500 dark:text-slate-300">
+                    <div className="w-7 h-7 rounded-full bg-slate-100 ring-2 ring-white flex items-center justify-center text-[10px] font-semibold text-slate-500">
                       +{presenceUsers.length - 4}
                     </div>
                   )}
                 </div>
               )}
 
-              <span className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 dark:bg-slate-700 ${permInfo?.color}`}>
+              <span className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 ${permInfo?.color}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${permDot(myPermission)}`} />
                 {permInfo?.label}
               </span>
 
               {/* Panel switcher — segmented control */}
-              <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-0.5">
+              <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setSidePanel(p => p === 'comments' ? null : 'comments')}
+                  className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all
+                    ${sidePanel === 'comments'
+                      ? 'bg-white text-[#1E2129] shadow-sm'
+                      : 'text-slate-500 hover:text-[#1E2129]'
+                    }`}
+                >
+                  <FaCommentMedical className="text-[10px]" />
+                  <span className="hidden lg:inline">Commentaires</span>
+                  {openCommentCount > 0 && (
+                    <span className="min-w-[16px] h-4 px-1 rounded-full bg-[#1a73e8] text-white text-[9px] font-semibold flex items-center justify-center">{openCommentCount}</span>
+                  )}
+                </button>
                 <button
                   onClick={() => setSidePanel(p => p === 'history' ? null : 'history')}
                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all
                     ${sidePanel === 'history'
-                      ? 'bg-white dark:bg-slate-800 text-[#1E2129] dark:text-slate-100 shadow-sm'
-                      : 'text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200'
+                      ? 'bg-white text-[#1E2129] shadow-sm'
+                      : 'text-slate-500 hover:text-[#1E2129]'
                     }`}
                 >
                   <FaHistory className="text-[10px]" />
@@ -826,8 +1055,8 @@ const EditContent = ({
                   onClick={() => setSidePanel(p => p === 'access' ? null : 'access')}
                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all
                     ${sidePanel === 'access'
-                      ? 'bg-white dark:bg-slate-800 text-[#1E2129] dark:text-slate-100 shadow-sm'
-                      : 'text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200'
+                      ? 'bg-white text-[#1E2129] shadow-sm'
+                      : 'text-slate-500 hover:text-[#1E2129]'
                     }`}
                 >
                   <FaUsers className="text-[10px]" />
@@ -836,7 +1065,7 @@ const EditContent = ({
                 </button>
                 <button
                   onClick={() => setTrackingOpen(true)}
-                  className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200 transition-all"
+                  className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium text-slate-500 hover:text-[#1E2129] transition-all"
                 >
                   <FaUserEdit className="text-[10px]" />
                   <span className="hidden lg:inline">Suivi</span>
@@ -853,7 +1082,7 @@ const EditContent = ({
                   {isDirty && !showSummary && (
                     <button
                       onClick={() => setShowSummary(true)}
-                      className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-[#1E2129] dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                      className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-[#1E2129] hover:bg-slate-50 transition-colors"
                       title="Ajouter une note à cette version"
                     >
                       <FaTag className="text-[11px]" />
@@ -864,7 +1093,7 @@ const EditContent = ({
                     disabled={isSaving || !isDirty}
                     className={`flex items-center gap-1.5 px-2 sm:px-4 py-1.5 rounded-lg text-[12px] sm:text-[12.5px] font-medium transition-colors
                       ${isSaving || !isDirty
-                        ? 'bg-slate-50 dark:bg-slate-700 text-slate-300 dark:text-slate-500 cursor-not-allowed'
+                        ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
                         : 'bg-[#3454D1] hover:bg-[#2c47b8] text-white'
                       }`}
                   >
@@ -879,7 +1108,7 @@ const EditContent = ({
                   if (isDirty && !window.confirm('Des modifications non sauvegardées seront perdues. Quitter ?')) return;
                   window.history.back();
                 }}
-                className="p-1.5 sm:p-2 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="p-1.5 sm:p-2 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-colors"
               >
                 <FaTimes className="text-sm" />
               </button>
@@ -887,14 +1116,14 @@ const EditContent = ({
           </div>
 
           {showSummary && (
-            <div className="flex items-center gap-2 px-5 py-2 bg-[#EEF1FC] dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-700">
+            <div className="flex items-center gap-2 px-5 py-2 bg-[#EEF1FC] border-t border-slate-100">
               <FaTag className="text-[#3454D1] text-[11px] flex-shrink-0" />
               <input
                 type="text"
                 value={summary}
                 onChange={e => setSummary(e.target.value)}
                 placeholder="Note pour cette version — ex. ajout section 3, correction orthographe…"
-                className="flex-1 text-[12.5px] bg-transparent border-0 outline-none text-[#1E2129] dark:text-slate-200 placeholder-slate-400"
+                className="flex-1 text-[12.5px] bg-transparent border-0 outline-none text-[#1E2129] placeholder-slate-400"
                 onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setShowSummary(false); }}
                 autoFocus
               />
@@ -905,34 +1134,44 @@ const EditContent = ({
           )}
 
           {isReadOnly && (
-            <div className="flex items-center gap-2 px-5 py-1.5 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-700">
+            <div className="flex items-center gap-2 px-5 py-1.5 bg-slate-50 border-t border-slate-100">
               <FaLock className="text-slate-400 text-[10px] flex-shrink-0" />
-              <span className="text-[11.5px] text-slate-500 dark:text-slate-400">
+              <span className="text-[11.5px] text-slate-500">
                 {myPermission === 'none' ? "Vous n'avez pas accès à ce document." : 'Lecture seule — vous ne pouvez pas modifier ce document.'}
               </span>
             </div>
           )}
+
+          {editor && (
+            <div className="border-t border-slate-100">
+              <DocMenus
+                editor={editor}
+                isReadOnly={isReadOnly}
+                actions={menuActions}
+                fullWidth={fullWidth}
+                commentsOpen={sidePanel === 'comments'}
+              />
+            </div>
+          )}
         </div>
+
+        {/* ══ TOOLBAR (pleine largeur, sur plusieurs lignes si besoin) ══ */}
+        {!isReadOnly && editor && (
+          <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 bg-[#F9FBFD] relative z-30">
+            <div className="bg-[#EDF2FA] rounded-2xl px-1">
+              <MenuBar editor={editor} onComment={startComment} onFind={() => setFindOpen(true)} onPrint={() => window.print()} />
+            </div>
+          </div>
+        )}
 
         {/* ══ BODY ══ */}
         <div className="flex-1 flex overflow-hidden relative">
           <div className="flex-1 overflow-y-auto">
-            <div className="max-w-[840px] mx-auto px-4 sm:px-0 py-4 sm:py-8">
-
-              {/* Floating toolbar — same width as the page, not the screen */}
-              {!isReadOnly && editor && (
-                <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-2 mb-4 sm:mb-6 bg-white/95 dark:bg-slate-800/95 backdrop-blur border border-slate-200/80 dark:border-slate-700 rounded-xl shadow-sm shadow-black/[0.03] overflow-x-auto scrollbar-hide">
-                  <MenuBar editor={editor} />
-                </div>
-              )}
-
-              {/* Paper */}
-              <div className="bg-white dark:bg-slate-800 sm:rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_rgba(30,33,41,0.06)] border border-slate-200/60 dark:border-slate-700 min-h-[calc(100vh-260px)]">
-                <div className="px-4 py-6 sm:px-10 sm:py-12 lg:px-16">
-                  <EditorContent
-                    editor={editor}
-                    className="prose prose-slate dark:prose-invert font-serif max-w-none min-h-96 focus:outline-none prose-p:leading-relaxed"
-                  />
+            <div className={`${fullWidth ? 'w-full' : 'max-w-[900px] mx-auto'} px-0 sm:px-4 py-2 sm:py-3`}>
+              {/* Feuille : occupe toute la largeur disponible */}
+              <div className="doc-paper doc-editor bg-white sm:rounded-xl border border-slate-200 shadow-sm min-h-[calc(100vh-320px)]">
+                <div className="px-5 py-6 sm:px-10 sm:py-10 lg:px-14" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                  <EditorContent editor={editor} className="max-w-none min-h-96 focus:outline-none" />
                 </div>
               </div>
             </div>
@@ -942,7 +1181,7 @@ const EditContent = ({
           {sidePanel && (
             <div className="lg:hidden fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={() => setSidePanel(null)} />
           )}
-          <div className={`fixed inset-y-0 right-0 z-50 lg:static flex-shrink-0 ${sidePanel ? 'w-full sm:w-80' : 'w-0'} overflow-hidden transition-[width] duration-200 border-l border-slate-200/70 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl lg:shadow-none`}>
+          <div className={`fixed inset-y-0 right-0 z-50 lg:static flex-shrink-0 ${sidePanel ? 'w-full sm:w-80' : 'w-0'} overflow-hidden transition-[width] duration-200 border-l border-slate-200/70 bg-white shadow-2xl lg:shadow-none`}>
             {sidePanel === 'history' && (
               <VersionPanel
                 fileId={file.id}
@@ -953,6 +1192,23 @@ const EditContent = ({
                   providerRef.current?.notifyReload();
                   setTimeout(() => window.location.reload(), 500);
                 }}
+              />
+            )}
+            {sidePanel === 'comments' && (
+              <CommentsPanel
+                comments={comments}
+                activeId={activeCommentId}
+                onSelect={selectComment}
+                pendingQuote={pendingComment ? pendingComment.quote : null}
+                onAdd={addComment}
+                onCancelPending={() => setPendingComment(null)}
+                onReply={replyComment}
+                onResolve={toggleResolveComment}
+                onDelete={deleteComment}
+                currentUserId={auth.user.id}
+                canModerate={myPermission === 'admin' || canManageAccess}
+                canComment={canComment}
+                onClose={() => setSidePanel(null)}
               />
             )}
             {sidePanel === 'access' && (
@@ -966,25 +1222,40 @@ const EditContent = ({
         </div>
 
         {/* ══ FOOTER ══ */}
-        <div className="flex-shrink-0 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700/60 px-5 py-1.5">
+        <div className="flex-shrink-0 bg-white border-t border-slate-100 px-5 py-1.5">
           <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
             <span className="flex items-center gap-3">
               <span className="flex items-center gap-1.5">
                 <Avatar user={auth.user} size={4} ring={false} />
-                <span className="hidden sm:inline">Connecté en tant que <span className="font-medium text-slate-600 dark:text-slate-300">{auth.user.name}</span></span>
-                <span className="sm:hidden font-medium text-slate-600 dark:text-slate-300">{auth.user.name}</span>
+                <span className="hidden sm:inline">Connecté en tant que <span className="font-medium text-slate-600">{auth.user.name}</span></span>
+                <span className="sm:hidden font-medium text-slate-600">{auth.user.name}</span>
               </span>
               <span className="text-slate-300">·</span>
               <span>{wordCount} mot{wordCount !== 1 ? 's' : ''}</span>
             </span>
             {lastModifiedBy && (
               <span className="hidden sm:inline">
-                Dernière modification par <span className="font-medium text-slate-600 dark:text-slate-300">{lastModifiedBy.name}</span> — {fmtDate(lastModifiedBy.timestamp)}
+                Dernière modification par <span className="font-medium text-slate-600">{lastModifiedBy.name}</span> — {fmtDate(lastModifiedBy.timestamp)}
               </span>
             )}
           </div>
         </div>
       </div>
+
+      {/* Bouton flottant « Commenter » */}
+      {selBtn && !isReadOnly && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={startComment}
+          style={{ position: 'fixed', top: selBtn.top, left: selBtn.left, zIndex: 950 }}
+          className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-white border border-slate-300 shadow-lg text-[12px] font-medium text-[#1a73e8] hover:bg-[#e8f0fe]"
+        >
+          <FaCommentMedical className="text-[11px]" /> Commenter
+        </button>
+      )}
+
+      <FindReplaceBar editor={editor} open={findOpen} onClose={() => setFindOpen(false)} readOnly={isReadOnly} />
 
       {/* ══ TOASTS ══ */}
       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2">

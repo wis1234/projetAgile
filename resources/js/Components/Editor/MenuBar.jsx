@@ -5,9 +5,11 @@ import {
   FaListUl, FaListOl, FaUndo, FaRedo,
   FaLink, FaImage, FaCode, FaHistory,
   FaPalette, FaHighlighter, FaCheck, FaTimes, FaChevronDown,
-  FaQuoteLeft, FaMinus
+  FaQuoteLeft, FaMinus, FaTable, FaSubscript, FaSuperscript, FaTasks,
+  FaIndent, FaOutdent, FaArrowsAltV, FaCommentMedical, FaSearch, FaPrint
 } from 'react-icons/fa';
 import { MdOutlineFormatClear } from 'react-icons/md';
+import DropdownPanel from './DropdownPanel';
 
 /* ─── Design tokens ─── */
 const ACCENT    = '#1a73e8'; // Google Docs blue
@@ -60,12 +62,13 @@ const HIGHLIGHT_COLORS = [
 
 /* ─── Atoms ─── */
 const Divider = () => (
-  <div className="w-px h-5 bg-gray-300 dark:bg-slate-600 flex-shrink-0 mx-0.5" />
+  <div className="w-px h-5 bg-gray-300 flex-shrink-0 mx-0.5" />
 );
 
 const ToolBtn = ({ active, disabled, title, onClick, children }) => (
   <button
     type="button"
+    onMouseDown={e => e.preventDefault()}
     onClick={onClick}
     disabled={disabled}
     title={title}
@@ -73,39 +76,18 @@ const ToolBtn = ({ active, disabled, title, onClick, children }) => (
       relative flex items-center justify-center rounded h-7 min-w-[28px] px-1.5 text-[13px]
       transition-colors select-none
       ${active
-        ? 'bg-[#c2d7f7] text-[#1a73e8] dark:bg-blue-900/40 dark:text-blue-300'
-        : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+        ? 'bg-[#c2d7f7] text-[#1a73e8]'
+        : 'text-gray-700 hover:bg-gray-100'
       }
       ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
     `}
   >
     {children}
     {active && (
-      <span className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full bg-[#1a73e8] dark:bg-blue-400" />
+      <span className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full bg-[#1a73e8]" />
     )}
   </button>
 );
-
-/* ─── Dropdown wrapper (click-outside aware) ─── */
-const DropdownPanel = ({ open, onClose, children, className = '' }) => {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return;
-    const fn = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
-    document.addEventListener('mousedown', fn);
-    return () => document.removeEventListener('mousedown', fn);
-  }, [open, onClose]);
-  if (!open) return null;
-  return (
-    <div
-      ref={ref}
-      className={`absolute top-full left-0 z-50 mt-1 bg-white dark:bg-slate-800
-        border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl overflow-hidden ${className}`}
-    >
-      {children}
-    </div>
-  );
-};
 
 /* ─── Colour swatch grid ─── */
 const ColorSwatchGrid = ({ colors, current, onSelect, onClear }) => (
@@ -123,7 +105,7 @@ const ColorSwatchGrid = ({ colors, current, onSelect, onClear }) => (
         />
       ))}
     </div>
-    <div className="border-t border-gray-100 dark:border-slate-700 pt-2 flex items-center gap-1.5">
+    <div className="border-t border-gray-100 pt-2 flex items-center gap-1.5">
       <input
         type="color"
         defaultValue={current || '#000000'}
@@ -131,7 +113,7 @@ const ColorSwatchGrid = ({ colors, current, onSelect, onClear }) => (
         className="w-6 h-6 cursor-pointer rounded border-none p-0"
         title="Couleur personnalisée"
       />
-      <span className="text-[11px] text-gray-500 dark:text-slate-400">Personnalisée</span>
+      <span className="text-[11px] text-gray-500">Personnalisée</span>
     </div>
     {onClear && (
       <button
@@ -148,7 +130,7 @@ const ColorSwatchGrid = ({ colors, current, onSelect, onClear }) => (
 /* ═══════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════════ */
-const MenuBar = ({ editor, onTrackChanges }) => {
+const MenuBar = ({ editor, onTrackChanges, onComment, onFind, onPrint }) => {
   const [open, setOpen]                   = useState(null); // 'style'|'font'|'size'|'color'|'highlight'
   const [currentColor, setCurrentColor]   = useState('#000000');
   const [currentHL, setCurrentHL]         = useState(null);
@@ -191,11 +173,13 @@ const MenuBar = ({ editor, onTrackChanges }) => {
 
   const activeFontLabel = FONT_FAMILIES.find(f => f.value === fontFamily)?.label ?? 'Arial';
 
+  const has = (name) => !!editor?.extensionManager?.extensions?.some((e) => e.name === name);
+
   if (!editor) return null;
 
   return (
-    <div className="flex flex-col bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 select-none">
-      <div className="flex flex-wrap items-center gap-0.5 px-2 py-1 min-h-[40px]">
+    <div className="flex flex-col bg-transparent select-none w-full">
+      <div className="flex flex-wrap items-center gap-x-0.5 gap-y-1 px-2 py-1 min-h-[40px]">
 
         {/* ── Undo / Redo ── */}
         <ToolBtn title="Annuler (Ctrl+Z)" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
@@ -212,8 +196,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
           <button
             type="button"
             onClick={() => toggle('style')}
-            className="flex items-center gap-1 h-7 px-2 rounded text-[12px] text-gray-700 dark:text-slate-300
-              hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors min-w-[128px] border border-transparent hover:border-gray-200 dark:hover:border-slate-600"
+            className="flex items-center gap-1 h-7 px-2 rounded text-[12px] text-gray-700
+              hover:bg-gray-100 transition-colors min-w-[128px] border border-transparent hover:border-gray-200"
           >
             <span className="flex-1 text-left truncate" style={{ fontSize: activeStyle.size, fontWeight: activeStyle.weight }}>
               {activeStyle.label}
@@ -232,8 +216,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
                   closeAll();
                 }}
                 className={`flex items-center gap-2 w-full px-3 py-2 text-left transition-colors
-                  hover:bg-blue-50 dark:hover:bg-slate-700
-                  ${activeStyle.label === s.label ? 'bg-blue-50 dark:bg-slate-700' : ''}`}
+                  hover:bg-blue-50
+                  ${activeStyle.label === s.label ? 'bg-blue-50' : ''}`}
                 style={{ fontSize: s.size, fontWeight: s.weight }}
               >
                 {activeStyle.label === s.label && <FaCheck className="text-[10px] text-[#1a73e8]" />}
@@ -250,8 +234,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
           <button
             type="button"
             onClick={() => toggle('font')}
-            className="flex items-center gap-1 h-7 px-2 rounded text-[12px] text-gray-700 dark:text-slate-300
-              hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors min-w-[110px] border border-transparent hover:border-gray-200 dark:hover:border-slate-600"
+            className="flex items-center gap-1 h-7 px-2 rounded text-[12px] text-gray-700
+              hover:bg-gray-100 transition-colors min-w-[110px] border border-transparent hover:border-gray-200"
             style={{ fontFamily: fontFamily || 'Arial, sans-serif' }}
           >
             <span className="flex-1 text-left truncate">{activeFontLabel}</span>
@@ -268,8 +252,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
                   closeAll();
                 }}
                 className={`flex items-center gap-2 w-full px-3 py-2 text-left text-[13px] transition-colors
-                  hover:bg-blue-50 dark:hover:bg-slate-700
-                  ${fontFamily === f.value ? 'bg-blue-50 dark:bg-slate-700' : ''}`}
+                  hover:bg-blue-50
+                  ${fontFamily === f.value ? 'bg-blue-50' : ''}`}
                 style={{ fontFamily: f.value }}
               >
                 {fontFamily === f.value && <FaCheck className="text-[10px] text-[#1a73e8] flex-shrink-0" />}
@@ -286,7 +270,7 @@ const MenuBar = ({ editor, onTrackChanges }) => {
           <button
             type="button"
             onClick={() => { const n = Math.max(6, (parseInt(fontSize)||11) - 1); editor.chain().focus().setFontSize(`${n}pt`).run(); setFontSize(String(n)); }}
-            className="h-7 w-5 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 text-sm transition-colors border border-r-0 border-gray-200 dark:border-slate-600 rounded-l"
+            className="h-7 w-5 flex items-center justify-center hover:bg-gray-100 text-gray-500 text-sm transition-colors border border-r-0 border-gray-200 rounded-l"
             title="Réduire"
           >−</button>
           <input
@@ -295,18 +279,18 @@ const MenuBar = ({ editor, onTrackChanges }) => {
             onChange={e => setFontSize(e.target.value)}
             onBlur={e => { const v = parseInt(e.target.value); if (v > 0) { editor.chain().focus().setFontSize(`${v}pt`).run(); setFontSize(String(v)); } }}
             onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(fontSize); if (v > 0) editor.chain().focus().setFontSize(`${v}pt`).run(); closeAll(); } }}
-            className="h-7 w-10 text-center text-[12px] border-y border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:z-10"
+            className="h-7 w-10 text-center text-[12px] border-y border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:z-10"
           />
           <button
             type="button"
             onClick={() => toggle('size')}
-            className="h-7 w-4 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-400 text-[8px] transition-colors border border-gray-200 dark:border-slate-600"
+            className="h-7 w-4 flex items-center justify-center hover:bg-gray-100 text-gray-400 text-[8px] transition-colors border border-gray-200"
             title="Choisir taille"
           ><FaChevronDown /></button>
           <button
             type="button"
             onClick={() => { const n = (parseInt(fontSize)||11) + 1; editor.chain().focus().setFontSize(`${n}pt`).run(); setFontSize(String(n)); }}
-            className="h-7 w-5 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 text-sm transition-colors border border-l-0 border-gray-200 dark:border-slate-600 rounded-r"
+            className="h-7 w-5 flex items-center justify-center hover:bg-gray-100 text-gray-500 text-sm transition-colors border border-l-0 border-gray-200 rounded-r"
             title="Augmenter"
           >+</button>
           <DropdownPanel open={open === 'size'} onClose={closeAll} className="w-16">
@@ -314,8 +298,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
               {FONT_SIZES.map(s => (
                 <button key={s} type="button"
                   onClick={() => { editor.chain().focus().setFontSize(`${s}pt`).run(); setFontSize(s); closeAll(); }}
-                  className={`block w-full text-center px-2 py-1 text-[12px] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors
-                    ${fontSize === s ? 'font-bold text-[#1a73e8]' : 'text-gray-700 dark:text-slate-200'}`}
+                  className={`block w-full text-center px-2 py-1 text-[12px] hover:bg-blue-50 transition-colors
+                    ${fontSize === s ? 'font-bold text-[#1a73e8]' : 'text-gray-700'}`}
                 >{s}</button>
               ))}
             </div>
@@ -329,14 +313,16 @@ const MenuBar = ({ editor, onTrackChanges }) => {
         <ToolBtn active={editor.isActive('italic')}     title="Italique (Ctrl+I)"  onClick={() => editor.chain().focus().toggleItalic().run()}>    <FaItalic      className="text-[12px]" /></ToolBtn>
         <ToolBtn active={editor.isActive('underline')}  title="Souligné (Ctrl+U)"  onClick={() => editor.chain().focus().toggleUnderline().run()}> <FaUnderline   className="text-[12px]" /></ToolBtn>
         <ToolBtn active={editor.isActive('strike')}     title="Barré"              onClick={() => editor.chain().focus().toggleStrike().run()}>    <FaStrikethrough className="text-[12px]" /></ToolBtn>
+        {has('superscript') && <ToolBtn active={editor.isActive('superscript')} title="Exposant" onClick={() => editor.chain().focus().toggleSuperscript().run()}><FaSuperscript className="text-[11px]" /></ToolBtn>}
+        {has('subscript') && <ToolBtn active={editor.isActive('subscript')} title="Indice" onClick={() => editor.chain().focus().toggleSubscript().run()}><FaSubscript className="text-[11px]" /></ToolBtn>}
 
         <Divider />
 
         {/* ── Text color ── */}
         <div className="relative">
           <button type="button" onClick={() => toggle('color')} title="Couleur du texte"
-            className="flex flex-col items-center justify-center h-7 w-8 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-            <FaPalette className="text-[12px] text-gray-600 dark:text-slate-300" />
+            className="flex flex-col items-center justify-center h-7 w-8 rounded hover:bg-gray-100 transition-colors">
+            <FaPalette className="text-[12px] text-gray-600" />
             <span className="w-5 h-1 rounded-full mt-0.5" style={{ backgroundColor: currentColor }} />
           </button>
           <DropdownPanel open={open === 'color'} onClose={closeAll}>
@@ -352,13 +338,13 @@ const MenuBar = ({ editor, onTrackChanges }) => {
         {/* ── Highlight color ── */}
         <div className="relative">
           <button type="button" onClick={() => toggle('highlight')} title="Surbrillance"
-            className="flex flex-col items-center justify-center h-7 w-8 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-            <FaHighlighter className="text-[12px] text-gray-600 dark:text-slate-300" />
+            className="flex flex-col items-center justify-center h-7 w-8 rounded hover:bg-gray-100 transition-colors">
+            <FaHighlighter className="text-[12px] text-gray-600" />
             <span className="w-5 h-1 rounded-full mt-0.5" style={{ backgroundColor: currentHL ?? '#ffd700' }} />
           </button>
           <DropdownPanel open={open === 'highlight'} onClose={closeAll} className="w-52">
             <div className="p-3">
-              <p className="text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-2">Couleur de surlignage</p>
+              <p className="text-[11px] font-semibold text-gray-500 mb-2">Couleur de surlignage</p>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {HIGHLIGHT_COLORS.map(c => (
                   <button key={c.name} type="button" title={c.name}
@@ -389,6 +375,26 @@ const MenuBar = ({ editor, onTrackChanges }) => {
         {/* ── Lists ── */}
         <ToolBtn active={editor.isActive('bulletList')}  title="Liste à puces"   onClick={() => editor.chain().focus().toggleBulletList().run()}>  <FaListUl className="text-[12px]" /></ToolBtn>
         <ToolBtn active={editor.isActive('orderedList')} title="Liste numérotée" onClick={() => editor.chain().focus().toggleOrderedList().run()}><FaListOl className="text-[12px]" /></ToolBtn>
+        {has('taskList') && <ToolBtn active={editor.isActive('taskList')} title="Liste de tâches" onClick={() => editor.chain().focus().toggleTaskList().run()}><FaTasks className="text-[12px]" /></ToolBtn>}
+        <ToolBtn title="Diminuer le retrait" onClick={() => (editor.isActive('taskItem') ? editor.chain().focus().liftListItem('taskItem') : editor.chain().focus().liftListItem('listItem')).run()}><FaOutdent className="text-[12px]" /></ToolBtn>
+        <ToolBtn title="Augmenter le retrait" onClick={() => (editor.isActive('taskItem') ? editor.chain().focus().sinkListItem('taskItem') : editor.chain().focus().sinkListItem('listItem')).run()}><FaIndent className="text-[12px]" /></ToolBtn>
+
+        {has('lineHeight') && (
+          <div className="relative">
+            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => toggle('lh')} title="Interligne"
+              className="flex items-center justify-center h-7 w-8 rounded hover:bg-gray-100 transition-colors text-gray-600">
+              <FaArrowsAltV className="text-[12px]" />
+            </button>
+            <DropdownPanel open={open === 'lh'} onClose={closeAll} className="w-36 py-1">
+              {[['1', 'Simple'], ['1.15', '1,15'], ['1.5', '1,5'], ['2', 'Double']].map(([v, l]) => (
+                <button key={v} type="button" onClick={() => { editor.chain().focus().setLineHeight(v).run(); closeAll(); }}
+                  className="block w-full text-left px-4 py-1.5 text-[13px] text-gray-700 hover:bg-blue-50">{l}</button>
+              ))}
+              <button type="button" onClick={() => { editor.chain().focus().unsetLineHeight().run(); closeAll(); }}
+                className="block w-full text-left px-4 py-1.5 text-[12px] text-red-500 hover:bg-red-50">Réinitialiser</button>
+            </DropdownPanel>
+          </div>
+        )}
 
         <Divider />
 
@@ -396,6 +402,42 @@ const MenuBar = ({ editor, onTrackChanges }) => {
         <ToolBtn active={editor.isActive('blockquote')} title="Citation" onClick={() => editor.chain().focus().toggleBlockquote().run()}><FaQuoteLeft className="text-[12px]" /></ToolBtn>
         <ToolBtn active={editor.isActive('codeBlock')}  title="Bloc de code" onClick={() => editor.chain().focus().toggleCodeBlock().run()}><FaCode className="text-[12px]" /></ToolBtn>
         <ToolBtn title="Ligne de séparation" onClick={() => editor.chain().focus().setHorizontalRule().run()}><FaMinus className="text-[12px]" /></ToolBtn>
+
+        {has('table') && (
+          <div className="relative">
+            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => toggle('table')} title="Tableau"
+              className={`flex items-center justify-center h-7 w-8 rounded transition-colors ${editor.isActive('table') ? 'bg-[#c2d7f7] text-[#1a73e8]' : 'text-gray-600 hover:bg-gray-100'}`}>
+              <FaTable className="text-[12px]" />
+            </button>
+            <DropdownPanel open={open === 'table'} onClose={closeAll} className="w-60 py-1">
+              {[
+                ['Insérer un tableau 3 × 3', () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(), true],
+                ['Insérer un tableau 5 × 4', () => editor.chain().focus().insertTable({ rows: 5, cols: 4, withHeaderRow: true }).run(), true],
+                ['—'],
+                ['Ajouter une ligne au-dessus', () => editor.chain().focus().addRowBefore().run()],
+                ['Ajouter une ligne en dessous', () => editor.chain().focus().addRowAfter().run()],
+                ['Ajouter une colonne à gauche', () => editor.chain().focus().addColumnBefore().run()],
+                ['Ajouter une colonne à droite', () => editor.chain().focus().addColumnAfter().run()],
+                ['—'],
+                ['Fusionner les cellules', () => editor.chain().focus().mergeCells().run()],
+                ['Scinder la cellule', () => editor.chain().focus().splitCell().run()],
+                ['Basculer la ligne d’en-tête', () => editor.chain().focus().toggleHeaderRow().run()],
+                ['—'],
+                ['Supprimer la ligne', () => editor.chain().focus().deleteRow().run()],
+                ['Supprimer la colonne', () => editor.chain().focus().deleteColumn().run()],
+                ['Supprimer le tableau', () => editor.chain().focus().deleteTable().run()],
+              ].map(([label, fn, always], i) => label === '—'
+                ? <div key={i} className="my-1 border-t border-gray-100" />
+                : (
+                  <button key={label} type="button" disabled={!always && !editor.isActive('table')}
+                    onClick={() => { fn(); closeAll(); }}
+                    className="block w-full text-left px-4 py-1.5 text-[13px] text-gray-700 hover:bg-blue-50 disabled:opacity-35 disabled:hover:bg-transparent">
+                    {label}
+                  </button>
+                ))}
+            </DropdownPanel>
+          </div>
+        )}
 
         <Divider />
 
@@ -405,6 +447,12 @@ const MenuBar = ({ editor, onTrackChanges }) => {
         <ToolBtn title="Effacer la mise en forme" onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}>
           <MdOutlineFormatClear className="text-[14px]" />
         </ToolBtn>
+
+        {/* ── Commentaire / Recherche / Impression ── */}
+        {(onComment || onFind || onPrint) && <Divider />}
+        {onComment && <ToolBtn title="Ajouter un commentaire (Ctrl+Alt+M)" onClick={onComment}><FaCommentMedical className="text-[12px]" /></ToolBtn>}
+        {onFind && <ToolBtn title="Rechercher et remplacer (Ctrl+H)" onClick={onFind}><FaSearch className="text-[12px]" /></ToolBtn>}
+        {onPrint && <ToolBtn title="Imprimer (Ctrl+P)" onClick={onPrint}><FaPrint className="text-[12px]" /></ToolBtn>}
 
         {/* ── Track changes ── */}
         {onTrackChanges && (

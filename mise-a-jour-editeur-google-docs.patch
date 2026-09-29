@@ -1,0 +1,1956 @@
+diff --git a/app/Http/Controllers/TaskController.php b/app/Http/Controllers/TaskController.php
+index d44761e..6dd2898 100644
+--- a/app/Http/Controllers/TaskController.php
++++ b/app/Http/Controllers/TaskController.php
+@@ -347,10 +347,26 @@ public function store(Request $request)
+         $assigneeName    = $assignee?->name ?? 'Non assigné';
+         $taskDescription = $task->description ?? 'Aucune description fournie.';
+ 
++        // Citation motivante affichée sous le titre (une citation différente selon la tâche)
++        $quotes = [
++            ['Just Do It !', 'Nike'],
++            ['Le succès est la somme de petits efforts répétés jour après jour.', 'Robert Collier'],
++            ['La discipline est le pont entre les objectifs et les accomplissements.', 'Jim Rohn'],
++            ['Ce n\'est pas la montagne que nous conquérons, mais nous-mêmes.', 'Edmund Hillary'],
++            ['Impossible n\'est pas un fait, c\'est une opinion.', 'Muhammad Ali'],
++            ['La meilleure façon de prédire l\'avenir, c\'est de le créer.', 'Peter Drucker'],
++            ['Petit à petit, l\'oiseau fait son nid.', 'Proverbe'],
++            ['Fais-le maintenant : parfois « plus tard » devient « jamais ».', 'Proverbe'],
++        ];
++        [$quoteText, $quoteAuthor] = $quotes[$task->id % count($quotes)];
++        $quoteBlock = '<blockquote><p>' . e($quoteText) . '</p><p>— ' . e($quoteAuthor) . '</p></blockquote>';
++
+         // Document HTML riche — structure Google Docs
+         $htmlContent = <<<HTML
+ <h1>{$task->title}</h1>
+ 
++{$quoteBlock}
++
+ <p><strong>📁 Projet :</strong> {$project->name}<br>
+ <strong>👤 Créé par :</strong> {$creator->name}<br>
+ <strong>📅 Date de création :</strong> {$createdAt}<br>
+diff --git a/package.json b/package.json
+index 6d71ce1..dfe48e4 100644
+--- a/package.json
++++ b/package.json
+@@ -61,6 +61,10 @@
+         "@tiptap/extension-code-block-lowlight": "^3.0.9",
+         "@tiptap/extension-collaboration": "3.20.0",
+         "@tiptap/extension-collaboration-caret": "3.20.0",
++        "@tiptap/extension-list": "3.20.0",
++        "@tiptap/extension-subscript": "3.20.0",
++        "@tiptap/extension-superscript": "3.20.0",
++        "@tiptap/extension-table": "3.20.0",
+         "@tiptap/extension-color": "^3.0.9",
+         "@tiptap/extension-document": "^3.0.9",
+         "@tiptap/extension-font-family": "^3.0.9",
+diff --git a/resources/js/Components/Editor/CommentsPanel.jsx b/resources/js/Components/Editor/CommentsPanel.jsx
+new file mode 100644
+index 0000000..8d8d4d5
+--- /dev/null
++++ b/resources/js/Components/Editor/CommentsPanel.jsx
+@@ -0,0 +1,174 @@
++import React, { useState } from 'react';
++import { FaCommentMedical, FaCheck, FaTrash, FaReply, FaUndo, FaTimes } from 'react-icons/fa';
++
++const fmt = (ts) => (ts
++  ? new Date(ts).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
++  : '');
++
++const COLORS = ['#1a73e8', '#7c3aed', '#16a34a', '#d97706', '#e11d48', '#0891b2'];
++
++const Initial = ({ name, id }) => (
++  <div
++    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0"
++    style={{ background: COLORS[Math.abs(Number(id) || 0) % COLORS.length] }}
++  >
++    {(name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
++  </div>
++);
++
++const Composer = ({ placeholder, onSubmit, onCancel, submitLabel = 'Commenter', autoFocus = true }) => {
++  const [text, setText] = useState('');
++  const submit = () => {
++    const t = text.trim();
++    if (!t) return;
++    onSubmit(t);
++    setText('');
++  };
++  return (
++    <div>
++      <textarea
++        autoFocus={autoFocus}
++        value={text}
++        onChange={(e) => setText(e.target.value)}
++        onKeyDown={(e) => {
++          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit(); }
++          if (e.key === 'Escape') onCancel?.();
++        }}
++        rows={2}
++        placeholder={placeholder}
++        className="w-full text-[13px] border border-slate-300 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40 focus:border-[#1a73e8]"
++      />
++      <div className="flex justify-end gap-2 mt-1.5">
++        {onCancel && <button type="button" onClick={onCancel} className="px-3 h-7 text-[12px] rounded-full text-slate-600 hover:bg-slate-100">Annuler</button>}
++        <button type="button" onClick={submit} disabled={!text.trim()} className="px-3 h-7 text-[12px] rounded-full bg-[#1a73e8] text-white hover:bg-[#1765cc] disabled:opacity-40">{submitLabel}</button>
++      </div>
++    </div>
++  );
++};
++
++const CommentsPanel = ({
++  comments = [],
++  activeId,
++  onSelect,
++  pendingQuote,
++  onAdd,
++  onCancelPending,
++  onReply,
++  onResolve,
++  onDelete,
++  currentUserId,
++  canModerate = false,
++  canComment = true,
++  onClose,
++}) => {
++  const [filter, setFilter] = useState('open');
++
++  const threads = comments
++    .filter((c) => c.kind === 'comment')
++    .filter((c) => (filter === 'open' ? !c.resolved : c.resolved))
++    .sort((a, b) => a.createdAt - b.createdAt);
++
++  const repliesOf = (id) => comments.filter((c) => c.kind === 'reply' && c.parentId === id).sort((a, b) => a.createdAt - b.createdAt);
++  const openCount = comments.filter((c) => c.kind === 'comment' && !c.resolved).length;
++  const doneCount = comments.filter((c) => c.kind === 'comment' && c.resolved).length;
++  const canDelete = (c) => canModerate || String(c.userId) === String(currentUserId);
++
++  return (
++    <div className="flex flex-col h-full bg-white">
++      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
++        <span className="text-[13px] font-semibold text-slate-800 flex items-center gap-2"><FaCommentMedical className="text-[#1a73e8]" /> Commentaires</span>
++        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400"><FaTimes className="text-xs" /></button>
++      </div>
++
++      <div className="flex gap-1 px-3 pt-2">
++        {[['open', `Ouverts (${openCount})`], ['resolved', `Résolus (${doneCount})`]].map(([k, label]) => (
++          <button key={k} type="button" onClick={() => setFilter(k)}
++            className={`px-3 h-7 rounded-full text-[12px] font-medium transition-colors ${filter === k ? 'bg-[#e8f0fe] text-[#1a73e8]' : 'text-slate-500 hover:bg-slate-100'}`}>
++            {label}
++          </button>
++        ))}
++      </div>
++
++      <div className="flex-1 overflow-y-auto p-3 space-y-3">
++        {pendingQuote != null && (
++          <div className="rounded-xl border-2 border-[#1a73e8] bg-white p-3 shadow-md">
++            <p className="text-[12px] italic text-slate-500 border-l-2 border-amber-400 pl-2 mb-2 line-clamp-3">« {pendingQuote} »</p>
++            <Composer placeholder="Ajouter un commentaire… (Ctrl+Entrée pour envoyer)" onSubmit={onAdd} onCancel={onCancelPending} />
++          </div>
++        )}
++
++        {threads.length === 0 && pendingQuote == null && (
++          <div className="text-center text-[12.5px] text-slate-400 py-10 px-4">
++            {filter === 'open'
++              ? (canComment ? 'Sélectionnez du texte puis cliquez sur « Commenter » pour lancer une discussion.' : 'Aucun commentaire.')
++              : 'Aucun commentaire résolu.'}
++          </div>
++        )}
++
++        {threads.map((c) => {
++          const active = c.id === activeId;
++          const replies = repliesOf(c.id);
++          return (
++            <div key={c.id} onClick={() => onSelect?.(c.id)}
++              className={`rounded-xl border p-3 cursor-pointer transition-shadow ${active ? 'border-[#1a73e8] shadow-md bg-[#f8fbff]' : 'border-slate-200 hover:shadow-sm bg-white'}`}>
++              <div className="flex items-start gap-2">
++                <Initial name={c.userName} id={c.userId} />
++                <div className="flex-1 min-w-0">
++                  <div className="flex items-center justify-between gap-2">
++                    <span className="text-[12.5px] font-semibold text-slate-800 truncate">{c.userName}</span>
++                    <span className="text-[10.5px] text-slate-400 flex-shrink-0">{fmt(c.createdAt)}</span>
++                  </div>
++                  {c.quote && <p className="text-[11.5px] italic text-slate-500 border-l-2 border-amber-400 pl-2 my-1.5 line-clamp-2">« {c.quote} »</p>}
++                  <p className="text-[13px] text-slate-700 whitespace-pre-wrap break-words">{c.text}</p>
++                </div>
++              </div>
++
++              {replies.map((r) => (
++                <div key={r.id} className="flex items-start gap-2 mt-3 pl-4">
++                  <Initial name={r.userName} id={r.userId} />
++                  <div className="flex-1 min-w-0">
++                    <div className="flex items-center justify-between gap-2">
++                      <span className="text-[12px] font-semibold text-slate-800 truncate">{r.userName}</span>
++                      <span className="flex items-center gap-2 flex-shrink-0">
++                        <span className="text-[10.5px] text-slate-400">{fmt(r.createdAt)}</span>
++                        {canDelete(r) && <button type="button" title="Supprimer la réponse" onClick={(e) => { e.stopPropagation(); onDelete?.(r.id); }} className="text-slate-300 hover:text-red-500"><FaTrash className="text-[9px]" /></button>}
++                      </span>
++                    </div>
++                    <p className="text-[12.5px] text-slate-700 whitespace-pre-wrap break-words">{r.text}</p>
++                  </div>
++                </div>
++              ))}
++
++              {active && canComment && !c.resolved && (
++                <div className="mt-3 pl-4" onClick={(e) => e.stopPropagation()}>
++                  <Composer autoFocus={false} placeholder="Répondre…" submitLabel="Répondre" onSubmit={(t) => onReply?.(c.id, t)} />
++                </div>
++              )}
++
++              <div className="flex items-center justify-end gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
++                {canComment && (
++                  <button type="button" onClick={() => onResolve?.(c.id)} title={c.resolved ? 'Rouvrir' : 'Résoudre'}
++                    className="flex items-center gap-1 px-2 h-6 rounded-full text-[11px] text-slate-500 hover:bg-slate-100">
++                    {c.resolved ? <><FaUndo className="text-[9px]" /> Rouvrir</> : <><FaCheck className="text-[9px] text-emerald-600" /> Résoudre</>}
++                  </button>
++                )}
++                {!active && !c.resolved && canComment && (
++                  <button type="button" onClick={() => onSelect?.(c.id)} className="flex items-center gap-1 px-2 h-6 rounded-full text-[11px] text-slate-500 hover:bg-slate-100">
++                    <FaReply className="text-[9px]" /> Répondre
++                  </button>
++                )}
++                {canDelete(c) && (
++                  <button type="button" onClick={() => onDelete?.(c.id)} title="Supprimer le fil" className="flex items-center gap-1 px-2 h-6 rounded-full text-[11px] text-slate-400 hover:bg-red-50 hover:text-red-600">
++                    <FaTrash className="text-[9px]" />
++                  </button>
++                )}
++              </div>
++            </div>
++          );
++        })}
++      </div>
++    </div>
++  );
++};
++
++export default CommentsPanel;
+diff --git a/resources/js/Components/Editor/DocMenus.jsx b/resources/js/Components/Editor/DocMenus.jsx
+new file mode 100644
+index 0000000..1b8a4c1
+--- /dev/null
++++ b/resources/js/Components/Editor/DocMenus.jsx
+@@ -0,0 +1,216 @@
++import React, { useCallback, useRef, useState } from 'react';
++import { FaCheck, FaTimes } from 'react-icons/fa';
++import DropdownPanel from './DropdownPanel';
++
++const SHORTCUTS = [
++  ['Enregistrer', 'Ctrl + S'], ['Annuler', 'Ctrl + Z'], ['Rétablir', 'Ctrl + Y'],
++  ['Gras', 'Ctrl + B'], ['Italique', 'Ctrl + I'], ['Souligné', 'Ctrl + U'],
++  ['Lien', 'Ctrl + K'], ['Rechercher et remplacer', 'Ctrl + H'],
++  ['Ajouter un commentaire', 'Ctrl + Alt + M'], ['Tout sélectionner', 'Ctrl + A'],
++  ['Titre 1 / 2 / 3', 'Ctrl + Alt + 1 / 2 / 3'], ['Liste à puces', 'Ctrl + Maj + 8'],
++  ['Liste numérotée', 'Ctrl + Maj + 7'], ['Aligner à gauche / centre / droite', 'Ctrl + Maj + L / E / R'],
++];
++
++const TopMenu = ({ label, items, open, onToggle, onHover, onClose }) => (
++  <div className="relative">
++    <button
++      type="button"
++      onClick={onToggle}
++      onMouseEnter={onHover}
++      className={`px-2.5 h-7 rounded text-[13px] text-slate-700 transition-colors ${open ? 'bg-[#e8eaed]' : 'hover:bg-[#f1f3f4]'}`}
++    >
++      {label}
++    </button>
++    <DropdownPanel open={open} onClose={onClose} className="min-w-[270px] py-1.5">
++      {items.filter(Boolean).map((it, i) => {
++        if (it.type === 'sep') return <div key={`s${i}`} className="my-1 border-t border-slate-200" />;
++        if (it.type === 'heading') return <div key={`h${i}`} className="px-4 pt-1.5 pb-0.5 text-[10.5px] uppercase tracking-wide text-slate-400">{it.label}</div>;
++        return (
++          <button
++            key={it.label + i}
++            type="button"
++            disabled={it.disabled}
++            onMouseDown={(e) => e.preventDefault()}
++            onClick={() => { onClose(); it.onClick?.(); }}
++            className="flex items-center w-full gap-2 px-4 h-8 text-left text-[13px] text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent"
++          >
++            <span className="w-4 flex-shrink-0 text-[#1a73e8]">{it.checked ? <FaCheck className="text-[10px]" /> : null}</span>
++            <span className="flex-1 truncate">{it.label}</span>
++            {it.shortcut && <span className="text-[11px] text-slate-400 ml-4">{it.shortcut}</span>}
++          </button>
++        );
++      })}
++    </DropdownPanel>
++  </div>
++);
++
++const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, commentsOpen = false }) => {
++  const [openKey, setOpenKey] = useState(null);
++  const [showShortcuts, setShowShortcuts] = useState(false);
++  const fileInput = useRef(null);
++
++  const close = useCallback(() => setOpenKey(null), []);
++  const has = (name) => !!editor?.extensionManager?.extensions?.some((e) => e.name === name);
++  const run = (fn) => () => { if (editor && !isReadOnly) fn(editor.chain().focus()).run(); };
++  const ro = isReadOnly;
++
++  const onPickImage = (e) => {
++    const f = e.target.files?.[0];
++    e.target.value = '';
++    if (!f || !editor) return;
++    if (f.size > 2 * 1024 * 1024) { window.alert('Image trop lourde (2 Mo maximum). Utilisez plutôt une URL.'); return; }
++    const reader = new FileReader();
++    reader.onload = () => editor.chain().focus().setImage({ src: reader.result }).run();
++    reader.readAsDataURL(f);
++  };
++
++  const insertUrlImage = () => { const url = window.prompt("URL de l'image"); if (url) editor.chain().focus().setImage({ src: url }).run(); };
++  const insertLink = () => {
++    const prev = editor.getAttributes('link').href;
++    const url = window.prompt('URL du lien', prev ?? '');
++    if (url === null) return;
++    if (url === '') editor.chain().focus().extendMarkRange('link').unsetLink().run();
++    else editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
++  };
++  const insertDate = () => editor.chain().focus().insertContent(new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })).run();
++  const pasteText = async () => {
++    try { const t = await navigator.clipboard.readText(); if (t) editor.chain().focus().insertContent(t).run(); }
++    catch { window.alert('Le navigateur bloque le collage par le menu. Utilisez Ctrl + V.'); }
++  };
++  const wordStats = () => {
++    const text = editor.getText();
++    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
++    window.alert(`Mots : ${words}\nCaractères : ${text.length}\nCaractères (sans espaces) : ${text.replace(/\s/g, '').length}`);
++  };
++
++  const menus = editor ? [
++    ['Fichier', [
++      { label: 'Enregistrer', shortcut: 'Ctrl+S', onClick: actions.save, disabled: ro },
++      { label: 'Renommer', onClick: actions.rename, disabled: ro },
++      { type: 'sep' },
++      { type: 'heading', label: 'Télécharger' },
++      { label: 'Page web (.html)', onClick: actions.downloadHtml },
++      { label: 'Microsoft Word (.doc)', onClick: actions.downloadDoc },
++      { label: 'Texte brut (.txt)', onClick: actions.downloadTxt },
++      { type: 'sep' },
++      { label: 'Historique des versions', onClick: actions.history },
++      { label: 'Partager', onClick: actions.share },
++      { type: 'sep' },
++      { label: 'Imprimer', shortcut: 'Ctrl+P', onClick: actions.print },
++      { type: 'sep' },
++      { label: 'Fermer', onClick: actions.close },
++    ]],
++    ['Édition', [
++      { label: 'Annuler', shortcut: 'Ctrl+Z', onClick: run((c) => c.undo()), disabled: ro || !editor.can().undo() },
++      { label: 'Rétablir', shortcut: 'Ctrl+Y', onClick: run((c) => c.redo()), disabled: ro || !editor.can().redo() },
++      { type: 'sep' },
++      { label: 'Couper', shortcut: 'Ctrl+X', onClick: () => { editor.view.focus(); document.execCommand('cut'); }, disabled: ro },
++      { label: 'Copier', shortcut: 'Ctrl+C', onClick: () => { editor.view.focus(); document.execCommand('copy'); } },
++      { label: 'Coller', shortcut: 'Ctrl+V', onClick: pasteText, disabled: ro },
++      { type: 'sep' },
++      { label: 'Tout sélectionner', shortcut: 'Ctrl+A', onClick: () => editor.chain().focus().selectAll().run() },
++      { type: 'sep' },
++      { label: 'Rechercher et remplacer', shortcut: 'Ctrl+H', onClick: actions.find },
++    ]],
++    ['Affichage', [
++      { label: 'Pleine largeur', checked: fullWidth, onClick: actions.toggleFullWidth },
++      { label: 'Plein écran', onClick: actions.toggleFullscreen },
++      { type: 'sep' },
++      { label: 'Commentaires', checked: commentsOpen, onClick: actions.toggleComments },
++      { label: 'Historique des versions', onClick: actions.history },
++    ]],
++    ['Insertion', [
++      { label: 'Image depuis l’ordinateur…', onClick: () => fileInput.current?.click(), disabled: ro },
++      { label: 'Image depuis une URL…', onClick: insertUrlImage, disabled: ro },
++      { label: 'Lien…', shortcut: 'Ctrl+K', onClick: insertLink, disabled: ro },
++      { type: 'sep' },
++      has('table') && { label: 'Tableau 3 × 3', onClick: run((c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true })), disabled: ro },
++      { label: 'Ligne horizontale', onClick: run((c) => c.setHorizontalRule()), disabled: ro },
++      { label: 'Bloc de code', onClick: run((c) => c.toggleCodeBlock()), disabled: ro },
++      { label: 'Citation', onClick: run((c) => c.toggleBlockquote()), disabled: ro },
++      { type: 'sep' },
++      { label: 'Liste à puces', onClick: run((c) => c.toggleBulletList()), disabled: ro },
++      { label: 'Liste numérotée', onClick: run((c) => c.toggleOrderedList()), disabled: ro },
++      has('taskList') && { label: 'Liste de tâches', onClick: run((c) => c.toggleTaskList()), disabled: ro },
++      { type: 'sep' },
++      { label: 'Date du jour', onClick: insertDate, disabled: ro },
++      { label: 'Commentaire', shortcut: 'Ctrl+Alt+M', onClick: actions.comment, disabled: ro },
++    ]],
++    ['Format', [
++      { type: 'heading', label: 'Texte' },
++      { label: 'Gras', shortcut: 'Ctrl+B', checked: editor.isActive('bold'), onClick: run((c) => c.toggleBold()), disabled: ro },
++      { label: 'Italique', shortcut: 'Ctrl+I', checked: editor.isActive('italic'), onClick: run((c) => c.toggleItalic()), disabled: ro },
++      { label: 'Souligné', shortcut: 'Ctrl+U', checked: editor.isActive('underline'), onClick: run((c) => c.toggleUnderline()), disabled: ro },
++      { label: 'Barré', checked: editor.isActive('strike'), onClick: run((c) => c.toggleStrike()), disabled: ro },
++      has('superscript') && { label: 'Exposant', checked: editor.isActive('superscript'), onClick: run((c) => c.toggleSuperscript()), disabled: ro },
++      has('subscript') && { label: 'Indice', checked: editor.isActive('subscript'), onClick: run((c) => c.toggleSubscript()), disabled: ro },
++      { type: 'sep' },
++      { type: 'heading', label: 'Styles de paragraphe' },
++      { label: 'Texte normal', checked: editor.isActive('paragraph'), onClick: run((c) => c.setParagraph()), disabled: ro },
++      { label: 'Titre 1', checked: editor.isActive('heading', { level: 1 }), onClick: run((c) => c.setHeading({ level: 1 })), disabled: ro },
++      { label: 'Titre 2', checked: editor.isActive('heading', { level: 2 }), onClick: run((c) => c.setHeading({ level: 2 })), disabled: ro },
++      { label: 'Titre 3', checked: editor.isActive('heading', { level: 3 }), onClick: run((c) => c.setHeading({ level: 3 })), disabled: ro },
++      { type: 'sep' },
++      { type: 'heading', label: 'Alignement' },
++      { label: 'À gauche', onClick: run((c) => c.setTextAlign('left')), disabled: ro },
++      { label: 'Centré', onClick: run((c) => c.setTextAlign('center')), disabled: ro },
++      { label: 'À droite', onClick: run((c) => c.setTextAlign('right')), disabled: ro },
++      { label: 'Justifié', onClick: run((c) => c.setTextAlign('justify')), disabled: ro },
++      has('lineHeight') && { type: 'sep' },
++      has('lineHeight') && { type: 'heading', label: 'Interligne' },
++      ...(has('lineHeight') ? ['1', '1.15', '1.5', '2'].map((v) => ({ label: v === '1.15' ? '1,15 (par défaut)' : v.replace('.', ','), onClick: run((c) => c.setLineHeight(v)), disabled: ro })) : []),
++      { type: 'sep' },
++      { label: 'Effacer la mise en forme', onClick: run((c) => c.clearNodes().unsetAllMarks()), disabled: ro },
++    ]],
++    ['Outils', [
++      { label: 'Nombre de mots', onClick: wordStats },
++      { label: 'Rechercher et remplacer', shortcut: 'Ctrl+H', onClick: actions.find },
++      { type: 'sep' },
++      { label: 'Suivi des modifications', onClick: actions.tracking },
++      { label: 'Historique des versions', onClick: actions.history },
++    ]],
++    ['Aide', [
++      { label: 'Raccourcis clavier', onClick: () => setShowShortcuts(true) },
++    ]],
++  ] : [];
++
++  return (
++    <>
++      <div className="flex items-center gap-0.5 px-2 sm:px-4 py-0.5 overflow-x-auto scrollbar-hide" role="menubar">
++        {menus.map(([label, items]) => (
++          <TopMenu
++            key={label}
++            label={label}
++            items={items}
++            open={openKey === label}
++            onToggle={() => setOpenKey((k) => (k === label ? null : label))}
++            onHover={() => { if (openKey && openKey !== label) setOpenKey(label); }}
++            onClose={close}
++          />
++        ))}
++        <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
++      </div>
++
++      {showShortcuts && (
++        <div className="fixed inset-0 z-[1100] bg-black/30 flex items-center justify-center p-4" onClick={() => setShowShortcuts(false)}>
++          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
++            <div className="flex items-center justify-between mb-3">
++              <h3 className="text-[15px] font-semibold text-slate-800">Raccourcis clavier</h3>
++              <button type="button" onClick={() => setShowShortcuts(false)} className="p-1 rounded hover:bg-slate-100 text-slate-400"><FaTimes /></button>
++            </div>
++            <div className="divide-y divide-slate-100">
++              {SHORTCUTS.map(([n, k]) => (
++                <div key={n} className="flex items-center justify-between py-2 text-[13px]">
++                  <span className="text-slate-700">{n}</span>
++                  <kbd className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-mono">{k}</kbd>
++                </div>
++              ))}
++            </div>
++          </div>
++        </div>
++      )}
++    </>
++  );
++};
++
++export default DocMenus;
+diff --git a/resources/js/Components/Editor/DropdownPanel.jsx b/resources/js/Components/Editor/DropdownPanel.jsx
+new file mode 100644
+index 0000000..a6f69a4
+--- /dev/null
++++ b/resources/js/Components/Editor/DropdownPanel.jsx
+@@ -0,0 +1,75 @@
++import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
++import { createPortal } from 'react-dom';
++
++/**
++ * Panneau déroulant rendu dans <body> (position: fixed) : il n'est donc jamais
++ * coupé ni caché par un conteneur parent (overflow, z-index, zone d'écriture…).
++ * Il s'ancre sur l'élément PARENT du composant (le <div className="relative"> du bouton).
++ */
++const DropdownPanel = ({ open, onClose, children, className = '' }) => {
++  const markerRef = useRef(null);
++  const panelRef = useRef(null);
++  const [pos, setPos] = useState(null);
++
++  const getAnchor = () => markerRef.current?.parentElement ?? null;
++
++  useLayoutEffect(() => {
++    if (!open) { setPos(null); return undefined; }
++
++    const place = () => {
++      const anchor = getAnchor();
++      if (!anchor) return;
++      const r = anchor.getBoundingClientRect();
++      const pw = panelRef.current?.offsetWidth || 0;
++      const ph = panelRef.current?.offsetHeight || 0;
++      const left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8));
++      let top = r.bottom + 4;
++      if (top + ph > window.innerHeight - 8) top = Math.max(8, window.innerHeight - ph - 8);
++      setPos({ top, left });
++    };
++
++    place();
++    const raf = requestAnimationFrame(place);
++    window.addEventListener('resize', place);
++    window.addEventListener('scroll', place, true);
++    return () => {
++      cancelAnimationFrame(raf);
++      window.removeEventListener('resize', place);
++      window.removeEventListener('scroll', place, true);
++    };
++  }, [open]);
++
++  useEffect(() => {
++    if (!open) return undefined;
++    const fn = (e) => {
++      if (panelRef.current?.contains(e.target)) return;
++      if (getAnchor()?.contains(e.target)) return; // le bouton gère lui-même l'ouverture/fermeture
++      onClose();
++    };
++    const esc = (e) => { if (e.key === 'Escape') onClose(); };
++    document.addEventListener('mousedown', fn);
++    document.addEventListener('keydown', esc);
++    return () => {
++      document.removeEventListener('mousedown', fn);
++      document.removeEventListener('keydown', esc);
++    };
++  }, [open, onClose]);
++
++  return (
++    <>
++      <span ref={markerRef} className="hidden" aria-hidden="true" />
++      {open && createPortal(
++        <div
++          ref={panelRef}
++          style={{ position: 'fixed', top: pos?.top ?? -9999, left: pos?.left ?? -9999, zIndex: 1000, maxHeight: 'calc(100vh - 16px)' }}
++          className={`bg-white border border-gray-200 rounded-lg shadow-xl overflow-y-auto ${className}`}
++        >
++          {children}
++        </div>,
++        document.body
++      )}
++    </>
++  );
++};
++
++export default DropdownPanel;
+diff --git a/resources/js/Components/Editor/FindReplaceBar.jsx b/resources/js/Components/Editor/FindReplaceBar.jsx
+new file mode 100644
+index 0000000..069817d
+--- /dev/null
++++ b/resources/js/Components/Editor/FindReplaceBar.jsx
+@@ -0,0 +1,136 @@
++import React, { useCallback, useEffect, useRef, useState } from 'react';
++import { FaSearch, FaChevronUp, FaChevronDown, FaTimes } from 'react-icons/fa';
++import { searchKey, findMatches } from './extensions/search-highlight';
++
++const FindReplaceBar = ({ editor, open, onClose, readOnly = false }) => {
++  const [term, setTerm] = useState('');
++  const [replaceWith, setReplaceWith] = useState('');
++  const [caseSensitive, setCaseSensitive] = useState(false);
++  const [current, setCurrent] = useState(0);
++  const [count, setCount] = useState(0);
++  const inputRef = useRef(null);
++
++  const push = useCallback((meta) => {
++    if (!editor || editor.isDestroyed) return;
++    editor.view.dispatch(editor.state.tr.setMeta(searchKey, meta));
++  }, [editor]);
++
++  const recount = useCallback(() => {
++    if (!editor || editor.isDestroyed) return [];
++    const m = findMatches(editor.state.doc, term, caseSensitive);
++    setCount(m.length);
++    return m;
++  }, [editor, term, caseSensitive]);
++
++  const select = useCallback((matches, idx) => {
++    const m = matches[idx];
++    if (!m) return;
++    editor.chain().setTextSelection({ from: m.from, to: m.to }).scrollIntoView().run();
++  }, [editor]);
++
++  // Nouveau terme : surligner et aller à la première occurrence
++  useEffect(() => {
++    if (!open || !editor) return;
++    push({ term, caseSensitive, current: 0 });
++    setCurrent(0);
++    const m = recount();
++    if (term && m.length) select(m, 0);
++  }, [term, caseSensitive, open]); // eslint-disable-line react-hooks/exhaustive-deps
++
++  // Mise à jour du compteur quand le document change
++  useEffect(() => {
++    if (!open || !editor) return undefined;
++    const fn = () => recount();
++    editor.on('update', fn);
++    return () => editor.off('update', fn);
++  }, [open, editor, recount]);
++
++  useEffect(() => {
++    if (open) setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select(); }, 30);
++    else if (editor && !editor.isDestroyed) push({ term: '', current: 0 });
++  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
++
++  const go = (delta) => {
++    const m = findMatches(editor.state.doc, term, caseSensitive);
++    if (!m.length) return;
++    const idx = (current + delta + m.length) % m.length;
++    setCurrent(idx);
++    push({ current: idx });
++    select(m, idx);
++  };
++
++  const replaceOne = () => {
++    if (readOnly) return;
++    const m = findMatches(editor.state.doc, term, caseSensitive);
++    const hit = m[Math.min(current, m.length - 1)];
++    if (!hit) return;
++    editor.view.dispatch(editor.state.tr.insertText(replaceWith, hit.from, hit.to));
++    const after = recount();
++    if (after.length) { const idx = Math.min(current, after.length - 1); setCurrent(idx); push({ current: idx }); select(after, idx); }
++  };
++
++  const replaceAll = () => {
++    if (readOnly) return;
++    const m = findMatches(editor.state.doc, term, caseSensitive);
++    if (!m.length) return;
++    const tr = editor.state.tr;
++    [...m].reverse().forEach((hit) => tr.insertText(replaceWith, hit.from, hit.to));
++    editor.view.dispatch(tr);
++    recount();
++  };
++
++  if (!open) return null;
++
++  return (
++    <div className="fixed top-36 right-4 sm:right-8 z-[900] w-[340px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-xl shadow-2xl p-3 text-slate-700">
++      <div className="flex items-center justify-between mb-2">
++        <span className="flex items-center gap-2 text-[13px] font-semibold"><FaSearch className="text-[11px] text-[#1a73e8]" /> Rechercher et remplacer</span>
++        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400" title="Fermer (Échap)"><FaTimes className="text-xs" /></button>
++      </div>
++
++      <div className="flex items-center gap-1.5 mb-2">
++        <input
++          ref={inputRef}
++          value={term}
++          onChange={(e) => setTerm(e.target.value)}
++          onKeyDown={(e) => { if (e.key === 'Enter') go(e.shiftKey ? -1 : 1); if (e.key === 'Escape') onClose(); }}
++          placeholder="Rechercher"
++          className="flex-1 min-w-0 h-8 px-2 text-[13px] border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40 focus:border-[#1a73e8]"
++        />
++        <span className="text-[11px] text-slate-500 w-12 text-center tabular-nums">{term ? (count ? `${current + 1}/${count}` : '0/0') : ''}</span>
++        <button type="button" onClick={() => go(-1)} className="p-1.5 rounded hover:bg-slate-100" title="Précédent (Maj+Entrée)"><FaChevronUp className="text-[10px]" /></button>
++        <button type="button" onClick={() => go(1)} className="p-1.5 rounded hover:bg-slate-100" title="Suivant (Entrée)"><FaChevronDown className="text-[10px]" /></button>
++      </div>
++
++      {!readOnly && (
++        <>
++          <input
++            value={replaceWith}
++            onChange={(e) => setReplaceWith(e.target.value)}
++            onKeyDown={(e) => { if (e.key === 'Enter') replaceOne(); if (e.key === 'Escape') onClose(); }}
++            placeholder="Remplacer par"
++            className="w-full h-8 px-2 mb-2 text-[13px] border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40 focus:border-[#1a73e8]"
++          />
++          <div className="flex items-center justify-between gap-2">
++            <label className="flex items-center gap-1.5 text-[12px] text-slate-600 cursor-pointer select-none">
++              <input type="checkbox" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} className="rounded" />
++              Respecter la casse
++            </label>
++            <div className="flex gap-1.5">
++              <button type="button" onClick={replaceOne} disabled={!count} className="px-2.5 h-7 text-[12px] rounded-md border border-slate-300 hover:bg-slate-50 disabled:opacity-40">Remplacer</button>
++              <button type="button" onClick={replaceAll} disabled={!count} className="px-2.5 h-7 text-[12px] rounded-md bg-[#1a73e8] text-white hover:bg-[#1765cc] disabled:opacity-40">Tout remplacer</button>
++            </div>
++          </div>
++        </>
++      )}
++      {readOnly && (
++        <label className="flex items-center gap-1.5 text-[12px] text-slate-600 cursor-pointer select-none">
++          <input type="checkbox" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} className="rounded" />
++          Respecter la casse
++        </label>
++      )}
++    </div>
++  );
++};
++
++export default FindReplaceBar;
+diff --git a/resources/js/Components/Editor/MenuBar.jsx b/resources/js/Components/Editor/MenuBar.jsx
+index 4cf9fd8..2597cc4 100644
+--- a/resources/js/Components/Editor/MenuBar.jsx
++++ b/resources/js/Components/Editor/MenuBar.jsx
+@@ -5,9 +5,11 @@ import {
+   FaListUl, FaListOl, FaUndo, FaRedo,
+   FaLink, FaImage, FaCode, FaHistory,
+   FaPalette, FaHighlighter, FaCheck, FaTimes, FaChevronDown,
+-  FaQuoteLeft, FaMinus
++  FaQuoteLeft, FaMinus, FaTable, FaSubscript, FaSuperscript, FaTasks,
++  FaIndent, FaOutdent, FaArrowsAltV, FaCommentMedical, FaSearch, FaPrint
+ } from 'react-icons/fa';
+ import { MdOutlineFormatClear } from 'react-icons/md';
++import DropdownPanel from './DropdownPanel';
+ 
+ /* ─── Design tokens ─── */
+ const ACCENT    = '#1a73e8'; // Google Docs blue
+@@ -60,12 +62,13 @@ const HIGHLIGHT_COLORS = [
+ 
+ /* ─── Atoms ─── */
+ const Divider = () => (
+-  <div className="w-px h-5 bg-gray-300 dark:bg-slate-600 flex-shrink-0 mx-0.5" />
++  <div className="w-px h-5 bg-gray-300 flex-shrink-0 mx-0.5" />
+ );
+ 
+ const ToolBtn = ({ active, disabled, title, onClick, children }) => (
+   <button
+     type="button"
++    onMouseDown={e => e.preventDefault()}
+     onClick={onClick}
+     disabled={disabled}
+     title={title}
+@@ -73,40 +76,19 @@ const ToolBtn = ({ active, disabled, title, onClick, children }) => (
+       relative flex items-center justify-center rounded h-7 min-w-[28px] px-1.5 text-[13px]
+       transition-colors select-none
+       ${active
+-        ? 'bg-[#c2d7f7] text-[#1a73e8] dark:bg-blue-900/40 dark:text-blue-300'
+-        : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
++        ? 'bg-[#c2d7f7] text-[#1a73e8]'
++        : 'text-gray-700 hover:bg-gray-100'
+       }
+       ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
+     `}
+   >
+     {children}
+     {active && (
+-      <span className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full bg-[#1a73e8] dark:bg-blue-400" />
++      <span className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full bg-[#1a73e8]" />
+     )}
+   </button>
+ );
+ 
+-/* ─── Dropdown wrapper (click-outside aware) ─── */
+-const DropdownPanel = ({ open, onClose, children, className = '' }) => {
+-  const ref = useRef(null);
+-  useEffect(() => {
+-    if (!open) return;
+-    const fn = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+-    document.addEventListener('mousedown', fn);
+-    return () => document.removeEventListener('mousedown', fn);
+-  }, [open, onClose]);
+-  if (!open) return null;
+-  return (
+-    <div
+-      ref={ref}
+-      className={`absolute top-full left-0 z-50 mt-1 bg-white dark:bg-slate-800
+-        border border-gray-200 dark:border-slate-600 rounded-lg shadow-xl overflow-hidden ${className}`}
+-    >
+-      {children}
+-    </div>
+-  );
+-};
+-
+ /* ─── Colour swatch grid ─── */
+ const ColorSwatchGrid = ({ colors, current, onSelect, onClear }) => (
+   <div className="p-2 w-52">
+@@ -123,7 +105,7 @@ const ColorSwatchGrid = ({ colors, current, onSelect, onClear }) => (
+         />
+       ))}
+     </div>
+-    <div className="border-t border-gray-100 dark:border-slate-700 pt-2 flex items-center gap-1.5">
++    <div className="border-t border-gray-100 pt-2 flex items-center gap-1.5">
+       <input
+         type="color"
+         defaultValue={current || '#000000'}
+@@ -131,7 +113,7 @@ const ColorSwatchGrid = ({ colors, current, onSelect, onClear }) => (
+         className="w-6 h-6 cursor-pointer rounded border-none p-0"
+         title="Couleur personnalisée"
+       />
+-      <span className="text-[11px] text-gray-500 dark:text-slate-400">Personnalisée</span>
++      <span className="text-[11px] text-gray-500">Personnalisée</span>
+     </div>
+     {onClear && (
+       <button
+@@ -148,7 +130,7 @@ const ColorSwatchGrid = ({ colors, current, onSelect, onClear }) => (
+ /* ═══════════════════════════════════════════════════════════════
+    MAIN COMPONENT
+ ═══════════════════════════════════════════════════════════════ */
+-const MenuBar = ({ editor, onTrackChanges }) => {
++const MenuBar = ({ editor, onTrackChanges, onComment, onFind, onPrint }) => {
+   const [open, setOpen]                   = useState(null); // 'style'|'font'|'size'|'color'|'highlight'
+   const [currentColor, setCurrentColor]   = useState('#000000');
+   const [currentHL, setCurrentHL]         = useState(null);
+@@ -191,11 +173,13 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+ 
+   const activeFontLabel = FONT_FAMILIES.find(f => f.value === fontFamily)?.label ?? 'Arial';
+ 
++  const has = (name) => !!editor?.extensionManager?.extensions?.some((e) => e.name === name);
++
+   if (!editor) return null;
+ 
+   return (
+-    <div className="flex flex-col bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 select-none">
+-      <div className="flex flex-wrap items-center gap-0.5 px-2 py-1 min-h-[40px]">
++    <div className="flex flex-col bg-transparent select-none w-full">
++      <div className="flex flex-wrap items-center gap-x-0.5 gap-y-1 px-2 py-1 min-h-[40px]">
+ 
+         {/* ── Undo / Redo ── */}
+         <ToolBtn title="Annuler (Ctrl+Z)" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
+@@ -212,8 +196,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+           <button
+             type="button"
+             onClick={() => toggle('style')}
+-            className="flex items-center gap-1 h-7 px-2 rounded text-[12px] text-gray-700 dark:text-slate-300
+-              hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors min-w-[128px] border border-transparent hover:border-gray-200 dark:hover:border-slate-600"
++            className="flex items-center gap-1 h-7 px-2 rounded text-[12px] text-gray-700
++              hover:bg-gray-100 transition-colors min-w-[128px] border border-transparent hover:border-gray-200"
+           >
+             <span className="flex-1 text-left truncate" style={{ fontSize: activeStyle.size, fontWeight: activeStyle.weight }}>
+               {activeStyle.label}
+@@ -232,8 +216,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+                   closeAll();
+                 }}
+                 className={`flex items-center gap-2 w-full px-3 py-2 text-left transition-colors
+-                  hover:bg-blue-50 dark:hover:bg-slate-700
+-                  ${activeStyle.label === s.label ? 'bg-blue-50 dark:bg-slate-700' : ''}`}
++                  hover:bg-blue-50
++                  ${activeStyle.label === s.label ? 'bg-blue-50' : ''}`}
+                 style={{ fontSize: s.size, fontWeight: s.weight }}
+               >
+                 {activeStyle.label === s.label && <FaCheck className="text-[10px] text-[#1a73e8]" />}
+@@ -250,8 +234,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+           <button
+             type="button"
+             onClick={() => toggle('font')}
+-            className="flex items-center gap-1 h-7 px-2 rounded text-[12px] text-gray-700 dark:text-slate-300
+-              hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors min-w-[110px] border border-transparent hover:border-gray-200 dark:hover:border-slate-600"
++            className="flex items-center gap-1 h-7 px-2 rounded text-[12px] text-gray-700
++              hover:bg-gray-100 transition-colors min-w-[110px] border border-transparent hover:border-gray-200"
+             style={{ fontFamily: fontFamily || 'Arial, sans-serif' }}
+           >
+             <span className="flex-1 text-left truncate">{activeFontLabel}</span>
+@@ -268,8 +252,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+                   closeAll();
+                 }}
+                 className={`flex items-center gap-2 w-full px-3 py-2 text-left text-[13px] transition-colors
+-                  hover:bg-blue-50 dark:hover:bg-slate-700
+-                  ${fontFamily === f.value ? 'bg-blue-50 dark:bg-slate-700' : ''}`}
++                  hover:bg-blue-50
++                  ${fontFamily === f.value ? 'bg-blue-50' : ''}`}
+                 style={{ fontFamily: f.value }}
+               >
+                 {fontFamily === f.value && <FaCheck className="text-[10px] text-[#1a73e8] flex-shrink-0" />}
+@@ -286,7 +270,7 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+           <button
+             type="button"
+             onClick={() => { const n = Math.max(6, (parseInt(fontSize)||11) - 1); editor.chain().focus().setFontSize(`${n}pt`).run(); setFontSize(String(n)); }}
+-            className="h-7 w-5 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 text-sm transition-colors border border-r-0 border-gray-200 dark:border-slate-600 rounded-l"
++            className="h-7 w-5 flex items-center justify-center hover:bg-gray-100 text-gray-500 text-sm transition-colors border border-r-0 border-gray-200 rounded-l"
+             title="Réduire"
+           >−</button>
+           <input
+@@ -295,18 +279,18 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+             onChange={e => setFontSize(e.target.value)}
+             onBlur={e => { const v = parseInt(e.target.value); if (v > 0) { editor.chain().focus().setFontSize(`${v}pt`).run(); setFontSize(String(v)); } }}
+             onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(fontSize); if (v > 0) editor.chain().focus().setFontSize(`${v}pt`).run(); closeAll(); } }}
+-            className="h-7 w-10 text-center text-[12px] border-y border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:z-10"
++            className="h-7 w-10 text-center text-[12px] border-y border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:z-10"
+           />
+           <button
+             type="button"
+             onClick={() => toggle('size')}
+-            className="h-7 w-4 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-400 text-[8px] transition-colors border border-gray-200 dark:border-slate-600"
++            className="h-7 w-4 flex items-center justify-center hover:bg-gray-100 text-gray-400 text-[8px] transition-colors border border-gray-200"
+             title="Choisir taille"
+           ><FaChevronDown /></button>
+           <button
+             type="button"
+             onClick={() => { const n = (parseInt(fontSize)||11) + 1; editor.chain().focus().setFontSize(`${n}pt`).run(); setFontSize(String(n)); }}
+-            className="h-7 w-5 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 text-sm transition-colors border border-l-0 border-gray-200 dark:border-slate-600 rounded-r"
++            className="h-7 w-5 flex items-center justify-center hover:bg-gray-100 text-gray-500 text-sm transition-colors border border-l-0 border-gray-200 rounded-r"
+             title="Augmenter"
+           >+</button>
+           <DropdownPanel open={open === 'size'} onClose={closeAll} className="w-16">
+@@ -314,8 +298,8 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+               {FONT_SIZES.map(s => (
+                 <button key={s} type="button"
+                   onClick={() => { editor.chain().focus().setFontSize(`${s}pt`).run(); setFontSize(s); closeAll(); }}
+-                  className={`block w-full text-center px-2 py-1 text-[12px] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors
+-                    ${fontSize === s ? 'font-bold text-[#1a73e8]' : 'text-gray-700 dark:text-slate-200'}`}
++                  className={`block w-full text-center px-2 py-1 text-[12px] hover:bg-blue-50 transition-colors
++                    ${fontSize === s ? 'font-bold text-[#1a73e8]' : 'text-gray-700'}`}
+                 >{s}</button>
+               ))}
+             </div>
+@@ -329,14 +313,16 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+         <ToolBtn active={editor.isActive('italic')}     title="Italique (Ctrl+I)"  onClick={() => editor.chain().focus().toggleItalic().run()}>    <FaItalic      className="text-[12px]" /></ToolBtn>
+         <ToolBtn active={editor.isActive('underline')}  title="Souligné (Ctrl+U)"  onClick={() => editor.chain().focus().toggleUnderline().run()}> <FaUnderline   className="text-[12px]" /></ToolBtn>
+         <ToolBtn active={editor.isActive('strike')}     title="Barré"              onClick={() => editor.chain().focus().toggleStrike().run()}>    <FaStrikethrough className="text-[12px]" /></ToolBtn>
++        {has('superscript') && <ToolBtn active={editor.isActive('superscript')} title="Exposant" onClick={() => editor.chain().focus().toggleSuperscript().run()}><FaSuperscript className="text-[11px]" /></ToolBtn>}
++        {has('subscript') && <ToolBtn active={editor.isActive('subscript')} title="Indice" onClick={() => editor.chain().focus().toggleSubscript().run()}><FaSubscript className="text-[11px]" /></ToolBtn>}
+ 
+         <Divider />
+ 
+         {/* ── Text color ── */}
+         <div className="relative">
+           <button type="button" onClick={() => toggle('color')} title="Couleur du texte"
+-            className="flex flex-col items-center justify-center h-7 w-8 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+-            <FaPalette className="text-[12px] text-gray-600 dark:text-slate-300" />
++            className="flex flex-col items-center justify-center h-7 w-8 rounded hover:bg-gray-100 transition-colors">
++            <FaPalette className="text-[12px] text-gray-600" />
+             <span className="w-5 h-1 rounded-full mt-0.5" style={{ backgroundColor: currentColor }} />
+           </button>
+           <DropdownPanel open={open === 'color'} onClose={closeAll}>
+@@ -352,13 +338,13 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+         {/* ── Highlight color ── */}
+         <div className="relative">
+           <button type="button" onClick={() => toggle('highlight')} title="Surbrillance"
+-            className="flex flex-col items-center justify-center h-7 w-8 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+-            <FaHighlighter className="text-[12px] text-gray-600 dark:text-slate-300" />
++            className="flex flex-col items-center justify-center h-7 w-8 rounded hover:bg-gray-100 transition-colors">
++            <FaHighlighter className="text-[12px] text-gray-600" />
+             <span className="w-5 h-1 rounded-full mt-0.5" style={{ backgroundColor: currentHL ?? '#ffd700' }} />
+           </button>
+           <DropdownPanel open={open === 'highlight'} onClose={closeAll} className="w-52">
+             <div className="p-3">
+-              <p className="text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-2">Couleur de surlignage</p>
++              <p className="text-[11px] font-semibold text-gray-500 mb-2">Couleur de surlignage</p>
+               <div className="flex flex-wrap gap-1.5 mb-2">
+                 {HIGHLIGHT_COLORS.map(c => (
+                   <button key={c.name} type="button" title={c.name}
+@@ -389,6 +375,26 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+         {/* ── Lists ── */}
+         <ToolBtn active={editor.isActive('bulletList')}  title="Liste à puces"   onClick={() => editor.chain().focus().toggleBulletList().run()}>  <FaListUl className="text-[12px]" /></ToolBtn>
+         <ToolBtn active={editor.isActive('orderedList')} title="Liste numérotée" onClick={() => editor.chain().focus().toggleOrderedList().run()}><FaListOl className="text-[12px]" /></ToolBtn>
++        {has('taskList') && <ToolBtn active={editor.isActive('taskList')} title="Liste de tâches" onClick={() => editor.chain().focus().toggleTaskList().run()}><FaTasks className="text-[12px]" /></ToolBtn>}
++        <ToolBtn title="Diminuer le retrait" onClick={() => (editor.isActive('taskItem') ? editor.chain().focus().liftListItem('taskItem') : editor.chain().focus().liftListItem('listItem')).run()}><FaOutdent className="text-[12px]" /></ToolBtn>
++        <ToolBtn title="Augmenter le retrait" onClick={() => (editor.isActive('taskItem') ? editor.chain().focus().sinkListItem('taskItem') : editor.chain().focus().sinkListItem('listItem')).run()}><FaIndent className="text-[12px]" /></ToolBtn>
++
++        {has('lineHeight') && (
++          <div className="relative">
++            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => toggle('lh')} title="Interligne"
++              className="flex items-center justify-center h-7 w-8 rounded hover:bg-gray-100 transition-colors text-gray-600">
++              <FaArrowsAltV className="text-[12px]" />
++            </button>
++            <DropdownPanel open={open === 'lh'} onClose={closeAll} className="w-36 py-1">
++              {[['1', 'Simple'], ['1.15', '1,15'], ['1.5', '1,5'], ['2', 'Double']].map(([v, l]) => (
++                <button key={v} type="button" onClick={() => { editor.chain().focus().setLineHeight(v).run(); closeAll(); }}
++                  className="block w-full text-left px-4 py-1.5 text-[13px] text-gray-700 hover:bg-blue-50">{l}</button>
++              ))}
++              <button type="button" onClick={() => { editor.chain().focus().unsetLineHeight().run(); closeAll(); }}
++                className="block w-full text-left px-4 py-1.5 text-[12px] text-red-500 hover:bg-red-50">Réinitialiser</button>
++            </DropdownPanel>
++          </div>
++        )}
+ 
+         <Divider />
+ 
+@@ -397,6 +403,42 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+         <ToolBtn active={editor.isActive('codeBlock')}  title="Bloc de code" onClick={() => editor.chain().focus().toggleCodeBlock().run()}><FaCode className="text-[12px]" /></ToolBtn>
+         <ToolBtn title="Ligne de séparation" onClick={() => editor.chain().focus().setHorizontalRule().run()}><FaMinus className="text-[12px]" /></ToolBtn>
+ 
++        {has('table') && (
++          <div className="relative">
++            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => toggle('table')} title="Tableau"
++              className={`flex items-center justify-center h-7 w-8 rounded transition-colors ${editor.isActive('table') ? 'bg-[#c2d7f7] text-[#1a73e8]' : 'text-gray-600 hover:bg-gray-100'}`}>
++              <FaTable className="text-[12px]" />
++            </button>
++            <DropdownPanel open={open === 'table'} onClose={closeAll} className="w-60 py-1">
++              {[
++                ['Insérer un tableau 3 × 3', () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(), true],
++                ['Insérer un tableau 5 × 4', () => editor.chain().focus().insertTable({ rows: 5, cols: 4, withHeaderRow: true }).run(), true],
++                ['—'],
++                ['Ajouter une ligne au-dessus', () => editor.chain().focus().addRowBefore().run()],
++                ['Ajouter une ligne en dessous', () => editor.chain().focus().addRowAfter().run()],
++                ['Ajouter une colonne à gauche', () => editor.chain().focus().addColumnBefore().run()],
++                ['Ajouter une colonne à droite', () => editor.chain().focus().addColumnAfter().run()],
++                ['—'],
++                ['Fusionner les cellules', () => editor.chain().focus().mergeCells().run()],
++                ['Scinder la cellule', () => editor.chain().focus().splitCell().run()],
++                ['Basculer la ligne d’en-tête', () => editor.chain().focus().toggleHeaderRow().run()],
++                ['—'],
++                ['Supprimer la ligne', () => editor.chain().focus().deleteRow().run()],
++                ['Supprimer la colonne', () => editor.chain().focus().deleteColumn().run()],
++                ['Supprimer le tableau', () => editor.chain().focus().deleteTable().run()],
++              ].map(([label, fn, always], i) => label === '—'
++                ? <div key={i} className="my-1 border-t border-gray-100" />
++                : (
++                  <button key={label} type="button" disabled={!always && !editor.isActive('table')}
++                    onClick={() => { fn(); closeAll(); }}
++                    className="block w-full text-left px-4 py-1.5 text-[13px] text-gray-700 hover:bg-blue-50 disabled:opacity-35 disabled:hover:bg-transparent">
++                    {label}
++                  </button>
++                ))}
++            </DropdownPanel>
++          </div>
++        )}
++
+         <Divider />
+ 
+         {/* ── Link / Image / Clear ── */}
+@@ -406,6 +448,12 @@ const MenuBar = ({ editor, onTrackChanges }) => {
+           <MdOutlineFormatClear className="text-[14px]" />
+         </ToolBtn>
+ 
++        {/* ── Commentaire / Recherche / Impression ── */}
++        {(onComment || onFind || onPrint) && <Divider />}
++        {onComment && <ToolBtn title="Ajouter un commentaire (Ctrl+Alt+M)" onClick={onComment}><FaCommentMedical className="text-[12px]" /></ToolBtn>}
++        {onFind && <ToolBtn title="Rechercher et remplacer (Ctrl+H)" onClick={onFind}><FaSearch className="text-[12px]" /></ToolBtn>}
++        {onPrint && <ToolBtn title="Imprimer (Ctrl+P)" onClick={onPrint}><FaPrint className="text-[12px]" /></ToolBtn>}
++
+         {/* ── Track changes ── */}
+         {onTrackChanges && (
+           <>
+diff --git a/resources/js/Components/Editor/editorStyles.js b/resources/js/Components/Editor/editorStyles.js
+new file mode 100644
+index 0000000..6f82220
+--- /dev/null
++++ b/resources/js/Components/Editor/editorStyles.js
+@@ -0,0 +1,53 @@
++/* Styles de l'éditeur de documents (tableaux, tâches, citations, commentaires, recherche). */
++if (typeof document !== 'undefined' && !document.getElementById('doc-editor-styles')) {
++  const st = document.createElement('style');
++  st.id = 'doc-editor-styles';
++  st.textContent = `
++    .doc-editor .ProseMirror { border: 0 !important; box-shadow: none !important; padding: 0 !important; min-height: 60vh; background: transparent !important; outline: none; color: #202124; font-size: 15px; }
++    .doc-editor .ProseMirror:focus { box-shadow: none !important; }
++    .doc-editor .ProseMirror p { margin: 0.5em 0; }
++    .doc-editor .ProseMirror h1 { font-size: 2em; margin: 0.8em 0 0.4em; }
++    .doc-editor .ProseMirror h2 { font-size: 1.5em; margin: 0.8em 0 0.4em; }
++    .doc-editor .ProseMirror h3 { font-size: 1.2em; margin: 0.8em 0 0.4em; }
++    .doc-editor .ProseMirror ul { list-style: disc; padding-left: 1.6em; }
++    .doc-editor .ProseMirror ol { list-style: decimal; padding-left: 1.6em; }
++    .doc-editor .ProseMirror ul[data-type="taskList"] { list-style: none; padding-left: 0.2em; }
++    .doc-editor .ProseMirror ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5em; }
++    .doc-editor .ProseMirror ul[data-type="taskList"] li > label { margin-top: 0.25em; user-select: none; }
++    .doc-editor .ProseMirror ul[data-type="taskList"] li > div { flex: 1; }
++    .doc-editor .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; color: #80868b; }
++
++    /* Citation (style "Just Do It !") */
++    .doc-editor .ProseMirror blockquote { margin: 1.2em 0; padding: 0.9em 1.3em; border-left: 5px solid #1a73e8; background: #f1f6fe; border-radius: 0 10px 10px 0; font-style: italic; font-size: 1.2em; color: #1a3a6b; }
++    .doc-editor .ProseMirror blockquote p { margin: 0.2em 0; }
++    .doc-editor .ProseMirror blockquote p:last-child:not(:first-child) { font-size: 0.75em; font-style: normal; font-weight: 600; text-align: right; color: #5f6368; }
++
++    /* Tableaux */
++    .doc-editor .ProseMirror table { border-collapse: collapse; table-layout: fixed; width: 100%; margin: 1em 0; overflow: hidden; }
++    .doc-editor .ProseMirror td, .doc-editor .ProseMirror th { border: 1px solid #c4c7c5; padding: 6px 10px; vertical-align: top; position: relative; min-width: 60px; }
++    .doc-editor .ProseMirror th { background: #f1f3f4; font-weight: 600; text-align: left; }
++    .doc-editor .ProseMirror .selectedCell:after { content: ''; position: absolute; inset: 0; background: rgba(26,115,232,0.15); pointer-events: none; }
++    .doc-editor .ProseMirror .tableWrapper { overflow-x: auto; }
++
++    .doc-editor .ProseMirror hr { border: 0; border-top: 1px solid #dadce0; margin: 1.2em 0; }
++    .doc-editor .ProseMirror img { max-width: 100%; height: auto; }
++    .doc-editor .ProseMirror sub { vertical-align: sub; font-size: 0.8em; }
++    .doc-editor .ProseMirror sup { vertical-align: super; font-size: 0.8em; }
++    .doc-editor .ProseMirror a { color: #1a73e8; text-decoration: underline; }
++
++    /* Recherche */
++    .doc-editor .search-match { background: #fff2a8; border-radius: 2px; }
++    .doc-editor .search-match-current { background: #ffb74d; }
++
++    /* Commentaires (la couleur des passages commentés est injectée dynamiquement) */
++    .doc-editor .comment-mark { cursor: pointer; }
++
++    @media print {
++      body * { visibility: hidden !important; }
++      .doc-paper, .doc-paper * { visibility: visible !important; }
++      .doc-paper { position: absolute !important; left: 0; top: 0; width: 100% !important; box-shadow: none !important; border: 0 !important; }
++    }
++  `;
++  document.head.appendChild(st);
++}
++export {};
+diff --git a/resources/js/Components/Editor/extensions/comment-mark.js b/resources/js/Components/Editor/extensions/comment-mark.js
+new file mode 100644
+index 0000000..d4c19fd
+--- /dev/null
++++ b/resources/js/Components/Editor/extensions/comment-mark.js
+@@ -0,0 +1,33 @@
++import { Mark, mergeAttributes } from '@tiptap/core';
++
++/**
++ * Marque "commentaire" : ancre un fil de discussion sur un passage sélectionné.
++ * Le contenu des commentaires est stocké dans le Y.Map "comments" du document Yjs
++ * (donc synchronisé en temps réel et sauvegardé avec le document).
++ */
++export const CommentMark = Mark.create({
++  name: 'comment',
++  inclusive: false,
++  keepOnSplit: false,
++  excludes: '', // autorise plusieurs commentaires superposés
++
++  addAttributes() {
++    return {
++      commentId: {
++        default: null,
++        parseHTML: (el) => el.getAttribute('data-comment-id'),
++        renderHTML: (attrs) => (attrs.commentId ? { 'data-comment-id': attrs.commentId } : {}),
++      },
++    };
++  },
++
++  parseHTML() {
++    return [{ tag: 'span[data-comment-id]' }];
++  },
++
++  renderHTML({ HTMLAttributes }) {
++    return ['span', mergeAttributes({ class: 'comment-mark' }, HTMLAttributes), 0];
++  },
++});
++
++export default CommentMark;
+diff --git a/resources/js/Components/Editor/extensions/line-height.js b/resources/js/Components/Editor/extensions/line-height.js
+new file mode 100644
+index 0000000..2048464
+--- /dev/null
++++ b/resources/js/Components/Editor/extensions/line-height.js
+@@ -0,0 +1,40 @@
++import { Extension } from '@tiptap/core';
++
++/** Interligne (comme Google Docs) sur les paragraphes et titres. */
++export const LineHeight = Extension.create({
++  name: 'lineHeight',
++
++  addOptions() {
++    return { types: ['paragraph', 'heading'] };
++  },
++
++  addGlobalAttributes() {
++    return [
++      {
++        types: this.options.types,
++        attributes: {
++          lineHeight: {
++            default: null,
++            parseHTML: (el) => el.style.lineHeight || null,
++            renderHTML: (attrs) => (attrs.lineHeight ? { style: `line-height: ${attrs.lineHeight}` } : {}),
++          },
++        },
++      },
++    ];
++  },
++
++  addCommands() {
++    return {
++      setLineHeight:
++        (value) =>
++        ({ commands }) =>
++          this.options.types.map((t) => commands.updateAttributes(t, { lineHeight: value })).every(Boolean),
++      unsetLineHeight:
++        () =>
++        ({ commands }) =>
++          this.options.types.map((t) => commands.resetAttributes(t, 'lineHeight')).every(Boolean),
++    };
++  },
++});
++
++export default LineHeight;
+diff --git a/resources/js/Components/Editor/extensions/search-highlight.js b/resources/js/Components/Editor/extensions/search-highlight.js
+new file mode 100644
+index 0000000..6e4614c
+--- /dev/null
++++ b/resources/js/Components/Editor/extensions/search-highlight.js
+@@ -0,0 +1,68 @@
++import { Extension } from '@tiptap/core';
++import { Plugin, PluginKey } from '@tiptap/pm/state';
++import { Decoration, DecorationSet } from '@tiptap/pm/view';
++
++export const searchKey = new PluginKey('searchHighlight');
++
++/**
++ * Retourne toutes les occurrences { from, to } d'un terme dans le document.
++ * La recherche se fait par bloc de texte (paragraphe, titre…) : un mot coupé par une
++ * mise en forme ou un commentaire (gras, couleur, surlignage…) est donc bien retrouvé.
++ */
++export function findMatches(doc, term, caseSensitive = false) {
++  if (!term) return [];
++  const needle = caseSensitive ? term : term.toLowerCase();
++  const matches = [];
++  doc.descendants((node, pos) => {
++    if (!node.isTextblock) return true;
++    let text = '';
++    node.forEach((child) => {
++      text += child.isText ? child.text : '\ufffc'.repeat(child.nodeSize); // objets inline (images…) = 1 caractère
++    });
++    const hay = caseSensitive ? text : text.toLowerCase();
++    let i = 0;
++    while ((i = hay.indexOf(needle, i)) !== -1) {
++      matches.push({ from: pos + 1 + i, to: pos + 1 + i + needle.length });
++      i += needle.length || 1;
++    }
++    return false;
++  });
++  return matches;
++}
++
++export const SearchHighlight = Extension.create({
++  name: 'searchHighlight',
++
++  addProseMirrorPlugins() {
++    return [
++      new Plugin({
++        key: searchKey,
++        state: {
++          init: () => ({ term: '', caseSensitive: false, current: 0 }),
++          apply(tr, value) {
++            const meta = tr.getMeta(searchKey);
++            return meta ? { ...value, ...meta } : value;
++          },
++        },
++        props: {
++          decorations(state) {
++            const { term, caseSensitive, current } = searchKey.getState(state);
++            if (!term) return null;
++            const matches = findMatches(state.doc, term, caseSensitive);
++            if (!matches.length) return null;
++            return DecorationSet.create(
++              state.doc,
++              matches.map((m, i) =>
++                Decoration.inline(m.from, m.to, {
++                  class: i === current ? 'search-match search-match-current' : 'search-match',
++                })
++              )
++            );
++          },
++        },
++      }),
++    ];
++  },
++});
++
++export default SearchHighlight;
+diff --git a/resources/js/Pages/Files/EditContent.jsx b/resources/js/Pages/Files/EditContent.jsx
+index 47fd2f8..aad26c7 100644
+--- a/resources/js/Pages/Files/EditContent.jsx
++++ b/resources/js/Pages/Files/EditContent.jsx
+@@ -9,7 +9,7 @@ import {
+   FaAngleRight, FaAngleLeft, FaAngleDown, FaUndo,
+   FaTag, FaPlus, FaTrash, FaExclamationTriangle, FaClock,
+   FaUserSlash, FaShare, FaChevronDown, FaSearch, FaCheck,
+-  FaUser, FaMinus, FaFileAlt, FaGoogleDrive, FaPen,
++  FaUser, FaMinus, FaFileAlt, FaGoogleDrive, FaPen, FaCommentMedical,
+ } from 'react-icons/fa';
+ import { isPdfFile } from '@/utils/fileUtils';
+ import MenuBar from '@/Components/Editor/MenuBar';
+@@ -34,6 +34,17 @@ import { CollaborationCaret } from '@tiptap/extension-collaboration-caret';
+ import { prosemirrorToYDoc } from '@tiptap/y-tiptap';
+ import { DOMParser as PMDOMParser } from '@tiptap/pm/model';
+ import { PusherYjsProvider, toBase64, fromBase64 } from '@/lib/yjsPusherProvider';
++import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
++import Subscript from '@tiptap/extension-subscript';
++import Superscript from '@tiptap/extension-superscript';
++import { TaskList, TaskItem } from '@tiptap/extension-list';
++import { CommentMark } from '@/Components/Editor/extensions/comment-mark';
++import { SearchHighlight } from '@/Components/Editor/extensions/search-highlight';
++import { LineHeight } from '@/Components/Editor/extensions/line-height';
++import DocMenus from '@/Components/Editor/DocMenus';
++import FindReplaceBar from '@/Components/Editor/FindReplaceBar';
++import CommentsPanel from '@/Components/Editor/CommentsPanel';
++import '@/Components/Editor/editorStyles';
+ 
+ /* ── Style des curseurs collaboratifs ── */
+ if (typeof document !== 'undefined' && !document.getElementById('collab-caret-style')) {
+@@ -57,11 +68,11 @@ const COLLAB_COLORS = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#
+ ──────────────────────────────────────────────────────────── */
+ 
+ const PERMISSIONS = [
+-  { value: 'none',    label: 'Aucun accès', icon: <FaUserSlash />,  dot: 'bg-red-400',     color: 'text-red-600 dark:text-red-400'       },
+-  { value: 'view',    label: 'Lecture',      icon: <FaEye />,        dot: 'bg-slate-400',   color: 'text-slate-600 dark:text-slate-300'   },
+-  { value: 'comment', label: 'Commentaire',  icon: <FaComments />,   dot: 'bg-sky-400',     color: 'text-sky-600 dark:text-sky-400'       },
+-  { value: 'edit',    label: 'Éditeur',      icon: <FaEdit />,       dot: 'bg-emerald-400', color: 'text-emerald-600 dark:text-emerald-400'},
+-  { value: 'admin',   label: 'Admin',        icon: <FaShieldAlt />,  dot: 'bg-violet-400',  color: 'text-violet-600 dark:text-violet-400' },
++  { value: 'none',    label: 'Aucun accès', icon: <FaUserSlash />,  dot: 'bg-red-400',     color: 'text-red-600'       },
++  { value: 'view',    label: 'Lecture',      icon: <FaEye />,        dot: 'bg-slate-400',   color: 'text-slate-600'   },
++  { value: 'comment', label: 'Commentaire',  icon: <FaComments />,   dot: 'bg-sky-400',     color: 'text-sky-600'       },
++  { value: 'edit',    label: 'Éditeur',      icon: <FaEdit />,       dot: 'bg-emerald-400', color: 'text-emerald-600'},
++  { value: 'admin',   label: 'Admin',        icon: <FaShieldAlt />,  dot: 'bg-violet-400',  color: 'text-violet-600' },
+ ];
+ 
+ const permLabel = (v) => PERMISSIONS.find(p => p.value === v)?.label ?? v;
+@@ -84,8 +95,8 @@ const Avatar = ({ user, size = 7, ring = true }) => {
+   const color  = colors[(user?.id ?? 0) % colors.length];
+   const sz     = `w-${size} h-${size}`;
+   return user?.profile_photo_url
+-    ? <img src={user.profile_photo_url} alt={user.name} className={`${sz} rounded-full object-cover ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`} />
+-    : <div className={`${sz} rounded-full ${color} flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`}>{initials}</div>;
++    ? <img src={user.profile_photo_url} alt={user.name} className={`${sz} rounded-full object-cover ${ring ? 'ring-2 ring-white' : ''}`} />
++    : <div className={`${sz} rounded-full ${color} flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 ${ring ? 'ring-2 ring-white' : ''}`}>{initials}</div>;
+ };
+ 
+ const Toast = ({ message, type = 'success', onClose }) => (
+@@ -101,10 +112,10 @@ const Toast = ({ message, type = 'success', onClose }) => (
+ /* Section header used inside the side panels — a left accent bar
+    replaces the uppercase/tracking-widest label pattern. */
+ const PanelHeader = ({ children, right }) => (
+-  <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
++  <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100">
+     <div className="flex items-center gap-2">
+       <span className="w-1 h-4 rounded-full bg-[#3454D1]" />
+-      <span className="text-[13px] font-semibold text-[#1E2129] dark:text-slate-100">{children}</span>
++      <span className="text-[13px] font-semibold text-[#1E2129]">{children}</span>
+     </div>
+     {right}
+   </div>
+@@ -156,11 +167,11 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
+ 
+       {preview ? (
+         <div className="flex flex-col flex-1 overflow-hidden">
+-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-slate-700/60 bg-[#EEF1FC] dark:bg-slate-800">
++          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 bg-[#EEF1FC]">
+             <button onClick={() => setPreview(null)} className="text-[#3454D1] hover:opacity-70 transition-opacity">
+               <FaAngleLeft className="text-xs" />
+             </button>
+-            <span className="text-xs font-semibold text-[#1E2129] dark:text-slate-200">
++            <span className="text-xs font-semibold text-[#1E2129]">
+               Aperçu — version {preview.version_number}
+             </span>
+             {canRestore && (
+@@ -175,7 +186,7 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
+             )}
+           </div>
+           <div
+-            className="flex-1 overflow-y-auto p-5 prose prose-sm max-w-none font-serif text-[#1E2129] dark:text-slate-300 text-[13px] leading-relaxed"
++            className="flex-1 overflow-y-auto p-5 prose prose-sm max-w-none font-serif text-[#1E2129] text-[13px] leading-relaxed"
+             dangerouslySetInnerHTML={{ __html: preview.content }}
+           />
+         </div>
+@@ -187,7 +198,7 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
+           {versions.map((v, i) => (
+             <div
+               key={v.id}
+-              className="group px-4 py-3 border-b border-slate-100 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
++              className="group px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors"
+             >
+               <div className="flex items-start gap-2.5">
+                 <div className="flex-shrink-0 mt-0.5">
+@@ -195,16 +206,16 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
+                 </div>
+                 <div className="flex-1 min-w-0">
+                   <div className="flex items-center gap-1.5 flex-wrap">
+-                    <span className="text-[12px] font-semibold text-[#1E2129] dark:text-slate-200">
++                    <span className="text-[12px] font-semibold text-[#1E2129]">
+                       Version {v.version_number}
+                     </span>
+                     {v.label && (
+-                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">
++                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-violet-50 text-violet-600">
+                         {v.label}
+                       </span>
+                     )}
+                     {i === 0 && (
+-                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
++                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-600">
+                         Actuelle
+                       </span>
+                     )}
+@@ -226,7 +237,7 @@ const VersionPanel = ({ fileId, recentVersions: initial = [], canRestore, onRest
+                   <button
+                     onClick={() => handleRestore(v)}
+                     disabled={!!restoring}
+-                    className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200 transition-colors"
++                    className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-[#1E2129] transition-colors"
+                   >
+                     {restoring === v.id ? <FaSpinner className="animate-spin text-[9px]" /> : <FaUndo className="text-[9px]" />}
+                     Restaurer
+@@ -334,7 +345,7 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
+       )}
+ 
+       {canManage && (
+-        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/60">
++        <div className="px-4 py-3 border-b border-slate-100">
+           <div className="relative">
+             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-[11px]" />
+             <input
+@@ -342,18 +353,18 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
+               value={search}
+               onChange={e => setSearch(e.target.value)}
+               placeholder="Ajouter une personne par nom ou e-mail"
+-              className="w-full pl-8 pr-3 py-2 text-[12px] bg-slate-50 dark:bg-slate-700/50 border border-transparent rounded-lg text-[#1E2129] dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#3454D1]/40 focus:ring-2 focus:ring-[#3454D1]/15 transition"
++              className="w-full pl-8 pr-3 py-2 text-[12px] bg-slate-50 border border-transparent rounded-lg text-[#1E2129] placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#3454D1]/40 focus:ring-2 focus:ring-[#3454D1]/15 transition"
+             />
+             {searching && <FaSpinner className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-300 text-[11px]" />}
+           </div>
+ 
+           {results.length > 0 && (
+-            <div className="mt-2 rounded-xl border border-slate-100 dark:border-slate-700 overflow-hidden shadow-sm shadow-black/5">
++            <div className="mt-2 rounded-xl border border-slate-100 overflow-hidden shadow-sm shadow-black/5">
+               {results.slice(0, 5).map(user => (
+-                <div key={user.id} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-b border-slate-50 dark:border-slate-700 last:border-0">
++                <div key={user.id} className="flex items-center gap-2 px-3 py-2 bg-white border-b border-slate-50 last:border-0">
+                   <Avatar user={user} size={6} ring={false} />
+                   <div className="flex-1 min-w-0">
+-                    <p className="text-[12px] font-medium text-[#1E2129] dark:text-slate-100 truncate">{user.name}</p>
++                    <p className="text-[12px] font-medium text-[#1E2129] truncate">{user.name}</p>
+                     <p className="text-[10.5px] text-slate-400 truncate">{user.email}</p>
+                   </div>
+                   {['view','comment','edit'].map(p => (
+@@ -362,7 +373,7 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
+                       onClick={() => grantAccess(user, p)}
+                       disabled={adding}
+                       title={permLabel(p)}
+-                      className={`p-1.5 rounded-md transition-colors text-[11px] ${permColor(p)} hover:bg-slate-100 dark:hover:bg-slate-700`}
++                      className={`p-1.5 rounded-md transition-colors text-[11px] ${permColor(p)} hover:bg-slate-100`}
+                     >
+                       {PERMISSIONS.find(x => x.value === p)?.icon}
+                     </button>
+@@ -386,10 +397,10 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
+           </div>
+         )}
+         {accesses.map(a => (
+-          <div key={a.id} className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
++          <div key={a.id} className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 transition-colors group">
+             <Avatar user={a} size={7} ring={false} />
+             <div className="flex-1 min-w-0">
+-              <p className="text-[12px] font-medium text-[#1E2129] dark:text-slate-100 truncate">{a.name}</p>
++              <p className="text-[12px] font-medium text-[#1E2129] truncate">{a.name}</p>
+               <p className="text-[10.5px] text-slate-400 truncate">{a.email}</p>
+             </div>
+             {canManage ? (
+@@ -397,7 +408,7 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
+                 <select
+                   value={a.permission}
+                   onChange={e => updatePermission(a.id, e.target.value)}
+-                  className="text-[11px] font-medium bg-slate-50 dark:bg-slate-700 border-0 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#3454D1]/25 text-[#1E2129] dark:text-slate-200"
++                  className="text-[11px] font-medium bg-slate-50 border-0 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#3454D1]/25 text-[#1E2129]"
+                 >
+                   {PERMISSIONS.map(p => (
+                     <option key={p.value} value={p.value}>{p.label}</option>
+@@ -405,7 +416,7 @@ const AccessPanel = ({ fileId, collaborators: initial = [], canManage }) => {
+                 </select>
+                 <button
+                   onClick={() => revokeAccess(a.id, a.name)}
+-                  className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
++                  className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                   title="Révoquer"
+                 >
+                   <FaTrash className="text-[9px]" />
+@@ -441,7 +452,7 @@ const EditableTitle = ({ value, onRename, readOnly }) => {
+   };
+ 
+   if (readOnly) {
+-    return <p className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 truncate leading-tight">{value}</p>;
++    return <p className="text-[14px] font-semibold text-[#1E2129] truncate leading-tight">{value}</p>;
+   }
+ 
+   return editing ? (
+@@ -451,7 +462,7 @@ const EditableTitle = ({ value, onRename, readOnly }) => {
+       onChange={e => setDraft(e.target.value)}
+       onBlur={commit}
+       onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
+-      className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 leading-tight bg-[#EEF1FC] dark:bg-slate-700 rounded px-1.5 py-0.5 -mx-1.5 focus:outline-none focus:ring-2 focus:ring-[#3454D1]/30 min-w-0 w-full"
++      className="text-[14px] font-semibold text-[#1E2129] leading-tight bg-[#EEF1FC] rounded px-1.5 py-0.5 -mx-1.5 focus:outline-none focus:ring-2 focus:ring-[#3454D1]/30 min-w-0 w-full"
+     />
+   ) : (
+     <button
+@@ -459,7 +470,7 @@ const EditableTitle = ({ value, onRename, readOnly }) => {
+       className="group flex items-center gap-1.5 min-w-0 text-left"
+       title="Renommer le document"
+     >
+-      <p className="text-[14px] font-semibold text-[#1E2129] dark:text-slate-100 truncate leading-tight">{value}</p>
++      <p className="text-[14px] font-semibold text-[#1E2129] truncate leading-tight">{value}</p>
+       <FaPen className="text-[9px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+     </button>
+   );
+@@ -494,6 +505,7 @@ const EditContent = ({
+   const awareness = useMemo(() => new Awareness(ydoc), [ydoc]);
+   const providerRef  = useRef(null);
+   const reloadingRef = useRef(false);
++  const commentClickRef = useRef(null);
+   const [collabReady, setCollabReady] = useState(false);
+   const collabUser = useMemo(() => ({
+     id: auth.user.id,
+@@ -523,9 +535,20 @@ const EditContent = ({
+       Highlight.configure({ multicolor: true, HTMLAttributes: { class: 'highlight' } }),
+       Color,
+       Image.configure({ inline: true, allowBase64: true }),
++      Subscript, Superscript, LineHeight,
++      Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
++      TaskList, TaskItem.configure({ nested: true }),
++      CommentMark, SearchHighlight,
+       Collaboration.configure({ document: ydoc }),
+       CollaborationCaret.configure({ provider: { awareness }, user: collabUser }),
+     ],
++    editorProps: {
++      handleClick: (_view, _pos, event) => {
++        const el = event.target?.closest?.('[data-comment-id]');
++        if (el) commentClickRef.current?.(el.getAttribute('data-comment-id'));
++        return false;
++      },
++    },
+     onUpdate: ({ editor, transaction }) => {
+       const text = editor.getText().trim();
+       setWordCount(text ? text.split(/\s+/).length : 0);
+@@ -731,6 +754,197 @@ const EditContent = ({
+     }
+   }, [docTitle, file.id, addToast]);
+ 
++  /* ── Commentaires (stockés dans le Y.Map "comments" du document, donc temps réel) ── */
++  const commentsMap = useMemo(() => ydoc.getMap('comments'), [ydoc]);
++  const [comments, setComments] = useState([]);
++  const [activeCommentId, setActiveCommentId] = useState(null);
++  const [pendingComment, setPendingComment] = useState(null); // { from, to, quote }
++  const pendingRef = useRef(null);
++  const startCommentRef = useRef(null);
++  const [selBtn, setSelBtn] = useState(null);
++  const [findOpen, setFindOpen] = useState(false);
++  const [fullWidth, setFullWidth] = useState(true);
++  const canComment = !isReadOnly;
++
++  useEffect(() => { pendingRef.current = pendingComment; }, [pendingComment]);
++
++  useEffect(() => {
++    const sync = () => setComments(Array.from(commentsMap.values()));
++    sync();
++    commentsMap.observe(sync);
++    return () => commentsMap.unobserve(sync);
++  }, [commentsMap]);
++
++  commentClickRef.current = (id) => { setActiveCommentId(id); setSidePanel('comments'); };
++
++  // Bouton flottant « Commenter » près de la sélection + suivi de la plage en attente
++  useEffect(() => {
++    if (!editor) return undefined;
++    const update = () => {
++      if (editor.isDestroyed) return;
++      const { to, empty } = editor.state.selection;
++      if (isReadOnly || empty || !editor.isFocused) { setSelBtn(null); return; }
++      const c = editor.view.coordsAtPos(to);
++      setSelBtn({ top: c.bottom + 6, left: Math.max(8, Math.min(c.right + 6, window.innerWidth - 150)) });
++    };
++    const hide = () => setSelBtn(null);
++    const track = ({ transaction }) => {
++      const p = pendingRef.current;
++      if (!p || !transaction.docChanged) return;
++      const from = transaction.mapping.map(p.from);
++      const to = transaction.mapping.map(p.to);
++      if (from !== p.from || to !== p.to) setPendingComment({ ...p, from, to });
++    };
++    editor.on('selectionUpdate', update);
++    editor.on('focus', update);
++    editor.on('blur', hide);
++    editor.on('transaction', track);
++    window.addEventListener('scroll', update, true);
++    return () => {
++      editor.off('selectionUpdate', update);
++      editor.off('focus', update);
++      editor.off('blur', hide);
++      editor.off('transaction', track);
++      window.removeEventListener('scroll', update, true);
++    };
++  }, [editor, isReadOnly]);
++
++  const startComment = useCallback(() => {
++    if (!editor || isReadOnly) return;
++    const { from, to, empty } = editor.state.selection;
++    if (empty) { addToast('Sélectionnez d\u2019abord le passage à commenter', 'error'); return; }
++    setPendingComment({ from, to, quote: editor.state.doc.textBetween(from, to, ' ').slice(0, 300) });
++    setSidePanel('comments');
++    setSelBtn(null);
++  }, [editor, isReadOnly, addToast]);
++  startCommentRef.current = startComment;
++
++  const newId = (prefix) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
++
++  const addComment = useCallback((text) => {
++    const p = pendingRef.current;
++    if (!p || !editor) return;
++    const id = newId('c');
++    const max = editor.state.doc.content.size;
++    const from = Math.max(1, Math.min(p.from, max));
++    const to = Math.max(from, Math.min(p.to, max));
++    editor.chain().setTextSelection({ from, to }).setMark('comment', { commentId: id }).run();
++    commentsMap.set(id, {
++      id, kind: 'comment', userId: auth.user.id, userName: auth.user.name,
++      text, quote: p.quote, createdAt: Date.now(), resolved: false,
++    });
++    setPendingComment(null);
++    setActiveCommentId(id);
++  }, [editor, commentsMap, auth.user.id, auth.user.name]);
++
++  const replyComment = useCallback((parentId, text) => {
++    const id = newId('r');
++    commentsMap.set(id, { id, kind: 'reply', parentId, userId: auth.user.id, userName: auth.user.name, text, createdAt: Date.now() });
++  }, [commentsMap, auth.user.id, auth.user.name]);
++
++  const toggleResolveComment = useCallback((id) => {
++    const c = commentsMap.get(id);
++    if (!c) return;
++    commentsMap.set(id, { ...c, resolved: !c.resolved });
++    if (!c.resolved) setActiveCommentId((cur) => (cur === id ? null : cur));
++  }, [commentsMap]);
++
++  const deleteComment = useCallback((id) => {
++    const c = commentsMap.get(id);
++    if (!c || !editor) return;
++    if (c.kind === 'comment') {
++      ydoc.transact(() => {
++        Array.from(commentsMap.values()).filter((x) => x.kind === 'reply' && x.parentId === id).forEach((r) => commentsMap.delete(r.id));
++        commentsMap.delete(id);
++      });
++      const { state, view } = editor;
++      const type = state.schema.marks.comment;
++      const tr = state.tr;
++      state.doc.descendants((node, pos) => {
++        node.marks.forEach((m) => { if (m.type === type && m.attrs.commentId === id) tr.removeMark(pos, pos + node.nodeSize, m); });
++      });
++      if (tr.docChanged) view.dispatch(tr);
++      setActiveCommentId((cur) => (cur === id ? null : cur));
++    } else {
++      commentsMap.delete(id);
++    }
++  }, [commentsMap, editor, ydoc]);
++
++  const selectComment = useCallback((id) => {
++    setActiveCommentId(id);
++    if (!editor) return;
++    let from = null; let to = null;
++    editor.state.doc.descendants((node, pos) => {
++      if (node.marks.some((m) => m.type.name === 'comment' && m.attrs.commentId === id)) {
++        if (from === null) from = pos;
++        to = pos + node.nodeSize;
++      }
++    });
++    if (from !== null) editor.chain().setTextSelection({ from, to }).scrollIntoView().run();
++  }, [editor]);
++
++  const openCommentCount = comments.filter((c) => c.kind === 'comment' && !c.resolved).length;
++  const commentCss = useMemo(() => {
++    const safe = (id) => /^[\w-]+$/.test(String(id));
++    const css = comments
++      .filter((c) => c.kind === 'comment' && !c.resolved && safe(c.id))
++      .map((c) => `.doc-editor span[data-comment-id="${c.id}"]{background:rgba(255,212,0,.35);border-bottom:2px solid #f9ab00}`)
++      .join('');
++    const act = activeCommentId && safe(activeCommentId)
++      ? `.doc-editor span[data-comment-id="${activeCommentId}"]{background:rgba(255,193,7,.7)}` : '';
++    return css + act;
++  }, [comments, activeCommentId]);
++
++  /* ── Menus : téléchargements, plein écran, raccourcis ── */
++  const baseName = (docTitle || 'document').replace(/[\\/:*?"<>|]+/g, '-');
++  const downloadBlob = (name, mime, content) => {
++    const url = URL.createObjectURL(new Blob([content], { type: mime }));
++    const a = document.createElement('a');
++    a.href = url; a.download = name;
++    document.body.appendChild(a); a.click(); a.remove();
++    setTimeout(() => URL.revokeObjectURL(url), 1000);
++  };
++  const wrapHtml = (body) => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${baseName}</title></head><body>${body}</body></html>`;
++
++  const menuActions = {
++    save: () => saveRef.current?.(),
++    rename: () => {
++      const n = window.prompt('Renommer le document', docTitle);
++      if (n && n.trim() && n.trim() !== docTitle) handleRename(n.trim());
++    },
++    downloadHtml: () => downloadBlob(`${baseName}.html`, 'text/html;charset=utf-8', wrapHtml(editor.getHTML())),
++    downloadDoc: () => downloadBlob(`${baseName}.doc`, 'application/msword',
++      `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${baseName}</title></head><body>${editor.getHTML()}</body></html>`),
++    downloadTxt: () => downloadBlob(`${baseName}.txt`, 'text/plain;charset=utf-8', editor.getText({ blockSeparator: '\n' })),
++    history: () => setSidePanel('history'),
++    share: () => setSidePanel('access'),
++    print: () => window.print(),
++    close: () => {
++      if (isDirty && !window.confirm('Des modifications non sauvegardées seront perdues. Quitter ?')) return;
++      window.history.back();
++    },
++    find: () => setFindOpen(true),
++    toggleFullWidth: () => setFullWidth((v) => !v),
++    toggleFullscreen: () => {
++      if (document.fullscreenElement) document.exitFullscreen?.();
++      else document.documentElement.requestFullscreen?.();
++    },
++    toggleComments: () => setSidePanel((p) => (p === 'comments' ? null : 'comments')),
++    comment: () => startCommentRef.current?.(),
++    tracking: () => setTrackingOpen(true),
++  };
++
++  useEffect(() => {
++    const fn = (e) => {
++      if (!(e.ctrlKey || e.metaKey)) return;
++      const k = e.key.toLowerCase();
++      if (k === 'h' && !e.altKey) { e.preventDefault(); setFindOpen(true); }
++      else if (k === 'm' && e.altKey) { e.preventDefault(); startCommentRef.current?.(); }
++    };
++    window.addEventListener('keydown', fn);
++    return () => window.removeEventListener('keydown', fn);
++  }, []);
++
+   /* ── Tracking modal handlers (à brancher sur l'API de suivi réelle) ── */
+   const [changes, setChanges] = useState(pendingChanges);
+   const handleAcceptChange = useCallback((id) => setChanges(prev => prev.map(c => c.id === id ? { ...c, status: 'accepted' } : c)), []);
+@@ -748,10 +962,11 @@ const EditContent = ({
+     <AdminLayout>
+       <Head title={`Édition — ${docTitle}`} />
+ 
+-      <div className="flex flex-col h-[calc(100vh-64px)] md:h-screen bg-[#F4F5F7] dark:bg-slate-900 overflow-hidden relative">
++      <div className="flex flex-col h-[calc(100vh-64px)] md:h-screen bg-[#F9FBFD] overflow-hidden relative">
++        <style>{commentCss}</style>
+ 
+         {/* ══ TITLE BAR ══ */}
+-        <div className="flex-shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200/70 dark:border-slate-700 z-40">
++        <div className="flex-shrink-0 bg-white border-b border-slate-200/70 z-40">
+ 
+           {/* Breadcrumb */}
+           {(project || task) && (
+@@ -766,7 +981,7 @@ const EditContent = ({
+ 
+           <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-5 py-2.5">
+             <div className="flex items-center gap-2.5 flex-1 min-w-0">
+-              <div className="w-8 h-8 bg-[#EEF1FC] dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
++              <div className="w-8 h-8 bg-[#EEF1FC] rounded-lg flex items-center justify-center flex-shrink-0">
+                 <FaFileAlt className="text-[#3454D1] text-[13px]" />
+               </div>
+               <div className="min-w-0 flex-1">
+@@ -775,7 +990,7 @@ const EditContent = ({
+                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                     isSaving ? 'bg-[#3454D1] animate-pulse' : isDirty ? 'bg-amber-400' : 'bg-emerald-400'
+                   }`} />
+-                  <span className="text-[10px] sm:text-[11px] text-slate-400 flex items-center gap-1 truncate">
++                  <span className="text-[11px] sm:text-[12px] text-slate-500 flex items-center gap-1 truncate">
+                     {isSaving
+                       ? 'Enregistrement…'
+                       : isDirty
+@@ -797,26 +1012,40 @@ const EditContent = ({
+                 <div className="flex -space-x-1.5">
+                   {presenceUsers.slice(0, 4).map(u => <Avatar key={u.id} user={u} size={7} />)}
+                   {presenceUsers.length > 4 && (
+-                    <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-600 ring-2 ring-white dark:ring-slate-800 flex items-center justify-center text-[10px] font-semibold text-slate-500 dark:text-slate-300">
++                    <div className="w-7 h-7 rounded-full bg-slate-100 ring-2 ring-white flex items-center justify-center text-[10px] font-semibold text-slate-500">
+                       +{presenceUsers.length - 4}
+                     </div>
+                   )}
+                 </div>
+               )}
+ 
+-              <span className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 dark:bg-slate-700 ${permInfo?.color}`}>
++              <span className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 ${permInfo?.color}`}>
+                 <span className={`w-1.5 h-1.5 rounded-full ${permDot(myPermission)}`} />
+                 {permInfo?.label}
+               </span>
+ 
+               {/* Panel switcher — segmented control */}
+-              <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-0.5">
++              <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
++                <button
++                  onClick={() => setSidePanel(p => p === 'comments' ? null : 'comments')}
++                  className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all
++                    ${sidePanel === 'comments'
++                      ? 'bg-white text-[#1E2129] shadow-sm'
++                      : 'text-slate-500 hover:text-[#1E2129]'
++                    }`}
++                >
++                  <FaCommentMedical className="text-[10px]" />
++                  <span className="hidden lg:inline">Commentaires</span>
++                  {openCommentCount > 0 && (
++                    <span className="min-w-[16px] h-4 px-1 rounded-full bg-[#1a73e8] text-white text-[9px] font-semibold flex items-center justify-center">{openCommentCount}</span>
++                  )}
++                </button>
+                 <button
+                   onClick={() => setSidePanel(p => p === 'history' ? null : 'history')}
+                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all
+                     ${sidePanel === 'history'
+-                      ? 'bg-white dark:bg-slate-800 text-[#1E2129] dark:text-slate-100 shadow-sm'
+-                      : 'text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200'
++                      ? 'bg-white text-[#1E2129] shadow-sm'
++                      : 'text-slate-500 hover:text-[#1E2129]'
+                     }`}
+                 >
+                   <FaHistory className="text-[10px]" />
+@@ -826,8 +1055,8 @@ const EditContent = ({
+                   onClick={() => setSidePanel(p => p === 'access' ? null : 'access')}
+                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all
+                     ${sidePanel === 'access'
+-                      ? 'bg-white dark:bg-slate-800 text-[#1E2129] dark:text-slate-100 shadow-sm'
+-                      : 'text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200'
++                      ? 'bg-white text-[#1E2129] shadow-sm'
++                      : 'text-slate-500 hover:text-[#1E2129]'
+                     }`}
+                 >
+                   <FaUsers className="text-[10px]" />
+@@ -836,7 +1065,7 @@ const EditContent = ({
+                 </button>
+                 <button
+                   onClick={() => setTrackingOpen(true)}
+-                  className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium text-slate-500 hover:text-[#1E2129] dark:hover:text-slate-200 transition-all"
++                  className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[12px] font-medium text-slate-500 hover:text-[#1E2129] transition-all"
+                 >
+                   <FaUserEdit className="text-[10px]" />
+                   <span className="hidden lg:inline">Suivi</span>
+@@ -853,7 +1082,7 @@ const EditContent = ({
+                   {isDirty && !showSummary && (
+                     <button
+                       onClick={() => setShowSummary(true)}
+-                      className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-[#1E2129] dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
++                      className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-[#1E2129] hover:bg-slate-50 transition-colors"
+                       title="Ajouter une note à cette version"
+                     >
+                       <FaTag className="text-[11px]" />
+@@ -864,7 +1093,7 @@ const EditContent = ({
+                     disabled={isSaving || !isDirty}
+                     className={`flex items-center gap-1.5 px-2 sm:px-4 py-1.5 rounded-lg text-[12px] sm:text-[12.5px] font-medium transition-colors
+                       ${isSaving || !isDirty
+-                        ? 'bg-slate-50 dark:bg-slate-700 text-slate-300 dark:text-slate-500 cursor-not-allowed'
++                        ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                         : 'bg-[#3454D1] hover:bg-[#2c47b8] text-white'
+                       }`}
+                   >
+@@ -879,7 +1108,7 @@ const EditContent = ({
+                   if (isDirty && !window.confirm('Des modifications non sauvegardées seront perdues. Quitter ?')) return;
+                   window.history.back();
+                 }}
+-                className="p-1.5 sm:p-2 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
++                className="p-1.5 sm:p-2 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-colors"
+               >
+                 <FaTimes className="text-sm" />
+               </button>
+@@ -887,14 +1116,14 @@ const EditContent = ({
+           </div>
+ 
+           {showSummary && (
+-            <div className="flex items-center gap-2 px-5 py-2 bg-[#EEF1FC] dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-700">
++            <div className="flex items-center gap-2 px-5 py-2 bg-[#EEF1FC] border-t border-slate-100">
+               <FaTag className="text-[#3454D1] text-[11px] flex-shrink-0" />
+               <input
+                 type="text"
+                 value={summary}
+                 onChange={e => setSummary(e.target.value)}
+                 placeholder="Note pour cette version — ex. ajout section 3, correction orthographe…"
+-                className="flex-1 text-[12.5px] bg-transparent border-0 outline-none text-[#1E2129] dark:text-slate-200 placeholder-slate-400"
++                className="flex-1 text-[12.5px] bg-transparent border-0 outline-none text-[#1E2129] placeholder-slate-400"
+                 onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setShowSummary(false); }}
+                 autoFocus
+               />
+@@ -905,34 +1134,44 @@ const EditContent = ({
+           )}
+ 
+           {isReadOnly && (
+-            <div className="flex items-center gap-2 px-5 py-1.5 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-700">
++            <div className="flex items-center gap-2 px-5 py-1.5 bg-slate-50 border-t border-slate-100">
+               <FaLock className="text-slate-400 text-[10px] flex-shrink-0" />
+-              <span className="text-[11.5px] text-slate-500 dark:text-slate-400">
++              <span className="text-[11.5px] text-slate-500">
+                 {myPermission === 'none' ? "Vous n'avez pas accès à ce document." : 'Lecture seule — vous ne pouvez pas modifier ce document.'}
+               </span>
+             </div>
+           )}
++
++          {editor && (
++            <div className="border-t border-slate-100">
++              <DocMenus
++                editor={editor}
++                isReadOnly={isReadOnly}
++                actions={menuActions}
++                fullWidth={fullWidth}
++                commentsOpen={sidePanel === 'comments'}
++              />
++            </div>
++          )}
+         </div>
+ 
++        {/* ══ TOOLBAR (pleine largeur, sur plusieurs lignes si besoin) ══ */}
++        {!isReadOnly && editor && (
++          <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 bg-[#F9FBFD] relative z-30">
++            <div className="bg-[#EDF2FA] rounded-2xl px-1">
++              <MenuBar editor={editor} onComment={startComment} onFind={() => setFindOpen(true)} onPrint={() => window.print()} />
++            </div>
++          </div>
++        )}
++
+         {/* ══ BODY ══ */}
+         <div className="flex-1 flex overflow-hidden relative">
+           <div className="flex-1 overflow-y-auto">
+-            <div className="max-w-[840px] mx-auto px-4 sm:px-0 py-4 sm:py-8">
+-
+-              {/* Floating toolbar — same width as the page, not the screen */}
+-              {!isReadOnly && editor && (
+-                <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-2 mb-4 sm:mb-6 bg-white/95 dark:bg-slate-800/95 backdrop-blur border border-slate-200/80 dark:border-slate-700 rounded-xl shadow-sm shadow-black/[0.03] overflow-x-auto scrollbar-hide">
+-                  <MenuBar editor={editor} />
+-                </div>
+-              )}
+-
+-              {/* Paper */}
+-              <div className="bg-white dark:bg-slate-800 sm:rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_rgba(30,33,41,0.06)] border border-slate-200/60 dark:border-slate-700 min-h-[calc(100vh-260px)]">
+-                <div className="px-4 py-6 sm:px-10 sm:py-12 lg:px-16">
+-                  <EditorContent
+-                    editor={editor}
+-                    className="prose prose-slate dark:prose-invert font-serif max-w-none min-h-96 focus:outline-none prose-p:leading-relaxed"
+-                  />
++            <div className={`${fullWidth ? 'w-full' : 'max-w-[900px] mx-auto'} px-0 sm:px-4 py-2 sm:py-3`}>
++              {/* Feuille : occupe toute la largeur disponible */}
++              <div className="doc-paper doc-editor bg-white sm:rounded-xl border border-slate-200 shadow-sm min-h-[calc(100vh-320px)]">
++                <div className="px-5 py-6 sm:px-10 sm:py-10 lg:px-14" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
++                  <EditorContent editor={editor} className="max-w-none min-h-96 focus:outline-none" />
+                 </div>
+               </div>
+             </div>
+@@ -942,7 +1181,7 @@ const EditContent = ({
+           {sidePanel && (
+             <div className="lg:hidden fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={() => setSidePanel(null)} />
+           )}
+-          <div className={`fixed inset-y-0 right-0 z-50 lg:static flex-shrink-0 ${sidePanel ? 'w-full sm:w-80' : 'w-0'} overflow-hidden transition-[width] duration-200 border-l border-slate-200/70 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl lg:shadow-none`}>
++          <div className={`fixed inset-y-0 right-0 z-50 lg:static flex-shrink-0 ${sidePanel ? 'w-full sm:w-80' : 'w-0'} overflow-hidden transition-[width] duration-200 border-l border-slate-200/70 bg-white shadow-2xl lg:shadow-none`}>
+             {sidePanel === 'history' && (
+               <VersionPanel
+                 fileId={file.id}
+@@ -955,6 +1194,23 @@ const EditContent = ({
+                 }}
+               />
+             )}
++            {sidePanel === 'comments' && (
++              <CommentsPanel
++                comments={comments}
++                activeId={activeCommentId}
++                onSelect={selectComment}
++                pendingQuote={pendingComment ? pendingComment.quote : null}
++                onAdd={addComment}
++                onCancelPending={() => setPendingComment(null)}
++                onReply={replyComment}
++                onResolve={toggleResolveComment}
++                onDelete={deleteComment}
++                currentUserId={auth.user.id}
++                canModerate={myPermission === 'admin' || canManageAccess}
++                canComment={canComment}
++                onClose={() => setSidePanel(null)}
++              />
++            )}
+             {sidePanel === 'access' && (
+               <AccessPanel
+                 fileId={file.id}
+@@ -966,26 +1222,41 @@ const EditContent = ({
+         </div>
+ 
+         {/* ══ FOOTER ══ */}
+-        <div className="flex-shrink-0 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700/60 px-5 py-1.5">
++        <div className="flex-shrink-0 bg-white border-t border-slate-100 px-5 py-1.5">
+           <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
+             <span className="flex items-center gap-3">
+               <span className="flex items-center gap-1.5">
+                 <Avatar user={auth.user} size={4} ring={false} />
+-                <span className="hidden sm:inline">Connecté en tant que <span className="font-medium text-slate-600 dark:text-slate-300">{auth.user.name}</span></span>
+-                <span className="sm:hidden font-medium text-slate-600 dark:text-slate-300">{auth.user.name}</span>
++                <span className="hidden sm:inline">Connecté en tant que <span className="font-medium text-slate-600">{auth.user.name}</span></span>
++                <span className="sm:hidden font-medium text-slate-600">{auth.user.name}</span>
+               </span>
+               <span className="text-slate-300">·</span>
+               <span>{wordCount} mot{wordCount !== 1 ? 's' : ''}</span>
+             </span>
+             {lastModifiedBy && (
+               <span className="hidden sm:inline">
+-                Dernière modification par <span className="font-medium text-slate-600 dark:text-slate-300">{lastModifiedBy.name}</span> — {fmtDate(lastModifiedBy.timestamp)}
++                Dernière modification par <span className="font-medium text-slate-600">{lastModifiedBy.name}</span> — {fmtDate(lastModifiedBy.timestamp)}
+               </span>
+             )}
+           </div>
+         </div>
+       </div>
+ 
++      {/* Bouton flottant « Commenter » */}
++      {selBtn && !isReadOnly && (
++        <button
++          type="button"
++          onMouseDown={(e) => e.preventDefault()}
++          onClick={startComment}
++          style={{ position: 'fixed', top: selBtn.top, left: selBtn.left, zIndex: 950 }}
++          className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-white border border-slate-300 shadow-lg text-[12px] font-medium text-[#1a73e8] hover:bg-[#e8f0fe]"
++        >
++          <FaCommentMedical className="text-[11px]" /> Commenter
++        </button>
++      )}
++
++      <FindReplaceBar editor={editor} open={findOpen} onClose={() => setFindOpen(false)} readOnly={isReadOnly} />
++
+       {/* ══ TOASTS ══ */}
+       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2">
+         {toasts.map(t => (
