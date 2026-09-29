@@ -714,7 +714,29 @@ public function editContent(File $file)
     $this->authorize('view', $file);
      $file->load(['project.users', 'task.project']); // ← ajoute cette ligne
 
-    $this->authorize('update', $file);
+    $currentUser  = auth()->user();
+    $myPermission = $file->accessFor($currentUser);
+
+    // Collègue qui n'est ni admin, ni manager du projet, ni assigné à la tâche : aucun accès.
+    // La page s'affiche avec le message d'accès refusé, SANS le contenu du document.
+    if ($myPermission === 'none') {
+        return \Inertia\Inertia::render('Files/EditContent', [
+            'file' => [
+                'id'          => $file->id,
+                'name'        => $file->name,
+                'type'        => $file->type,
+                'content'     => '',
+                'yjs_state'   => null,
+                'is_editable' => false,
+                'project'     => null,
+            ],
+            'lastModifiedBy'  => null,
+            'myPermission'    => 'none',
+            'collaborators'   => [],
+            'recentVersions'  => [],
+            'canManageAccess' => false,
+        ]);
+    }
 
     $editableTypes = ['text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json'];
     $extension = pathinfo($file->name, PATHINFO_EXTENSION);
@@ -734,15 +756,7 @@ public function editContent(File $file)
 
     $file->load(['lastModifiedBy:id,name', 'project.users', 'accesses.user:id,name,email,profile_photo_path']);
 
-    $currentUser = auth()->user();
-    $myPermission = $file->accessFor($currentUser);
-
-if ($myPermission !== 'admin' && $myPermission !== 'edit') {
-    if ($file->task && $file->task->isAssignedTo($currentUser)) {
-        $myPermission = 'edit';
-    }
-}
-    
+    // (l'accès de la personne assignée est maintenant calculé dans File::accessFor())
 
     // Collaborateurs actifs (accès non-expiré, non-none)
     $collaborators = $file->accesses
@@ -808,7 +822,7 @@ if ($myPermission !== 'admin' && $myPermission !== 'edit') {
 
 public function updateContent(Request $request, File $file)
 {
-    $this->authorize('update', $file);
+    $this->authorize('update_colab', $file);
     $request->validate(['content' => 'required|string']);
 
     if (!is_file_editable($file->type, $file->name)) {
@@ -866,7 +880,7 @@ $oldVersionIds = $file->versions()
  */
 public function autoSaveContent(Request $request, File $file)
 {
-    $this->authorize('update', $file);
+    $this->authorize('update_colab', $file);
     $request->validate(['content' => 'present|nullable|string']);
 
     if (!is_file_editable($file->type, $file->name)) {
@@ -915,7 +929,7 @@ public function autoSaveContent(Request $request, File $file)
 
 public function initYjsState(Request $request, File $file)
 {
-    $this->authorize('update', $file);
+    $this->authorize('update_colab', $file);
 
     $request->validate(['state' => 'required|string']);
 
@@ -931,7 +945,7 @@ public function initYjsState(Request $request, File $file)
 
 public function updateYjsState(Request $request, File $file)
 {
-    $this->authorize('update', $file); // même policy que updateContent
+    $this->authorize('update_colab', $file); // même policy que updateContent
 
     $request->validate(['state' => 'required|string']);
 

@@ -99,7 +99,29 @@ public function accesses()
     return $this->hasMany(FileAccess::class);
 }
 
+/** Cache par requête : accessFor() est appelé plusieurs fois (policies, canal Pusher, page). */
+private array $accessCache = [];
+
+/**
+ * Niveau d'accès de $user sur ce document : none < view < comment < edit < admin.
+ *
+ *  - admin global                          → admin
+ *  - propriétaire du fichier               → admin
+ *  - manager du projet                     → admin
+ *  - personne assignée à la tâche liée     → edit  (écriture)
+ *  - accès explicite (panneau Partager)    → son niveau (le plus élevé l'emporte)
+ *  - tous les autres collègues             → none  (aucun accès)
+ */
 public function accessFor(User $user): string
+{
+    if (! isset($this->accessCache[$user->id])) {
+        $this->accessCache[$user->id] = $this->computeAccessFor($user);
+    }
+
+    return $this->accessCache[$user->id];
+}
+
+private function computeAccessFor(User $user): string
 {
     // Admin global → toujours admin
     if ($user->hasRole('admin')) return 'admin';
@@ -107,12 +129,34 @@ public function accessFor(User $user): string
     // Propriétaire du fichier → admin
     if ($this->user_id === $user->id) return 'admin';
 
-    $access = $this->accesses()
-        ->where('user_id', $user->id)
-        ->first();
+    // Manager du projet (ou du projet de la tâche liée) → admin du document
+    $project = $this->project ?? $this->task?->project;
+    if ($project && $project->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'manager')
+            ->exists()) {
+        return 'admin';
+    }
 
-    if (! $access) return 'none';
-    return $access->effectivePermission();
+    $rank  = ['none' => 0, 'view' => 1, 'comment' => 2, 'edit' => 3, 'admin' => 4];
+    $level = 'none';
+
+    // Personne à qui la tâche liée est assignée → droit d'écriture
+    $task = $this->task;
+    if ($task && $task->assigned_to !== null && (int) $task->assigned_to === (int) $user->id) {
+        $level = 'edit';
+    }
+
+    // Accès explicite (partage) : on garde le niveau le plus élevé
+    $access = $this->accesses()->where('user_id', $user->id)->first();
+    if ($access) {
+        $explicit = $access->effectivePermission();
+        if (($rank[$explicit] ?? 0) > $rank[$level]) {
+            $level = $explicit;
+        }
+    }
+
+    return $level;
 }
 
 public function canUser(User $user, string $permission): bool

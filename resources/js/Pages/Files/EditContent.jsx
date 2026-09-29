@@ -505,7 +505,8 @@ const EditContent = ({
   const autosaveTriggerRef = useRef(null);
   const editVersionRef = useRef(0);
 
-  const isReadOnly = myPermission === 'view' || myPermission === 'none';
+  // Écriture : uniquement admin / manager du projet / personne assignée (niveau « edit » ou « admin »)
+  const isReadOnly = !['edit', 'admin'].includes(myPermission);
   const canRestore = myPermission === 'admin';
 
   /* ── Collaboration temps réel (Yjs + Pusher) ── */
@@ -614,7 +615,7 @@ const EditContent = ({
 
   /* ── Temps réel : présence + synchronisation Yjs via Pusher ── */
   useEffect(() => {
-    if (!editor || !collabReady || !file?.id || typeof window.Echo === 'undefined') return;
+    if (!editor || !collabReady || !file?.id || myPermission === 'none' || typeof window.Echo === 'undefined') return;
 
     const channelName = `presence-document.${file.id}`;
 
@@ -1096,6 +1097,34 @@ const EditContent = ({
   const isPdf = isPdfFile(file.type, file.name);
   if (isPdf) {
     return <AdminLayout><div className="p-8 text-center"><h2 className="text-xl font-semibold">La modification des PDF n'est pas prise en charge.</h2></div></AdminLayout>;
+  }
+
+  // Collègue sans droit sur ce document (ni admin, ni manager du projet, ni assigné à la tâche)
+  if (myPermission === 'none') {
+    return (
+      <AdminLayout>
+        <Head title="Accès refusé" />
+        <div className="flex items-center justify-center min-h-[70vh] p-6">
+          <div className="max-w-md w-full text-center bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
+              <FaLock className="text-slate-400 text-xl" />
+            </div>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">Vous n'avez pas accès à ce document</h2>
+            <p className="text-[13.5px] text-slate-500 mb-6">
+              Ce document est réservé aux administrateurs, aux managers du projet et à la personne à qui la tâche est assignée.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button type="button" onClick={() => window.history.back()} className="px-4 h-9 rounded-lg border border-slate-300 text-[13px] text-slate-700 hover:bg-slate-50">
+                Retour
+              </button>
+              <a href={route('files.show', file.id)} className="px-4 h-9 leading-9 rounded-lg bg-[#1a73e8] text-white text-[13px] hover:bg-[#1765cc]">
+                Voir la fiche du fichier
+              </a>
+            </div>
+          </div>
+        </div>
+      </AdminLayout>
+    );
   }
 
   const permInfo = PERMISSIONS.find(p => p.value === myPermission);

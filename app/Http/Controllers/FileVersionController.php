@@ -42,7 +42,7 @@ class FileVersionController extends Controller
     // POST /files/{file}/versions — snapshot manuel (appelé depuis updateContent)
     public function store(Request $request, File $file)
     {
-        $this->authorize('update', $file);
+        $this->authorize('update_colab', $file);
 
         $request->validate([
             'content' => 'required|string',

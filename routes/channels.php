@@ -52,12 +52,9 @@ Broadcast::channel('presence-document.{fileId}', function ($user, $fileId) {
     $file = File::find($fileId);
     if (!$file) return false;
 
-    $hasAccess = $file->canUser($user, 'view');
-    if (!$hasAccess && $file->task && $file->task->isAssignedTo($user)) {
-        $hasAccess = true;
-    }
-    
-    if (!$hasAccess) return false;
+    // accessFor() inclut déjà : admin, manager du projet, personne assignée, propriétaire, accès partagés.
+    // Les autres collègues n'ont pas le droit de rejoindre le document en temps réel.
+    if (!$file->canUser($user, 'view')) return false;
 
     return [
         'id'                => $user->id,
