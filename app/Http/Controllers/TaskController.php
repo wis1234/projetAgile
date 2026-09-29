@@ -317,7 +317,7 @@ public function store(Request $request)
         Storage::disk('public')->makeDirectory($projectPath, 0755, true);
 
         // Nom lisible du fichier de suivi
-        $fileName = 'Suivi — ' . $task->title;
+        $fileName = 'Fichier de suivi : ' . $task->title;
         $filePath = $projectPath . '/' . Str::slug($task->title) . '-suivi.html';
 
         $creator   = auth()->user();
@@ -349,14 +349,32 @@ public function store(Request $request)
 
         // Citation motivante affichée sous le titre (une citation différente selon la tâche)
         $quotes = [
-            ['Just Do It !', 'Nike'],
-            ['Le succès est la somme de petits efforts répétés jour après jour.', 'Robert Collier'],
-            ['La discipline est le pont entre les objectifs et les accomplissements.', 'Jim Rohn'],
-            ['Ce n\'est pas la montagne que nous conquérons, mais nous-mêmes.', 'Edmund Hillary'],
-            ['Impossible n\'est pas un fait, c\'est une opinion.', 'Muhammad Ali'],
-            ['La meilleure façon de prédire l\'avenir, c\'est de le créer.', 'Peter Drucker'],
-            ['Petit à petit, l\'oiseau fait son nid.', 'Proverbe'],
-            ['Fais-le maintenant : parfois « plus tard » devient « jamais ».', 'Proverbe'],
+['Just Do It.', 'Nike'],
+['Success is the sum of small efforts, repeated day in and day out.', 'Robert Collier'],
+['Discipline is the bridge between goals and accomplishment.', 'Jim Rohn'],
+['It is not the mountain we conquer, but ourselves.', 'Edmund Hillary'],
+['Impossible is just an opinion.', 'Muhammad Ali'],
+['The best way to predict the future is to create it.', 'Peter Drucker'],
+['Little by little, a little becomes a lot.', 'Proverb'],
+['Do it now. Sometimes “later” becomes “never.”', 'Proverb'],
+['Success is not final, failure is not fatal: it is the courage to continue that counts.', 'Winston Churchill'],
+['The secret of getting ahead is getting started.', 'Mark Twain'],
+['Great things are done by a series of small things brought together.', 'Vincent van Gogh'],
+['Don’t watch the clock; do what it does. Keep going.', 'Sam Levenson'],
+['The future depends on what you do today.', 'Mahatma Gandhi'],
+['Believe you can and you’re halfway there.', 'Theodore Roosevelt'],
+['Your only limit is your mind.', 'Unknown'],
+['Dream big. Start small. Act now.', 'Robin Sharma'],
+['Success doesn’t come from what you do occasionally. It comes from what you do consistently.', 'Marie Forleo'],
+['Hard work beats talent when talent doesn’t work hard.', 'Tim Notke'],
+['The harder you work for something, the greater you’ll feel when you achieve it.', 'Unknown'],
+['Stay focused and never give up.', 'Unknown'],
+['Every accomplishment starts with the decision to try.', 'John F. Kennedy'],
+['Action is the foundational key to all success.', 'Pablo Picasso'],
+['Great things never come from comfort zones.', 'Unknown'],
+['You don’t have to be great to start, but you have to start to be great.', 'Zig Ziglar'],
+['Success is walking from failure to failure with no loss of enthusiasm.', 'Winston Churchill'],
+
         ];
         [$quoteText, $quoteAuthor] = $quotes[$task->id % count($quotes)];
         $quoteBlock = '<blockquote><p>' . e($quoteText) . '</p><p>— ' . e($quoteAuthor) . '</p></blockquote>';
@@ -367,52 +385,10 @@ public function store(Request $request)
 
 {$quoteBlock}
 
-<p><strong>📁 Projet :</strong> {$project->name}<br>
-<strong>👤 Créé par :</strong> {$creator->name}<br>
-<strong>📅 Date de création :</strong> {$createdAt}<br>
-<strong>👥 Assigné à :</strong> {$assigneeName}<br>
-<strong>⚡ Priorité :</strong> {$priority}<br>
-<strong>📊 Statut :</strong> {$status}<br>
-<strong>⏰ Échéance :</strong> {$dueDate}</p>
-
 <hr>
 
 <h2>📋 Description</h2>
 <p>{$taskDescription}</p>
-
-<hr>
-
-<h2>🎯 Objectifs</h2>
-<ul>
-  <li>Définir les livrables attendus pour cette tâche</li>
-  <li>Identifier les critères d'acceptation</li>
-  <li>Valider avec l'équipe les attentes</li>
-</ul>
-
-<h2>📈 Avancement</h2>
-<p>Utilisez cette section pour noter régulièrement l'avancement de la tâche.</p>
-<ul>
-  <li><strong>[Date]</strong> — Démarrage de la tâche</li>
-</ul>
-
-<h2>🚧 Blocages et risques</h2>
-<p>Notez ici tout blocage rencontré ou risque identifié.</p>
-<ul>
-  <li>Aucun blocage identifié pour l'instant</li>
-</ul>
-
-<h2>💬 Notes et décisions</h2>
-<p>Consignez les décisions importantes, réunions clés ou informations utiles à l'équipe.</p>
-<ul>
-  <li><strong>[Date]</strong> — Création du document de suivi</li>
-</ul>
-
-<h2>✅ Critères de validation</h2>
-<ul>
-  <li>Livrable principal réalisé</li>
-  <li>Revue qualité effectuée</li>
-  <li>Validé par le responsable</li>
-</ul>
 
 <hr>
 <p><em>Ce document est partagé avec tous les membres du projet <strong>{$project->name}</strong>. Toutes les modifications sont enregistrées automatiquement.</em></p>
