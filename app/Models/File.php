@@ -109,8 +109,9 @@ private array $accessCache = [];
  *  - propriétaire du fichier               → admin
  *  - manager du projet                     → admin
  *  - personne assignée à la tâche liée     → edit  (écriture)
+ *  - autre membre du projet (non muet)     → view  (LECTURE SEULE : il voit le document)
  *  - accès explicite (panneau Partager)    → son niveau (le plus élevé l'emporte)
- *  - tous les autres collègues             → none  (aucun accès)
+ *  - toute personne étrangère au projet    → none  (aucun accès)
  */
 public function accessFor(User $user): string
 {
@@ -145,6 +146,14 @@ private function computeAccessFor(User $user): string
     $task = $this->task;
     if ($task && $task->assigned_to !== null && (int) $task->assigned_to === (int) $user->id) {
         $level = 'edit';
+    }
+
+    // Autre membre du projet (non muet) : peut consulter le document, en lecture seule
+    if ($level === 'none' && $project && $project->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('is_muted', false)
+            ->exists()) {
+        $level = 'view';
     }
 
     // Accès explicite (partage) : on garde le niveau le plus élevé

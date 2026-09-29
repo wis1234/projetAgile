@@ -717,7 +717,8 @@ public function editContent(File $file)
     $currentUser  = auth()->user();
     $myPermission = $file->accessFor($currentUser);
 
-    // Collègue qui n'est ni admin, ni manager du projet, ni assigné à la tâche : aucun accès.
+    // Personne étrangère au projet (et sans accès partagé) : aucun accès.
+    // (Les autres membres du projet ont le niveau « view » : ils voient le document en lecture seule.)
     // La page s'affiche avec le message d'accès refusé, SANS le contenu du document.
     if ($myPermission === 'none') {
         return \Inertia\Inertia::render('Files/EditContent', [

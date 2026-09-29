@@ -516,6 +516,7 @@ const EditContent = ({
   const reloadingRef = useRef(false);
   const commentClickRef = useRef(null);
   const [collabReady, setCollabReady] = useState(false);
+  const [staticSnapshot, setStaticSnapshot] = useState(false); // lecteur ouvrant un document jamais initialisé
   const collabUser = useMemo(() => ({
     id: auth.user.id,
     name: auth.user.name,
@@ -596,8 +597,10 @@ const EditContent = ({
             );
             Y.applyUpdate(ydoc, fromBase64(data.state), 'init');
           } catch {
-            // Lecture seule ou réseau : affichage local uniquement
+            // Le serveur réserve l'initialisation aux éditeurs : un lecteur affiche un aperçu local
+            // (sans synchronisation, pour ne pas mélanger deux états initiaux différents)
             Y.applyUpdate(ydoc, fromBase64(seed), 'init');
+            if (isReadOnly) setStaticSnapshot(true);
           }
         }
       } catch (e) {
@@ -634,7 +637,9 @@ const EditContent = ({
         setPresenceUsers(prev => prev.filter(u => u.id !== user.id));
       });
 
-    const provider = new PusherYjsProvider({
+    let provider = null;
+    if (!staticSnapshot) {
+    provider = new PusherYjsProvider({
       doc: ydoc,
       awareness,
       readOnly: isReadOnly,
@@ -646,13 +651,14 @@ const EditContent = ({
     });
     provider.attach(channel);
     providerRef.current = provider;
+    }
 
     return () => {
-      provider.destroy();
+      provider?.destroy();
       providerRef.current = null;
       window.Echo.leave(channelName);
     };
-  }, [editor, collabReady, file?.id, ydoc, awareness, isReadOnly, addToast]);
+  }, [editor, collabReady, file?.id, ydoc, awareness, isReadOnly, addToast, staticSnapshot]);
 
   /* ── Sauvegarde de l'état Yjs sur le serveur (debounce 2,5 s) ── */
   useEffect(() => {
@@ -1111,7 +1117,7 @@ const EditContent = ({
             </div>
             <h2 className="text-lg font-semibold text-slate-800 mb-2">Vous n'avez pas accès à ce document</h2>
             <p className="text-[13.5px] text-slate-500 mb-6">
-              Ce document est réservé aux administrateurs, aux managers du projet et à la personne à qui la tâche est assignée.
+              Ce document n'est pas accessible avec votre compte. Demandez l'accès à un manager du projet.
             </p>
             <div className="flex items-center justify-center gap-3">
               <button type="button" onClick={() => window.history.back()} className="px-4 h-9 rounded-lg border border-slate-300 text-[13px] text-slate-700 hover:bg-slate-50">
@@ -1298,7 +1304,9 @@ const EditContent = ({
             <div className="flex items-center gap-2 px-5 py-1.5 bg-slate-50 border-t border-slate-100">
               <FaLock className="text-slate-400 text-[10px] flex-shrink-0" />
               <span className="text-[11.5px] text-slate-500">
-                {myPermission === 'none' ? "Vous n'avez pas accès à ce document." : 'Lecture seule — vous ne pouvez pas modifier ce document.'}
+                {staticSnapshot
+                  ? "Lecture seule — aperçu du document. Rechargez la page pour voir les modifications en direct."
+                  : 'Lecture seule — vous pouvez consulter ce document, mais seuls les administrateurs, les managers du projet et la personne assignée à la tâche peuvent le modifier.'}
               </span>
             </div>
           )}
