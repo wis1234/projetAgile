@@ -44,6 +44,8 @@ import { LineHeight } from '@/Components/Editor/extensions/line-height';
 import DocMenus from '@/Components/Editor/DocMenus';
 import FindReplaceBar from '@/Components/Editor/FindReplaceBar';
 import CommentsPanel from '@/Components/Editor/CommentsPanel';
+import DocCallButton from '@/Components/Editor/DocCallButton';
+import { InsertionMark, DeletionMark, SuggestionMode, collectSuggestions, resolveSuggestion } from '@/Components/Editor/extensions/suggestion-mode';
 import '@/Components/Editor/editorStyles';
 
 /* ── Style des curseurs collaboratifs ── */
@@ -481,9 +483,10 @@ const EditableTitle = ({ value, onRename, readOnly }) => {
 ═══════════════════════════════════════════════════════════════ */
 const EditContent = ({
   file, lastModifiedBy, auth, myPermission = 'edit', collaborators = [], recentVersions = [],
-  canManageAccess = false, project = null, task = null, pendingChanges = [],
+  canManageAccess = false, project: projectProp = null, task = null,
 }) => {
   const { flash }     = usePage().props;
+  const project = projectProp ?? file.project ?? null;
   const [isSaving,    setIsSaving]    = useState(false);
   const [isDirty,     setIsDirty]     = useState(false);
   const [lastSaved,   setLastSaved]   = useState(null);
@@ -496,6 +499,11 @@ const EditContent = ({
   const [wordCount, setWordCount]     = useState(0);
   const [docTitle,  setDocTitle]      = useState(file.name);
   const saveRef = useRef();
+  const [needsVersion, setNeedsVersion] = useState(false);   // modifications pas encore versionnées (bouton Enregistrer)
+  const [autoSaveError, setAutoSaveError] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);       // mode Suggestion (suivi des modifications)
+  const autosaveTriggerRef = useRef(null);
+  const editVersionRef = useRef(0);
 
   const isReadOnly = myPermission === 'view' || myPermission === 'none';
   const canRestore = myPermission === 'admin';
@@ -539,6 +547,7 @@ const EditContent = ({
       Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
       TaskList, TaskItem.configure({ nested: true }),
       CommentMark, SearchHighlight,
+      InsertionMark, DeletionMark, SuggestionMode,
       Collaboration.configure({ document: ydoc }),
       CollaborationCaret.configure({ provider: { awareness }, user: collabUser }),
     ],
@@ -555,6 +564,9 @@ const EditContent = ({
       // Les changements venant des autres collaborateurs ou du chargement ne sont pas "non sauvegardés"
       if (isReadOnly || isChangeOrigin(transaction)) return;
       setIsDirty(true);
+      setNeedsVersion(true);
+      editVersionRef.current += 1;
+      autosaveTriggerRef.current?.();   // enregistrement automatique
     },
   }, [ydoc]);
 
@@ -688,6 +700,8 @@ const EditContent = ({
         { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content } }
       );
       setIsDirty(false);
+      setNeedsVersion(false);
+      setAutoSaveError(false);
       setLastSaved(new Date().toISOString());
       setSummary('');
       setShowSummary(false);
@@ -714,30 +728,95 @@ const EditContent = ({
     return () => window.removeEventListener('keydown', fn);
   }, []);
 
-  /* ── Auto-save every 30s ── */
-  useEffect(() => {
-    if (!editor || !file?.id) return;
-    const iv = setInterval(() => {
-      if (isDirty) {
-        localStorage.setItem(`file_autosave_${file.id}`, JSON.stringify({
-          content: editor.getHTML(), fileId: file.id, timestamp: new Date().toISOString(),
-        }));
-        setLastSaved(new Date().toISOString());
-      }
-    }, 30000);
-    return () => clearInterval(iv);
-  }, [isDirty, editor, file?.id]);
+  /* ── Enregistrement automatique (comme Google Docs) ──
+     Le document est envoyé au serveur ~2,5 s après la dernière frappe (au plus 15 s en frappe continue),
+     sans créer de version à chaque fois, et une dernière fois quand on quitte / masque la page. */
+  const autosaveTimer = useRef(null);
+  const autosaveMaxTimer = useRef(null);
+  const autosaveBusy = useRef(false);
+  const autosaveAgain = useRef(false);
+  const [autoSaving, setAutoSaving] = useState(false);
 
-  /* ── Unsaved changes warning ── */
+  const runAutosave = useCallback(async () => {
+    clearTimeout(autosaveTimer.current);
+    clearTimeout(autosaveMaxTimer.current);
+    autosaveTimer.current = null;
+    autosaveMaxTimer.current = null;
+    if (!editor || editor.isDestroyed || isReadOnly || reloadingRef.current) return;
+    if (autosaveBusy.current) { autosaveAgain.current = true; return; }
+
+    autosaveBusy.current = true;
+    setAutoSaving(true);
+    const versionAtStart = editVersionRef.current;
+    try {
+      const { data } = await axios.post(route('files.autosave', file.id), { content: editor.getHTML() });
+      setAutoSaveError(false);
+      setLastSaved(data?.saved_at || new Date().toISOString());
+      if (editVersionRef.current === versionAtStart) setIsDirty(false);
+    } catch (err) {
+      setAutoSaveError(true);
+      // nouvel essai automatique dans 10 s
+      autosaveTimer.current = setTimeout(() => autosaveTriggerRef.current?.(), 10000);
+    } finally {
+      autosaveBusy.current = false;
+      setAutoSaving(false);
+      if (autosaveAgain.current) { autosaveAgain.current = false; autosaveTriggerRef.current?.(); }
+    }
+  }, [editor, isReadOnly, file.id]);
+
+  autosaveTriggerRef.current = () => {
+    if (isReadOnly) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(runAutosave, 2500);
+    if (!autosaveMaxTimer.current) autosaveMaxTimer.current = setTimeout(runAutosave, 15000);
+  };
+
+  // Dernier envoi quand on masque / quitte la page (même si l'onglet se ferme)
+  useEffect(() => {
+    if (!editor || isReadOnly) return undefined;
+    const flush = () => {
+      if (!autosaveTimer.current && !autosaveMaxTimer.current) return; // rien en attente
+      if (reloadingRef.current || editor.isDestroyed) return;
+      clearTimeout(autosaveTimer.current);
+      clearTimeout(autosaveMaxTimer.current);
+      autosaveTimer.current = null;
+      autosaveMaxTimer.current = null;
+      try {
+        const xsrf = decodeURIComponent((document.cookie.match(/XSRF-TOKEN=([^;]+)/) || [])[1] || '');
+        fetch(route('files.autosave', file.id), {
+          method: 'POST',
+          keepalive: true,
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-XSRF-TOKEN': xsrf,
+          },
+          body: JSON.stringify({ content: editor.getHTML() }),
+        });
+      } catch { /* ignore */ }
+    };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+      flush();
+    };
+  }, [editor, isReadOnly, file.id]);
+
+  /* ── Avertissement avant de quitter : uniquement si l'enregistrement automatique a échoué ── */
   useEffect(() => {
     const fn = (e) => {
-      if (!isDirty || isSaving) return;
+      if (!(isDirty && autoSaveError)) return;
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', fn);
     return () => window.removeEventListener('beforeunload', fn);
-  }, [isDirty, isSaving]);
+  }, [isDirty, autoSaveError]);
 
   /* ── Rename document ── */
   const handleRename = useCallback(async (newName) => {
@@ -932,6 +1011,7 @@ const EditContent = ({
     toggleComments: () => setSidePanel((p) => (p === 'comments' ? null : 'comments')),
     comment: () => startCommentRef.current?.(),
     tracking: () => setTrackingOpen(true),
+    toggleSuggesting: () => setSuggesting((v) => !v),
   };
 
   useEffect(() => {
@@ -945,11 +1025,73 @@ const EditContent = ({
     return () => window.removeEventListener('keydown', fn);
   }, []);
 
-  /* ── Tracking modal handlers (à brancher sur l'API de suivi réelle) ── */
-  const [changes, setChanges] = useState(pendingChanges);
-  const handleAcceptChange = useCallback((id) => setChanges(prev => prev.map(c => c.id === id ? { ...c, status: 'accepted' } : c)), []);
-  const handleRejectChange = useCallback((id) => setChanges(prev => prev.map(c => c.id === id ? { ...c, status: 'rejected' } : c)), []);
-  const pendingCount = changes.filter(c => c.status === 'pending').length;
+  /* ── Suivi des modifications : mode Suggestion ──
+     En mode Suggestion, ce qui est tapé / supprimé est marqué (insertion / suppression) au lieu d'être appliqué.
+     Les marques sont dans le document Yjs : tout le monde les voit en temps réel et peut les accepter ou les rejeter. */
+  const trackLogMap = useMemo(() => ydoc.getMap('tracklog'), [ydoc]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [trackLog, setTrackLog] = useState([]);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.storage.suggestionMode.enabled = suggesting && !isReadOnly;
+    editor.storage.suggestionMode.user = collabUser;
+  }, [editor, suggesting, isReadOnly, collabUser]);
+
+  useEffect(() => {
+    if (!editor) return undefined;
+    let t = null;
+    const recompute = () => { if (!editor.isDestroyed) setSuggestions(collectSuggestions(editor.state.doc)); };
+    const onTr = ({ transaction }) => {
+      if (!transaction.docChanged) return;
+      clearTimeout(t);
+      t = setTimeout(recompute, 150);
+    };
+    recompute();
+    editor.on('transaction', onTr);
+    return () => { clearTimeout(t); editor.off('transaction', onTr); };
+  }, [editor, collabReady]);
+
+  useEffect(() => {
+    const sync = () => setTrackLog(Array.from(trackLogMap.values()));
+    sync();
+    trackLogMap.observe(sync);
+    return () => trackLogMap.unobserve(sync);
+  }, [trackLogMap]);
+
+  const changes = useMemo(() => {
+    const pendingIds = new Set(suggestions.map((x) => x.id));
+    return [
+      ...suggestions.map(({ ranges, ...rest }) => rest),
+      ...trackLog.filter((l) => !pendingIds.has(l.id)),
+    ];
+  }, [suggestions, trackLog]);
+
+  const trackUsers = useMemo(() => {
+    const m = new Map();
+    collaborators.forEach((u) => m.set(String(u.id), { id: u.id, name: u.name }));
+    [...suggestions, ...trackLog].forEach((c) => {
+      if (c.userId != null && !m.has(String(c.userId))) m.set(String(c.userId), { id: c.userId, name: c.userName || 'Utilisateur' });
+    });
+    return Array.from(m.values());
+  }, [collaborators, suggestions, trackLog]);
+
+  const resolveChange = useCallback((id, accept) => {
+    if (!editor || isReadOnly) return;
+    const c = suggestions.find((x) => x.id === id);
+    if (c) {
+      trackLogMap.set(id, {
+        id, type: c.type, userId: c.userId, userName: c.userName, excerpt: c.excerpt, createdAt: c.createdAt,
+        status: accept ? 'accepted' : 'rejected', resolvedBy: auth.user.name, resolvedAt: Date.now(),
+      });
+    }
+    resolveSuggestion(editor, id, accept);
+  }, [editor, isReadOnly, suggestions, trackLogMap, auth.user.name]);
+
+  const handleAcceptChange = useCallback((id) => resolveChange(id, true), [resolveChange]);
+  const handleRejectChange = useCallback((id) => resolveChange(id, false), [resolveChange]);
+  const handleResolveAll = useCallback((accept) => suggestions.forEach((c) => resolveChange(c.id, accept)), [suggestions, resolveChange]);
+  const pendingCount = suggestions.length;
 
   const isPdf = isPdfFile(file.type, file.name);
   if (isPdf) {
@@ -988,26 +1130,29 @@ const EditContent = ({
                 <EditableTitle value={docTitle} onRename={handleRename} readOnly={isReadOnly} />
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                    isSaving ? 'bg-[#3454D1] animate-pulse' : isDirty ? 'bg-amber-400' : 'bg-emerald-400'
+                    (isSaving || autoSaving) ? 'bg-[#3454D1] animate-pulse' : autoSaveError ? 'bg-red-500' : isDirty ? 'bg-amber-400' : 'bg-emerald-400'
                   }`} />
                   <span className="text-[11px] sm:text-[12px] text-slate-500 flex items-center gap-1 truncate">
-                    {isSaving
+                    {(isSaving || autoSaving)
                       ? 'Enregistrement…'
-                      : isDirty
-                        ? 'Modifications non enregistrées'
-                        : (
+                      : autoSaveError
+                        ? 'Échec de l’enregistrement, nouvel essai…'
+                        : isDirty
+                          ? 'Modifications en cours…'
+                          : (
                           <>
                             <FaGoogleDrive className="text-[10px] text-slate-300 hidden sm:block" />
                             {lastSaved ? <span className="hidden sm:inline">Enregistré à {fmtDateShort(lastSaved)}</span> : <span className="hidden sm:inline">Modifications enregistrées</span>}
                             <span className="sm:hidden">Enregistré</span>
                           </>
-                        )}
+                          )}
                   </span>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+              {project && <DocCallButton project={project} auth={auth} />}
               {presenceUsers.length > 0 && (
                 <div className="flex -space-x-1.5">
                   {presenceUsers.slice(0, 4).map(u => <Avatar key={u.id} user={u} size={7} />)}
@@ -1079,7 +1224,7 @@ const EditContent = ({
 
               {!isReadOnly && (
                 <div className="flex items-center gap-1">
-                  {isDirty && !showSummary && (
+                  {needsVersion && !showSummary && (
                     <button
                       onClick={() => setShowSummary(true)}
                       className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-[#1E2129] hover:bg-slate-50 transition-colors"
@@ -1090,9 +1235,10 @@ const EditContent = ({
                   )}
                   <button
                     onClick={handleSave}
-                    disabled={isSaving || !isDirty}
+                    disabled={isSaving || !needsVersion}
+                    title="Enregistrer et créer une version dans l'historique (l'enregistrement automatique est déjà actif)"
                     className={`flex items-center gap-1.5 px-2 sm:px-4 py-1.5 rounded-lg text-[12px] sm:text-[12.5px] font-medium transition-colors
-                      ${isSaving || !isDirty
+                      ${isSaving || !needsVersion
                         ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
                         : 'bg-[#3454D1] hover:bg-[#2c47b8] text-white'
                       }`}
@@ -1150,6 +1296,7 @@ const EditContent = ({
                 actions={menuActions}
                 fullWidth={fullWidth}
                 commentsOpen={sidePanel === 'comments'}
+                suggesting={suggesting}
               />
             </div>
           )}
@@ -1168,6 +1315,20 @@ const EditContent = ({
         <div className="flex-1 flex overflow-hidden relative">
           <div className="flex-1 overflow-y-auto">
             <div className={`${fullWidth ? 'w-full' : 'max-w-[900px] mx-auto'} px-0 sm:px-4 py-2 sm:py-3`}>
+              {suggesting && !isReadOnly && (
+                <div className="mb-2 mx-2 sm:mx-0 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-[12.5px] text-amber-800">
+                  <FaUserEdit className="text-[12px] flex-shrink-0" />
+                  <span className="flex-1">
+                    <strong>Mode suggestion :</strong> vos modifications sont proposées (texte ajouté souligné, texte supprimé barré) et peuvent être acceptées ou rejetées.
+                  </span>
+                  <button type="button" onClick={() => setTrackingOpen(true)} className="px-2.5 h-7 rounded-md bg-white border border-amber-200 hover:bg-amber-100 font-medium">
+                    Voir ({pendingCount})
+                  </button>
+                  <button type="button" onClick={() => setSuggesting(false)} className="px-2.5 h-7 rounded-md bg-amber-600 text-white hover:bg-amber-700 font-medium">
+                    Revenir à l’édition
+                  </button>
+                </div>
+              )}
               {/* Feuille : occupe toute la largeur disponible */}
               <div className="doc-paper doc-editor bg-white sm:rounded-xl border border-slate-200 shadow-sm min-h-[calc(100vh-320px)]">
                 <div className="px-5 py-6 sm:px-10 sm:py-10 lg:px-14" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
@@ -1268,10 +1429,15 @@ const EditContent = ({
       <TrackingModal
         isOpen={trackingOpen}
         onClose={() => setTrackingOpen(false)}
-        users={collaborators}
+        users={trackUsers}
         changes={changes}
         onAccept={handleAcceptChange}
         onReject={handleRejectChange}
+        onAcceptAll={() => handleResolveAll(true)}
+        onRejectAll={() => handleResolveAll(false)}
+        canResolve={!isReadOnly}
+        suggesting={suggesting}
+        onToggleSuggesting={() => setSuggesting((v) => !v)}
       />
     </AdminLayout>
   );

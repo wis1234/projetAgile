@@ -378,6 +378,8 @@ Route::middleware('auth')->group(function () {
     ->name('files.update-yjs-state');
       Route::post('/files/{file}/yjs-init', [App\Http\Controllers\FileController::class, 'initYjsState'])
     ->name('files.init-yjs-state');
+      Route::post('/files/{file}/autosave', [App\Http\Controllers\FileController::class, 'autoSaveContent'])
+    ->name('files.autosave');
 
 
     

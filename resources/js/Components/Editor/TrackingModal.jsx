@@ -56,12 +56,13 @@ const groupByDay = (changes) => {
 export default function TrackingModal({
     isOpen, onClose, users = [], changes = [],
     onSelectUser, selectedUserId,
-    onAccept, onReject,
+    onAccept, onReject, onAcceptAll, onRejectAll,
+    canResolve = true, suggesting = false, onToggleSuggesting,
 }) {
     const [filterUserId, setFilterUserId] = useState(selectedUserId ?? null);
 
     const visibleChanges = useMemo(() => {
-        const list = filterUserId ? changes.filter(c => c.userId === filterUserId) : changes;
+        const list = filterUserId ? changes.filter(c => String(c.userId) === String(filterUserId)) : changes;
         return [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }, [changes, filterUserId]);
 
@@ -73,6 +74,8 @@ export default function TrackingModal({
         setFilterUserId(next);
         onSelectUser?.(next);
     };
+
+    const nameOf = (change) => users.find(u => String(u.id) === String(change.userId))?.name ?? change.userName ?? 'Utilisateur';
 
     return (
         <Transition appear show={isOpen} as={React.Fragment}>
@@ -111,6 +114,31 @@ export default function TrackingModal({
                                     </button>
                                 </div>
 
+                                {/* Mode suggestion + actions groupées */}
+                                <div className="flex items-center gap-2 flex-wrap px-5 py-2.5 border-b border-slate-100 bg-slate-50/60">
+                                    {onToggleSuggesting && canResolve && (
+                                        <button
+                                            type="button"
+                                            onClick={onToggleSuggesting}
+                                            className={`flex items-center gap-1.5 px-3 h-8 rounded-full text-[12px] font-medium border transition-colors
+                                                ${suggesting ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full ${suggesting ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                                            {suggesting ? 'Mode suggestion activé' : 'Activer le mode suggestion'}
+                                        </button>
+                                    )}
+                                    {canResolve && pendingCount > 0 && (
+                                        <div className="flex items-center gap-1.5 ml-auto">
+                                            <button type="button" onClick={onAcceptAll} className="flex items-center gap-1 px-2.5 h-8 rounded-md bg-emerald-50 text-emerald-700 text-[11.5px] font-medium hover:bg-emerald-100">
+                                                <FaCheck className="text-[9px]" /> Tout accepter
+                                            </button>
+                                            <button type="button" onClick={onRejectAll} className="flex items-center gap-1 px-2.5 h-8 rounded-md bg-red-50 text-red-700 text-[11.5px] font-medium hover:bg-red-100">
+                                                <FaTimes className="text-[9px]" /> Tout rejeter
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Filtre par auteur */}
                                 {users.length > 0 && (
                                     <div className="flex items-center gap-1.5 px-5 py-3 border-b border-slate-100 overflow-x-auto">
@@ -123,7 +151,7 @@ export default function TrackingModal({
                                         </button>
                                         {users.map((user) => {
                                             const c = colorFor(user.id);
-                                            const active = filterUserId === user.id;
+                                            const active = String(filterUserId) === String(user.id);
                                             return (
                                                 <button
                                                     key={user.id}
@@ -143,7 +171,8 @@ export default function TrackingModal({
                                 <div className="flex-1 overflow-y-auto">
                                     {visibleChanges.length === 0 && (
                                         <div className="text-center py-14 text-[13px] text-slate-400">
-                                            Aucune modification à afficher
+                                            Aucune modification à afficher.<br />
+                                            <span className="text-[12px]">Activez le mode suggestion : ce que vous tapez ou supprimez sera proposé au lieu d’être appliqué.</span>
                                         </div>
                                     )}
 
@@ -154,8 +183,7 @@ export default function TrackingModal({
                                             </div>
                                             <div className="relative">
                                                 {dayChanges.map((change, i) => {
-                                                    const user = users.find(u => u.id === change.userId);
-                                                    const color = colorFor(change.userId);
+                                                                                                        const color = colorFor(change.userId);
                                                     const type = TYPE_META[change.type] ?? TYPE_META.formatting;
                                                     const isLast = i === dayChanges.length - 1;
                                                     return (
@@ -168,7 +196,7 @@ export default function TrackingModal({
 
                                                             <div className="flex-1 min-w-0 pb-1">
                                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                                    <span className="text-[12.5px] font-medium text-[#1E2129]">{user?.name ?? 'Utilisateur'}</span>
+                                                                    <span className="text-[12.5px] font-medium text-[#1E2129]">{nameOf(change)}</span>
                                                                     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${type.badge}`}>
                                                                         {type.icon}{type.label}
                                                                     </span>
@@ -184,7 +212,7 @@ export default function TrackingModal({
                                                                     </p>
                                                                 )}
 
-                                                                {change.status === 'pending' ? (
+                                                                {change.status === 'pending' ? (!canResolve ? null : (
                                                                     <div className="flex items-center gap-2 mt-2">
                                                                         <button
                                                                             onClick={() => onAccept?.(change.id)}
@@ -199,11 +227,11 @@ export default function TrackingModal({
                                                                             <FaTimes className="text-[9px]" /> Rejeter
                                                                         </button>
                                                                     </div>
-                                                                ) : (
+                                                                )) : (
                                                                     <span className={`inline-flex items-center gap-1 mt-2 text-[11px] font-medium
                                                                         ${change.status === 'accepted' ? 'text-emerald-600' : 'text-red-500'}`}>
                                                                         <CheckIcon className="h-3 w-3" />
-                                                                        {change.status === 'accepted' ? 'Acceptée' : 'Rejetée'}
+                                                                        {change.status === 'accepted' ? 'Acceptée' : 'Rejetée'}{change.resolvedBy ? ` par ${change.resolvedBy}` : ''}
                                                                     </span>
                                                                 )}
                                                             </div>

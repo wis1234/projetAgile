@@ -859,6 +859,60 @@ $oldVersionIds = $file->versions()
     return response()->json(['success' => true, 'message' => 'Le contenu a été sauvegardé avec succès.']);
 }
 
+/**
+ * Enregistrement automatique (comme Google Docs) : écrit le contenu sur le disque sans
+ * créer une version à chaque appel. Un instantané n'est ajouté à l'historique qu'au plus
+ * toutes les 10 minutes (et seulement si le contenu a changé).
+ */
+public function autoSaveContent(Request $request, File $file)
+{
+    $this->authorize('update', $file);
+    $request->validate(['content' => 'present|nullable|string']);
+
+    if (!is_file_editable($file->type, $file->name)) {
+        return response()->json(['success' => false, 'message' => 'Ce type de fichier ne peut pas être modifié.'], 422);
+    }
+
+    $content = (string) $request->input('content', '');
+
+    // Même emplacement que updateContent() pour rester cohérent avec l'enregistrement manuel
+    $path = 'files/' . $file->project_id . '/' . $file->name;
+    \Storage::disk('public')->put($path, $content);
+
+    $file->update([
+        'file_path'        => $path,
+        'size'             => \Storage::disk('public')->size($path),
+        'last_modified_by' => \Auth::id(),
+        'updated_at'       => now(),
+    ]);
+
+    $last = $file->versions()->first();
+    if (!$last || ($last->content !== $content && $last->created_at->lt(now()->subMinutes(10)))) {
+        \App\Models\FileVersion::create([
+            'file_id'        => $file->id,
+            'user_id'        => \Auth::id(),
+            'content'        => $content,
+            'label'          => 'Enregistrement automatique',
+            'summary'        => null,
+            'version_number' => ($file->versions()->max('version_number') ?? 0) + 1,
+        ]);
+
+        $oldVersionIds = $file->versions()
+            ->orderByDesc('version_number')
+            ->skip(100)
+            ->take(PHP_INT_MAX)
+            ->pluck('id');
+        if ($oldVersionIds->isNotEmpty()) {
+            \App\Models\FileVersion::whereIn('id', $oldVersionIds)->delete();
+        }
+    }
+
+    return response()->json([
+        'success'  => true,
+        'saved_at' => now()->toIso8601String(),
+    ]);
+}
+
 public function initYjsState(Request $request, File $file)
 {
     $this->authorize('update', $file);

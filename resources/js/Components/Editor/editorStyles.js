@@ -39,6 +39,10 @@ if (typeof document !== 'undefined' && !document.getElementById('doc-editor-styl
     .doc-editor .search-match { background: #fff2a8; border-radius: 2px; }
     .doc-editor .search-match-current { background: #ffb74d; }
 
+    /* Suivi des modifications (mode suggestion) : couleur = auteur */
+    .doc-editor .tc-ins { color: var(--tc-color, #188038); text-decoration: underline; text-decoration-thickness: 1.5px; background: rgba(24,128,56,0.07); }
+    .doc-editor .tc-del { color: var(--tc-color, #c5221f); text-decoration: line-through; background: rgba(197,34,31,0.07); }
+
     /* Commentaires (la couleur des passages commentés est injectée dynamiquement) */
     .doc-editor .comment-mark { cursor: pointer; }
 

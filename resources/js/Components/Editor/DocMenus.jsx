@@ -44,7 +44,7 @@ const TopMenu = ({ label, items, open, onToggle, onHover, onClose }) => (
   </div>
 );
 
-const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, commentsOpen = false }) => {
+const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, commentsOpen = false, suggesting = false }) => {
   const [openKey, setOpenKey] = useState(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const fileInput = useRef(null);
@@ -166,7 +166,8 @@ const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, 
       { label: 'Nombre de mots', onClick: wordStats },
       { label: 'Rechercher et remplacer', shortcut: 'Ctrl+H', onClick: actions.find },
       { type: 'sep' },
-      { label: 'Suivi des modifications', onClick: actions.tracking },
+      { label: 'Mode suggestion (suivre mes modifications)', checked: suggesting, onClick: actions.toggleSuggesting, disabled: ro },
+      { label: 'Voir et traiter les modifications', onClick: actions.tracking },
       { label: 'Historique des versions', onClick: actions.history },
     ]],
     ['Aide', [
@@ -189,6 +190,30 @@ const DocMenus = ({ editor, isReadOnly = false, actions = {}, fullWidth = true, 
           />
         ))}
         <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
+
+        {/* Mode : Édition / Suggestion (comme Google Docs) */}
+        {!isReadOnly && actions.toggleSuggesting && (
+          <div className="ml-auto flex items-center flex-shrink-0 pl-3">
+            <div className="flex items-center rounded-full bg-[#f1f3f4] p-0.5 text-[12px] font-medium">
+              <button
+                type="button"
+                onClick={() => suggesting && actions.toggleSuggesting()}
+                className={`px-3 h-6 rounded-full transition-colors ${!suggesting ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                title="Vos modifications sont appliquées directement"
+              >
+                Édition
+              </button>
+              <button
+                type="button"
+                onClick={() => !suggesting && actions.toggleSuggesting()}
+                className={`px-3 h-6 rounded-full transition-colors ${suggesting ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                title="Vos modifications sont proposées et doivent être acceptées"
+              >
+                Suggestion
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showShortcuts && (
