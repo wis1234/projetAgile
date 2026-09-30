@@ -38,7 +38,9 @@ const postJson = async (url, body) => {
  *  - pas d'appel en cours  → on choisit d'abord QUI appeler, puis l'appel démarre ;
  *  - appel en cours        → on le rejoint directement.
  */
-export default function DocCallButton({ project, auth, compact = false, label = 'ProJA Meet' }) {
+export default function DocCallButton({ project, auth, compact = false, label = 'ProJA Meet', variant = 'pill' }) {
+  // variant : 'pill' (bouton avec texte) | 'icon' (rond, sur en-tête coloré) | 'icon-light' (rond, sur en-tête clair / mobile)
+  const isIcon = variant === 'icon' || variant === 'icon-light';
   const [callActive, setCallActive] = useState(false);
   const [showCall, setShowCall] = useState(false);
   const [showSelect, setShowSelect] = useState(false);
@@ -133,17 +135,27 @@ export default function DocCallButton({ project, auth, compact = false, label = 
         type="button"
         onClick={handleClick}
         title={callActive ? 'Un appel est en cours : rejoindre' : 'Lancer un appel ProJA Meet avec les membres du projet'}
-        className={`flex items-center rounded-full font-medium border transition-colors flex-shrink-0 whitespace-nowrap ${
-          compact ? 'gap-1.5 h-7 px-2.5 sm:px-3 text-[12.5px]' : 'gap-2 h-9 px-3 md:px-4 text-[13px]'
-        } ${
-          callActive
-            ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
-            : 'bg-white text-[#1a73e8] border-slate-300 hover:bg-[#e8f0fe]'
-        }`}
+        className={isIcon
+          ? `relative w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all active:scale-90 ${
+              callActive
+                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30 hover:bg-emerald-600'
+                : variant === 'icon'
+                  ? 'text-white/90 hover:bg-white/15'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-200'
+            }`
+          : `flex items-center rounded-full font-medium border transition-colors flex-shrink-0 whitespace-nowrap ${
+              compact ? 'gap-1.5 h-7 px-2.5 sm:px-3 text-[12.5px]' : 'gap-2 h-9 px-3 md:px-4 text-[13px]'
+            } ${
+              callActive
+                ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                : 'bg-white text-[#1a73e8] border-slate-300 hover:bg-[#e8f0fe]'
+            }`}
       >
-        <FaVideo className={compact ? 'text-[12px]' : 'text-[13px]'} />
-        <span className="hidden sm:inline">{label}</span>
-        {callActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+        <FaVideo className={isIcon ? 'text-[15px]' : compact ? 'text-[12px]' : 'text-[13px]'} />
+        {!isIcon && <span className="hidden sm:inline">{label}</span>}
+        {callActive && (isIcon
+          ? <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-white ring-2 ring-emerald-500 animate-pulse" />
+          : <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />)}
       </button>
 
       <CallMemberSelectModal

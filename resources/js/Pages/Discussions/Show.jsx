@@ -4,6 +4,9 @@ import { useTranslation } from 'react-i18next';
 import AdminLayout from '@/Layouts/AdminLayout';
 import Modal from '@/Components/Modal';
 import AudioPlayer from '@/Components/AudioPlayer';
+import StickerMessage from '@/Components/Stickers/StickerMessage';
+import StickerCreatorModal from '@/Components/Stickers/StickerCreatorModal';
+import DocCallButton from '@/Components/Editor/DocCallButton';
 import {
   FaCommentDots, FaMicrophone, FaStop, FaReply, FaPaperPlane, FaEnvelope,
   FaPaperclip, FaSmile, FaSmileBeam, FaSave, FaTimes, FaCopy, FaCheck,
@@ -200,6 +203,11 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
   // ─── Stickers personnalisés (pack partagé par l'équipe, image ou vidéo courte) ───
   const [stickers, setStickers] = useState([]);
   const stickerInputRef = useRef(null);
+  const [stickerCreatorOpen, setStickerCreatorOpen] = useState(false);
+  // Appel vidéo ProJA Meet : on choisit QUI appeler parmi les membres du projet de la tâche
+  const callProject = (task.project_id || task.project?.id)
+    ? { id: task.project_id || task.project.id, name: task.title, users: projectMembers }
+    : null;
 
   const [reactions, setReactions] = useState(() => {
     if (typeof window === 'undefined') return {};
@@ -1102,6 +1110,8 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
               <FaExternalLinkAlt className="w-4 h-4" />
             </button>
 
+            {callProject && <DocCallButton project={callProject} auth={auth} variant="icon" />}
+
             <OnlineAvatarStack users={onlineUsers} />
 
             <label
@@ -1186,7 +1196,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
 
                     <div className={
                       comment.is_sticker
-                        ? `relative ${isPending ? 'opacity-70' : ''} ${hasFailed ? 'opacity-50' : ''}`
+                        ? 'relative'
                         : `relative px-3.5 py-2.5 shadow-sm ${comment.audio_path ? 'min-w-[220px]' : 'min-w-[120px]'} ${isPending ? 'bubble-pending' : ''} ${
                             isMe
                               ? `bubble-right ${hasFailed ? 'bg-red-100 dark:bg-red-900/40 text-red-900' : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'}`
@@ -1222,35 +1232,16 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                       )}
 
                       {comment.is_sticker ? (
-                        <>
-                          {resolvedVideoSrc ? (
-                            <video src={resolvedVideoSrc} autoPlay loop muted playsInline className="w-36 h-36 object-contain" />
-                          ) : (
-                            <img
-                              src={resolvedImageSrc}
-                              alt="Sticker"
-                              className="w-36 h-36 object-contain cursor-pointer"
-                              loading="lazy"
-                              onClick={() => setImageLightbox(resolvedImageSrc)}
-                            />
-                          )}
-                          <div className="flex items-center gap-1 mt-1 justify-end tick text-gray-400 dark:text-gray-500">
-                            <span>{new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-                            {isMe && (
-                              hasFailed
-                                ? <span className="text-red-500 text-xs">✕</span>
-                                : isPending
-                                ? <span className="text-gray-400">⏳</span>
-                                : <span className="text-blue-500 font-bold">✓✓</span>
-                            )}
-                          </div>
-                          {hasFailed && (
-                            <p className="text-xs text-red-500 mt-1 font-medium">
-                              Échec de l'envoi.
-                              <button onClick={() => retryComment(comment)} className="ml-1 underline hover:no-underline font-semibold">Réessayer</button>
-                            </p>
-                          )}
-                        </>
+                        <StickerMessage
+                          imagePath={comment.image_path}
+                          videoPath={comment.video_path}
+                          time={new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          isMe={isMe}
+                          pending={isPending}
+                          failed={hasFailed}
+                          onRetry={() => retryComment(comment)}
+                          onOpen={setImageLightbox}
+                        />
                       ) : editingId === comment.id ? (
                         <form onSubmit={handleUpdateComment} className="min-w-[200px]">
                           <textarea
@@ -1475,6 +1466,15 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                 >
                   <span className="text-2xl leading-none">＋</span>
                   <span className="text-[9px] mt-1 font-medium text-center leading-tight">Ajouter<br/>photo/vidéo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStickerCreatorOpen(true)}
+                  className="aspect-square rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 text-white flex flex-col items-center justify-center hover:opacity-90 transition-opacity shadow-sm"
+                >
+                  <span className="text-xl leading-none">✨</span>
+                  <span className="text-[9px] mt-1 font-semibold text-center leading-tight">Créer un<br/>sticker animé</span>
                 </button>
 
                 {stickers.map(sticker => (
@@ -1735,6 +1735,12 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
           })()}
         </div>
       </Modal>
+
+      <StickerCreatorModal
+        open={stickerCreatorOpen}
+        onClose={() => setStickerCreatorOpen(false)}
+        onCreated={(sticker) => setStickers(prev => [sticker, ...prev])}
+      />
 
       {imageLightbox && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setImageLightbox(null)}>

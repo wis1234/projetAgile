@@ -1,0 +1,1178 @@
+diff --git a/package.json b/package.json
+index dfe48e4..0536a6c 100644
+--- a/package.json
++++ b/package.json
+@@ -95,6 +95,7 @@
+         "dropbox": "^10.34.0",
+         "fedapay-reactjs": "^1.1.2",
+         "framer-motion": "^12.23.12",
++        "fflate": "^0.8.2",
+         "highlight.js": "^11.11.1",
+         "i18next": "^25.5.2",
+         "i18next-browser-languagedetector": "^8.2.0",
+diff --git a/resources/js/Components/Editor/DocCallButton.jsx b/resources/js/Components/Editor/DocCallButton.jsx
+index b86900a..3c7313a 100644
+--- a/resources/js/Components/Editor/DocCallButton.jsx
++++ b/resources/js/Components/Editor/DocCallButton.jsx
+@@ -38,7 +38,9 @@ const postJson = async (url, body) => {
+  *  - pas d'appel en cours  → on choisit d'abord QUI appeler, puis l'appel démarre ;
+  *  - appel en cours        → on le rejoint directement.
+  */
+-export default function DocCallButton({ project, auth, compact = false, label = 'ProJA Meet' }) {
++export default function DocCallButton({ project, auth, compact = false, label = 'ProJA Meet', variant = 'pill' }) {
++  // variant : 'pill' (bouton avec texte) | 'icon' (rond, sur en-tête coloré) | 'icon-light' (rond, sur en-tête clair / mobile)
++  const isIcon = variant === 'icon' || variant === 'icon-light';
+   const [callActive, setCallActive] = useState(false);
+   const [showCall, setShowCall] = useState(false);
+   const [showSelect, setShowSelect] = useState(false);
+@@ -133,17 +135,27 @@ export default function DocCallButton({ project, auth, compact = false, label =
+         type="button"
+         onClick={handleClick}
+         title={callActive ? 'Un appel est en cours : rejoindre' : 'Lancer un appel ProJA Meet avec les membres du projet'}
+-        className={`flex items-center rounded-full font-medium border transition-colors flex-shrink-0 whitespace-nowrap ${
+-          compact ? 'gap-1.5 h-7 px-2.5 sm:px-3 text-[12.5px]' : 'gap-2 h-9 px-3 md:px-4 text-[13px]'
+-        } ${
+-          callActive
+-            ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+-            : 'bg-white text-[#1a73e8] border-slate-300 hover:bg-[#e8f0fe]'
+-        }`}
++        className={isIcon
++          ? `relative w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all active:scale-90 ${
++              callActive
++                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30 hover:bg-emerald-600'
++                : variant === 'icon'
++                  ? 'text-white/90 hover:bg-white/15'
++                  : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-200'
++            }`
++          : `flex items-center rounded-full font-medium border transition-colors flex-shrink-0 whitespace-nowrap ${
++              compact ? 'gap-1.5 h-7 px-2.5 sm:px-3 text-[12.5px]' : 'gap-2 h-9 px-3 md:px-4 text-[13px]'
++            } ${
++              callActive
++                ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
++                : 'bg-white text-[#1a73e8] border-slate-300 hover:bg-[#e8f0fe]'
++            }`}
+       >
+-        <FaVideo className={compact ? 'text-[12px]' : 'text-[13px]'} />
+-        <span className="hidden sm:inline">{label}</span>
+-        {callActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
++        <FaVideo className={isIcon ? 'text-[15px]' : compact ? 'text-[12px]' : 'text-[13px]'} />
++        {!isIcon && <span className="hidden sm:inline">{label}</span>}
++        {callActive && (isIcon
++          ? <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-white ring-2 ring-emerald-500 animate-pulse" />
++          : <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />)}
+       </button>
+ 
+       <CallMemberSelectModal
+diff --git a/resources/js/Components/Stickers/StickerCreatorModal.jsx b/resources/js/Components/Stickers/StickerCreatorModal.jsx
+new file mode 100644
+index 0000000..030dbc3
+--- /dev/null
++++ b/resources/js/Components/Stickers/StickerCreatorModal.jsx
+@@ -0,0 +1,246 @@
++import React, { useEffect, useMemo, useRef, useState } from 'react';
++import { FaTimes, FaMagic, FaSpinner } from 'react-icons/fa';
++import { encodeAPNG } from '@/lib/apng';
++import { ANIMATIONS, renderStickerFrame, renderAllFrames } from './stickerRender';
++
++const QUICK_EMOJIS = ['😀','😂','🥰','😎','🤩','😭','😡','🥳','👍','👏','🙏','💪','🔥','❤️','🎉','💯','✅','🚀','⭐','🎯','💡','☕','🍕','🐱'];
++const TEXT_COLORS = ['#111827', '#ffffff', '#e11d48', '#ea580c', '#ca8a04', '#16a34a', '#2563eb', '#9333ea'];
++const BG_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#a855f7', '#14b8a6', '#111827', '#ec4899'];
++const FPS = 20;
++
++const csrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
++const makeCanvas = (s) => { const c = document.createElement('canvas'); c.width = s; c.height = s; return c; };
++
++/**
++ * Créateur de stickers ANIMÉS : on choisit un émoji, un texte ou une image, puis un mouvement
++ * (rebond, secousse, pulsation, rotation…). Le résultat est un PNG animé (APNG) à fond transparent,
++ * ajouté au pack partagé de l'équipe — il s'affiche en boucle dans toutes les discussions.
++ */
++export default function StickerCreatorModal({ open, onClose, onCreated }) {
++  const [kind, setKind] = useState('emoji');            // emoji | text | image
++  const [emoji, setEmoji] = useState('🔥');
++  const [text, setText] = useState('BRAVO !');
++  const [color, setColor] = useState('#e11d48');
++  const [image, setImage] = useState(null);
++  const [animation, setAnimation] = useState('bounce');
++  const [duration, setDuration] = useState(1.2);
++  const [withBg, setWithBg] = useState(false);
++  const [bgColor, setBgColor] = useState('#22c55e');
++  const [name, setName] = useState('');
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState('');
++  const canvasRef = useRef(null);
++  const fileRef = useRef(null);
++
++  const opts = useMemo(() => ({
++    source: kind === 'emoji' ? { kind: 'emoji', value: emoji }
++      : kind === 'text' ? { kind: 'text', value: text, color, outlineColor: color === '#ffffff' ? '#1f2937' : '#ffffff' }
++      : { kind: 'image', image },
++    animation,
++    background: withBg ? bgColor : null,
++  }), [kind, emoji, text, color, image, animation, withBg, bgColor]);
++
++  // Aperçu animé en direct
++  useEffect(() => {
++    if (!open) return undefined;
++    const canvas = canvasRef.current;
++    if (!canvas) return undefined;
++    const ctx = canvas.getContext('2d');
++    let raf;
++    const start = performance.now();
++    const loop = (now) => {
++      const t = (((now - start) / 1000) / duration) % 1;
++      renderStickerFrame(ctx, canvas.width, t, opts);
++      raf = requestAnimationFrame(loop);
++    };
++    raf = requestAnimationFrame(loop);
++    return () => cancelAnimationFrame(raf);
++  }, [open, opts, duration]);
++
++  useEffect(() => { if (open) { setError(''); setBusy(false); } }, [open]);
++
++  if (!open) return null;
++
++  const pickImage = (e) => {
++    const f = e.target.files?.[0];
++    e.target.value = '';
++    if (!f) return;
++    if (!f.type.startsWith('image/')) { setError('Choisissez une image (PNG, JPG, WebP…).'); return; }
++    const url = URL.createObjectURL(f);
++    const img = new Image();
++    img.onload = () => { setImage(img); setKind('image'); setError(''); };
++    img.onerror = () => setError("Impossible de lire cette image.");
++    img.src = url;
++  };
++
++  const upload = async (png) => {
++    const fd = new FormData();
++    fd.append('image', new File([png], 'sticker.png', { type: 'image/png' }));
++    if (name.trim()) fd.append('name', name.trim().slice(0, 50));
++    const res = await fetch('/api/stickers', {
++      method: 'POST',
++      headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
++      body: fd,
++    });
++    if (!res.ok) {
++      let msg = "Impossible d'ajouter ce sticker.";
++      try { const d = await res.json(); msg = d.message || msg; } catch { /* ignore */ }
++      throw new Error(msg);
++    }
++    return res.json();
++  };
++
++  const create = async () => {
++    if (kind === 'image' && !image) { setError('Choisissez d’abord une image.'); return; }
++    if (kind === 'text' && !text.trim()) { setError('Saisissez un texte.'); return; }
++    setBusy(true);
++    setError('');
++    try {
++      await new Promise((r) => setTimeout(r, 30)); // laisse l'interface afficher « Création… »
++      const frameCount = Math.max(8, Math.round(duration * FPS));
++      let size = 256;
++      let png = encodeAPNG(renderAllFrames(makeCanvas, size, frameCount, opts), size, size, 1000 / FPS);
++      if (png.length > 5.5 * 1024 * 1024) { // trop lourd pour le serveur (6 Mo) : on réduit
++        size = 192;
++        png = encodeAPNG(renderAllFrames(makeCanvas, size, frameCount, opts), size, size, 1000 / FPS);
++      }
++      const sticker = await upload(png);
++      onCreated?.(sticker);
++      onClose?.();
++    } catch (err) {
++      setError(err.message || 'Création impossible.');
++    } finally {
++      setBusy(false);
++    }
++  };
++
++  const Swatches = ({ colors, value, onPick }) => (
++    <div className="flex flex-wrap gap-1.5">
++      {colors.map((c) => (
++        <button key={c} type="button" onClick={() => onPick(c)} aria-label={c}
++          className={`w-6 h-6 rounded-full border-2 transition-transform ${value === c ? 'border-blue-600 scale-110' : 'border-gray-300'}`}
++          style={{ background: c }} />
++      ))}
++    </div>
++  );
++
++  return (
++    <div className="fixed inset-0 z-[1200] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
++      <div className="bg-white dark:bg-gray-800 w-full sm:max-w-lg max-h-[94vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl shadow-2xl"
++        onClick={(e) => e.stopPropagation()}>
++        <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
++          <h3 className="flex items-center gap-2 text-[15px] font-semibold text-gray-900 dark:text-white">
++            <FaMagic className="text-blue-500" /> Créer un sticker animé
++          </h3>
++          <button type="button" onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500">
++            <FaTimes />
++          </button>
++        </div>
++
++        <div className="p-4 space-y-4">
++          {/* Aperçu (damier = transparence) */}
++          <div className="mx-auto w-44 h-44 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-600"
++            style={{ backgroundImage: 'conic-gradient(#e5e7eb 25%, #fff 0 50%, #e5e7eb 0 75%, #fff 0)', backgroundSize: '16px 16px' }}>
++            <canvas ref={canvasRef} width={256} height={256} className="w-full h-full" />
++          </div>
++
++          {/* Contenu */}
++          <div>
++            <div className="flex gap-2 mb-2">
++              {[['emoji', 'Émoji'], ['text', 'Texte'], ['image', 'Image']].map(([k, l]) => (
++                <button key={k} type="button" onClick={() => setKind(k)}
++                  className={`px-3 py-1 text-xs font-semibold rounded-full ${kind === k ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
++                  {l}
++                </button>
++              ))}
++            </div>
++
++            {kind === 'emoji' && (
++              <div className="grid grid-cols-8 gap-1">
++                {QUICK_EMOJIS.map((e) => (
++                  <button key={e} type="button" onClick={() => setEmoji(e)}
++                    className={`text-2xl p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${emoji === e ? 'bg-blue-50 dark:bg-blue-900/40 ring-2 ring-blue-500' : ''}`}>
++                    {e}
++                  </button>
++                ))}
++                <input value={emoji} onChange={(e) => setEmoji([...e.target.value].slice(-2).join(''))}
++                  className="col-span-8 mt-1 text-center text-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg py-1"
++                  placeholder="Ou tapez un émoji" />
++              </div>
++            )}
++
++            {kind === 'text' && (
++              <div className="space-y-2">
++                <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, 60))} rows={2}
++                  className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 resize-none"
++                  placeholder="Votre texte (2 lignes max.)" />
++                <Swatches colors={TEXT_COLORS} value={color} onPick={setColor} />
++              </div>
++            )}
++
++            {kind === 'image' && (
++              <div>
++                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
++                <button type="button" onClick={() => fileRef.current?.click()}
++                  className="w-full py-3 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700">
++                  {image ? 'Changer d’image' : '＋ Choisir une image (un PNG transparent donne le meilleur rendu)'}
++                </button>
++              </div>
++            )}
++          </div>
++
++          {/* Mouvement */}
++          <div>
++            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Mouvement</p>
++            <div className="grid grid-cols-3 gap-1.5">
++              {ANIMATIONS.map((a) => (
++                <button key={a.id} type="button" onClick={() => setAnimation(a.id)}
++                  className={`flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg border ${
++                    animation === a.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:bg-gray-50'}`}>
++                  <span>{a.icon}</span>{a.label}
++                </button>
++              ))}
++            </div>
++          </div>
++
++          {/* Vitesse + fond */}
++          <div className="grid grid-cols-2 gap-4">
++            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400">
++              Vitesse
++              <input type="range" min="0.6" max="2.4" step="0.1" value={3 - duration}
++                onChange={(e) => setDuration(3 - Number(e.target.value))} className="w-full mt-1" />
++            </label>
++            <div>
++              <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400 cursor-pointer">
++                <input type="checkbox" checked={withBg} onChange={(e) => setWithBg(e.target.checked)} /> Fond coloré arrondi
++              </label>
++              {withBg && <div className="mt-1.5"><Swatches colors={BG_COLORS} value={bgColor} onPick={setBgColor} /></div>}
++            </div>
++          </div>
++
++          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={50}
++            placeholder="Nom du sticker (facultatif)"
++            className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2" />
++
++          {error && <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/30 rounded-lg px-3 py-2">{error}</p>}
++
++          <p className="text-[11px] text-gray-400 leading-relaxed">
++            Astuce : avec le bouton ＋ du pack, vous pouvez aussi importer un GIF, un WebP animé ou une courte vidéo.
++          </p>
++
++          <div className="flex justify-end gap-2 pt-1">
++            <button type="button" onClick={onClose} disabled={busy}
++              className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
++              Annuler
++            </button>
++            <button type="button" onClick={create} disabled={busy}
++              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
++              {busy ? <FaSpinner className="animate-spin" /> : <FaMagic />}
++              {busy ? 'Création…' : 'Créer le sticker'}
++            </button>
++          </div>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/resources/js/Components/Stickers/StickerMessage.jsx b/resources/js/Components/Stickers/StickerMessage.jsx
+new file mode 100644
+index 0000000..a1677d5
+--- /dev/null
++++ b/resources/js/Components/Stickers/StickerMessage.jsx
+@@ -0,0 +1,60 @@
++import React from 'react';
++
++const resolveSrc = (p) => {
++  if (!p) return null;
++  if (p.startsWith('blob:') || p.startsWith('http')) return p;
++  return `/storage/public/${p}`;
++};
++
++/**
++ * Sticker façon WhatsApp dans une discussion :
++ *  - aucune bulle : le sticker « flotte » sur le fond de la conversation (fond transparent conservé) ;
++ *  - grand format (≈ 176 px), animé en boucle (GIF / WebP / APNG animés et vidéos courtes) ;
++ *  - l'heure (et l'état d'envoi) dans une petite pastille sombre translucide en bas à droite.
++ */
++export default function StickerMessage({
++  imagePath, videoPath, time = '', isMe = false, pending = false, failed = false,
++  onRetry = null, onOpen = null, compact = false,
++}) {
++  const img = resolveSrc(imagePath);
++  const vid = resolveSrc(videoPath);
++  const size = compact ? 'w-36 h-36 max-w-[48vw] max-h-[48vw]' : 'w-40 h-40 sm:w-44 sm:h-44';
++
++  return (
++    <div className={`relative inline-block select-none ${pending ? 'opacity-70' : ''} ${failed ? 'opacity-60' : ''}`}>
++      {vid ? (
++        <video
++          src={vid}
++          autoPlay
++          loop
++          muted
++          playsInline
++          className={`${size} object-contain pointer-events-none`}
++          style={{ background: 'transparent' }}
++        />
++      ) : (
++        <img
++          src={img}
++          alt="Sticker"
++          loading="lazy"
++          draggable={false}
++          onClick={() => onOpen?.(img)}
++          className={`${size} object-contain ${onOpen ? 'cursor-pointer' : ''}`}
++          style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.10))' }}
++        />
++      )}
++
++      <span className="absolute bottom-1 right-1 flex items-center gap-0.5 rounded-full bg-black/45 px-1.5 py-[1px] text-[10px] leading-4 text-white backdrop-blur-sm">
++        {time}
++        {isMe && (failed ? <span className="text-red-300">✕</span> : pending ? <span>⏳</span> : <span className="text-sky-300 font-bold">✓✓</span>)}
++      </span>
++
++      {failed && (
++        <p className="mt-0.5 text-[11px] font-medium text-red-500">
++          Échec de l'envoi.
++          {onRetry && <button type="button" onClick={onRetry} className="ml-1 underline font-semibold">Réessayer</button>}
++        </p>
++      )}
++    </div>
++  );
++}
+diff --git a/resources/js/Components/Stickers/StickerPack.jsx b/resources/js/Components/Stickers/StickerPack.jsx
+new file mode 100644
+index 0000000..75c580a
+--- /dev/null
++++ b/resources/js/Components/Stickers/StickerPack.jsx
+@@ -0,0 +1,109 @@
++import React, { useCallback, useEffect, useRef, useState } from 'react';
++import { FaMagic, FaTimes } from 'react-icons/fa';
++import StickerCreatorModal from './StickerCreatorModal';
++
++const resolveSrc = (p) => {
++  if (!p) return null;
++  if (p.startsWith('blob:') || p.startsWith('http')) return p;
++  return `/storage/public/${p}`;
++};
++const csrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
++
++/**
++ * Pack de stickers partagé (même API que les pages Discussions) : envoyer, importer (image / GIF /
++ * WebP animé / courte vidéo), CRÉER un sticker animé, et supprimer ses propres stickers.
++ */
++export default function StickerPack({ onSend, onError }) {
++  const [stickers, setStickers] = useState([]);
++  const [loading, setLoading] = useState(true);
++  const [creatorOpen, setCreatorOpen] = useState(false);
++  const inputRef = useRef(null);
++
++  const load = useCallback(async () => {
++    try {
++      const res = await fetch('/api/stickers', { headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
++      if (res.ok) setStickers(await res.json());
++    } catch { /* silencieux */ } finally { setLoading(false); }
++  }, []);
++  useEffect(() => { load(); }, [load]);
++
++  const upload = async (e) => {
++    const file = e.target.files?.[0];
++    e.target.value = '';
++    if (!file) return;
++    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
++      onError?.('Seules les images et les courtes vidéos peuvent devenir des stickers.');
++      return;
++    }
++    if (file.size > 6 * 1024 * 1024) { onError?.('Fichier trop lourd (6 Mo max) — choisissez une vidéo plus courte.'); return; }
++    try {
++      const fd = new FormData();
++      fd.append('image', file);
++      const res = await fetch('/api/stickers', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' }, body: fd });
++      if (!res.ok) {
++        let msg = "Impossible d'ajouter ce sticker.";
++        try { msg = (await res.json()).message || msg; } catch { /* ignore */ }
++        throw new Error(msg);
++      }
++      const sticker = await res.json();
++      setStickers((prev) => [sticker, ...prev]);
++      onError?.('');
++    } catch (err) { onError?.(err.message || "Impossible d'ajouter ce sticker."); }
++  };
++
++  const remove = async (e, sticker) => {
++    e.stopPropagation();
++    if (!window.confirm('Supprimer ce sticker du pack ?')) return;
++    try {
++      const res = await fetch(`/api/stickers/${sticker.id}`, { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' } });
++      if (res.ok) setStickers((prev) => prev.filter((s) => s.id !== sticker.id));
++      else onError?.('Suppression impossible.');
++    } catch { onError?.('Suppression impossible.'); }
++  };
++
++  return (
++    <>
++      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
++        <input type="file" ref={inputRef} onChange={upload} accept="image/*,video/mp4,video/webm,video/quicktime" className="hidden" />
++
++        <button type="button" onClick={() => inputRef.current?.click()}
++          className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
++          <span className="text-2xl leading-none">＋</span>
++          <span className="text-[9px] mt-1 font-medium text-center leading-tight">Importer<br />image/GIF/vidéo</span>
++        </button>
++
++        <button type="button" onClick={() => setCreatorOpen(true)}
++          className="aspect-square rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 text-white flex flex-col items-center justify-center hover:opacity-90 transition-opacity shadow-sm">
++          <FaMagic className="text-lg" />
++          <span className="text-[9px] mt-1 font-semibold text-center leading-tight">Créer un<br />sticker animé</span>
++        </button>
++
++        {stickers.map((sticker) => (
++          <div key={sticker.id} className="relative group">
++            <button type="button" onClick={() => onSend?.(sticker)} title={sticker.name || 'Envoyer ce sticker'}
++              className="w-full aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 hover:scale-105 transition-transform">
++              {sticker.type === 'video'
++                ? <video src={resolveSrc(sticker.image_path)} className="w-full h-full object-contain p-1" autoPlay loop muted playsInline />
++                : <img src={resolveSrc(sticker.image_path)} alt={sticker.name || 'Sticker'} className="w-full h-full object-contain p-1" loading="lazy" />}
++            </button>
++            {sticker.is_mine && (
++              <button type="button" onClick={(e) => remove(e, sticker)} title="Supprimer mon sticker"
++                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
++                <FaTimes className="text-[9px]" />
++              </button>
++            )}
++          </div>
++        ))}
++
++        {!loading && stickers.length === 0 && (
++          <p className="col-span-4 sm:col-span-6 text-xs text-gray-400 px-2 py-3 text-center leading-relaxed">
++            Aucun sticker pour l'instant. Créez-en un animé avec « Créer », ou importez une image, un GIF ou une courte vidéo.
++          </p>
++        )}
++      </div>
++
++      <StickerCreatorModal open={creatorOpen} onClose={() => setCreatorOpen(false)}
++        onCreated={(s) => setStickers((prev) => [s, ...prev])} />
++    </>
++  );
++}
+diff --git a/resources/js/Components/Stickers/stickerRender.js b/resources/js/Components/Stickers/stickerRender.js
+new file mode 100644
+index 0000000..8693cff
+--- /dev/null
++++ b/resources/js/Components/Stickers/stickerRender.js
+@@ -0,0 +1,138 @@
++/**
++ * Rendu d'une image (frame) de sticker animé sur un contexte canvas 2D.
++ * Fonction pure (aucune dépendance au DOM) : t ∈ [0,1[ = position dans la boucle d'animation.
++ */
++
++export const ANIMATIONS = [
++  { id: 'bounce',  label: 'Rebond',       icon: '⤴️' },
++  { id: 'shake',   label: 'Secousse',     icon: '📳' },
++  { id: 'pulse',   label: 'Pulsation',    icon: '💓' },
++  { id: 'spin',    label: 'Rotation',     icon: '🔄' },
++  { id: 'wiggle',  label: 'Balancement',  icon: '🎶' },
++  { id: 'float',   label: 'Flottement',   icon: '🎈' },
++  { id: 'zoom',    label: 'Zoom',         icon: '🔍' },
++  { id: 'blink',   label: 'Clignotement', icon: '✨' },
++  { id: 'tada',    label: 'Tada',         icon: '🎉' },
++];
++
++const TAU = Math.PI * 2;
++const ease = (x) => 0.5 - 0.5 * Math.cos(Math.PI * x);
++
++/** Transformation (décalage, échelle, rotation, opacité) à l'instant t. Toujours périodique : boucle parfaite. */
++export function animationTransform(id, t) {
++  const s = Math.sin(t * TAU);
++  switch (id) {
++    case 'bounce': {
++      const b = Math.abs(Math.sin(t * Math.PI * 2 * 1));      // deux rebonds par boucle
++      return { dy: -b * 0.22, sx: 1 + (1 - b) * 0.08, sy: 1 - (1 - b) * 0.08, rot: 0, alpha: 1 };
++    }
++    case 'shake':   return { dx: Math.sin(t * TAU * 6) * 0.07, rot: Math.sin(t * TAU * 6) * 0.06, alpha: 1 };
++    case 'pulse': {
++      const p = 1 + 0.14 * Math.sin(t * TAU);
++      return { sx: p, sy: p, alpha: 1 };
++    }
++    case 'spin':    return { rot: ease(t) * TAU, alpha: 1 };
++    case 'wiggle':  return { rot: Math.sin(t * TAU) * 0.22, alpha: 1 };
++    case 'float':   return { dy: s * 0.07, dx: Math.cos(t * TAU) * 0.03, rot: s * 0.03, alpha: 1 };
++    case 'zoom': {
++      const z = 0.82 + 0.3 * ease(t < 0.5 ? t * 2 : 2 - t * 2);
++      return { sx: z, sy: z, alpha: 1 };
++    }
++    case 'blink':   return { alpha: 0.35 + 0.65 * (0.5 + 0.5 * Math.cos(t * TAU)) };
++    case 'tada': {
++      const k = t < 0.5 ? t / 0.5 : 0;
++      const sc = t < 0.5 ? 1 + 0.18 * Math.sin(k * Math.PI) : 1;
++      const r = t < 0.5 ? Math.sin(k * TAU * 2) * 0.16 * Math.sin(k * Math.PI) : 0;
++      return { sx: sc, sy: sc, rot: r, alpha: 1 };
++    }
++    default: return { alpha: 1 };
++  }
++}
++
++/**
++ * @param ctx   contexte 2D (canvas DOM ou OffscreenCanvas)
++ * @param size  côté du sticker en pixels
++ * @param t     position dans la boucle (0 ≤ t < 1)
++ * @param opts  { source: {kind:'emoji'|'text'|'image', value, image?, color?, outline?, bold?},
++ *                animation: id, background: null | '#rrggbb' }
++ */
++export function renderStickerFrame(ctx, size, t, opts) {
++  const { source, animation = 'bounce', background = null } = opts;
++  ctx.clearRect(0, 0, size, size);
++
++  if (background) {
++    const r = size * 0.18;
++    ctx.fillStyle = background;
++    ctx.beginPath();
++    ctx.moveTo(r, 0);
++    ctx.arcTo(size, 0, size, size, r);
++    ctx.arcTo(size, size, 0, size, r);
++    ctx.arcTo(0, size, 0, 0, r);
++    ctx.arcTo(0, 0, size, 0, r);
++    ctx.closePath();
++    ctx.fill();
++  }
++
++  const a = { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0, alpha: 1, ...animationTransform(animation, t) };
++  ctx.save();
++  ctx.globalAlpha = a.alpha;
++  ctx.translate(size / 2 + a.dx * size, size / 2 + a.dy * size);
++  ctx.rotate(a.rot);
++  ctx.scale(a.sx, a.sy);
++
++  const pad = background ? 0.14 : 0.06;
++  const box = size * (1 - pad * 2);
++
++  if (source.kind === 'image' && source.image) {
++    const img = source.image;
++    const iw = img.naturalWidth || img.width;
++    const ih = img.naturalHeight || img.height;
++    const k = Math.min(box / iw, box / ih);
++    ctx.drawImage(img, (-iw * k) / 2, (-ih * k) / 2, iw * k, ih * k);
++  } else {
++    const value = String(source.value || '').trim() || '😀';
++    const isEmoji = source.kind === 'emoji';
++    const lines = value.split('\n').slice(0, 4);
++    const family = isEmoji
++      ? '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'
++      : '"Arial Black","Impact","Helvetica Neue",Arial,sans-serif';
++    let fs = isEmoji ? box * 0.86 : box * 0.42;
++    const setFont = () => { ctx.font = `${isEmoji || source.bold !== false ? '900 ' : ''}${fs}px ${family}`; };
++    setFont();
++    // Réduit la taille pour que le texte tienne dans le cadre
++    const widest = () => Math.max(...lines.map((l) => ctx.measureText(l).width));
++    while (widest() > box && fs > 10) { fs *= 0.93; setFont(); }
++    while (!isEmoji && lines.length * fs * 1.1 > box && fs > 10) { fs *= 0.93; setFont(); }
++
++    ctx.textAlign = 'center';
++    ctx.textBaseline = 'middle';
++    const lh = fs * 1.08;
++    lines.forEach((line, i) => {
++      const y = (i - (lines.length - 1) / 2) * lh;
++      if (!isEmoji && source.outline !== false) {
++        ctx.lineJoin = 'round';
++        ctx.lineWidth = Math.max(4, fs * 0.16);
++        ctx.strokeStyle = source.outlineColor || '#ffffff';
++        ctx.strokeText(line, 0, y);
++      }
++      ctx.fillStyle = source.color || '#111827';
++      ctx.fillText(line, 0, y);
++    });
++  }
++  ctx.restore();
++}
++
++/**
++ * Génère toutes les images de la boucle.
++ * @returns {Uint8ClampedArray[]} pixels RGBA de chaque image
++ */
++export function renderAllFrames(makeCanvas, size, frameCount, opts) {
++  const canvas = makeCanvas(size);
++  const ctx = canvas.getContext('2d', { willReadFrequently: true });
++  const frames = [];
++  for (let i = 0; i < frameCount; i++) {
++    renderStickerFrame(ctx, size, i / frameCount, opts);
++    frames.push(new Uint8ClampedArray(ctx.getImageData(0, 0, size, size).data));
++  }
++  return frames;
++}
+diff --git a/resources/js/Pages/Discussions/Show.jsx b/resources/js/Pages/Discussions/Show.jsx
+index 0ac3506..95b46b8 100644
+--- a/resources/js/Pages/Discussions/Show.jsx
++++ b/resources/js/Pages/Discussions/Show.jsx
+@@ -4,6 +4,9 @@ import { useTranslation } from 'react-i18next';
+ import AdminLayout from '@/Layouts/AdminLayout';
+ import Modal from '@/Components/Modal';
+ import AudioPlayer from '@/Components/AudioPlayer';
++import StickerMessage from '@/Components/Stickers/StickerMessage';
++import StickerCreatorModal from '@/Components/Stickers/StickerCreatorModal';
++import DocCallButton from '@/Components/Editor/DocCallButton';
+ import {
+   FaCommentDots, FaMicrophone, FaStop, FaReply, FaPaperPlane, FaEnvelope,
+   FaPaperclip, FaSmile, FaSmileBeam, FaSave, FaTimes, FaCopy, FaCheck,
+@@ -200,6 +203,11 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+   // ─── Stickers personnalisés (pack partagé par l'équipe, image ou vidéo courte) ───
+   const [stickers, setStickers] = useState([]);
+   const stickerInputRef = useRef(null);
++  const [stickerCreatorOpen, setStickerCreatorOpen] = useState(false);
++  // Appel vidéo ProJA Meet : on choisit QUI appeler parmi les membres du projet de la tâche
++  const callProject = (task.project_id || task.project?.id)
++    ? { id: task.project_id || task.project.id, name: task.title, users: projectMembers }
++    : null;
+ 
+   const [reactions, setReactions] = useState(() => {
+     if (typeof window === 'undefined') return {};
+@@ -1102,6 +1110,8 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+               <FaExternalLinkAlt className="w-4 h-4" />
+             </button>
+ 
++            {callProject && <DocCallButton project={callProject} auth={auth} variant="icon" />}
++
+             <OnlineAvatarStack users={onlineUsers} />
+ 
+             <label
+@@ -1186,7 +1196,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+ 
+                     <div className={
+                       comment.is_sticker
+-                        ? `relative ${isPending ? 'opacity-70' : ''} ${hasFailed ? 'opacity-50' : ''}`
++                        ? 'relative'
+                         : `relative px-3.5 py-2.5 shadow-sm ${comment.audio_path ? 'min-w-[220px]' : 'min-w-[120px]'} ${isPending ? 'bubble-pending' : ''} ${
+                             isMe
+                               ? `bubble-right ${hasFailed ? 'bg-red-100 dark:bg-red-900/40 text-red-900' : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'}`
+@@ -1222,35 +1232,16 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+                       )}
+ 
+                       {comment.is_sticker ? (
+-                        <>
+-                          {resolvedVideoSrc ? (
+-                            <video src={resolvedVideoSrc} autoPlay loop muted playsInline className="w-36 h-36 object-contain" />
+-                          ) : (
+-                            <img
+-                              src={resolvedImageSrc}
+-                              alt="Sticker"
+-                              className="w-36 h-36 object-contain cursor-pointer"
+-                              loading="lazy"
+-                              onClick={() => setImageLightbox(resolvedImageSrc)}
+-                            />
+-                          )}
+-                          <div className="flex items-center gap-1 mt-1 justify-end tick text-gray-400 dark:text-gray-500">
+-                            <span>{new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+-                            {isMe && (
+-                              hasFailed
+-                                ? <span className="text-red-500 text-xs">✕</span>
+-                                : isPending
+-                                ? <span className="text-gray-400">⏳</span>
+-                                : <span className="text-blue-500 font-bold">✓✓</span>
+-                            )}
+-                          </div>
+-                          {hasFailed && (
+-                            <p className="text-xs text-red-500 mt-1 font-medium">
+-                              Échec de l'envoi.
+-                              <button onClick={() => retryComment(comment)} className="ml-1 underline hover:no-underline font-semibold">Réessayer</button>
+-                            </p>
+-                          )}
+-                        </>
++                        <StickerMessage
++                          imagePath={comment.image_path}
++                          videoPath={comment.video_path}
++                          time={new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
++                          isMe={isMe}
++                          pending={isPending}
++                          failed={hasFailed}
++                          onRetry={() => retryComment(comment)}
++                          onOpen={setImageLightbox}
++                        />
+                       ) : editingId === comment.id ? (
+                         <form onSubmit={handleUpdateComment} className="min-w-[200px]">
+                           <textarea
+@@ -1477,6 +1468,15 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+                   <span className="text-[9px] mt-1 font-medium text-center leading-tight">Ajouter<br/>photo/vidéo</span>
+                 </button>
+ 
++                <button
++                  type="button"
++                  onClick={() => setStickerCreatorOpen(true)}
++                  className="aspect-square rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 text-white flex flex-col items-center justify-center hover:opacity-90 transition-opacity shadow-sm"
++                >
++                  <span className="text-xl leading-none">✨</span>
++                  <span className="text-[9px] mt-1 font-semibold text-center leading-tight">Créer un<br/>sticker animé</span>
++                </button>
++
+                 {stickers.map(sticker => (
+                   <button
+                     key={sticker.id}
+@@ -1736,6 +1736,12 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+         </div>
+       </Modal>
+ 
++      <StickerCreatorModal
++        open={stickerCreatorOpen}
++        onClose={() => setStickerCreatorOpen(false)}
++        onCreated={(sticker) => setStickers(prev => [sticker, ...prev])}
++      />
++
+       {imageLightbox && (
+         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setImageLightbox(null)}>
+           <button type="button" onClick={() => setImageLightbox(null)} className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center backdrop-blur-md transition-colors" title="Fermer">
+diff --git a/resources/js/Pages/Mobile/Discussions/Show.jsx b/resources/js/Pages/Mobile/Discussions/Show.jsx
+index aa61a90..9b05f61 100644
+--- a/resources/js/Pages/Mobile/Discussions/Show.jsx
++++ b/resources/js/Pages/Mobile/Discussions/Show.jsx
+@@ -3,6 +3,9 @@ import { usePage } from '@inertiajs/react';
+ import MobileLayout from '@/Layouts/MobileLayout';
+ import { nativeFeedback } from '@/lib/platform';
+ import AudioPlayer from '@/Components/AudioPlayer';
++import StickerMessage from '@/Components/Stickers/StickerMessage';
++import StickerCreatorModal from '@/Components/Stickers/StickerCreatorModal';
++import DocCallButton from '@/Components/Editor/DocCallButton';
+ // Ajout de l'icône email
+ import { FaEnvelope } from 'react-icons/fa';
+ 
+@@ -264,36 +267,17 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
+         )}
+ 
+         {comment.is_sticker ? (
+-          /* ─── Sticker (image ou vidéo courte) : pas de bulle, juste le média qui "flotte" ─── */
+-          <div className={`relative ${comment._pending ? 'opacity-70' : ''} ${comment._failed ? 'opacity-50' : ''}`}>
+-            {resolvedVideoSrc ? (
+-              <video
+-                src={resolvedVideoSrc}
+-                autoPlay
+-                loop
+-                muted
+-                playsInline
+-                className="w-32 h-32 max-w-[45vw] max-h-[45vw] object-contain"
+-              />
+-            ) : (
+-              <img
+-                src={resolvedImageSrc}
+-                alt="Sticker"
+-                className="w-32 h-32 max-w-[45vw] max-h-[45vw] object-contain cursor-pointer"
+-                loading="lazy"
+-                onClick={() => onImageClick?.(resolvedImageSrc)}
+-              />
+-            )}
+-            <div className={`flex items-center gap-1 mt-0.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
+-              {comment._failed && <span className="text-[10px] text-red-500 font-medium">⚠ Échec</span>}
+-              <span className="text-[10px] text-gray-400 dark:text-gray-500">{formatTime(comment.created_at)}</span>
+-              {isMe && (
+-                <svg className={`w-3 h-3 ${comment._pending ? 'text-gray-300' : 'text-blue-400'}`} fill="currentColor" viewBox="0 0 20 20">
+-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0z" clipRule="evenodd" />
+-                </svg>
+-              )}
+-            </div>
+-          </div>
++          /* ─── Sticker façon WhatsApp : pas de bulle, fond transparent, animé en boucle, heure en pastille ─── */
++          <StickerMessage
++            compact
++            imagePath={comment.image_path}
++            videoPath={comment.video_path}
++            time={formatTime(comment.created_at)}
++            isMe={isMe}
++            pending={comment._pending}
++            failed={comment._failed}
++            onOpen={onImageClick}
++          />
+         ) : (
+           <div
+             className={`px-3.5 py-2 ${bubbleClass} ${comment._pending ? 'opacity-70' : ''} ${comment._failed ? 'opacity-50 border-red-400' : ''}`}
+@@ -392,6 +376,11 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
+   // ─── Stickers personnalisés (pack partagé par l'équipe) ─────────────
+   const [stickers, setStickers] = useState([]);
+   const stickerInputRef = useRef(null);
++  const [stickerCreatorOpen, setStickerCreatorOpen] = useState(false);
++  // Appel vidéo ProJA Meet (comme sur la version web) : on choisit QUI appeler
++  const callProject = (task.project_id || task.project?.id)
++    ? { id: task.project_id || task.project.id, name: task.title, users: projectMembers }
++    : null;
+ 
+   // ─── Ajout : état et fonction pour le partage par email ─────────────
+   const [shareDiscussionEmail, setShareDiscussionEmail] = useState(me?.share_discussions_by_email ?? true);
+@@ -976,6 +965,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
+   // ─── Header custom avec infos de la tâche : qui est en ligne ────────────
+   const headerRight = (
+     <div className="flex items-center gap-2">
++      {callProject && <DocCallButton project={callProject} auth={auth} variant="icon-light" />}
+       <button
+         type="button"
+         onClick={toggleDiscussionEmail}
+@@ -1155,7 +1145,16 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
+                     className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 active:bg-gray-50 dark:active:bg-gray-800 transition-colors"
+                   >
+                     <span className="text-2xl leading-none">＋</span>
+-                    <span className="text-[9px] mt-1 font-medium text-center leading-tight">Ajouter<br/>photo/vidéo</span>
++                    <span className="text-[9px] mt-1 font-medium text-center leading-tight">Importer<br/>image/GIF/vidéo</span>
++                  </button>
++
++                  <button
++                    type="button"
++                    onClick={() => setStickerCreatorOpen(true)}
++                    className="aspect-square rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 text-white flex flex-col items-center justify-center active:scale-95 transition-transform shadow-sm"
++                  >
++                    <span className="text-xl leading-none">✨</span>
++                    <span className="text-[9px] mt-1 font-semibold text-center leading-tight">Créer un<br/>sticker animé</span>
+                   </button>
+ 
+                   {stickers.map(sticker => (
+@@ -1429,6 +1428,11 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
+           />
+         </div>
+       )}
++      <StickerCreatorModal
++        open={stickerCreatorOpen}
++        onClose={() => setStickerCreatorOpen(false)}
++        onCreated={(sticker) => setStickers(prev => [sticker, ...prev])}
++      />
+     </MobileLayout>
+   );
+ }
+\ No newline at end of file
+diff --git a/resources/js/Pages/Tasks/Show.jsx b/resources/js/Pages/Tasks/Show.jsx
+index b81c698..1ef7ce0 100644
+--- a/resources/js/Pages/Tasks/Show.jsx
++++ b/resources/js/Pages/Tasks/Show.jsx
+@@ -10,6 +10,9 @@ import i18n from 'i18next';
+ import { FaSave, FaTimes, FaExpand, FaCompress, FaCopy, FaPause, FaCheck } from 'react-icons/fa';
+ import LiveKitCallModal from '@/Components/LiveKitCallModal';
+ import AudioPlayer from '@/Components/AudioPlayer';
++import StickerMessage from '@/Components/Stickers/StickerMessage';
++import StickerPack from '@/Components/Stickers/StickerPack';
++import DocCallButton from '@/Components/Editor/DocCallButton';
+ 
+ // Composant de compte à rebours réutilisable
+ const formatTimeUnit = (value, label) => (
+@@ -1089,12 +1092,89 @@ const retryComment = async (failedComment) => {
+   });
+   setComments(prev => removeOptimistic(prev));
+ 
++  // Un sticker qui a échoué est simplement retiré : il suffit de re-cliquer dessus dans le pack
++  if (failedComment.is_sticker) return;
++
+   // Remettre le contenu dans le formulaire
+   setCommentContent(failedComment.content === 'Message audio enregistré et sauvegardé' ? '' : failedComment.content);
+   if (failedComment.parent_id) setReplyingTo(failedComment.parent_id);
+ };
+ 
+ 
++  // ─── Envoi d'un sticker du pack (en un clic) : image, GIF/WebP/APNG animé ou courte vidéo ───
++  const sendSticker = async (sticker) => {
++    const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
++    const now = new Date().toISOString();
++    const isVideo = sticker.type === 'video';
++    const flat = (list) => list.flatMap(c => [c, ...(c.replies ? flat(c.replies) : [])]);
++    const parent = replyingTo ? flat(comments).find(c => String(c.id || c._tempId) === String(replyingTo)) : null;
++
++    const optimistic = {
++      _tempId: tempId,
++      id: null,
++      _pending: true,
++      _failed: false,
++      content: '',
++      audio_path: null,
++      image_path: isVideo ? null : sticker.image_path,
++      video_path: isVideo ? sticker.image_path : null,
++      is_sticker: true,
++      created_at: now,
++      updated_at: now,
++      user: {
++        id: auth.user.id,
++        name: auth.user.name,
++        profile_photo_url: auth.user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth.user.name || '')}`,
++        role: auth.user.role,
++      },
++      parent_id: replyingTo || null,
++      parent: parent ? { id: parent.id || parent._tempId, content: parent.content, is_sticker: parent.is_sticker, image_path: parent.image_path, video_path: parent.video_path, audio_path: parent.audio_path } : null,
++      replies: [],
++    };
++
++    setComments(prev => [optimistic, ...prev]);
++    const savedReplyingTo = replyingTo;
++    setReplyingTo(null);
++    setShowEmojiPicker(false);
++    setError('');
++    setTimeout(() => {
++      const container = document.getElementById('chat-messages-container');
++      if (container) container.scrollTop = container.scrollHeight;
++    }, 50);
++
++    try {
++      const fd = new FormData();
++      fd.append('sticker_id', sticker.id);
++      if (savedReplyingTo) fd.append('parent_id', savedReplyingTo);
++
++      const res = await fetch(`/api/tasks/${task.id}/comments`, {
++        method: 'POST',
++        headers: {
++          'X-Requested-With': 'XMLHttpRequest',
++          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
++        },
++        body: fd,
++      });
++      if (!res.ok) {
++        let msg = `Erreur ${res.status}`;
++        try {
++          const errorData = await res.json();
++          msg = errorData.message || (errorData.errors ? Object.values(errorData.errors).flat().join(' ') : msg);
++        } catch { /* ignore */ }
++        throw new Error(msg);
++      }
++      const saved = await res.json();
++      const serverComment = saved.comment || saved;
++      setComments(prev => prev.map(c => c._tempId === tempId
++        ? { ...c, ...serverComment, _pending: false, _failed: false, _tempId: tempId, replies: c.replies || [] }
++        : c));
++    } catch (err) {
++      console.error('Erreur envoi sticker:', err);
++      setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, _pending: false, _failed: true } : c));
++      setError(err.message || "Échec de l'envoi du sticker.");
++    }
++  };
++
+   const handlePaymentSubmit = async (e) => {
+     e.preventDefault();
+     setPaymentLoading(true);
+@@ -2995,6 +3075,14 @@ return () => {
+ </button>
+ */}
+ 
++        {(task.project_id || task.project?.id) && (
++          <DocCallButton
++            project={{ id: task.project_id || task.project.id, name: task.title, users: projectMembers || [] }}
++            auth={auth}
++            variant="icon"
++          />
++        )}
++
+         <label
+           className={`flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full transition-colors duration-200 cursor-pointer select-none border ${
+             shareDiscussionEmail
+@@ -3145,7 +3233,7 @@ return () => {
+                   )}
+ 
+                   {/* Bulle de Message */}
+-                  <div className={`relative px-3.5 py-2.5 shadow-sm ${comment.audio_path ? 'min-w-[220px]' : 'min-w-[120px]'} ${
++                  <div className={comment.is_sticker ? 'relative' : `relative px-3.5 py-2.5 shadow-sm ${comment.audio_path ? 'min-w-[220px]' : 'min-w-[120px]'} ${
+                     isPending ? 'bubble-pending' : ''
+                   } ${
+                     isMe
+@@ -3164,7 +3252,7 @@ return () => {
+                     )}
+ 
+                     {/* Nom d'auteur si message tiers */}
+-                    {!isMe && comment.user?.name && (
++                    {!isMe && !comment.is_sticker && comment.user?.name && (
+                       <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 mb-0.5">
+                         {comment.user.name}
+                       </p>
+@@ -3177,12 +3265,23 @@ return () => {
+                           ? 'border-white/80 bg-white/15 text-white/90'
+                           : 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-gray-600 dark:text-gray-300'
+                       }`}>
+-                        <p className="truncate opacity-80">{comment.parent.content}</p>
++                        <p className="truncate opacity-80">{comment.parent.content || (comment.parent.is_sticker ? '🎨 Sticker' : (comment.parent.video_path ? '🎬 Vidéo' : (comment.parent.image_path ? '📷 Photo' : (comment.parent.audio_path ? '🎙 Message vocal' : '…'))))}</p>
+                       </div>
+                     )}
+ 
+                     {/* Mode édition */}
+-                    {editingId === comment.id ? (
++                    {comment.is_sticker ? (
++                      <StickerMessage
++                        imagePath={comment.image_path}
++                        videoPath={comment.video_path}
++                        time={new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
++                        isMe={isMe}
++                        pending={isPending}
++                        failed={hasFailed}
++                        onRetry={() => retryComment(comment)}
++                        onOpen={setImageLightbox}
++                      />
++                    ) : editingId === comment.id ? (
+                       <form onSubmit={handleUpdateComment} className="min-w-[200px]">
+                         <textarea
+                           value={editContent}
+@@ -3313,9 +3412,11 @@ return () => {
+                       )}
+                       {isMe && (
+                         <>
+-                          <button onClick={() => handleEditComment(comment)} className="text-gray-500 hover:text-blue-500 p-1 rounded-full transition-colors" title={t('edit')}>
+-                            <FaEdit className="w-3.5 h-3.5" />
+-                          </button>
++                          {!comment.is_sticker && (
++                            <button onClick={() => handleEditComment(comment)} className="text-gray-500 hover:text-blue-500 p-1 rounded-full transition-colors" title={t('edit')}>
++                              <FaEdit className="w-3.5 h-3.5" />
++                            </button>
++                          )}
+                           <button onClick={() => handleDeleteComment(comment.id)} className="text-gray-500 hover:text-red-500 p-1 rounded-full transition-colors" title={t('delete')}>
+                             <FaTrash className="w-3.5 h-3.5" />
+                           </button>
+@@ -3453,7 +3554,7 @@ return () => {
+ 
+     {/* ─── DRAWER STICKERS & EMOJIS (WHATSAPP STYLE) ─── */}
+     {showEmojiPicker && (
+-      <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3 shadow-lg max-h-56 overflow-y-auto">
++      <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3 shadow-lg max-h-72 overflow-y-auto">
+         <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2 mb-2">
+           <div className="flex gap-2">
+             <button
+@@ -3502,22 +3603,7 @@ return () => {
+             ))}
+           </div>
+         ) : (
+-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+-            {STICKERS.map(sticker => (
+-              <button
+-                key={sticker.id}
+-                type="button"
+-                onClick={() => {
+-                  setCommentContent(prev => (prev ? prev + ' ' : '') + `${sticker.emoji} ${sticker.title}`);
+-                  setShowEmojiPicker(false);
+-                }}
+-                className={`flex items-center gap-2 p-2 rounded-xl border text-xs font-bold transition-all hover:scale-102 hover:shadow-md ${sticker.bg}`}
+-              >
+-                <span className="text-xl">{sticker.emoji}</span>
+-                <span>{sticker.title}</span>
+-              </button>
+-            ))}
+-          </div>
++          <StickerPack onSend={sendSticker} onError={setError} />
+         )}
+       </div>
+     )}
+diff --git a/resources/js/lib/apng.js b/resources/js/lib/apng.js
+new file mode 100644
+index 0000000..b08a7df
+--- /dev/null
++++ b/resources/js/lib/apng.js
+@@ -0,0 +1,87 @@
++import { zlibSync } from 'fflate';
++
++/**
++ * Encodeur APNG (PNG animé) : transparence complète (alpha 8 bits), lisible par toutes les balises <img>
++ * modernes (Chrome, Firefox, Safari, Edge, Android, iOS) — c'est ce qui permet des stickers qui bougent
++ * SANS fond, comme sur WhatsApp, sans ffmpeg côté serveur.
++ */
++
++const CRC_TABLE = (() => {
++  const t = new Uint32Array(256);
++  for (let n = 0; n < 256; n++) {
++    let c = n;
++    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
++    t[n] = c >>> 0;
++  }
++  return t;
++})();
++
++const crc32 = (buf) => {
++  let c = 0xffffffff;
++  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
++  return (c ^ 0xffffffff) >>> 0;
++};
++
++const u32 = (n) => new Uint8Array([(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]);
++const u16 = (n) => new Uint8Array([(n >>> 8) & 255, n & 255]);
++
++const concat = (parts) => {
++  const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
++  let o = 0;
++  parts.forEach((p) => { out.set(p, o); o += p.length; });
++  return out;
++};
++
++const chunk = (type, data) => {
++  const typeBytes = new Uint8Array([...type].map((c) => c.charCodeAt(0)));
++  const body = concat([typeBytes, data]);
++  return concat([u32(data.length), body, u32(crc32(body))]);
++};
++
++/** Filtre « Sub » (type 1) : améliore nettement la compression des aplats / dégradés. */
++const filterSub = (rgba, w, h) => {
++  const stride = w * 4;
++  const out = new Uint8Array((stride + 1) * h);
++  for (let y = 0; y < h; y++) {
++    const row = y * (stride + 1);
++    out[row] = 1;
++    for (let x = 0; x < stride; x++) {
++      const left = x >= 4 ? rgba[y * stride + x - 4] : 0;
++      out[row + 1 + x] = (rgba[y * stride + x] - left) & 255;
++    }
++  }
++  return out;
++};
++
++/**
++ * @param {Uint8ClampedArray[]|Uint8Array[]} frames  pixels RGBA (w*h*4) de chaque image
++ * @param {number} w largeur
++ * @param {number} h hauteur
++ * @param {number} delayMs durée d'une image en millisecondes
++ * @returns {Uint8Array} fichier .png animé
++ */
++export function encodeAPNG(frames, w, h, delayMs = 50) {
++  const sig = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
++  const ihdr = concat([u32(w), u32(h), new Uint8Array([8, 6, 0, 0, 0])]); // 8 bits, RGBA
++  const parts = [sig, chunk('IHDR', ihdr), chunk('acTL', concat([u32(frames.length), u32(0)]))]; // 0 = boucle infinie
++
++  let seq = 0;
++  frames.forEach((px, i) => {
++    const fctl = concat([
++      u32(seq++), u32(w), u32(h), u32(0), u32(0),
++      u16(Math.max(1, Math.round(delayMs))), u16(1000),   // délai = delayMs / 1000 s
++      new Uint8Array([1, 0]),                               // dispose = fond transparent, blend = source
++    ]);
++    parts.push(chunk('fcTL', fctl));
++
++    const z = zlibSync(filterSub(px, w, h), { level: 6 });
++    if (i === 0) {
++      parts.push(chunk('IDAT', z));
++    } else {
++      parts.push(chunk('fdAT', concat([u32(seq++), z])));
++    }
++  });
++
++  parts.push(chunk('IEND', new Uint8Array(0)));
++  return concat(parts);
++}

@@ -3,6 +3,9 @@ import { usePage } from '@inertiajs/react';
 import MobileLayout from '@/Layouts/MobileLayout';
 import { nativeFeedback } from '@/lib/platform';
 import AudioPlayer from '@/Components/AudioPlayer';
+import StickerMessage from '@/Components/Stickers/StickerMessage';
+import StickerCreatorModal from '@/Components/Stickers/StickerCreatorModal';
+import DocCallButton from '@/Components/Editor/DocCallButton';
 // Ajout de l'icône email
 import { FaEnvelope } from 'react-icons/fa';
 
@@ -264,36 +267,17 @@ const MessageBubble = ({ comment, isMe, showAvatar, onReply, onLongPress, onImag
         )}
 
         {comment.is_sticker ? (
-          /* ─── Sticker (image ou vidéo courte) : pas de bulle, juste le média qui "flotte" ─── */
-          <div className={`relative ${comment._pending ? 'opacity-70' : ''} ${comment._failed ? 'opacity-50' : ''}`}>
-            {resolvedVideoSrc ? (
-              <video
-                src={resolvedVideoSrc}
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="w-32 h-32 max-w-[45vw] max-h-[45vw] object-contain"
-              />
-            ) : (
-              <img
-                src={resolvedImageSrc}
-                alt="Sticker"
-                className="w-32 h-32 max-w-[45vw] max-h-[45vw] object-contain cursor-pointer"
-                loading="lazy"
-                onClick={() => onImageClick?.(resolvedImageSrc)}
-              />
-            )}
-            <div className={`flex items-center gap-1 mt-0.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
-              {comment._failed && <span className="text-[10px] text-red-500 font-medium">⚠ Échec</span>}
-              <span className="text-[10px] text-gray-400 dark:text-gray-500">{formatTime(comment.created_at)}</span>
-              {isMe && (
-                <svg className={`w-3 h-3 ${comment._pending ? 'text-gray-300' : 'text-blue-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
-            </div>
-          </div>
+          /* ─── Sticker façon WhatsApp : pas de bulle, fond transparent, animé en boucle, heure en pastille ─── */
+          <StickerMessage
+            compact
+            imagePath={comment.image_path}
+            videoPath={comment.video_path}
+            time={formatTime(comment.created_at)}
+            isMe={isMe}
+            pending={comment._pending}
+            failed={comment._failed}
+            onOpen={onImageClick}
+          />
         ) : (
           <div
             className={`px-3.5 py-2 ${bubbleClass} ${comment._pending ? 'opacity-70' : ''} ${comment._failed ? 'opacity-50 border-red-400' : ''}`}
@@ -392,6 +376,11 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   // ─── Stickers personnalisés (pack partagé par l'équipe) ─────────────
   const [stickers, setStickers] = useState([]);
   const stickerInputRef = useRef(null);
+  const [stickerCreatorOpen, setStickerCreatorOpen] = useState(false);
+  // Appel vidéo ProJA Meet (comme sur la version web) : on choisit QUI appeler
+  const callProject = (task.project_id || task.project?.id)
+    ? { id: task.project_id || task.project.id, name: task.title, users: projectMembers }
+    : null;
 
   // ─── Ajout : état et fonction pour le partage par email ─────────────
   const [shareDiscussionEmail, setShareDiscussionEmail] = useState(me?.share_discussions_by_email ?? true);
@@ -976,6 +965,7 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
   // ─── Header custom avec infos de la tâche : qui est en ligne ────────────
   const headerRight = (
     <div className="flex items-center gap-2">
+      {callProject && <DocCallButton project={callProject} auth={auth} variant="icon-light" />}
       <button
         type="button"
         onClick={toggleDiscussionEmail}
@@ -1155,7 +1145,16 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
                     className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 active:bg-gray-50 dark:active:bg-gray-800 transition-colors"
                   >
                     <span className="text-2xl leading-none">＋</span>
-                    <span className="text-[9px] mt-1 font-medium text-center leading-tight">Ajouter<br/>photo/vidéo</span>
+                    <span className="text-[9px] mt-1 font-medium text-center leading-tight">Importer<br/>image/GIF/vidéo</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setStickerCreatorOpen(true)}
+                    className="aspect-square rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 text-white flex flex-col items-center justify-center active:scale-95 transition-transform shadow-sm"
+                  >
+                    <span className="text-xl leading-none">✨</span>
+                    <span className="text-[9px] mt-1 font-semibold text-center leading-tight">Créer un<br/>sticker animé</span>
                   </button>
 
                   {stickers.map(sticker => (
@@ -1429,6 +1428,11 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
           />
         </div>
       )}
+      <StickerCreatorModal
+        open={stickerCreatorOpen}
+        onClose={() => setStickerCreatorOpen(false)}
+        onCreated={(sticker) => setStickers(prev => [sticker, ...prev])}
+      />
     </MobileLayout>
   );
 }

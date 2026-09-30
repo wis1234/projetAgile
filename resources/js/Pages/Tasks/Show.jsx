@@ -10,6 +10,9 @@ import i18n from 'i18next';
 import { FaSave, FaTimes, FaExpand, FaCompress, FaCopy, FaPause, FaCheck } from 'react-icons/fa';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import AudioPlayer from '@/Components/AudioPlayer';
+import StickerMessage from '@/Components/Stickers/StickerMessage';
+import StickerPack from '@/Components/Stickers/StickerPack';
+import DocCallButton from '@/Components/Editor/DocCallButton';
 
 // Composant de compte à rebours réutilisable
 const formatTimeUnit = (value, label) => (
@@ -1089,11 +1092,88 @@ const retryComment = async (failedComment) => {
   });
   setComments(prev => removeOptimistic(prev));
 
+  // Un sticker qui a échoué est simplement retiré : il suffit de re-cliquer dessus dans le pack
+  if (failedComment.is_sticker) return;
+
   // Remettre le contenu dans le formulaire
   setCommentContent(failedComment.content === 'Message audio enregistré et sauvegardé' ? '' : failedComment.content);
   if (failedComment.parent_id) setReplyingTo(failedComment.parent_id);
 };
 
+
+  // ─── Envoi d'un sticker du pack (en un clic) : image, GIF/WebP/APNG animé ou courte vidéo ───
+  const sendSticker = async (sticker) => {
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const now = new Date().toISOString();
+    const isVideo = sticker.type === 'video';
+    const flat = (list) => list.flatMap(c => [c, ...(c.replies ? flat(c.replies) : [])]);
+    const parent = replyingTo ? flat(comments).find(c => String(c.id || c._tempId) === String(replyingTo)) : null;
+
+    const optimistic = {
+      _tempId: tempId,
+      id: null,
+      _pending: true,
+      _failed: false,
+      content: '',
+      audio_path: null,
+      image_path: isVideo ? null : sticker.image_path,
+      video_path: isVideo ? sticker.image_path : null,
+      is_sticker: true,
+      created_at: now,
+      updated_at: now,
+      user: {
+        id: auth.user.id,
+        name: auth.user.name,
+        profile_photo_url: auth.user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth.user.name || '')}`,
+        role: auth.user.role,
+      },
+      parent_id: replyingTo || null,
+      parent: parent ? { id: parent.id || parent._tempId, content: parent.content, is_sticker: parent.is_sticker, image_path: parent.image_path, video_path: parent.video_path, audio_path: parent.audio_path } : null,
+      replies: [],
+    };
+
+    setComments(prev => [optimistic, ...prev]);
+    const savedReplyingTo = replyingTo;
+    setReplyingTo(null);
+    setShowEmojiPicker(false);
+    setError('');
+    setTimeout(() => {
+      const container = document.getElementById('chat-messages-container');
+      if (container) container.scrollTop = container.scrollHeight;
+    }, 50);
+
+    try {
+      const fd = new FormData();
+      fd.append('sticker_id', sticker.id);
+      if (savedReplyingTo) fd.append('parent_id', savedReplyingTo);
+
+      const res = await fetch(`/api/tasks/${task.id}/comments`, {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: fd,
+      });
+      if (!res.ok) {
+        let msg = `Erreur ${res.status}`;
+        try {
+          const errorData = await res.json();
+          msg = errorData.message || (errorData.errors ? Object.values(errorData.errors).flat().join(' ') : msg);
+        } catch { /* ignore */ }
+        throw new Error(msg);
+      }
+      const saved = await res.json();
+      const serverComment = saved.comment || saved;
+      setComments(prev => prev.map(c => c._tempId === tempId
+        ? { ...c, ...serverComment, _pending: false, _failed: false, _tempId: tempId, replies: c.replies || [] }
+        : c));
+    } catch (err) {
+      console.error('Erreur envoi sticker:', err);
+      setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, _pending: false, _failed: true } : c));
+      setError(err.message || "Échec de l'envoi du sticker.");
+    }
+  };
 
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
@@ -2995,6 +3075,14 @@ return () => {
 </button>
 */}
 
+        {(task.project_id || task.project?.id) && (
+          <DocCallButton
+            project={{ id: task.project_id || task.project.id, name: task.title, users: projectMembers || [] }}
+            auth={auth}
+            variant="icon"
+          />
+        )}
+
         <label
           className={`flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-full transition-colors duration-200 cursor-pointer select-none border ${
             shareDiscussionEmail
@@ -3145,7 +3233,7 @@ return () => {
                   )}
 
                   {/* Bulle de Message */}
-                  <div className={`relative px-3.5 py-2.5 shadow-sm ${comment.audio_path ? 'min-w-[220px]' : 'min-w-[120px]'} ${
+                  <div className={comment.is_sticker ? 'relative' : `relative px-3.5 py-2.5 shadow-sm ${comment.audio_path ? 'min-w-[220px]' : 'min-w-[120px]'} ${
                     isPending ? 'bubble-pending' : ''
                   } ${
                     isMe
@@ -3164,7 +3252,7 @@ return () => {
                     )}
 
                     {/* Nom d'auteur si message tiers */}
-                    {!isMe && comment.user?.name && (
+                    {!isMe && !comment.is_sticker && comment.user?.name && (
                       <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 mb-0.5">
                         {comment.user.name}
                       </p>
@@ -3177,12 +3265,23 @@ return () => {
                           ? 'border-white/80 bg-white/15 text-white/90'
                           : 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-gray-600 dark:text-gray-300'
                       }`}>
-                        <p className="truncate opacity-80">{comment.parent.content}</p>
+                        <p className="truncate opacity-80">{comment.parent.content || (comment.parent.is_sticker ? '🎨 Sticker' : (comment.parent.video_path ? '🎬 Vidéo' : (comment.parent.image_path ? '📷 Photo' : (comment.parent.audio_path ? '🎙 Message vocal' : '…'))))}</p>
                       </div>
                     )}
 
                     {/* Mode édition */}
-                    {editingId === comment.id ? (
+                    {comment.is_sticker ? (
+                      <StickerMessage
+                        imagePath={comment.image_path}
+                        videoPath={comment.video_path}
+                        time={new Date(comment.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        isMe={isMe}
+                        pending={isPending}
+                        failed={hasFailed}
+                        onRetry={() => retryComment(comment)}
+                        onOpen={setImageLightbox}
+                      />
+                    ) : editingId === comment.id ? (
                       <form onSubmit={handleUpdateComment} className="min-w-[200px]">
                         <textarea
                           value={editContent}
@@ -3313,9 +3412,11 @@ return () => {
                       )}
                       {isMe && (
                         <>
-                          <button onClick={() => handleEditComment(comment)} className="text-gray-500 hover:text-blue-500 p-1 rounded-full transition-colors" title={t('edit')}>
-                            <FaEdit className="w-3.5 h-3.5" />
-                          </button>
+                          {!comment.is_sticker && (
+                            <button onClick={() => handleEditComment(comment)} className="text-gray-500 hover:text-blue-500 p-1 rounded-full transition-colors" title={t('edit')}>
+                              <FaEdit className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button onClick={() => handleDeleteComment(comment.id)} className="text-gray-500 hover:text-red-500 p-1 rounded-full transition-colors" title={t('delete')}>
                             <FaTrash className="w-3.5 h-3.5" />
                           </button>
@@ -3453,7 +3554,7 @@ return () => {
 
     {/* ─── DRAWER STICKERS & EMOJIS (WHATSAPP STYLE) ─── */}
     {showEmojiPicker && (
-      <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3 shadow-lg max-h-56 overflow-y-auto">
+      <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3 shadow-lg max-h-72 overflow-y-auto">
         <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2 mb-2">
           <div className="flex gap-2">
             <button
@@ -3502,22 +3603,7 @@ return () => {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {STICKERS.map(sticker => (
-              <button
-                key={sticker.id}
-                type="button"
-                onClick={() => {
-                  setCommentContent(prev => (prev ? prev + ' ' : '') + `${sticker.emoji} ${sticker.title}`);
-                  setShowEmojiPicker(false);
-                }}
-                className={`flex items-center gap-2 p-2 rounded-xl border text-xs font-bold transition-all hover:scale-102 hover:shadow-md ${sticker.bg}`}
-              >
-                <span className="text-xl">{sticker.emoji}</span>
-                <span>{sticker.title}</span>
-              </button>
-            ))}
-          </div>
+          <StickerPack onSend={sendSticker} onError={setError} />
         )}
       </div>
     )}
