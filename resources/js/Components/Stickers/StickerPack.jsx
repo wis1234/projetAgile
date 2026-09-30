@@ -1,3 +1,4 @@
+import AnimatedImage from './AnimatedImage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FaMagic, FaTimes } from 'react-icons/fa';
 import StickerCreatorModal from './StickerCreatorModal';
@@ -84,7 +85,7 @@ export default function StickerPack({ onSend, onError }) {
               className="w-full aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 hover:scale-105 transition-transform">
               {sticker.type === 'video'
                 ? <video src={resolveSrc(sticker.image_path)} className="w-full h-full object-contain p-1" autoPlay loop muted playsInline />
-                : <img src={resolveSrc(sticker.image_path)} alt={sticker.name || 'Sticker'} className="w-full h-full object-contain p-1" loading="lazy" />}
+                : <AnimatedImage src={resolveSrc(sticker.image_path)} alt={sticker.name || 'Sticker'} className="w-full h-full object-contain p-1" />}
             </button>
             {sticker.is_mine && (
               <button type="button" onClick={(e) => remove(e, sticker)} title="Supprimer mon sticker"

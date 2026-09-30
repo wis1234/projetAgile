@@ -1,4 +1,5 @@
 import React from 'react';
+import AnimatedImage from './AnimatedImage';
 
 const resolveSrc = (p) => {
   if (!p) return null;
@@ -33,11 +34,8 @@ export default function StickerMessage({
           style={{ background: 'transparent' }}
         />
       ) : (
-        <img
+        <AnimatedImage
           src={img}
-          alt="Sticker"
-          loading="lazy"
-          draggable={false}
           onClick={() => onOpen?.(img)}
           className={`${size} object-contain ${onOpen ? 'cursor-pointer' : ''}`}
           style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.10))' }}

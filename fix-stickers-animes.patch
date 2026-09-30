@@ -1,0 +1,376 @@
+diff --git a/resources/js/Components/Stickers/AnimatedImage.jsx b/resources/js/Components/Stickers/AnimatedImage.jsx
+new file mode 100644
+index 0000000..5b85e9d
+--- /dev/null
++++ b/resources/js/Components/Stickers/AnimatedImage.jsx
+@@ -0,0 +1,42 @@
++import React, { useEffect, useRef, useState } from 'react';
++import { loadApng } from '@/lib/apngDecode';
++
++/**
++ * Affiche une image ; si c'est un APNG (sticker animé créé dans l'app), l'anime en boucle sur un canvas.
++ * Repli automatique sur <img> pour tout autre format (GIF, WebP animé… déjà lus nativement).
++ */
++export default function AnimatedImage({ src, className = '', style, alt = 'Sticker', onClick, loading = 'lazy' }) {
++  const canvasRef = useRef(null);
++  const [anim, setAnim] = useState(null);
++
++  useEffect(() => {
++    let alive = true;
++    setAnim(null);
++    if (src && !src.startsWith('blob:') && /\.png(\?|$)/i.test(src)) {
++      loadApng(src).then((a) => { if (alive && a) setAnim(a); });
++    }
++    return () => { alive = false; };
++  }, [src]);
++
++  useEffect(() => {
++    if (!anim || !canvasRef.current) return undefined;
++    const canvas = canvasRef.current;
++    const ctx = canvas.getContext('2d');
++    let i = 0, timer;
++    const tick = () => {
++      const f = anim.frames[i];
++      if (f.dispose === 1 || i === 0) ctx.clearRect(0, 0, anim.w, anim.h);
++      if (f.blend === 0) ctx.clearRect(f.x, f.y, f.canvas.width, f.canvas.height);
++      ctx.drawImage(f.canvas, f.x, f.y);
++      i = (i + 1) % anim.frames.length;
++      timer = setTimeout(tick, f.delay);
++    };
++    tick();
++    return () => clearTimeout(timer);
++  }, [anim]);
++
++  if (anim) {
++    return <canvas ref={canvasRef} width={anim.w} height={anim.h} className={className} style={style} onClick={onClick} role="img" aria-label={alt} />;
++  }
++  return <img src={src} alt={alt} loading={loading} draggable={false} className={className} style={style} onClick={onClick} />;
++}
+diff --git a/resources/js/Components/Stickers/StickerMessage.jsx b/resources/js/Components/Stickers/StickerMessage.jsx
+index a1677d5..f29a647 100644
+--- a/resources/js/Components/Stickers/StickerMessage.jsx
++++ b/resources/js/Components/Stickers/StickerMessage.jsx
+@@ -1,4 +1,5 @@
+ import React from 'react';
++import AnimatedImage from './AnimatedImage';
+ 
+ const resolveSrc = (p) => {
+   if (!p) return null;
+@@ -33,11 +34,8 @@ export default function StickerMessage({
+           style={{ background: 'transparent' }}
+         />
+       ) : (
+-        <img
++        <AnimatedImage
+           src={img}
+-          alt="Sticker"
+-          loading="lazy"
+-          draggable={false}
+           onClick={() => onOpen?.(img)}
+           className={`${size} object-contain ${onOpen ? 'cursor-pointer' : ''}`}
+           style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.10))' }}
+diff --git a/resources/js/Components/Stickers/StickerPack.jsx b/resources/js/Components/Stickers/StickerPack.jsx
+index 75c580a..94a5209 100644
+--- a/resources/js/Components/Stickers/StickerPack.jsx
++++ b/resources/js/Components/Stickers/StickerPack.jsx
+@@ -1,3 +1,4 @@
++import AnimatedImage from './AnimatedImage';
+ import React, { useCallback, useEffect, useRef, useState } from 'react';
+ import { FaMagic, FaTimes } from 'react-icons/fa';
+ import StickerCreatorModal from './StickerCreatorModal';
+@@ -84,7 +85,7 @@ export default function StickerPack({ onSend, onError }) {
+               className="w-full aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 hover:scale-105 transition-transform">
+               {sticker.type === 'video'
+                 ? <video src={resolveSrc(sticker.image_path)} className="w-full h-full object-contain p-1" autoPlay loop muted playsInline />
+-                : <img src={resolveSrc(sticker.image_path)} alt={sticker.name || 'Sticker'} className="w-full h-full object-contain p-1" loading="lazy" />}
++                : <AnimatedImage src={resolveSrc(sticker.image_path)} alt={sticker.name || 'Sticker'} className="w-full h-full object-contain p-1" />}
+             </button>
+             {sticker.is_mine && (
+               <button type="button" onClick={(e) => remove(e, sticker)} title="Supprimer mon sticker"
+diff --git a/resources/js/Pages/Discussions/Show.jsx b/resources/js/Pages/Discussions/Show.jsx
+index 95b46b8..ace4828 100644
+--- a/resources/js/Pages/Discussions/Show.jsx
++++ b/resources/js/Pages/Discussions/Show.jsx
+@@ -6,6 +6,7 @@ import Modal from '@/Components/Modal';
+ import AudioPlayer from '@/Components/AudioPlayer';
+ import StickerMessage from '@/Components/Stickers/StickerMessage';
+ import StickerCreatorModal from '@/Components/Stickers/StickerCreatorModal';
++import AnimatedImage from '@/Components/Stickers/AnimatedImage';
+ import DocCallButton from '@/Components/Editor/DocCallButton';
+ import {
+   FaCommentDots, FaMicrophone, FaStop, FaReply, FaPaperPlane, FaEnvelope,
+@@ -515,6 +516,26 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+     }
+   };
+ 
++  // ─── Suppression d'un sticker créé par l'utilisateur (le sien uniquement ; les messages déjà envoyés restent intacts) ───
++  const deleteSticker = async (e, sticker) => {
++    e.stopPropagation();
++    if (!window.confirm('Supprimer ce sticker du pack ?')) return;
++    try {
++      const res = await fetch(`/api/stickers/${sticker.id}`, {
++        method: 'DELETE',
++        headers: {
++          'X-Requested-With': 'XMLHttpRequest',
++          Accept: 'application/json',
++          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
++        },
++      });
++      if (!res.ok) throw new Error();
++      setStickers(prev => prev.filter(s => s.id !== sticker.id));
++    } catch {
++      setError('Suppression impossible.');
++    }
++  };
++
+   // ─── Envoi d'un sticker existant du pack (en un clic, image ou vidéo) ─────
+   const sendSticker = async (sticker) => {
+     const tempId = generateTempId();
+@@ -1478,34 +1499,32 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+                 </button>
+ 
+                 {stickers.map(sticker => (
+-                  <button
+-                    key={sticker.id}
+-                    type="button"
+-                    onClick={() => sendSticker(sticker)}
+-                    title={sticker.name || 'Envoyer ce sticker'}
+-                    className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 hover:scale-105 transition-transform"
+-                  >
+-                    {sticker.type === 'video' ? (
+-                      <video
+-                        src={resolveMediaSrc(sticker.image_path)}
+-                        className="w-full h-full object-contain p-1"
+-                        autoPlay
+-                        loop
+-                        muted
+-                        playsInline
+-                      />
+-                    ) : (
+-                      <img
+-                        src={resolveMediaSrc(sticker.image_path)}
+-                        alt={sticker.name || 'Sticker'}
+-                        className="w-full h-full object-contain p-1"
+-                        loading="lazy"
+-                      />
+-                    )}
+-                    {sticker.type === 'video' && (
+-                      <span className="absolute bottom-0.5 right-0.5 text-[8px] bg-black/60 text-white rounded px-1 leading-tight">🎥</span>
++                  <div key={sticker.id} className="relative group">
++                    <button
++                      type="button"
++                      onClick={() => sendSticker(sticker)}
++                      title={sticker.name || 'Envoyer ce sticker'}
++                      className="relative w-full aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 hover:scale-105 transition-transform"
++                    >
++                      {sticker.type === 'video' ? (
++                        <video src={resolveMediaSrc(sticker.image_path)} className="w-full h-full object-contain p-1" autoPlay loop muted playsInline />
++                      ) : (
++                        <AnimatedImage src={resolveMediaSrc(sticker.image_path)} alt={sticker.name || 'Sticker'} className="w-full h-full object-contain p-1" />
++                      )}
++                      {sticker.type === 'video' && (
++                        <span className="absolute bottom-0.5 right-0.5 text-[8px] bg-black/60 text-white rounded px-1 leading-tight">🎥</span>
++                      )}
++                    </button>
++                    {sticker.is_mine && (
++                      <button
++                        type="button"
++                        onClick={(e) => deleteSticker(e, sticker)}
++                        title="Supprimer mon sticker"
++                        aria-label="Supprimer mon sticker"
++                        className="absolute -top-1 -right-1 z-10 w-5 h-5 rounded-full bg-red-600 text-white text-[10px] leading-none flex items-center justify-center shadow opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
++                      ><FaTimes /></button>
+                     )}
+-                  </button>
++                  </div>
+                 ))}
+ 
+                 {stickers.length === 0 && (
+diff --git a/resources/js/Pages/Mobile/Discussions/Show.jsx b/resources/js/Pages/Mobile/Discussions/Show.jsx
+index 9b05f61..86e017d 100644
+--- a/resources/js/Pages/Mobile/Discussions/Show.jsx
++++ b/resources/js/Pages/Mobile/Discussions/Show.jsx
+@@ -5,6 +5,7 @@ import { nativeFeedback } from '@/lib/platform';
+ import AudioPlayer from '@/Components/AudioPlayer';
+ import StickerMessage from '@/Components/Stickers/StickerMessage';
+ import StickerCreatorModal from '@/Components/Stickers/StickerCreatorModal';
++import AnimatedImage from '@/Components/Stickers/AnimatedImage';
+ import DocCallButton from '@/Components/Editor/DocCallButton';
+ // Ajout de l'icône email
+ import { FaEnvelope } from 'react-icons/fa';
+@@ -783,6 +784,26 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
+     }
+   };
+ 
++  // ─── Suppression d'un sticker créé par l'utilisateur (le sien uniquement ; les messages déjà envoyés restent intacts) ───
++  const deleteSticker = async (e, sticker) => {
++    e.stopPropagation();
++    if (!window.confirm('Supprimer ce sticker du pack ?')) return;
++    try {
++      const res = await fetch(`/api/stickers/${sticker.id}`, {
++        method: 'DELETE',
++        headers: {
++          'X-Requested-With': 'XMLHttpRequest',
++          Accept: 'application/json',
++          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
++        },
++      });
++      if (!res.ok) throw new Error();
++      setStickers(prev => prev.filter(s => s.id !== sticker.id));
++    } catch {
++      showToast('error', 'Suppression impossible.');
++    }
++  };
++
+   // ─── Envoi d'un sticker existant du pack (en un tap, image ou vidéo) ─────
+   const sendSticker = async (sticker) => {
+     nativeFeedback.tap();
+@@ -1158,34 +1179,32 @@ export default function MobileDiscussionShow({ task, projectMembers = [] }) {
+                   </button>
+ 
+                   {stickers.map(sticker => (
+-                    <button
+-                      key={sticker.id}
+-                      type="button"
+-                      onClick={() => sendSticker(sticker)}
+-                      title={sticker.name || 'Envoyer ce sticker'}
+-                      className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 active:scale-95 transition-transform"
+-                    >
+-                      {sticker.type === 'video' ? (
+-                        <video
+-                          src={resolveImageSrc(sticker.image_path)}
+-                          className="w-full h-full object-contain p-1"
+-                          autoPlay
+-                          loop
+-                          muted
+-                          playsInline
+-                        />
+-                      ) : (
+-                        <img
+-                          src={resolveImageSrc(sticker.image_path)}
+-                          alt={sticker.name || 'Sticker'}
+-                          className="w-full h-full object-contain p-1"
+-                          loading="lazy"
+-                        />
+-                      )}
+-                      {sticker.type === 'video' && (
+-                        <span className="absolute bottom-0.5 right-0.5 text-[8px] bg-black/60 text-white rounded px-1 leading-tight">🎥</span>
++                    <div key={sticker.id} className="relative group">
++                      <button
++                        type="button"
++                        onClick={() => sendSticker(sticker)}
++                        title={sticker.name || 'Envoyer ce sticker'}
++                        className="relative w-full aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-600 active:scale-95 transition-transform"
++                      >
++                        {sticker.type === 'video' ? (
++                          <video src={resolveImageSrc(sticker.image_path)} className="w-full h-full object-contain p-1" autoPlay loop muted playsInline />
++                        ) : (
++                          <AnimatedImage src={resolveImageSrc(sticker.image_path)} alt={sticker.name || 'Sticker'} className="w-full h-full object-contain p-1" />
++                        )}
++                        {sticker.type === 'video' && (
++                          <span className="absolute bottom-0.5 right-0.5 text-[8px] bg-black/60 text-white rounded px-1 leading-tight">🎥</span>
++                        )}
++                      </button>
++                      {sticker.is_mine && (
++                        <button
++                          type="button"
++                          onClick={(e) => deleteSticker(e, sticker)}
++                          title="Supprimer mon sticker"
++                          aria-label="Supprimer mon sticker"
++                          className="absolute -top-1 -right-1 z-10 w-5 h-5 rounded-full bg-red-600 text-white text-[10px] leading-none flex items-center justify-center shadow opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
++                        >✕</button>
+                       )}
+-                    </button>
++                    </div>
+                   ))}
+ 
+                   {stickers.length === 0 && (
+diff --git a/resources/js/lib/apngDecode.js b/resources/js/lib/apngDecode.js
+new file mode 100644
+index 0000000..f7e4f8c
+--- /dev/null
++++ b/resources/js/lib/apngDecode.js
+@@ -0,0 +1,83 @@
++import { unzlibSync } from 'fflate';
++
++/**
++ * Décodeur APNG minimal (RGBA 8 bits) : permet de jouer l'animation nous-mêmes sur un <canvas>
++ * sans dépendre de la lecture d'APNG par la balise <img> (proxy, WebView, mode économie d'énergie…).
++ * Retourne null si le fichier n'est pas un APNG exploitable (on retombe alors sur <img>).
++ */
++const cache = new Map();
++
++const u32 = (b, o) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
++const u16 = (b, o) => (b[o] << 8) | b[o + 1];
++
++function unfilter(raw, w, h) {
++  const stride = w * 4;
++  const out = new Uint8ClampedArray(stride * h);
++  for (let y = 0; y < h; y++) {
++    const ft = raw[y * (stride + 1)];
++    const src = y * (stride + 1) + 1;
++    const dst = y * stride;
++    for (let x = 0; x < stride; x++) {
++      const a = x >= 4 ? out[dst + x - 4] : 0;
++      const b = y > 0 ? out[dst - stride + x] : 0;
++      const c = x >= 4 && y > 0 ? out[dst - stride + x - 4] : 0;
++      let add = 0;
++      if (ft === 1) add = a;
++      else if (ft === 2) add = b;
++      else if (ft === 3) add = (a + b) >> 1;
++      else if (ft === 4) {
++        const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
++        add = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
++      }
++      out[dst + x] = (raw[src + x] + add) & 255;
++    }
++  }
++  return out;
++}
++
++export async function loadApng(url) {
++  if (cache.has(url)) return cache.get(url);
++  const p = (async () => {
++    try {
++      const res = await fetch(url);
++      if (!res.ok) return null;
++      const buf = new Uint8Array(await res.arrayBuffer());
++      let o = 8, w = 0, h = 0, animated = false;
++      const frames = [];
++      let cur = null;
++      while (o < buf.length) {
++        const len = u32(buf, o);
++        const type = String.fromCharCode(buf[o + 4], buf[o + 5], buf[o + 6], buf[o + 7]);
++        const d = o + 8;
++        if (type === 'IHDR') {
++          w = u32(buf, d); h = u32(buf, d + 4);
++          if (buf[d + 8] !== 8 || buf[d + 9] !== 6 || buf[d + 12] !== 0) return null; // RGBA 8 bits non entrelacé seulement
++        } else if (type === 'acTL') animated = true;
++        else if (type === 'fcTL') {
++          const num = u16(buf, d + 20), den = u16(buf, d + 22) || 100;
++          cur = { w: u32(buf, d + 4), h: u32(buf, d + 8), x: u32(buf, d + 12), y: u32(buf, d + 16),
++            delay: Math.max(20, (num / den) * 1000), dispose: buf[d + 24], blend: buf[d + 25], data: [] };
++          frames.push(cur);
++        } else if (type === 'IDAT' && cur) cur.data.push(buf.subarray(d, d + len));
++        else if (type === 'fdAT' && cur) cur.data.push(buf.subarray(d + 4, d + len));
++        else if (type === 'IEND') break;
++        o += 12 + len;
++      }
++      if (!animated || frames.length < 2) return null;
++      const out = frames.map((f) => {
++        const z = new Uint8Array(f.data.reduce((s, c) => s + c.length, 0));
++        let k = 0; f.data.forEach((c) => { z.set(c, k); k += c.length; });
++        const px = unfilter(unzlibSync(z), f.w, f.h);
++        const c = document.createElement('canvas');
++        c.width = f.w; c.height = f.h;
++        c.getContext('2d').putImageData(new ImageData(px, f.w, f.h), 0, 0);
++        return { canvas: c, x: f.x, y: f.y, delay: f.delay, dispose: f.dispose, blend: f.blend };
++      });
++      return { w, h, frames: out };
++    } catch {
++      return null;
++    }
++  })();
++  cache.set(url, p);
++  return p;
++}

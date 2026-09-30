@@ -6,6 +6,7 @@ import Modal from '@/Components/Modal';
 import AudioPlayer from '@/Components/AudioPlayer';
 import StickerMessage from '@/Components/Stickers/StickerMessage';
 import StickerCreatorModal from '@/Components/Stickers/StickerCreatorModal';
+import AnimatedImage from '@/Components/Stickers/AnimatedImage';
 import DocCallButton from '@/Components/Editor/DocCallButton';
 import {
   FaCommentDots, FaMicrophone, FaStop, FaReply, FaPaperPlane, FaEnvelope,
@@ -512,6 +513,26 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
       console.error('Erreur envoi commentaire:', err);
       setComments(prev => prev.map(c => c._tempId === tempId ? { ...c, _pending: false, _failed: true } : c));
       setError(err.message || 'Échec de l\'envoi. Appuyez sur "Réessayer".');
+    }
+  };
+
+  // ─── Suppression d'un sticker créé par l'utilisateur (le sien uniquement ; les messages déjà envoyés restent intacts) ───
+  const deleteSticker = async (e, sticker) => {
+    e.stopPropagation();
+    if (!window.confirm('Supprimer ce sticker du pack ?')) return;
+    try {
+      const res = await fetch(`/api/stickers/${sticker.id}`, {
+        method: 'DELETE',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+      });
+      if (!res.ok) throw new Error();
+      setStickers(prev => prev.filter(s => s.id !== sticker.id));
+    } catch {
+      setError('Suppression impossible.');
     }
   };
 
@@ -1478,34 +1499,32 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
                 </button>
 
                 {stickers.map(sticker => (
-                  <button
-                    key={sticker.id}
-                    type="button"
-                    onClick={() => sendSticker(sticker)}
-                    title={sticker.name || 'Envoyer ce sticker'}
-                    className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 hover:scale-105 transition-transform"
-                  >
-                    {sticker.type === 'video' ? (
-                      <video
-                        src={resolveMediaSrc(sticker.image_path)}
-                        className="w-full h-full object-contain p-1"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                      />
-                    ) : (
-                      <img
-                        src={resolveMediaSrc(sticker.image_path)}
-                        alt={sticker.name || 'Sticker'}
-                        className="w-full h-full object-contain p-1"
-                        loading="lazy"
-                      />
+                  <div key={sticker.id} className="relative group">
+                    <button
+                      type="button"
+                      onClick={() => sendSticker(sticker)}
+                      title={sticker.name || 'Envoyer ce sticker'}
+                      className="relative w-full aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 hover:scale-105 transition-transform"
+                    >
+                      {sticker.type === 'video' ? (
+                        <video src={resolveMediaSrc(sticker.image_path)} className="w-full h-full object-contain p-1" autoPlay loop muted playsInline />
+                      ) : (
+                        <AnimatedImage src={resolveMediaSrc(sticker.image_path)} alt={sticker.name || 'Sticker'} className="w-full h-full object-contain p-1" />
+                      )}
+                      {sticker.type === 'video' && (
+                        <span className="absolute bottom-0.5 right-0.5 text-[8px] bg-black/60 text-white rounded px-1 leading-tight">🎥</span>
+                      )}
+                    </button>
+                    {sticker.is_mine && (
+                      <button
+                        type="button"
+                        onClick={(e) => deleteSticker(e, sticker)}
+                        title="Supprimer mon sticker"
+                        aria-label="Supprimer mon sticker"
+                        className="absolute -top-1 -right-1 z-10 w-5 h-5 rounded-full bg-red-600 text-white text-[10px] leading-none flex items-center justify-center shadow opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                      ><FaTimes /></button>
                     )}
-                    {sticker.type === 'video' && (
-                      <span className="absolute bottom-0.5 right-0.5 text-[8px] bg-black/60 text-white rounded px-1 leading-tight">🎥</span>
-                    )}
-                  </button>
+                  </div>
                 ))}
 
                 {stickers.length === 0 && (
