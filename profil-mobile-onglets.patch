@@ -1,0 +1,454 @@
+diff --git a/app/Http/Controllers/ProfileController.php b/app/Http/Controllers/ProfileController.php
+index cec4e02..0f30c42 100644
+--- a/app/Http/Controllers/ProfileController.php
++++ b/app/Http/Controllers/ProfileController.php
+@@ -33,6 +33,13 @@ public function edit(Request $request): Response
+             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
+             'status' => session('status'),
+             'notificationPreferences' => $user->notification_preferences,
++            'bankDetails' => [
++                'bank_name' => $user->bank_name,
++                'account_holder_name' => $user->account_holder_name,
++                'account_number' => $user->account_number,
++                'iban' => $user->iban,
++                'swift_code' => $user->swift_code,
++            ],
+             // Toutes les données éditables (auth.user partagé n'en contient qu'une partie)
+             'profile' => [
+                 'name' => $user->name,
+diff --git a/resources/js/Components/Profile/ui.jsx b/resources/js/Components/Profile/ui.jsx
+index 2fd9fb3..50a2983 100644
+--- a/resources/js/Components/Profile/ui.jsx
++++ b/resources/js/Components/Profile/ui.jsx
+@@ -2,20 +2,20 @@ import { Transition } from '@headlessui/react';
+ import { CheckCircleIcon } from '@heroicons/react/24/solid';
+ 
+ export const inputCls =
+-    'block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-sm transition ' +
++    'block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-base text-slate-900 sm:py-2.5 sm:text-sm placeholder-slate-400 shadow-sm transition ' +
+     'focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 ' +
+     'dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-400 dark:disabled:bg-slate-800';
+ 
+ export const btnPrimary =
+-    'inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition ' +
++    'inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold sm:py-2.5 text-white shadow-sm transition ' +
+     'hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60';
+ 
+ export const btnGhost =
+-    'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition ' +
++    'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold sm:py-2.5 text-slate-700 shadow-sm transition ' +
+     'hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-300/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700';
+ 
+ export const btnDanger =
+-    'inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition ' +
++    'inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold sm:py-2.5 text-white shadow-sm transition ' +
+     'hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-60';
+ 
+ /** Carte de section : en-tête (icône, titre, description) + contenu + pied optionnel. */
+@@ -27,13 +27,13 @@ export function SectionCard({ id, icon: Icon, title, description, tone = 'blue',
+     return (
+         <section
+             id={id}
+-            className={`scroll-mt-24 overflow-hidden rounded-2xl border bg-white shadow-sm dark:bg-slate-800 ${
++            className={`overflow-hidden rounded-2xl border bg-white shadow-sm dark:bg-slate-800 ${
+                 tone === 'red' ? 'border-red-200 dark:border-red-900/50' : 'border-slate-200 dark:border-slate-700'
+             }`}
+         >
+-            <header className="flex items-start gap-4 border-b border-slate-100 px-6 py-5 dark:border-slate-700/70">
++            <header className="flex items-start gap-3 border-b border-slate-100 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5 dark:border-slate-700/70">
+                 {Icon && (
+-                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}>
++                    <span className={`flex h-9 w-9 shrink-0 sm:h-10 sm:w-10 items-center justify-center rounded-xl ${tones[tone]}`}>
+                         <Icon className="h-5 w-5" />
+                     </span>
+                 )}
+@@ -43,9 +43,9 @@ export function SectionCard({ id, icon: Icon, title, description, tone = 'blue',
+                 </div>
+                 {aside}
+             </header>
+-            <div className="px-6 py-6">{children}</div>
++            <div className="px-4 py-5 sm:px-6 sm:py-6">{children}</div>
+             {footer && (
+-                <footer className="border-t border-slate-100 bg-slate-50/70 px-6 py-4 dark:border-slate-700/70 dark:bg-slate-900/30">
++                <footer className="border-t border-slate-100 bg-slate-50/70 px-4 py-4 sm:px-6 dark:border-slate-700/70 dark:bg-slate-900/30">
+                     {footer}
+                 </footer>
+             )}
+@@ -66,12 +66,11 @@ export function Field({ label, htmlFor, hint, error, className = '', children })
+     );
+ }
+ 
+-/** Barre d'action : message de succès + bouton. */
++/** Barre d'action : bouton pleine largeur sur mobile, message de succès + note. */
+ export function SaveBar({ processing, saved, label = 'Enregistrer', busyLabel = 'Enregistrement…', note }) {
+     return (
+-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+-            <p className="text-xs text-slate-500 dark:text-slate-400">{note}</p>
+-            <div className="flex items-center justify-end gap-4">
++        <div className="flex flex-col gap-3 sm:flex-row-reverse sm:items-center sm:justify-between">
++            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:gap-4">
+                 <Transition
+                     show={!!saved}
+                     enter="transition ease-out duration-200"
+@@ -79,14 +78,15 @@ export function SaveBar({ processing, saved, label = 'Enregistrer', busyLabel =
+                     leave="transition ease-in duration-300"
+                     leaveTo="opacity-0"
+                 >
+-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
++                    <span role="status" className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                         <CheckCircleIcon className="h-5 w-5" /> Enregistré
+                     </span>
+                 </Transition>
+-                <button type="submit" disabled={processing} className={btnPrimary}>
++                <button type="submit" disabled={processing} className={`${btnPrimary} w-full sm:w-auto`}>
+                     {processing ? busyLabel : label}
+                 </button>
+             </div>
++            {note && <p className="text-center text-xs text-slate-500 dark:text-slate-400 sm:text-left">{note}</p>}
+         </div>
+     );
+ }
+diff --git a/resources/js/Pages/Profile/BankDetails.jsx b/resources/js/Pages/Profile/BankDetails.jsx
+index 8ddbfdc..6123296 100644
+--- a/resources/js/Pages/Profile/BankDetails.jsx
++++ b/resources/js/Pages/Profile/BankDetails.jsx
+@@ -1,56 +1,19 @@
+ import React from 'react';
+-import { Head, useForm, Link } from '@inertiajs/react';
+-import { ArrowLeftIcon, BanknotesIcon } from '@heroicons/react/24/outline';
++import { Head, Link } from '@inertiajs/react';
++import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+ import AdminLayout from '@/Layouts/AdminLayout';
+-import { SectionCard, Field, SaveBar, inputCls } from '@/Components/Profile/ui';
++import BankDetailsForm from './Partials/BankDetailsForm';
+ 
++// Page conservée pour les anciens liens ; le formulaire est aussi intégré à « Mon profil » (onglet Banque).
+ export default function BankDetails({ bankDetails }) {
+-    const { data, setData, put, errors, processing, recentlySuccessful } = useForm({
+-        bank_name: bankDetails.bank_name || '',
+-        account_holder_name: bankDetails.account_holder_name || '',
+-        account_number: bankDetails.account_number || '',
+-        iban: bankDetails.iban || '',
+-        swift_code: bankDetails.swift_code || '',
+-    });
+-
+-    const submit = (e) => {
+-        e.preventDefault();
+-        put(route('profile.update-bank-details'), { preserveScroll: true });
+-    };
+-
+     return (
+-        <div className="min-h-screen bg-slate-50 px-4 py-8 dark:bg-slate-900 sm:px-6">
++        <div className="min-h-screen bg-slate-50 px-4 py-6 dark:bg-slate-900 sm:px-6 sm:py-8">
+             <Head title="Informations bancaires" />
+             <div className="mx-auto max-w-3xl">
+-                <Link href={route('profile.edit')} className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-blue-600 dark:text-slate-300">
++                <Link href={route('profile.edit')} className="mb-5 inline-flex items-center gap-2 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 dark:text-slate-300">
+                     <ArrowLeftIcon className="h-4 w-4" /> Retour au profil
+                 </Link>
+-                <form onSubmit={submit}>
+-                    <SectionCard
+-                        icon={BanknotesIcon}
+-                        title="Informations bancaires"
+-                        description="Coordonnées utilisées pour recevoir vos paiements."
+-                        footer={<SaveBar processing={processing} saved={recentlySuccessful} note="Tous les champs sont obligatoires." />}
+-                    >
+-                        <div className="grid gap-5 sm:grid-cols-2">
+-                            <Field label="Nom de la banque" htmlFor="bank_name" error={errors.bank_name}>
+-                                <input id="bank_name" className={inputCls} value={data.bank_name} onChange={(e) => setData('bank_name', e.target.value)} required />
+-                            </Field>
+-                            <Field label="Titulaire du compte" htmlFor="account_holder_name" error={errors.account_holder_name}>
+-                                <input id="account_holder_name" className={inputCls} value={data.account_holder_name} onChange={(e) => setData('account_holder_name', e.target.value)} required />
+-                            </Field>
+-                            <Field label="Numéro de compte" htmlFor="account_number" error={errors.account_number} className="sm:col-span-2">
+-                                <input id="account_number" className={`${inputCls} font-mono`} value={data.account_number} onChange={(e) => setData('account_number', e.target.value)} required />
+-                            </Field>
+-                            <Field label="IBAN" htmlFor="iban" error={errors.iban}>
+-                                <input id="iban" className={`${inputCls} font-mono uppercase`} value={data.iban} onChange={(e) => setData('iban', e.target.value.toUpperCase())} required />
+-                            </Field>
+-                            <Field label="Code SWIFT / BIC" htmlFor="swift_code" error={errors.swift_code}>
+-                                <input id="swift_code" className={`${inputCls} font-mono uppercase`} value={data.swift_code} onChange={(e) => setData('swift_code', e.target.value.toUpperCase())} required />
+-                            </Field>
+-                        </div>
+-                    </SectionCard>
+-                </form>
++                <BankDetailsForm bankDetails={bankDetails} />
+             </div>
+         </div>
+     );
+diff --git a/resources/js/Pages/Profile/Edit.jsx b/resources/js/Pages/Profile/Edit.jsx
+index e2b7ee6..a10e905 100644
+--- a/resources/js/Pages/Profile/Edit.jsx
++++ b/resources/js/Pages/Profile/Edit.jsx
+@@ -1,6 +1,6 @@
+ import AdminLayout from '@/Layouts/AdminLayout';
+-import { Head, Link } from '@inertiajs/react';
+-import { useEffect, useState } from 'react';
++import { Head } from '@inertiajs/react';
++import { useCallback, useEffect, useRef, useState } from 'react';
+ import {
+     UserCircleIcon, BellIcon, ShieldCheckIcon, BanknotesIcon, ExclamationTriangleIcon,
+ } from '@heroicons/react/24/outline';
+@@ -8,84 +8,123 @@ import DeleteUserForm from './Partials/DeleteUserForm';
+ import UpdatePasswordForm from './Partials/UpdatePasswordForm';
+ import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
+ import NotificationPreferencesForm from './Partials/NotificationPreferencesForm';
++import BankDetailsForm from './Partials/BankDetailsForm';
+ 
+-const sections = [
+-    { id: 'profil', label: 'Informations', icon: UserCircleIcon },
+-    { id: 'notifications', label: 'Notifications', icon: BellIcon },
+-    { id: 'securite', label: 'Sécurité', icon: ShieldCheckIcon },
+-    { id: 'danger', label: 'Zone sensible', icon: ExclamationTriangleIcon },
++const TABS = [
++    { id: 'profil', label: 'Informations', hint: 'Identité et photo', icon: UserCircleIcon },
++    { id: 'notifications', label: 'Notifications', hint: 'Alertes e-mail et push', icon: BellIcon },
++    { id: 'securite', label: 'Sécurité', hint: 'Mot de passe', icon: ShieldCheckIcon },
++    { id: 'banque', label: 'Banque', hint: 'Coordonnées de paiement', icon: BanknotesIcon },
++    { id: 'danger', label: 'Zone sensible', hint: 'Supprimer le compte', icon: ExclamationTriangleIcon, danger: true },
+ ];
++const ids = TABS.map((t) => t.id);
++const fromHash = () => {
++    const h = typeof window !== 'undefined' ? window.location.hash.slice(1) : '';
++    return ids.includes(h) ? h : 'profil';
++};
+ 
+-export default function Edit({ mustVerifyEmail, status, notificationPreferences, profile }) {
+-    const user = profile;
+-    const [active, setActive] = useState('profil');
++export default function Edit({ mustVerifyEmail, status, notificationPreferences, profile, bankDetails }) {
++    const [active, setActive] = useState(fromHash);
++    // Onglets chargés à la première visite puis conservés (les saisies non enregistrées ne sont pas perdues)
++    const [visited, setVisited] = useState(() => new Set([fromHash()]));
++    const tabRefs = useRef({});
+ 
+-    // Surbrillance de la rubrique visible pendant le défilement
+-    useEffect(() => {
+-        const obs = new IntersectionObserver(
+-            (entries) => entries.forEach((e) => e.isIntersecting && setActive(e.target.id)),
+-            { rootMargin: '-25% 0px -65% 0px' },
+-        );
+-        sections.forEach((s) => { const el = document.getElementById(s.id); if (el) obs.observe(el); });
+-        return () => obs.disconnect();
++    const select = useCallback((id) => {
++        setActive(id);
++        setVisited((v) => (v.has(id) ? v : new Set(v).add(id)));
++        window.history.replaceState(null, '', `#${id}`);
+     }, []);
+ 
+-    const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
++    // Bouton précédent / lien direct avec #ancre
++    useEffect(() => {
++        const onHash = () => select(fromHash());
++        window.addEventListener('hashchange', onHash);
++        return () => window.removeEventListener('hashchange', onHash);
++    }, [select]);
++
++    // Garde l'onglet actif visible dans la barre défilante (mobile)
++    useEffect(() => {
++        tabRefs.current[active]?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
++    }, [active]);
++
++    // Navigation clavier (← →) sur la liste d'onglets
++    const onKey = (e) => {
++        const i = ids.indexOf(active);
++        const next = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? i - 1 : null;
++        if (next === null) return;
++        e.preventDefault();
++        const id = ids[(next + ids.length) % ids.length];
++        select(id);
++        tabRefs.current[id]?.focus();
++    };
++
++    const user = profile;
+     const avatar = user.profile_photo_url
+         || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=2563eb&color=fff&size=160`;
+ 
+-    const navItem = (active_) =>
+-        `flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+-            active_
+-                ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
+-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/50'
+-        }`;
++    const panel = (id, node) =>
++        visited.has(id) && (
++            <div key={id} id={`panel-${id}`} role="tabpanel" aria-labelledby={`tab-${id}`} hidden={active !== id} className={active === id ? 'animate-[fadeIn_.18s_ease-out]' : ''}>
++                {node}
++            </div>
++        );
+ 
+     return (
+         <AdminLayout>
+             <Head title="Mon profil" />
+-            <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-900">
++            <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}`}</style>
++            <div className="min-h-screen bg-slate-50 pb-28 dark:bg-slate-900 lg:pb-16">
+                 {/* Bandeau */}
+-                <div className="relative">
+-                    <div className="h-36 bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600 sm:h-44" />
+-                    <div className="mx-auto -mt-14 max-w-6xl px-4 sm:-mt-16 sm:px-6">
+-                        <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-end sm:text-left">
+-                            <img
+-                                src={avatar}
+-                                alt={user.name}
+-                                className="h-28 w-28 rounded-2xl border-4 border-white bg-white object-cover shadow-lg dark:border-slate-900 sm:h-32 sm:w-32"
+-                            />
+-                            <div className="min-w-0 pb-1 sm:pb-3">
+-                                <h1 className="truncate text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">{user.name}</h1>
+-                                <p className="mt-0.5 truncate text-sm text-slate-600 dark:text-slate-300">
+-                                    {[user.job_title, user.company].filter(Boolean).join(' · ') || user.email}
+-                                </p>
+-                            </div>
++                <div className="h-28 bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600 sm:h-40" />
++                <div className="mx-auto -mt-12 max-w-6xl px-4 sm:-mt-16 sm:px-6">
++                    <div className="flex items-end gap-4">
++                        <img src={avatar} alt={user.name}
++                            className="h-24 w-24 shrink-0 rounded-2xl border-4 border-white bg-white object-cover shadow-lg dark:border-slate-900 sm:h-32 sm:w-32" />
++                        <div className="min-w-0 pb-1 sm:pb-3">
++                            <h1 className="truncate text-xl font-bold text-slate-900 dark:text-white sm:text-3xl">{user.name}</h1>
++                            <p className="truncate text-sm text-slate-600 dark:text-slate-300">
++                                {[user.job_title, user.company].filter(Boolean).join(' · ') || user.email}
++                            </p>
+                         </div>
+                     </div>
+                 </div>
+ 
+-                <div className="mx-auto mt-8 grid max-w-6xl gap-8 px-4 sm:px-6 lg:grid-cols-[15rem_1fr]">
+-                    {/* Navigation */}
+-                    <aside className="lg:sticky lg:top-24 lg:self-start">
+-                        <nav className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-800 lg:flex-col lg:overflow-visible">
+-                            {sections.map(({ id, label, icon: Icon }) => (
+-                                <button key={id} type="button" onClick={() => go(id)} className={`${navItem(active === id)} whitespace-nowrap`}>
+-                                    <Icon className="h-5 w-5 shrink-0" /> {label}
+-                                </button>
+-                            ))}
+-                            <Link href={route('profile.bank-details')} className={`${navItem(false)} whitespace-nowrap`}>
+-                                <BanknotesIcon className="h-5 w-5 shrink-0" /> Informations bancaires
+-                            </Link>
+-                        </nav>
++                <div className="mx-auto mt-6 grid max-w-6xl gap-5 px-4 sm:mt-8 sm:px-6 lg:grid-cols-[16rem_1fr] lg:gap-8">
++                    {/* Onglets : barre défilante (mobile) / menu latéral (PC) */}
++                    <aside className="-mx-4 sm:mx-0 lg:sticky lg:top-24 lg:self-start">
++                        <div role="tablist" aria-orientation="vertical" onKeyDown={onKey}
++                            className="flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:px-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:rounded-2xl lg:border lg:border-slate-200 lg:bg-white lg:p-2 lg:shadow-sm lg:dark:border-slate-700 lg:dark:bg-slate-800 [&::-webkit-scrollbar]:hidden">
++                            {TABS.map(({ id, label, hint, icon: Icon, danger }) => {
++                                const on = active === id;
++                                return (
++                                    <button key={id} id={`tab-${id}`} ref={(el) => (tabRefs.current[id] = el)}
++                                        role="tab" type="button" aria-selected={on} aria-controls={`panel-${id}`} tabIndex={on ? 0 : -1}
++                                        onClick={() => select(id)}
++                                        className={`flex shrink-0 snap-start items-center gap-2.5 whitespace-nowrap rounded-full border px-4 py-2.5 text-sm font-medium transition lg:w-full lg:rounded-xl lg:border-0 lg:px-3 lg:py-2.5 lg:text-left ${
++                                            on
++                                                ? danger
++                                                    ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300'
++                                                    : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300'
++                                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700/50 lg:bg-transparent lg:dark:bg-transparent'
++                                        }`}>
++                                        <Icon className="h-5 w-5 shrink-0" />
++                                        <span className="flex flex-col leading-tight">
++                                            <span>{label}</span>
++                                            <span className="hidden text-xs font-normal opacity-70 lg:block">{hint}</span>
++                                        </span>
++                                    </button>
++                                );
++                            })}
++                        </div>
+                     </aside>
+ 
+-                    {/* Contenu */}
+-                    <div className="min-w-0 space-y-6">
+-                        <UpdateProfileInformationForm profile={profile} mustVerifyEmail={mustVerifyEmail} status={status} />
+-                        <NotificationPreferencesForm notificationPreferences={notificationPreferences} />
+-                        <UpdatePasswordForm />
+-                        <DeleteUserForm />
++                    {/* Contenu de l'onglet actif */}
++                    <div className="min-w-0">
++                        {panel('profil', <UpdateProfileInformationForm profile={profile} mustVerifyEmail={mustVerifyEmail} status={status} />)}
++                        {panel('notifications', <NotificationPreferencesForm notificationPreferences={notificationPreferences} />)}
++                        {panel('securite', <UpdatePasswordForm />)}
++                        {panel('banque', <BankDetailsForm bankDetails={bankDetails} />)}
++                        {panel('danger', <DeleteUserForm />)}
+                     </div>
+                 </div>
+             </div>
+diff --git a/resources/js/Pages/Profile/Partials/BankDetailsForm.jsx b/resources/js/Pages/Profile/Partials/BankDetailsForm.jsx
+new file mode 100644
+index 0000000..ef9428c
+--- /dev/null
++++ b/resources/js/Pages/Profile/Partials/BankDetailsForm.jsx
+@@ -0,0 +1,48 @@
++import { useForm } from '@inertiajs/react';
++import { BanknotesIcon } from '@heroicons/react/24/outline';
++import { SectionCard, Field, SaveBar, inputCls } from '@/Components/Profile/ui';
++
++export default function BankDetailsForm({ bankDetails = {} }) {
++    const { data, setData, put, errors, processing, recentlySuccessful } = useForm({
++        bank_name: bankDetails.bank_name || '',
++        account_holder_name: bankDetails.account_holder_name || '',
++        account_number: bankDetails.account_number || '',
++        iban: bankDetails.iban || '',
++        swift_code: bankDetails.swift_code || '',
++    });
++
++    const submit = (e) => {
++        e.preventDefault();
++        put(route('profile.update-bank-details'), { preserveScroll: true });
++    };
++    const upper = (k) => (e) => setData(k, e.target.value.toUpperCase());
++
++    return (
++        <form onSubmit={submit}>
++            <SectionCard
++                icon={BanknotesIcon}
++                title="Informations bancaires"
++                description="Coordonnées utilisées pour recevoir vos paiements."
++                footer={<SaveBar processing={processing} saved={recentlySuccessful} note="Tous les champs sont obligatoires." />}
++            >
++                <div className="grid gap-5 sm:grid-cols-2">
++                    <Field label="Nom de la banque" htmlFor="bank_name" error={errors.bank_name}>
++                        <input id="bank_name" className={inputCls} value={data.bank_name} onChange={(e) => setData('bank_name', e.target.value)} required autoComplete="off" />
++                    </Field>
++                    <Field label="Titulaire du compte" htmlFor="account_holder_name" error={errors.account_holder_name}>
++                        <input id="account_holder_name" className={inputCls} value={data.account_holder_name} onChange={(e) => setData('account_holder_name', e.target.value)} required autoComplete="off" />
++                    </Field>
++                    <Field label="Numéro de compte" htmlFor="account_number" error={errors.account_number} className="sm:col-span-2">
++                        <input id="account_number" inputMode="numeric" className={`${inputCls} font-mono`} value={data.account_number} onChange={(e) => setData('account_number', e.target.value)} required autoComplete="off" />
++                    </Field>
++                    <Field label="IBAN" htmlFor="iban" error={errors.iban}>
++                        <input id="iban" maxLength={34} className={`${inputCls} font-mono uppercase`} value={data.iban} onChange={upper('iban')} required autoComplete="off" />
++                    </Field>
++                    <Field label="Code SWIFT / BIC" htmlFor="swift_code" error={errors.swift_code}>
++                        <input id="swift_code" maxLength={11} className={`${inputCls} font-mono uppercase`} value={data.swift_code} onChange={upper('swift_code')} required autoComplete="off" />
++                    </Field>
++                </div>
++            </SectionCard>
++        </form>
++    );
++}
+diff --git a/resources/js/Pages/Profile/Partials/NotificationPreferencesForm.jsx b/resources/js/Pages/Profile/Partials/NotificationPreferencesForm.jsx
+index 1e19805..f98d0d8 100644
+--- a/resources/js/Pages/Profile/Partials/NotificationPreferencesForm.jsx
++++ b/resources/js/Pages/Profile/Partials/NotificationPreferencesForm.jsx
+@@ -79,7 +79,7 @@ export default function NotificationPreferencesForm({ notificationPreferences =
+                 title="Notifications"
+                 description="Choisissez les alertes que vous souhaitez recevoir par e-mail."
+                 aside={
+-                    <div className="hidden shrink-0 items-center gap-3 text-xs font-medium sm:flex">
++                    <div className="hidden shrink-0 items-center gap-3 text-xs font-medium md:flex">
+                         <span className="text-slate-500 dark:text-slate-400">{activeCount}/{preferenceOptions.length} actives</span>
+                         <button type="button" onClick={() => setAll(true)} className="text-blue-600 hover:underline dark:text-blue-300">Tout activer</button>
+                         <button type="button" onClick={() => setAll(false)} className="text-slate-500 hover:underline dark:text-slate-400">Tout désactiver</button>
+@@ -87,6 +87,13 @@ export default function NotificationPreferencesForm({ notificationPreferences =
+                 }
+                 footer={<SaveBar processing={processing} saved={recentlySuccessful} label="Enregistrer les préférences" note="Modifiable à tout moment." />}
+             >
++                <div className="mb-4 flex items-center justify-between text-xs font-medium md:hidden">
++                    <span className="text-slate-500 dark:text-slate-400">{activeCount}/{preferenceOptions.length} actives</span>
++                    <span className="flex gap-4">
++                        <button type="button" onClick={() => setAll(true)} className="py-1 text-blue-600 dark:text-blue-300">Tout activer</button>
++                        <button type="button" onClick={() => setAll(false)} className="py-1 text-slate-500 dark:text-slate-400">Tout désactiver</button>
++                    </span>
++                </div>
+                 <ul className="divide-y divide-slate-100 dark:divide-slate-700/70">
+                     {preferenceOptions.map((o) => {
+                         const on = Boolean(prefs[o.key]);

@@ -79,7 +79,7 @@ export default function NotificationPreferencesForm({ notificationPreferences = 
                 title="Notifications"
                 description="Choisissez les alertes que vous souhaitez recevoir par e-mail."
                 aside={
-                    <div className="hidden shrink-0 items-center gap-3 text-xs font-medium sm:flex">
+                    <div className="hidden shrink-0 items-center gap-3 text-xs font-medium md:flex">
                         <span className="text-slate-500 dark:text-slate-400">{activeCount}/{preferenceOptions.length} actives</span>
                         <button type="button" onClick={() => setAll(true)} className="text-blue-600 hover:underline dark:text-blue-300">Tout activer</button>
                         <button type="button" onClick={() => setAll(false)} className="text-slate-500 hover:underline dark:text-slate-400">Tout désactiver</button>
@@ -87,6 +87,13 @@ export default function NotificationPreferencesForm({ notificationPreferences = 
                 }
                 footer={<SaveBar processing={processing} saved={recentlySuccessful} label="Enregistrer les préférences" note="Modifiable à tout moment." />}
             >
+                <div className="mb-4 flex items-center justify-between text-xs font-medium md:hidden">
+                    <span className="text-slate-500 dark:text-slate-400">{activeCount}/{preferenceOptions.length} actives</span>
+                    <span className="flex gap-4">
+                        <button type="button" onClick={() => setAll(true)} className="py-1 text-blue-600 dark:text-blue-300">Tout activer</button>
+                        <button type="button" onClick={() => setAll(false)} className="py-1 text-slate-500 dark:text-slate-400">Tout désactiver</button>
+                    </span>
+                </div>
                 <ul className="divide-y divide-slate-100 dark:divide-slate-700/70">
                     {preferenceOptions.map((o) => {
                         const on = Boolean(prefs[o.key]);

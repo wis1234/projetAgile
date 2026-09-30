@@ -33,6 +33,13 @@ class ProfileController extends Controller
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
             'notificationPreferences' => $user->notification_preferences,
+            'bankDetails' => [
+                'bank_name' => $user->bank_name,
+                'account_holder_name' => $user->account_holder_name,
+                'account_number' => $user->account_number,
+                'iban' => $user->iban,
+                'swift_code' => $user->swift_code,
+            ],
             // Toutes les données éditables (auth.user partagé n'en contient qu'une partie)
             'profile' => [
                 'name' => $user->name,
