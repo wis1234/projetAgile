@@ -1,6 +1,6 @@
 import { useForm, usePage } from '@inertiajs/react';
-import { Transition } from '@headlessui/react';
-import PrimaryButton from '@/Components/PrimaryButton';
+import { BellIcon } from '@heroicons/react/24/outline';
+import { SectionCard, SaveBar } from '@/Components/Profile/ui';
 import PushNotificationManager from '@/Components/PushNotificationManager';
 
 
@@ -55,87 +55,63 @@ const preferenceOptions = [
     },
 ];
 
-export default function NotificationPreferencesForm({ notificationPreferences = {}, className = '' }) {
+export default function NotificationPreferencesForm({ notificationPreferences = {} }) {
     const { data, setData, patch, processing, recentlySuccessful } = useForm({
-        notification_preferences: notificationPreferences,
+        notification_preferences: notificationPreferences || {},
     });
 
-    const togglePreference = (key) => {
-        setData('notification_preferences', {
-            ...data.notification_preferences,
-            [key]: !data.notification_preferences[key],
-        });
-    };
+    const prefs = data.notification_preferences || {};
+    const toggle = (key) => setData('notification_preferences', { ...prefs, [key]: !prefs[key] });
+    const setAll = (value) =>
+        setData('notification_preferences', Object.fromEntries(preferenceOptions.map((o) => [o.key, value])));
+    const activeCount = preferenceOptions.filter((o) => prefs[o.key]).length;
 
-    const handleSubmit = (e) => {
+    const submit = (e) => {
         e.preventDefault();
-        patch(route('profile.preferences.update'), {
-            preserveScroll: true,
-        });
+        patch(route('profile.preferences.update'), { preserveScroll: true });
     };
 
     return (
-        <section className={`w-full ${className}`}>
-            <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-800 dark:via-gray-800 dark:to-gray-900 border border-blue-100 dark:border-gray-700 rounded-2xl shadow-sm p-8">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
-                    <div>
-                        <h2 className="text-2xl font-bold text-blue-700 dark:text-blue-200">Préférences de notification</h2>
-                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                            Choisissez les types de notifications que vous souhaitez recevoir par email.
-                        </p>
+        <form onSubmit={submit}>
+            <SectionCard
+                id="notifications"
+                icon={BellIcon}
+                title="Notifications"
+                description="Choisissez les alertes que vous souhaitez recevoir par e-mail."
+                aside={
+                    <div className="hidden shrink-0 items-center gap-3 text-xs font-medium sm:flex">
+                        <span className="text-slate-500 dark:text-slate-400">{activeCount}/{preferenceOptions.length} actives</span>
+                        <button type="button" onClick={() => setAll(true)} className="text-blue-600 hover:underline dark:text-blue-300">Tout activer</button>
+                        <button type="button" onClick={() => setAll(false)} className="text-slate-500 hover:underline dark:text-slate-400">Tout désactiver</button>
                     </div>
-                    <div className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/40 px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-200">
-                        Personnalisation intelligente
-                    </div>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {preferenceOptions.map((option) => (
-                            <label
-                                key={option.key}
-                                className="group flex cursor-pointer items-start gap-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/50 p-4 transition hover:border-blue-300 hover:shadow-sm"
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={Boolean(data.notification_preferences?.[option.key])}
-                                    onChange={() => togglePreference(option.key)}
-                                    className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-lg">{option.icon}</span>
-                                        <span className="font-semibold text-gray-900 dark:text-gray-100">{option.title}</span>
-                                    </div>
-                                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{option.description}</p>
+                }
+                footer={<SaveBar processing={processing} saved={recentlySuccessful} label="Enregistrer les préférences" note="Modifiable à tout moment." />}
+            >
+                <ul className="divide-y divide-slate-100 dark:divide-slate-700/70">
+                    {preferenceOptions.map((o) => {
+                        const on = Boolean(prefs[o.key]);
+                        return (
+                            <li key={o.key} className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg dark:bg-slate-700/60">{o.icon}</span>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{o.title}</p>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">{o.description}</p>
                                 </div>
-                            </label>
-                        ))}
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-gray-200 dark:border-gray-700 pt-4">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Vous pouvez modifier ces préférences à tout moment depuis cette page.
-                        </p>
-                        <div className="flex items-center gap-3">
-                            <Transition
-                                show={recentlySuccessful}
-                                enter="transition ease-in-out"
-                                enterFrom="opacity-0"
-                                leave="transition ease-in-out"
-                                leaveTo="opacity-0"
-                            >
-                                <p className="text-sm text-green-600 dark:text-green-400">Enregistré.</p>
-                            </Transition>
-                            <PrimaryButton disabled={processing}>
-                                {processing ? 'Enregistrement...' : 'Enregistrer les préférences'}
-                            </PrimaryButton>
-                        </div>
-                    </div>
-                </form>
-                <PushNotificationManager />
-                
-            </div>
-        </section>
+                                <button
+                                    type="button" role="switch" aria-checked={on} aria-label={o.title}
+                                    onClick={() => toggle(o.key)}
+                                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-4 focus:ring-blue-500/25 ${on ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                >
+                                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                </button>
+                            </li>
+                        );
+                    })}
+                </ul>
+                <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+                    <PushNotificationManager />
+                </div>
+            </SectionCard>
+        </form>
     );
 }

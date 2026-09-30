@@ -1,11 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Head, useForm, Link } from '@inertiajs/react';
+import { ArrowLeftIcon, BanknotesIcon } from '@heroicons/react/24/outline';
 import AdminLayout from '@/Layouts/AdminLayout';
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
-import { Transition } from '@headlessui/react';
+import { SectionCard, Field, SaveBar, inputCls } from '@/Components/Profile/ui';
 
 export default function BankDetails({ bankDetails }) {
     const { data, setData, put, errors, processing, recentlySuccessful } = useForm({
@@ -18,99 +15,41 @@ export default function BankDetails({ bankDetails }) {
 
     const submit = (e) => {
         e.preventDefault();
-        put(route('profile.update-bank-details'));
+        put(route('profile.update-bank-details'), { preserveScroll: true });
     };
 
     return (
-        <div>
+        <div className="min-h-screen bg-slate-50 px-4 py-8 dark:bg-slate-900 sm:px-6">
             <Head title="Informations bancaires" />
-
-            <div className="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
-                <div className="mb-8">
-                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                        Informations bancaires
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Mettez à jour les informations de votre compte bancaire pour recevoir vos paiements.
-                    </p>
-                </div>
-
-                <form onSubmit={submit} className="space-y-6">
-                    <div>
-                        <InputLabel htmlFor="bank_name" value="Nom de la banque" />
-                        <TextInput
-                            id="bank_name"
-                            className="mt-1 block w-full"
-                            value={data.bank_name}
-                            onChange={(e) => setData('bank_name', e.target.value)}
-                            required
-                        />
-                        <InputError className="mt-2" message={errors.bank_name} />
-                    </div>
-
-                    <div>
-                        <InputLabel htmlFor="account_holder_name" value="Nom du titulaire du compte" />
-                        <TextInput
-                            id="account_holder_name"
-                            className="mt-1 block w-full"
-                            value={data.account_holder_name}
-                            onChange={(e) => setData('account_holder_name', e.target.value)}
-                            required
-                        />
-                        <InputError className="mt-2" message={errors.account_holder_name} />
-                    </div>
-
-                    <div>
-                        <InputLabel htmlFor="account_number" value="Numéro de compte" />
-                        <TextInput
-                            id="account_number"
-                            className="mt-1 block w-full"
-                            value={data.account_number}
-                            onChange={(e) => setData('account_number', e.target.value)}
-                            required
-                        />
-                        <InputError className="mt-2" message={errors.account_number} />
-                    </div>
-
-                    <div>
-                        <InputLabel htmlFor="iban" value="IBAN" />
-                        <TextInput
-                            id="iban"
-                            className="mt-1 block w-full font-mono"
-                            value={data.iban}
-                            onChange={(e) => setData('iban', e.target.value.toUpperCase())}
-                            required
-                        />
-                        <InputError className="mt-2" message={errors.iban} />
-                    </div>
-
-                    <div>
-                        <InputLabel htmlFor="swift_code" value="Code SWIFT/BIC" />
-                        <TextInput
-                            id="swift_code"
-                            className="mt-1 block w-full font-mono"
-                            value={data.swift_code}
-                            onChange={(e) => setData('swift_code', e.target.value.toUpperCase())}
-                            required
-                        />
-                        <InputError className="mt-2" message={errors.swift_code} />
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <PrimaryButton disabled={processing}>
-                            Enregistrer
-                        </PrimaryButton>
-
-                        <Transition
-                            show={recentlySuccessful}
-                            enter="transition ease-in-out"
-                            enterFrom="opacity-0"
-                            leave="transition ease-in-out"
-                            leaveTo="opacity-0"
-                        >
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Enregistré.</p>
-                        </Transition>
-                    </div>
+            <div className="mx-auto max-w-3xl">
+                <Link href={route('profile.edit')} className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-blue-600 dark:text-slate-300">
+                    <ArrowLeftIcon className="h-4 w-4" /> Retour au profil
+                </Link>
+                <form onSubmit={submit}>
+                    <SectionCard
+                        icon={BanknotesIcon}
+                        title="Informations bancaires"
+                        description="Coordonnées utilisées pour recevoir vos paiements."
+                        footer={<SaveBar processing={processing} saved={recentlySuccessful} note="Tous les champs sont obligatoires." />}
+                    >
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <Field label="Nom de la banque" htmlFor="bank_name" error={errors.bank_name}>
+                                <input id="bank_name" className={inputCls} value={data.bank_name} onChange={(e) => setData('bank_name', e.target.value)} required />
+                            </Field>
+                            <Field label="Titulaire du compte" htmlFor="account_holder_name" error={errors.account_holder_name}>
+                                <input id="account_holder_name" className={inputCls} value={data.account_holder_name} onChange={(e) => setData('account_holder_name', e.target.value)} required />
+                            </Field>
+                            <Field label="Numéro de compte" htmlFor="account_number" error={errors.account_number} className="sm:col-span-2">
+                                <input id="account_number" className={`${inputCls} font-mono`} value={data.account_number} onChange={(e) => setData('account_number', e.target.value)} required />
+                            </Field>
+                            <Field label="IBAN" htmlFor="iban" error={errors.iban}>
+                                <input id="iban" className={`${inputCls} font-mono uppercase`} value={data.iban} onChange={(e) => setData('iban', e.target.value.toUpperCase())} required />
+                            </Field>
+                            <Field label="Code SWIFT / BIC" htmlFor="swift_code" error={errors.swift_code}>
+                                <input id="swift_code" className={`${inputCls} font-mono uppercase`} value={data.swift_code} onChange={(e) => setData('swift_code', e.target.value.toUpperCase())} required />
+                            </Field>
+                        </div>
+                    </SectionCard>
                 </form>
             </div>
         </div>

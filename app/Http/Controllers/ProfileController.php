@@ -33,6 +33,17 @@ class ProfileController extends Controller
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
             'notificationPreferences' => $user->notification_preferences,
+            // Toutes les données éditables (auth.user partagé n'en contient qu'une partie)
+            'profile' => [
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'bio' => $user->bio,
+                'job_title' => $user->job_title,
+                'company' => $user->company,
+                'profile_photo_path' => $user->profile_photo_path,
+                'profile_photo_url' => $user->profile_photo_url,
+            ],
         ]);
     }
 
@@ -54,11 +65,7 @@ class ProfileController extends Controller
         if ($request->hasFile('profile_photo')) {
             try {
                 // Supprimer l'ancienne photo si elle existe et n'est pas l'avatar par défaut
-                if ($user->profile_photo_path && 
-                    !str_contains($user->profile_photo_path, 'ui-avatars.com') &&
-                    Storage::disk('public')->exists($user->profile_photo_path)) {
-                    Storage::disk('public')->delete($user->profile_photo_path);
-                }
+                $this->deleteStoredPhoto($user->profile_photo_path);
                 
                 // Stocker la nouvelle photo
                 $path = $request->file('profile_photo')->store('profile-photos', 'public');
@@ -88,6 +95,38 @@ class ProfileController extends Controller
             \Log::error('Erreur lors de la mise à jour du profil : ' . $e->getMessage());
             return back()->withErrors(['error' => 'Une erreur est survenue lors de la mise à jour du profil.']);
         }
+    }
+
+    /**
+     * Remove the stored profile photo file (the DB path is stored with a "public/" prefix).
+     */
+    private function deleteStoredPhoto(?string $path): void
+    {
+        if (!$path || str_contains($path, 'ui-avatars.com')) {
+            return;
+        }
+        $relative = preg_replace('#^public/#', '', $path);
+        if (Storage::disk('public')->exists($relative)) {
+            Storage::disk('public')->delete($relative);
+        }
+    }
+
+    /**
+     * Delete the user's profile photo (falls back to the generated avatar).
+     */
+    public function destroyPhoto(Request $request): RedirectResponse
+    {
+        try {
+            $this->authorize('update', $request->user());
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            abort(403);
+        }
+
+        $user = $request->user();
+        $this->deleteStoredPhoto($user->profile_photo_path);
+        $user->forceFill(['profile_photo_path' => null])->save();
+
+        return back()->with('success', 'Photo de profil supprimée.');
     }
 
     /**

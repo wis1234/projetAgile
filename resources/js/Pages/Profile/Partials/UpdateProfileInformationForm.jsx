@@ -1,19 +1,18 @@
 import { useRef, useState, useEffect } from 'react';
-import { useForm, usePage, router } from '@inertiajs/react';
-import { Transition } from '@headlessui/react';
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
-import Textarea from '@/Components/Textarea';
+import { useForm, router } from '@inertiajs/react';
+import { CameraIcon, TrashIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { SectionCard, Field, SaveBar, inputCls } from '@/Components/Profile/ui';
 
-export default function UpdateProfileInformation({ mustVerifyEmail, status, className = '' }) {
-    const { user } = usePage().props.auth;
+const fallbackAvatar = (name) =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=2563eb&color=fff&size=160`;
+
+export default function UpdateProfileInformation({ profile: user, mustVerifyEmail, status }) {
     const [preview, setPreview] = useState('');
     const [isUploading, setIsUploading] = useState(false);
+    const [photoError, setPhotoError] = useState('');
     const fileInput = useRef();
-    
-    const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
+
+    const { data, setData, errors, processing, recentlySuccessful } = useForm({
         name: user.name || '',
         email: user.email || '',
         profile_photo: null,
@@ -23,258 +22,107 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status, clas
         company: user.company || '',
     });
 
-    // Mettre à jour la prévisualisation quand l'utilisateur change
     useEffect(() => {
-        if (user.profile_photo_url) {
-            setPreview(user.profile_photo_url);
-        } else {
-            // Générer un avatar par défaut si pas de photo de profil
-            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=0D8ABC&color=fff`;
-            setPreview(defaultAvatar);
-        }
+        setPreview(user.profile_photo_url || fallbackAvatar(user.name));
     }, [user]);
 
+    const [saved, setSaved] = useState(false);
     const submit = (e) => {
         e.preventDefault();
         setIsUploading(true);
-        
-        router.post(route('profile.update'), 
-            { ...data, _method: 'patch' },
-            {
-                forceFormData: true,
-                onSuccess: (page) => {
-                    // Recharger la page pour s'assurer que tout est à jour
-                    if (page.props?.flash?.success) {
-                        setPreview(page.props.auth.user.profile_photo_url || preview);
-                    }
-                },
-                onFinish: () => {
-                    setIsUploading(false);
-                },
-                preserveScroll: true,
-            }
-        );
+        router.post(route('profile.update'), { ...data, _method: 'patch' }, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => { setSaved(true); setTimeout(() => setSaved(false), 2500); },
+            onFinish: () => setIsUploading(false),
+        });
     };
 
     const handlePhotoChange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-        // Vérifier la taille du fichier (max 1MB)
-        if (file.size > 1024 * 1024) {
-            alert('La photo ne doit pas dépasser 1 Mo');
-            return;
-        }
-
-        // Vérifier le type de fichier
-        if (!file.type.match('image.*')) {
-            alert('Veuillez sélectionner une image valide');
-            return;
-        }
-
-        // Mettre à jour la prévisualisation
+        setPhotoError('');
+        if (file.size > 1024 * 1024) return setPhotoError('La photo ne doit pas dépasser 1 Mo.');
+        if (!file.type.startsWith('image/')) return setPhotoError('Veuillez sélectionner une image valide.');
         const reader = new FileReader();
-        reader.onload = (ev) => {
-            setPreview(ev.target.result);
-            setData('profile_photo', file);
-        };
+        reader.onload = (ev) => { setPreview(ev.target.result); setData('profile_photo', file); };
         reader.readAsDataURL(file);
     };
 
     const removePhoto = () => {
+        if (!window.confirm('Supprimer votre photo de profil ?')) return;
         setData('profile_photo', null);
-        setPreview(`https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || 'User')}&background=0D8ABC&color=fff`);
-        
-        // Envoyer une requête pour supprimer la photo
-        router.delete(route('profile.photo'), {
-            preserveScroll: true,
-            onSuccess: () => {
-                // Mettre à jour la prévisualisation après suppression
-                setPreview(`https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || 'User')}&background=0D8ABC&color=fff`);
-            },
-        });
+        setPreview(fallbackAvatar(data.name));
+        router.delete(route('profile.photo.destroy'), { preserveScroll: true });
     };
 
-    return (
-        <section className={`w-full max-w-4xl mx-auto ${className}`}>
-            <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
-                    Informations du profil
-                </h2>
+    const busy = processing || isUploading;
 
-                <div className="flex flex-col md:flex-row gap-8">
-                    {/* Photo de profil */}
-                    <div className="w-full md:w-1/3 flex flex-col items-center">
-                        <div className="relative group mb-4">
-                            <div 
-                                className="w-40 h-40 rounded-full border-4 border-blue-400 overflow-hidden cursor-pointer hover:opacity-80 transition relative"
-                                onClick={() => fileInput.current.click()}
-                            >
-                                <img
-                                    src={preview}
-                                    alt="Photo de profil"
-                                    className="w-full h-full object-cover"
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black bg-opacity-50">
-                                    <span className="text-white font-medium">Changer</span>
-                                </div>
-                            </div>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                ref={fileInput}
-                                onChange={handlePhotoChange}
-                                disabled={isUploading}
-                            />
-                        </div>
-                        
+    return (
+        <form onSubmit={submit}>
+            <SectionCard
+                id="profil"
+                icon={UserCircleIcon}
+                title="Informations personnelles"
+                description="Ces informations sont visibles par les membres de vos projets."
+                footer={<SaveBar processing={busy} saved={saved || recentlySuccessful} note="Les champs marqués * sont obligatoires." />}
+            >
+                <div className="flex flex-col gap-8 md:flex-row">
+                    {/* Photo */}
+                    <div className="flex shrink-0 flex-col items-center md:w-44">
+                        <button
+                            type="button"
+                            onClick={() => fileInput.current.click()}
+                            className="group relative h-32 w-32 overflow-hidden rounded-2xl ring-4 ring-blue-50 transition hover:ring-blue-100 dark:ring-slate-700"
+                            aria-label="Changer la photo"
+                        >
+                            <img src={preview} alt="Photo de profil" className="h-full w-full object-cover" />
+                            <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-slate-900/55 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+                                <CameraIcon className="h-6 w-6" /> Changer
+                            </span>
+                        </button>
+                        <input type="file" accept="image/*" className="hidden" ref={fileInput} onChange={handlePhotoChange} disabled={busy} />
+                        <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">JPG, PNG · 1 Mo maximum</p>
                         {data.profile_photo && (
-                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                                <span className="truncate max-w-xs">{data.profile_photo.name}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setData('profile_photo', null);
-                                        fileInput.current.value = '';
-                                    }}
-                                    className="text-red-500 hover:text-red-700"
-                                    disabled={isUploading}
-                                >
-                                    ×
-                                </button>
-                            </div>
+                            <p className="mt-2 max-w-full truncate text-xs font-medium text-blue-600 dark:text-blue-300">{data.profile_photo.name}</p>
                         )}
-                        
-                        {user.profile_photo_path && (
-                            <button
-                                type="button"
-                                onClick={removePhoto}
-                                className="mt-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                disabled={isUploading}
-                            >
-                                Supprimer la photo
+                        {user.profile_photo_path && !data.profile_photo && (
+                            <button type="button" onClick={removePhoto} disabled={busy}
+                                className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400">
+                                <TrashIcon className="h-4 w-4" /> Supprimer la photo
                             </button>
                         )}
-                        
-                        <InputError className="mt-2" message={errors.profile_photo} />
+                        {(photoError || errors.profile_photo) && (
+                            <p className="mt-2 text-center text-xs font-medium text-red-600">{photoError || errors.profile_photo}</p>
+                        )}
                     </div>
 
-                    {/* Formulaire */}
-                    <div className="w-full md:w-2/3">
-                        <form onSubmit={submit} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <InputLabel htmlFor="name" value="Nom complet" />
-                                    <TextInput
-                                        id="name"
-                                        className="mt-1 block w-full"
-                                        value={data.name}
-                                        onChange={(e) => setData('name', e.target.value)}
-                                        required
-                                        isFocused
-                                        autoComplete="name"
-                                        disabled={isUploading}
-                                    />
-                                    <InputError className="mt-2" message={errors.name} />
-                                </div>
-
-                                <div>
-                                    <InputLabel htmlFor="email" value="Email" />
-                                    <TextInput
-                                        id="email"
-                                        type="email"
-                                        className="mt-1 block w-full"
-                                        value={data.email}
-                                        onChange={(e) => setData('email', e.target.value)}
-                                        required
-                                        autoComplete="email"
-                                        disabled={isUploading}
-                                    />
-                                    <InputError className="mt-2" message={errors.email} />
-                                </div>
-
-                                <div>
-                                    <InputLabel htmlFor="phone" value="Téléphone" />
-                                    <TextInput
-                                        id="phone"
-                                        type="tel"
-                                        className="mt-1 block w-full"
-                                        value={data.phone}
-                                        onChange={(e) => setData('phone', e.target.value)}
-                                        autoComplete="tel"
-                                        disabled={isUploading}
-                                    />
-                                    <InputError className="mt-2" message={errors.phone} />
-                                </div>
-
-                                <div>
-                                    <InputLabel htmlFor="job_title" value="Poste" />
-                                    <TextInput
-                                        id="job_title"
-                                        className="mt-1 block w-full"
-                                        value={data.job_title}
-                                        onChange={(e) => setData('job_title', e.target.value)}
-                                        autoComplete="organization-title"
-                                        disabled={isUploading}
-                                    />
-                                    <InputError className="mt-2" message={errors.job_title} />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                    <InputLabel htmlFor="company" value="Entreprise" />
-                                    <TextInput
-                                        id="company"
-                                        className="mt-1 block w-full"
-                                        value={data.company}
-                                        onChange={(e) => setData('company', e.target.value)}
-                                        autoComplete="organization"
-                                        disabled={isUploading}
-                                    />
-                                    <InputError className="mt-2" message={errors.company} />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                    <InputLabel htmlFor="bio" value="À propos de moi" />
-                                    <Textarea
-                                        id="bio"
-                                        className="mt-1 block w-full"
-                                        value={data.bio}
-                                        onChange={(e) => setData('bio', e.target.value)}
-                                        rows={4}
-                                        disabled={isUploading}
-                                    />
-                                    <p className="mt-1 text-sm text-gray-500">
-                                        Une brève description de vous-même pour que les autres utilisateurs puissent mieux vous connaître.
-                                    </p>
-                                    <InputError className="mt-2" message={errors.bio} />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-end mt-8">
-                                <Transition
-                                    show={recentlySuccessful}
-                                    enter="transition ease-in-out"
-                                    enterFrom="opacity-0"
-                                    leave="transition ease-in-out"
-                                    leaveTo="opacity-0"
-                                >
-                                    <p className="text-sm text-green-600 dark:text-green-400">
-                                        Enregistré.
-                                    </p>
-                                </Transition>
-
-                                <PrimaryButton 
-                                    className="ml-4" 
-                                    disabled={processing || isUploading}
-                                >
-                                    {processing || isUploading ? 'Enregistrement...' : 'Enregistrer'}
-                                </PrimaryButton>
-                            </div>
-                        </form>
+                    {/* Champs */}
+                    <div className="grid min-w-0 flex-1 grid-cols-1 gap-5 sm:grid-cols-2">
+                        <Field label="Nom complet *" htmlFor="name" error={errors.name}>
+                            <input id="name" className={inputCls} value={data.name} onChange={(e) => setData('name', e.target.value)} required autoComplete="name" disabled={busy} />
+                        </Field>
+                        <Field label="Adresse e-mail *" htmlFor="email" error={errors.email}
+                            hint={data.email !== user.email ? "Un nouvel e-mail devra être vérifié après l'enregistrement." : undefined}>
+                            <input id="email" type="email" className={inputCls} value={data.email} onChange={(e) => setData('email', e.target.value)} required autoComplete="email" disabled={busy} />
+                        </Field>
+                        <Field label="Téléphone" htmlFor="phone" error={errors.phone}>
+                            <input id="phone" type="tel" className={inputCls} value={data.phone} onChange={(e) => setData('phone', e.target.value)} autoComplete="tel" placeholder="+229 …" disabled={busy} />
+                        </Field>
+                        <Field label="Poste" htmlFor="job_title" error={errors.job_title}>
+                            <input id="job_title" className={inputCls} value={data.job_title} onChange={(e) => setData('job_title', e.target.value)} autoComplete="organization-title" disabled={busy} />
+                        </Field>
+                        <Field label="Entreprise" htmlFor="company" error={errors.company} className="sm:col-span-2">
+                            <input id="company" className={inputCls} value={data.company} onChange={(e) => setData('company', e.target.value)} autoComplete="organization" disabled={busy} />
+                        </Field>
+                        <Field label="À propos de moi" htmlFor="bio" error={errors.bio} className="sm:col-span-2"
+                            hint={`${(data.bio || '').length} caractères · Une brève présentation pour les autres membres.`}>
+                            <textarea id="bio" rows={4} className={`${inputCls} resize-y`} value={data.bio} onChange={(e) => setData('bio', e.target.value)} disabled={busy} />
+                        </Field>
+                        {status && <p className="sm:col-span-2 text-sm text-emerald-600">{status}</p>}
                     </div>
                 </div>
-            </div>
-        </section>
+            </SectionCard>
+        </form>
     );
 }

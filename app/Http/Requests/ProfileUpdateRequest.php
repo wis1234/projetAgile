@@ -32,4 +32,18 @@ class ProfileUpdateRequest extends FormRequest
             'profile_photo' => ['nullable', 'image', 'max:1024'], // 1MB Max
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Le nom est obligatoire.',
+            'email.required' => "L'adresse e-mail est obligatoire.",
+            'email.email' => "Saisissez une adresse e-mail valide.",
+            'email.lowercase' => "L'adresse e-mail doit être en minuscules.",
+            'email.unique' => 'Cette adresse e-mail est déjà utilisée.',
+            'profile_photo.image' => 'Le fichier doit être une image.',
+            'profile_photo.max' => 'La photo ne doit pas dépasser 1 Mo.',
+            'bio.max' => 'La présentation ne doit pas dépasser 1000 caractères.',
+        ];
+    }
 }

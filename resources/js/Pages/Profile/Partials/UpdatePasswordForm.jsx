@@ -1,142 +1,100 @@
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
-import { Transition } from '@headlessui/react';
 import { useForm } from '@inertiajs/react';
-import { useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { EyeIcon, EyeSlashIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { SectionCard, Field, SaveBar, inputCls } from '@/Components/Profile/ui';
 
-export default function UpdatePasswordForm({ className = '' }) {
+function PasswordInput({ id, value, onChange, autoComplete, inputRef }) {
+    const [show, setShow] = useState(false);
+    return (
+        <div className="relative">
+            <input
+                id={id} ref={inputRef} type={show ? 'text' : 'password'} value={value}
+                onChange={onChange} autoComplete={autoComplete} className={`${inputCls} pr-11`}
+            />
+            <button type="button" onClick={() => setShow((s) => !s)} tabIndex={-1}
+                aria-label={show ? 'Masquer' : 'Afficher'}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                {show ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+            </button>
+        </div>
+    );
+}
+
+function strength(pw) {
+    let score = 0;
+    if (pw.length >= 8) score++;
+    if (pw.length >= 12) score++;
+    if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+    if (/\d/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    return Math.min(score, 4);
+}
+const levels = [
+    { label: 'Trop faible', bar: 'bg-red-500', text: 'text-red-600' },
+    { label: 'Faible', bar: 'bg-orange-500', text: 'text-orange-600' },
+    { label: 'Moyen', bar: 'bg-amber-500', text: 'text-amber-600' },
+    { label: 'Bon', bar: 'bg-lime-500', text: 'text-lime-600' },
+    { label: 'Excellent', bar: 'bg-emerald-500', text: 'text-emerald-600' },
+];
+
+export default function UpdatePasswordForm() {
     const passwordInput = useRef();
     const currentPasswordInput = useRef();
-
-    const {
-        data,
-        setData,
-        errors,
-        put,
-        reset,
-        processing,
-        recentlySuccessful,
-    } = useForm({
-        current_password: '',
-        password: '',
-        password_confirmation: '',
+    const { data, setData, errors, put, reset, processing, recentlySuccessful } = useForm({
+        current_password: '', password: '', password_confirmation: '',
     });
 
-    const updatePassword = (e) => {
-        e.preventDefault();
+    const score = useMemo(() => strength(data.password), [data.password]);
+    const lvl = levels[score];
+    const mismatch = data.password_confirmation && data.password !== data.password_confirmation;
 
+    const submit = (e) => {
+        e.preventDefault();
         put(route('password.update'), {
             preserveScroll: true,
             onSuccess: () => reset(),
-            onError: (errors) => {
-                if (errors.password) {
-                    reset('password', 'password_confirmation');
-                    passwordInput.current.focus();
-                }
-
-                if (errors.current_password) {
-                    reset('current_password');
-                    currentPasswordInput.current.focus();
-                }
+            onError: (errs) => {
+                if (errs.password) { reset('password', 'password_confirmation'); passwordInput.current?.focus(); }
+                if (errs.current_password) { reset('current_password'); currentPasswordInput.current?.focus(); }
             },
         });
     };
 
     return (
-        <section className={className}>
-            <header>
-                <h2 className="text-lg font-medium text-gray-900">
-                    Update Password
-                </h2>
-
-                <p className="mt-1 text-sm text-gray-600">
-                    Ensure your account is using a long, random password to stay
-                    secure.
-                </p>
-            </header>
-
-            <form onSubmit={updatePassword} className="mt-6 space-y-6">
-                <div>
-                    <InputLabel
-                        htmlFor="current_password"
-                        value="Current Password"
-                    />
-
-                    <TextInput
-                        id="current_password"
-                        ref={currentPasswordInput}
-                        value={data.current_password}
-                        onChange={(e) =>
-                            setData('current_password', e.target.value)
-                        }
-                        type="password"
-                        className="mt-1 block w-full"
-                        autoComplete="current-password"
-                    />
-
-                    <InputError
-                        message={errors.current_password}
-                        className="mt-2"
-                    />
+        <form onSubmit={submit}>
+            <SectionCard
+                id="securite"
+                icon={ShieldCheckIcon}
+                title="Mot de passe et sécurité"
+                description="Utilisez un mot de passe long et unique pour protéger votre compte."
+                footer={<SaveBar processing={processing} saved={recentlySuccessful} label="Mettre à jour" note="Minimum 8 caractères, avec lettres et chiffres recommandés." />}
+            >
+                <div className="grid max-w-xl gap-5">
+                    <Field label="Mot de passe actuel" htmlFor="current_password" error={errors.current_password}>
+                        <PasswordInput id="current_password" inputRef={currentPasswordInput} value={data.current_password}
+                            onChange={(e) => setData('current_password', e.target.value)} autoComplete="current-password" />
+                    </Field>
+                    <Field label="Nouveau mot de passe" htmlFor="password" error={errors.password}>
+                        <PasswordInput id="password" inputRef={passwordInput} value={data.password}
+                            onChange={(e) => setData('password', e.target.value)} autoComplete="new-password" />
+                        {data.password && (
+                            <div className="mt-2.5">
+                                <div className="flex gap-1.5">
+                                    {[0, 1, 2, 3].map((i) => (
+                                        <span key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i < score ? lvl.bar : 'bg-slate-200 dark:bg-slate-700'}`} />
+                                    ))}
+                                </div>
+                                <p className={`mt-1.5 text-xs font-medium ${lvl.text}`}>Robustesse : {lvl.label}</p>
+                            </div>
+                        )}
+                    </Field>
+                    <Field label="Confirmer le nouveau mot de passe" htmlFor="password_confirmation"
+                        error={errors.password_confirmation || (mismatch ? 'Les mots de passe ne correspondent pas.' : '')}>
+                        <PasswordInput id="password_confirmation" value={data.password_confirmation}
+                            onChange={(e) => setData('password_confirmation', e.target.value)} autoComplete="new-password" />
+                    </Field>
                 </div>
-
-                <div>
-                    <InputLabel htmlFor="password" value="New Password" />
-
-                    <TextInput
-                        id="password"
-                        ref={passwordInput}
-                        value={data.password}
-                        onChange={(e) => setData('password', e.target.value)}
-                        type="password"
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                    />
-
-                    <InputError message={errors.password} className="mt-2" />
-                </div>
-
-                <div>
-                    <InputLabel
-                        htmlFor="password_confirmation"
-                        value="Confirm Password"
-                    />
-
-                    <TextInput
-                        id="password_confirmation"
-                        value={data.password_confirmation}
-                        onChange={(e) =>
-                            setData('password_confirmation', e.target.value)
-                        }
-                        type="password"
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                    />
-
-                    <InputError
-                        message={errors.password_confirmation}
-                        className="mt-2"
-                    />
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <PrimaryButton disabled={processing}>Save</PrimaryButton>
-
-                    <Transition
-                        show={recentlySuccessful}
-                        enter="transition ease-in-out"
-                        enterFrom="opacity-0"
-                        leave="transition ease-in-out"
-                        leaveTo="opacity-0"
-                    >
-                        <p className="text-sm text-gray-600">
-                            Saved.
-                        </p>
-                    </Transition>
-                </div>
-            </form>
-        </section>
+            </SectionCard>
+        </form>
     );
 }
