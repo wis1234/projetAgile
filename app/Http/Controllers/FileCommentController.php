@@ -25,6 +25,7 @@ class FileCommentController extends Controller
         $request->validate([
             'content' => 'required|string|max:2000',
         ]);
+
         $comment = FileComment::create([
             'file_id' => $fileId,
             'user_id' => Auth::id(),
@@ -41,31 +42,31 @@ class FileCommentController extends Controller
         $actionUrl = route('files.show', $file->id);
         $actionText = 'Voir le commentaire';
 
-foreach ($projectUsers as $user) {
-    if ($user->id !== $commentAuthorId) {
+        foreach ($projectUsers as $user) {
+            if ($user->id !== $commentAuthorId) {
+                // Mail existant
+                $user->notify(new \App\Notifications\UserActionMailNotification(
+                    $subject,
+                    $message,
+                    $actionUrl,
+                    $actionText,
+                    [
+                        'file_id' => $file->id,
+                        'comment_id' => $comment->id,
+                        'preference_key' => 'file_updates',
+                    ]
+                ));
 
-        // Mail existant
-        $user->notify(new \App\Notifications\UserActionMailNotification(
-            $subject,
-            $message,
-            $actionUrl,
-            $actionText,
-            [
-                'file_id' => $file->id,
-                'comment_id' => $comment->id,
-                'preference_key' => 'file_updates',
-            ]
-        ));
-
-        // Notification interne + Web Push
-        $user->notify(new ProjaNotification(
-            'Nouveau commentaire sur un fichier',
-            "{$comment->user->name} a commenté le fichier {$file->name}",
-            $actionUrl,
-            '/logo-proja.png',
-            'file-comment'
-        ));
-    }
+                // Notification interne + Web Push
+                $user->notify(new ProjaNotification(
+                    'Nouveau commentaire sur un fichier',
+                    "{$comment->user->name} a commenté le fichier {$file->name}",
+                    $actionUrl,
+                    '/logo-proja.png',
+                    'file-comment'
+                ));
+            }
+        }
 
         broadcast(new \App\Events\FileCommentPosted($comment, $fileId))->toOthers();
 
