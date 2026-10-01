@@ -36,7 +36,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Search user by email
     Route::post('/users/search-by-email', [UserController::class, 'searchByEmail'])
         ->name('api.users.search-by-email');
-        
+
+    Route::get('/inbox/users', [\App\Http\Controllers\InboxController::class, 'users'])
+        ->name('api.inbox.users');
+
+    Route::get('/inbox/conversations/{user}', [\App\Http\Controllers\InboxController::class, 'messages'])
+        ->name('api.inbox.messages');
+
+    Route::post('/inbox/conversations/{user}/messages', [\App\Http\Controllers\InboxController::class, 'storeMessage'])
+        ->name('api.inbox.store-message');
+
     // Zoom Meeting Routes
     Route::prefix('projects/{project}')->group(function () {
         Route::get('/zoom/active', [ZoomMeetingController::class, 'active'])->name('api.zoom.active');

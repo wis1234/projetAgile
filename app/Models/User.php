@@ -387,6 +387,23 @@ class User extends Authenticatable implements MustVerifyEmail
     public function messages() {
         return $this->hasMany(Message::class);
     }
+
+    public function privateConversations()
+    {
+        return $this->belongsToMany(User::class, 'private_conversations', 'user_a_id', 'user_b_id')
+            ->withPivot('id')
+            ->withTimestamps();
+    }
+
+    public function privateInboxMessagesSent()
+    {
+        return $this->hasMany(\App\Models\PrivateInboxMessage::class, 'sender_id');
+    }
+
+    public function privateInboxMessagesReceived()
+    {
+        return $this->hasMany(\App\Models\PrivateInboxMessage::class, 'receiver_id');
+    }
     public function auditLogs() {
         return $this->hasMany(AuditLog::class);
     }

@@ -45,6 +45,17 @@ Broadcast::channel('user.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
+Broadcast::channel('private-inbox.{userA}.{userB}', function ($user, $userA, $userB) {
+    $participants = [(int) $userA, (int) $userB];
+    sort($participants);
+
+    if ((int) $user->id !== $participants[0] && (int) $user->id !== $participants[1]) {
+        return false;
+    }
+
+    return ['id' => $user->id, 'name' => $user->name, 'profile_photo_url' => $user->profile_photo_url];
+});
+
 
 // ... modifications comme google Docs ...
 
