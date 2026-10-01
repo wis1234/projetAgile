@@ -562,6 +562,7 @@ Route::middleware(['auth'])->prefix('api/inbox')->group(function () {
     Route::get('/users', [\App\Http\Controllers\InboxController::class, 'users'])->name('api.inbox.users');
     Route::get('/conversations/{user}', [\App\Http\Controllers\InboxController::class, 'messages'])->name('api.inbox.messages');
     Route::post('/conversations/{user}/messages', [\App\Http\Controllers\InboxController::class, 'storeMessage'])->name('api.inbox.store-message');
+    Route::post('/conversations/{user}/read', [\App\Http\Controllers\InboxController::class, 'read'])->name('api.inbox.read');
 });
 
 // Activités

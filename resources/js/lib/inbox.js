@@ -90,40 +90,99 @@ export const writeTabToUrl = (tab) => {
   window.history.replaceState(window.history.state, '', url);
 };
 
+// ─── Médias : même convention que les commentaires de tâches (/storage/public/{chemin}) ───
+export const resolveMedia = (p) => {
+  if (!p) return '';
+  if (p.startsWith('blob:') || p.startsWith('http') || p.startsWith('data:')) return p;
+  const clean = p.replace(/^\/+/, '');
+  if (clean.startsWith('storage/public/')) return `/${clean}`;
+  if (clean.startsWith('storage/')) return `/${clean.replace(/^storage\//, 'storage/public/')}`;
+  return `/storage/public/${clean}`;
+};
+
+// ─── Aperçu court d'un message (liste des conversations, citation) ───
+export const messagePreview = (m) => {
+  if (!m) return 'Aucun message pour le moment';
+  if (m.preview) return m.preview;
+  if (m.type === 'image') return '📷 Photo';
+  if (m.type === 'audio') return '🎤 Message vocal';
+  if (m.type === 'video') return '🎬 Vidéo';
+  if (m.type === 'sticker') return 'Sticker';
+  return (m.content || '').replace(/\s+/g, ' ').trim() || '…';
+};
+
 // ─── API ───
 const parseError = async (res, fallback) => {
   const payload = await res.json().catch(() => ({}));
-  return new Error(payload.message || fallback);
+  const first = payload.errors ? Object.values(payload.errors).flat()[0] : null;
+  return new Error(first || payload.message || fallback);
 };
 
-export async function fetchInboxContacts() {
-  const res = await fetch('/api/inbox/users', { credentials: 'same-origin', headers: JSON_HEADERS });
-  if (!res.ok) throw await parseError(res, "Impossible de charger les contacts.");
+/** Conversations paginées : { data, next_page, total, unread_total } */
+export async function fetchInboxPage({ page = 1, search = '' } = {}, signal) {
+  const qs = new URLSearchParams({ page: String(page) });
+  if (search) qs.set('search', search);
+  const res = await fetch(`/api/inbox/users?${qs}`, { credentials: 'same-origin', headers: JSON_HEADERS, signal });
+  if (!res.ok) throw await parseError(res, 'Impossible de charger les conversations.');
   const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  // Compatibilité : ancienne réponse = simple tableau
+  if (Array.isArray(data)) return { data, next_page: null, total: data.length, unread_total: 0 };
+  return data;
 }
 
-export async function fetchInboxConversation(contactId) {
-  const res = await fetch(`/api/inbox/conversations/${contactId}`, {
-    credentials: 'same-origin',
-    headers: JSON_HEADERS,
-  });
+// Ancienne signature conservée (liste complète d'une page)
+export async function fetchInboxContacts() {
+  const { data } = await fetchInboxPage({ page: 1 });
+  return data || [];
+}
+
+/** Fil de messages : { messages, has_more, contact } ; `before` = id du plus ancien message déjà affiché. */
+export async function fetchInboxConversation(contactId, { before = null, limit = 30 } = {}) {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (before) qs.set('before', String(before));
+  const res = await fetch(`/api/inbox/conversations/${contactId}?${qs}`, { credentials: 'same-origin', headers: JSON_HEADERS });
   if (!res.ok) throw await parseError(res, "Impossible d'ouvrir cette conversation.");
   const data = await res.json();
   return {
     messages: Array.isArray(data.messages) ? data.messages : [],
+    has_more: !!data.has_more,
     contact: data.contact || data.user || null,
   };
 }
 
-export async function postInboxMessage(contactId, content) {
-  const res = await fetch(`/api/inbox/conversations/${contactId}/messages`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { ...JSON_HEADERS, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrf() },
-    body: JSON.stringify({ content }),
-  });
+/**
+ * Envoi d'un message. `payload` : { content, type, file, stickerId, replyToId }.
+ * Un fichier / sticker part en multipart ; un texte simple en JSON.
+ */
+export async function postInboxMessage(contactId, payload) {
+  const p = typeof payload === 'string' ? { content: payload } : (payload || {});
+  const url = `/api/inbox/conversations/${contactId}/messages`;
+  const base = { credentials: 'same-origin', method: 'POST' };
+  let res;
+
+  if (p.file || p.stickerId) {
+    const fd = new FormData();
+    if (p.content) fd.append('content', p.content);
+    if (p.file) { fd.append('attachment', p.file, p.file.name || 'media'); if (p.type) fd.append('type', p.type); }
+    if (p.stickerId) fd.append('sticker_id', p.stickerId);
+    if (p.replyToId) fd.append('reply_to_id', p.replyToId);
+    res = await fetch(url, { ...base, headers: { ...JSON_HEADERS, 'X-CSRF-TOKEN': getCsrf() }, body: fd });
+  } else {
+    res = await fetch(url, {
+      ...base,
+      headers: { ...JSON_HEADERS, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrf() },
+      body: JSON.stringify({ content: p.content, reply_to_id: p.replyToId || undefined }),
+    });
+  }
   if (!res.ok) throw await parseError(res, "Erreur lors de l'envoi du message.");
-  const payload = await res.json().catch(() => ({}));
-  return payload?.message || null;
+  const data = await res.json().catch(() => ({}));
+  return data?.message || null;
+}
+
+export async function markInboxRead(contactId) {
+  try {
+    await fetch(`/api/inbox/conversations/${contactId}/read`, {
+      method: 'POST', credentials: 'same-origin', headers: { ...JSON_HEADERS, 'X-CSRF-TOKEN': getCsrf() },
+    });
+  } catch { /* non bloquant */ }
 }

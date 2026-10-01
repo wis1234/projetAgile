@@ -26,7 +26,10 @@ class PrivateInboxMessageSent implements ShouldBroadcastNow
         sort($participants, SORT_NUMERIC);
 
         return [
+            // Fil de la conversation ouverte
             new PrivateChannel('private-inbox.' . $participants[0] . '.' . $participants[1]),
+            // Canal personnel du destinataire : met à jour la liste / les badges sans ouvrir la conversation
+            new PrivateChannel('user.' . $this->receiverId),
         ];
     }
 
