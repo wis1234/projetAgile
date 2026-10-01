@@ -58,6 +58,14 @@ Route::middleware('auth')->group(function () {
     // Page dédiée : la discussion d'UNE tâche, isolée de la fiche complète
     Route::get('/tasks/{task}/discussion', [TaskController::class, 'discussion'])
         ->name('tasks.discussion');
+
+// Conversation privée avec un contact (page dédiée, comme tasks.discussion)
+Route::get('/inbox/{contact}', function (\Illuminate\Http\Request $request, User $contact) {
+    abort_if($contact->id === $request->user()->id, 404);
+
+    return Inertia::render('Discussions/InboxShow', ['contactId' => $contact->id]);
+})->name('inbox.show');
+        
  
     // Menu "Plus" de la barre de navigation mobile (n'existe qu'en version Mobile UI)
     Route::get('/more', function () {
