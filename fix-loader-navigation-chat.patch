@@ -1,0 +1,39 @@
+diff --git a/resources/js/Components/Inbox/InboxThread.jsx b/resources/js/Components/Inbox/InboxThread.jsx
+index 897a35b..86dafd8 100644
+--- a/resources/js/Components/Inbox/InboxThread.jsx
++++ b/resources/js/Components/Inbox/InboxThread.jsx
+@@ -316,7 +316,7 @@ export default function InboxThread({ contactId, variant = 'web', onBack }) {
+ 
+   const root = mobile
+     ? 'flex h-full flex-col bg-slate-100 dark:bg-slate-950'
+-    : 'fixed bottom-0 left-0 right-0 top-0 z-50 flex flex-col bg-slate-100 dark:bg-slate-950 lg:left-64';
++    : 'fixed bottom-0 left-0 right-0 top-0 z-[45] flex flex-col bg-slate-100 dark:bg-slate-950 md:left-64';
+ 
+   return (
+     <div className={root}>
+diff --git a/resources/js/Layouts/AdminLayout.jsx b/resources/js/Layouts/AdminLayout.jsx
+index bdf7059..ac73c4e 100644
+--- a/resources/js/Layouts/AdminLayout.jsx
++++ b/resources/js/Layouts/AdminLayout.jsx
+@@ -82,7 +82,7 @@ const Loader = () => {
+   const letters = ['P', 'r', 'o', 'J', 'A'];
+ 
+   return (
+-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
++    <div className="fixed top-0 bottom-0 left-0 right-0 md:left-64 z-[60] flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
+       <div className="flex space-x-1 mb-8">
+         {letters.map((letter, index) => (
+           <span
+diff --git a/resources/js/Pages/Discussions/Show.jsx b/resources/js/Pages/Discussions/Show.jsx
+index ace4828..6acf2c5 100644
+--- a/resources/js/Pages/Discussions/Show.jsx
++++ b/resources/js/Pages/Discussions/Show.jsx
+@@ -1093,7 +1093,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+ 
+   return (
+     <>
+-<div className="fixed top-0 bottom-0 left-64 right-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
++<div className="fixed top-0 bottom-0 left-0 md:left-64 right-0 z-[45] bg-white dark:bg-gray-900 flex flex-col">
+             {/* ─── HEADER STYLE WHATSAPP ─── */}
+         <div className="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-800 text-white flex-shrink-0 shadow-md">
+           <div className="flex items-center gap-3 min-w-0">

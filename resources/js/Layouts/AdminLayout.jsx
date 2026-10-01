@@ -82,7 +82,7 @@ const Loader = () => {
   const letters = ['P', 'r', 'o', 'J', 'A'];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
+    <div className="fixed top-0 bottom-0 left-0 right-0 md:left-64 z-[60] flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
       <div className="flex space-x-1 mb-8">
         {letters.map((letter, index) => (
           <span
