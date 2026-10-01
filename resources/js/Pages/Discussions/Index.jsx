@@ -137,7 +137,8 @@ export default function Index() {
       if (page > 1) params.set('page', page);
 
       const res = await fetch(`/api/discussions?${params.toString()}`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
       });
       if (!res.ok) throw new Error('Erreur lors du chargement des discussions');
       const json = await res.json();
@@ -158,7 +159,8 @@ export default function Index() {
   const loadProjects = useCallback(async () => {
     try {
       const res = await fetch('/api/discussions/projects', {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
       });
       if (!res.ok) return;
       const data = await res.json();
@@ -184,7 +186,8 @@ export default function Index() {
   const loadInboxContacts = useCallback(async () => {
     try {
       const res = await fetch('/api/inbox/users', {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
       });
       if (!res.ok) throw new Error('Impossible de charger les contacts Inbox.');
       const data = await res.json();
@@ -206,7 +209,8 @@ export default function Index() {
     setInboxError('');
     try {
       const res = await fetch(`/api/inbox/conversations/${contactId}`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));

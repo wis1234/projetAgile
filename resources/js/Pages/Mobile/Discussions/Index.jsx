@@ -114,7 +114,8 @@ export default function MobileDiscussionsIndex() {
       if (searchTerm) params.set('search', searchTerm);
 
       const res = await fetch(`/api/discussions?${params.toString()}`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
       });
       if (!res.ok) throw new Error();
       const json = await res.json();
@@ -157,7 +158,8 @@ export default function MobileDiscussionsIndex() {
   const loadInboxContacts = useCallback(async () => {
     try {
       const res = await fetch('/api/inbox/users', {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -176,7 +178,8 @@ export default function MobileDiscussionsIndex() {
     setInboxError('');
     try {
       const res = await fetch(`/api/inbox/conversations/${contactId}`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
