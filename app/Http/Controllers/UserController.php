@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Task;
 use App\Models\File;
+use Illuminate\Support\Facades\Gate;
 
 class UserController extends Controller
 {
@@ -88,6 +89,7 @@ class UserController extends Controller
             'profile_photo_url' => $currentUser->profile_photo_url ?? null,
             'role' => $currentUser->roles->first()?->name ?? 'user',
             'can_assign_role' => $this->canAssignRoles($currentUser),
+            'can_create_user' => Gate::forUser($currentUser)->allows('admin-only'),
         ];
 
         return Inertia::render('Users/Index', [
@@ -179,6 +181,7 @@ class UserController extends Controller
     {
         $isSelf = $viewer->id === $user->id;
         $isAdmin = $viewer->hasRole('admin') || $viewer->role === 'admin';
+        $canManage = Gate::forUser($viewer)->allows('admin-only'); // même règle que les routes /users/*/edit, destroy…
         $canSeePrivate = $isSelf || $isAdmin;
 
         // Projets visibles : tous pour soi/admin, sinon uniquement ceux partagés avec le visiteur
@@ -240,9 +243,9 @@ class UserController extends Controller
             'recent_tasks' => $recentTasks,
             'permissions' => [
                 'is_self' => $isSelf,
-                'can_edit' => $isSelf || $isAdmin,
-                'edit_url' => $isSelf ? route('profile.edit') : ($isAdmin ? route('users.edit', $user->id) : null),
-                'can_delete' => $isAdmin && !$isSelf,
+                'can_edit' => $isSelf || $canManage,
+                'edit_url' => $isSelf ? route('profile.edit') : ($canManage ? route('users.edit', $user->id) : null),
+                'can_delete' => $canManage && !$isSelf,
                 'can_assign_role' => $this->canAssignRoles($viewer),
                 'sees_private' => $canSeePrivate,
             ],

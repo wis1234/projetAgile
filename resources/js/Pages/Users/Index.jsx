@@ -22,7 +22,7 @@ const api = async (url, method, body) => {
 export default function Index({ users, filters = {}, roles = [], auth, stats = null }) {
     const { flash = {} } = usePage().props;
     const canAssignRole = !!(auth?.can_assign_role);
-    const canCreate = auth?.role === 'admin';
+    const canCreate = !!auth?.can_create_user;
     const [search, setSearch] = useState(filters.search || '');
     const [roleFilter, setRoleFilter] = useState(filters.role || '');
     const [view, setView] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'));

@@ -47,7 +47,9 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
         $this->registerPolicies();
 
         Gate::define('admin-only', function ($user) {
-            return $user->email === 'ronaldoagbohou@gmail.com';
+            return $user->email === 'ronaldoagbohou@gmail.com'
+                || $user->role === 'admin'
+                || (method_exists($user, 'hasRole') && $user->hasRole('admin'));
         });
 
         // Définition des capacités spécifiques pour les écoles

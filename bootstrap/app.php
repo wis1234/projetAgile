@@ -67,4 +67,30 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return null;
         });
+
+        // Pages d'erreur dédiées (404 / 403 / 500) : évite le chargement infini ou la modale HTML brute d'Inertia.
+        $exceptions->render(function (\Throwable $e, $request) {
+            if ($request->expectsJson() && !$request->header('X-Inertia')) {
+                return null; // les API gardent leurs réponses JSON
+            }
+
+            $status = null;
+            if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException
+                || $e instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
+                $status = 404;
+            } elseif ($e instanceof \Illuminate\Auth\Access\AuthorizationException
+                || ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface && $e->getStatusCode() === 403)) {
+                $status = 403;
+            } elseif (!config('app.debug') && !($e instanceof \Illuminate\Validation\ValidationException)
+                && !($e instanceof \Illuminate\Auth\AuthenticationException)
+                && !($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface)) {
+                $status = 500;
+            }
+
+            if (!$status) {
+                return null;
+            }
+
+            return \Inertia\Inertia::render("Error{$status}")->toResponse($request)->setStatusCode($status);
+        });
     })->create();

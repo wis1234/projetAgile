@@ -74,22 +74,30 @@ export default function Edit({ mustVerifyEmail, status, notificationPreferences,
             <Head title="Mon profil" />
             <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}`}</style>
             <div className="min-h-screen bg-slate-50 pb-28 dark:bg-slate-900 lg:pb-16">
-                {/* Bandeau */}
-                <div className="h-28 bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600 sm:h-40" />
-                <div className="mx-auto -mt-12 max-w-6xl px-4 sm:-mt-16 sm:px-6">
-                    <div className="flex items-end gap-4">
-                        <img src={avatar} alt={user.name}
-                            className="h-24 w-24 shrink-0 rounded-2xl border-4 border-white bg-white object-cover shadow-lg dark:border-slate-900 sm:h-32 sm:w-32" />
-                        <div className="min-w-0 pb-1 sm:pb-3">
-                            <h1 className="truncate text-xl font-bold text-slate-900 dark:text-white sm:text-3xl">{user.name}</h1>
-                            <p className="truncate text-sm text-slate-600 dark:text-slate-300">
-                                {[user.job_title, user.company].filter(Boolean).join(' · ') || user.email}
-                            </p>
+                {/* En-tête : dégradé bleu */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700">
+                    <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-sm" />
+                    <div className="pointer-events-none absolute -bottom-20 left-10 h-56 w-56 rounded-full bg-indigo-400/20" />
+                    <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10">
+                        <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-6 sm:text-left">
+                            <img src={avatar} alt={user.name}
+                                className="h-24 w-24 shrink-0 rounded-2xl border-4 border-white/90 bg-white object-cover shadow-xl sm:h-28 sm:w-28" />
+                            <div className="min-w-0">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-blue-100/80">Mon profil</p>
+                                <h1 className="mt-1 truncate text-2xl font-bold text-white sm:text-3xl">{user.name}</h1>
+                                <p className="mt-1 truncate text-sm text-blue-100">
+                                    {[user.job_title, user.company].filter(Boolean).join(' · ') || user.email}
+                                </p>
+                                <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+                                    {user.email && <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur">{user.email}</span>}
+                                    {user.phone && <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur">{user.phone}</span>}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="mx-auto mt-6 grid max-w-6xl gap-5 px-4 sm:mt-8 sm:px-6 lg:grid-cols-[16rem_1fr] lg:gap-8">
+                <div className="relative z-10 mx-auto -mt-8 grid max-w-6xl gap-5 px-4 sm:-mt-10 sm:px-6 lg:grid-cols-[16rem_1fr] lg:gap-8">
                     {/* Onglets : barre défilante (mobile) / menu latéral (PC) */}
                     <aside className="-mx-4 sm:mx-0 lg:sticky lg:top-24 lg:self-start">
                         <div role="tablist" aria-orientation="vertical" onKeyDown={onKey}
