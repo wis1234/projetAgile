@@ -9,7 +9,7 @@ import {
   FaChevronDown, FaChevronUp, FaFileAlt, FaFilePdf, FaFileWord, FaTrash, FaChartLine, FaCommentDots,
   FaCheckCircle, FaClock, FaPlay, FaChartBar, FaCrown, FaUser, FaShieldAlt,
   FaPlus, FaGlobe, FaExternalLinkAlt, FaQuestionCircle, FaArrowUp, FaArrowDown,
-  FaEquals, FaExclamationTriangle, FaSpinner, FaListUl, FaVideo, FaDoorOpen, FaTimes, FaLock
+  FaEquals, FaExclamationTriangle, FaSpinner, FaListUl, FaVideo, FaDoorOpen, FaTimes, FaLock, FaCog, FaChevronRight
 } from 'react-icons/fa';
 import { Line, Bar } from 'react-chartjs-2';
 import 'chart.js/auto';
@@ -991,14 +991,21 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
 
             {/* Membres */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">
-                  {t('project_members')} ({project.users?.length || 0})
-                </h3>
-                <Link href={route('project-users.show', project.id)} className="text-xs text-blue-600 hover:text-blue-800 font-medium">
-                  {t('view_all')}
-                </Link>
-              </div>
+              <Link
+                href={route('project-users.show', project.id)}
+                className="group mb-4 flex items-center gap-3 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 transition-all hover:border-blue-300 hover:shadow-md dark:border-blue-900/40 dark:from-blue-900/20 dark:to-indigo-900/20"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm">
+                  <FaCog className="transition-transform duration-500 group-hover:rotate-180" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-gray-900 dark:text-white">Gestion des membres</span>
+                  <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
+                    {project.users?.length || 0} membre{(project.users?.length || 0) > 1 ? 's' : ''} · rôles, accès et sourdine
+                  </span>
+                </span>
+                <FaChevronRight className="shrink-0 text-xs text-blue-400 transition-transform group-hover:translate-x-0.5" />
+              </Link>
               <div className="space-y-3">
                 {project.users?.slice(0, 5).map(user => (
                   <div key={user.id} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-xl">

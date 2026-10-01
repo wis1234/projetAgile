@@ -369,8 +369,11 @@ const Index = ({
                     projects.map(project => (
                       <tr
                         key={project.id}
-                        className="hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors cursor-pointer group"
-                        onClick={() => router.visit(`/projects/${project.id}`)}
+                        className={project.is_muted
+                          ? 'bg-gray-100 dark:bg-gray-800/60 opacity-60 grayscale cursor-not-allowed group'
+                          : 'hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors cursor-pointer group'}
+                        aria-disabled={!!project.is_muted}
+                        onClick={() => { if (!project.is_muted) router.visit(`/projects/${project.id}`); }}
                       >
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
@@ -383,7 +386,7 @@ const Index = ({
                                 {project.is_muted && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold text-red-800 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-full">
                                     <FaVolumeMute className="text-red-500 text-xs" />
-                                    <span>En sourdine</span>
+                                    <span>Surveillance · No access</span>
                                   </span>
                                 )}
                               </div>
@@ -433,9 +436,21 @@ const Index = ({
               projects.map(project => (
                 <div
                   key={project.id}
-                  className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group"
-                  onClick={() => router.visit(`/projects/${project.id}`)}
+                  aria-disabled={!!project.is_muted}
+                  title={project.is_muted ? 'Accès suspendu sur ce projet' : undefined}
+                  className={project.is_muted
+                    ? 'relative overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800/60 p-5 shadow-none cursor-not-allowed select-none'
+                    : "bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group"}
+                  onClick={() => { if (!project.is_muted) router.visit(`/projects/${project.id}`); }}
                 >
+                  {project.is_muted && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-gray-200/50 dark:bg-gray-900/50 backdrop-grayscale">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-red-600 text-white shadow-lg ring-4 ring-white/70 dark:ring-gray-800/70"><FaVolumeMute /></span>
+                      <span className="mt-1 -rotate-3 rounded-md border-2 border-red-600 bg-white/90 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.2em] text-red-600 shadow dark:bg-gray-900/90">Surveillance</span>
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-red-700 dark:text-red-400">No access</span>
+                    </div>
+                  )}
+                  <div className={project.is_muted ? 'opacity-40 grayscale blur-[0.5px]' : ''}>
                   <div className={`w-full h-1 rounded-full mb-4 ${STATUS_CONFIG[project.status]?.dot.replace('bg-', 'bg-') || 'bg-gray-300'}`} />
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
@@ -448,12 +463,6 @@ const Index = ({
                     </div>
                     <StatusBadge status={project.status || 'nouveau'} />
                   </div>
-                  {project.is_muted && (
-                    <div className="mb-3 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold text-red-800 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-full">
-                      <FaVolumeMute className="text-red-500 text-xs" />
-                      <span>En sourdine</span>
-                    </div>
-                  )}
                   <div className="grid grid-cols-2 gap-2 mt-3 mb-4">
                     <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-2 text-center">
                       <div className="flex items-center justify-center gap-1 text-gray-600 dark:text-gray-300">
@@ -472,6 +481,7 @@ const Index = ({
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500">
                     <span>Créé le {new Date(project.created_at).toLocaleDateString('fr-FR')}</span>
+                  </div>
                   </div>
                 </div>
               ))

@@ -35,18 +35,26 @@ export default function MobileProjectsIndex({ projects: prop = { data: [] }, fil
           <div className="space-y-3">
             {list.map((p, i) => {
               const [label, tone] = STATUS[p.status || 'nouveau'] || STATUS.nouveau;
-              return (
-                <MCard key={p.id} href={`/projects/${p.id}`} className="!p-3.5">
-                  <div className="flex items-center gap-3">
-                    <span className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${GRAD[i % GRAD.length]} text-lg font-black text-white shadow-md`}>{(p.name || '?').slice(0, 2).toUpperCase()}</span>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-[15px] font-extrabold text-slate-900 dark:text-white">{p.name}</h3>
-                      <p className="mt-1 flex items-center gap-3 text-xs text-slate-500"><span><FaTasks className="mr-1 inline text-[10px]" />{p.task_count || 0}</span><span><FaUsers className="mr-1 inline text-[10px]" />{p.members_count || 0}</span></p>
-                      <div className="mt-2"><MPill tone={tone}>{label}</MPill></div>
+              const muted = !!p.is_muted;
+              const body = (
+                <div className="flex items-center gap-3">
+                  <span className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${GRAD[i % GRAD.length]} text-lg font-black text-white shadow-md ${muted ? 'opacity-40 grayscale' : ''}`}>{(p.name || '?').slice(0, 2).toUpperCase()}</span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className={`truncate text-[15px] font-extrabold ${muted ? 'text-slate-400' : 'text-slate-900 dark:text-white'}`}>{p.name}</h3>
+                    <p className="mt-1 flex items-center gap-3 text-xs text-slate-500"><span><FaTasks className="mr-1 inline text-[10px]" />{p.tasks_count ?? p.task_count ?? 0}</span><span><FaUsers className="mr-1 inline text-[10px]" />{p.users_count ?? p.members_count ?? 0}</span></p>
+                    <div className="mt-2">
+                      {muted
+                        ? <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-red-600 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400">Surveillance · No access</span>
+                        : <MPill tone={tone}>{label}</MPill>}
                     </div>
-                    <FaChevronRight className="text-xs text-slate-300" />
                   </div>
-                </MCard>
+                  {!muted && <FaChevronRight className="text-xs text-slate-300" />}
+                </div>
+              );
+              return muted ? (
+                <MCard key={p.id} className="!p-3.5 cursor-not-allowed bg-slate-100 opacity-70 grayscale dark:bg-slate-900/60" aria-disabled="true">{body}</MCard>
+              ) : (
+                <MCard key={p.id} href={`/projects/${p.id}`} className="!p-3.5">{body}</MCard>
               );
             })}
             {!Array.isArray(prop) && <MPager paginator={prop} only={['projects']} />}

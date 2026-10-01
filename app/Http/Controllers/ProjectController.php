@@ -93,6 +93,7 @@ class ProjectController extends Controller
                                       'updated_at'   => $project->updated_at,
                                       'users_count'  => $project->users_count,
                                       'tasks_count'  => $project->tasks_count,
+                                      'is_muted'     => (bool) ($currentUser?->pivot->is_muted ?? false),
                                       'users'        => $project->users->map(fn($user) => [
                                           'id'    => $user->id,
                                           'name'  => $user->name,
@@ -100,10 +101,6 @@ class ProjectController extends Controller
                                           'role'  => $user->pivot->role,
                                       ]),
                                   ];
-
-                                  if ($currentUser && $currentUser->pivot->is_muted) {
-                                      $projectData['is_muted'] = true;
-                                  }
 
                                   return $projectData;
                               });
