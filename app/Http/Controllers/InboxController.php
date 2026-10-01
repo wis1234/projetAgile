@@ -18,8 +18,9 @@ class InboxController extends Controller
 
         $sharedProjectIds = $user->projects()->pluck('projects.id');
 
+        // NB : profile_photo_url est un accessor calculé depuis profile_photo_path, pas une colonne.
         $contacts = User::query()
-            ->select(['users.id', 'users.name', 'users.email', 'users.profile_photo_url'])
+            ->select(['users.id', 'users.name', 'users.email', 'users.profile_photo_path'])
             ->where('users.id', '!=', $user->id)
             ->whereHas('projects', function ($query) use ($sharedProjectIds) {
                 $query->whereIn('projects.id', $sharedProjectIds);
@@ -61,7 +62,7 @@ class InboxController extends Controller
         $conversation = PrivateConversation::ensureBetween((int) $authUser->id, (int) $user->id);
 
         $messages = $conversation->messages()
-            ->with(['sender:id,name,profile_photo_url', 'receiver:id,name,profile_photo_url'])
+            ->with(['sender:id,name,profile_photo_path', 'receiver:id,name,profile_photo_path'])
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function (PrivateInboxMessage $message) use ($authUser) {

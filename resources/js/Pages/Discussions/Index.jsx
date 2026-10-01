@@ -189,6 +189,7 @@ export default function Index() {
       if (!res.ok) throw new Error('Impossible de charger les contacts Inbox.');
       const data = await res.json();
       const normalized = Array.isArray(data) ? data : [];
+      setInboxError('');
       setInboxContacts(normalized);
       if (!selectedInboxUserId && normalized[0]) {
         setSelectedInboxUserId(normalized[0].id);
@@ -546,9 +547,16 @@ export default function Index() {
             <div className="flex-1 min-h-0 flex flex-col">
               <div className="max-h-52 overflow-y-auto border-b border-gray-200 dark:border-gray-700">
                 {inboxContacts.length === 0 ? (
-                  <div className="px-4 py-5 text-xs text-gray-500 dark:text-gray-400">
-                    Aucun contact partagé dans vos projets.
-                  </div>
+                  inboxError ? (
+                    <div className="px-4 py-5 text-xs text-red-600 dark:text-red-400">
+                      {inboxError}{' '}
+                      <button type="button" onClick={loadInboxContacts} className="font-semibold underline">Réessayer</button>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-5 text-xs text-gray-500 dark:text-gray-400">
+                      Aucun contact partagé dans vos projets. Rejoignez un projet avec d'autres membres pour pouvoir discuter en privé.
+                    </div>
+                  )
                 ) : (
                   <ul className="divide-y divide-gray-100 dark:divide-gray-800">
                     {inboxContacts.map((contact) => (

@@ -162,6 +162,7 @@ export default function MobileDiscussionsIndex() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
+      setInboxError('');
       setInboxContacts(list);
       if (!selectedInboxUserId && list[0]) setSelectedInboxUserId(list[0].id);
     } catch {
@@ -315,7 +316,11 @@ export default function MobileDiscussionsIndex() {
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <div className="max-h-48 overflow-y-auto border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                 {inboxContacts.length === 0 ? (
+                  inboxError ? (
+                  <div className="px-3 py-5 text-xs text-red-600 dark:text-red-400">{inboxError} <button type="button" onClick={loadInboxContacts} className="font-semibold underline">Réessayer</button></div>
+                ) : (
                   <div className="px-3 py-5 text-xs text-gray-500 dark:text-gray-400">Aucun contact partagé dans vos projets.</div>
+                )
                 ) : (
                   <ul className="divide-y divide-gray-100 dark:divide-gray-800">
                     {inboxContacts.filter((contact) => !search || `${contact.name}`.toLowerCase().includes(search.toLowerCase())).map((contact) => (
