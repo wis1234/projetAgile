@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Project;
 use App\Models\User;
+use App\Models\Task;
 use Inertia\Inertia;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -32,8 +33,10 @@ class ProjectUserController extends Controller
         $userId = auth()->id();
 
         // Sous-requête : projets où l'utilisateur courant est membre
-        $myProjectsIds = Project::whereHas('users', fn($q) => $q->where('user_id', $userId))
-                                ->pluck('id');
+        $isAdmin = auth()->user()->hasRole('admin');
+        $myProjectsIds = $isAdmin
+            ? Project::pluck('id')
+            : Project::whereHas('users', fn($q) => $q->where('user_id', $userId))->pluck('id');
 
         // Requête de base : tous les utilisateurs qui sont membres d'au moins un de ces projets
         $query = User::whereHas('projects', function ($q) use ($myProjectsIds) {
@@ -54,7 +57,9 @@ class ProjectUserController extends Controller
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('job_title', 'like', "%{$search}%")
+                  ->orWhere('company', 'like', "%{$search}%");
             });
         }
 
@@ -106,6 +111,8 @@ class ProjectUserController extends Controller
                 'name'       => $user->name,
                 'email'      => $user->email,
                 'avatar'     => $user->profile_photo_url ?? null,
+                'job_title'  => $user->job_title,
+                'company'    => $user->company,
                 'created_at' => $user->created_at,
                 'common_projects' => $commonProjects->map(fn($p) => [
                     'id'   => $p->id,
@@ -119,7 +126,7 @@ class ProjectUserController extends Controller
         // Statistiques globales pour les cartes récapitulatives (optionnel)
         $globalStats = [
             'total_members' => User::whereHas('projects', fn($q) => $q->whereIn('projects.id', $myProjectsIds))->count(),
-            'total_projects' => Project::whereHas('users', fn($q) => $q->where('user_id', $userId))->count(),
+            'total_projects' => $myProjectsIds->count(),
             'total_roles' => DB::table('project_user')
                 ->whereIn('project_id', $myProjectsIds)
                 ->select('role', DB::raw('count(distinct user_id) as count'))
@@ -130,8 +137,7 @@ class ProjectUserController extends Controller
         ];
 
         // Liste des projets pour le filtre
-        $projectsList = Project::whereHas('users', fn($q) => $q->where('user_id', $userId))
-                               ->get(['id', 'name', 'status']);
+        $projectsList = Project::whereIn('id', $myProjectsIds)->orderBy('name')->get(['id', 'name', 'status']);
 
         return Inertia::render('ProjectUsers/Index', [
             'members'   => $members,
@@ -266,37 +272,80 @@ public function store(Request $request)
      */
     public function show(string $id)
     {
-        $project = Project::whereHas('users', function($query) {
-            $query->where('user_id', auth()->id());
-        })->with(['users' => function($query) {
-            $query->withPivot(['role', 'is_muted']);
-        }])->withCount('tasks')
-        ->findOrFail($id);
-        
+        $authUser = auth()->user();
+        $isAdmin = $authUser->hasRole('admin');
+
+        // Un administrateur doit pouvoir consulter n'importe quel projet, même sans en être membre
+        $project = Project::when(!$isAdmin, fn ($q) => $q->whereHas('users', fn ($u) => $u->where('user_id', $authUser->id)))
+            ->with(['users' => fn ($q) => $q->withPivot(['role', 'is_muted']), 'users.roles'])
+            ->withCount('tasks')
+            ->findOrFail($id);
+
         try {
             $this->authorize('view', $project);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
         }
-        
-        $project->users->each(function($user) {
-            if (!isset($user->pivot->is_muted)) {
-                $user->pivot->is_muted = false;
-            }
-        });
-        
-        $authUser = auth()->user();
-        
+
+        // Tâches par membre et par statut dans ce projet (une seule requête)
+        $rows = Task::where('project_id', $project->id)->whereNotNull('assigned_to')
+            ->select('assigned_to', 'status', DB::raw('count(*) as c'))
+            ->groupBy('assigned_to', 'status')->get();
+        $overdue = Task::where('project_id', $project->id)->whereNotNull('assigned_to')
+            ->where('status', '!=', 'done')->whereNotNull('due_date')->where('due_date', '<', now())
+            ->select('assigned_to', DB::raw('count(*) as c'))->groupBy('assigned_to')->pluck('c', 'assigned_to');
+        $byUser = $rows->groupBy('assigned_to');
+        $tasksByStatus = Task::where('project_id', $project->id)
+            ->select('status', DB::raw('count(*) as c'))->groupBy('status')->pluck('c', 'status');
+
+        // On n'envoie JAMAIS le modèle brut des membres (IBAN, facturation…) : champs explicites seulement
+        $members = $project->users->map(function ($u) use ($byUser, $overdue) {
+            $mine = $byUser->get($u->id, collect());
+            $total = (int) $mine->sum('c');
+            $done = (int) $mine->where('status', 'done')->sum('c');
+            return [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'phone' => $u->phone,
+                'job_title' => $u->job_title,
+                'company' => $u->company,
+                'profile_photo_url' => $u->profile_photo_url,
+                'global_role' => $u->roles->first()?->name ?? $u->role,
+                'created_at' => $u->created_at,
+                'pivot' => [
+                    'role' => $u->pivot->role,
+                    'is_muted' => (bool) ($u->pivot->is_muted ?? false),
+                    'created_at' => $u->pivot->created_at,
+                ],
+                'tasks_total' => $total,
+                'tasks_done' => $done,
+                'tasks_open' => $total - $done,
+                'tasks_overdue' => (int) ($overdue[$u->id] ?? 0),
+            ];
+        })->sortBy([['pivot.role', 'asc'], ['name', 'asc']])->values();
+
         return Inertia::render('ProjectUsers/Show', [
-            'project' => $project,
+            'project' => [
+                'id' => $project->id,
+                'name' => $project->name,
+                'description' => $project->description,
+                'status' => $project->status,
+                'created_at' => $project->created_at,
+                'updated_at' => $project->updated_at,
+                'tasks_count' => $project->tasks_count,
+                'tasks_by_status' => $tasksByStatus,
+                'users' => $members,
+            ],
+            'can_manage' => $authUser->can('manageMembers', $project),
             'auth' => [
                 'user' => [
                     'id' => $authUser->id,
                     'name' => $authUser->name,
                     'email' => $authUser->email,
                     'profile_photo_url' => $authUser->profile_photo_url ?? null,
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 

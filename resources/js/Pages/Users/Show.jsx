@@ -1,243 +1,266 @@
-import React from 'react';
-import { Link, usePage, router } from '@inertiajs/react';
-import AdminLayout from '../../Layouts/AdminLayout';
-import { 
-  FaUser, 
-  FaUsers, 
-  FaEdit, 
-  FaProjectDiagram, 
-  FaEnvelope, 
-  FaCalendarAlt,
-  FaUserTie,
-  FaUserShield,
-  FaArrowLeft
+import React, { useState } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import AdminLayout from '@/Layouts/AdminLayout';
+import RoleManagement from '@/Components/RoleManagement';
+import Modal from '@/Components/Modal';
+import {
+    FaArrowLeft, FaEdit, FaEnvelope, FaPhone, FaProjectDiagram, FaTasks, FaFolderOpen, FaExclamationTriangle,
+    FaBriefcase, FaBuilding, FaCalendarAlt, FaClock, FaCheckCircle, FaCrown, FaCreditCard, FaUniversity, FaTrash, FaHistory,
 } from 'react-icons/fa';
-import RoleManagement from '../../Components/RoleManagement';
-import { motion } from 'framer-motion';
+import {
+    Avatar, Badge, Card, Stat, ProgressBar, EmptyState, InfoRow, GLOBAL_ROLES, PROJECT_ROLES,
+    statusOf, fmtDate, timeAgo,
+} from '@/Components/People/shared';
+
+const csrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
 function Show({ user, auth }) {
-  const { flash = {} } = usePage().props;
-  
-  // Sanitize user data
-  const sanitizedUser = React.useMemo(() => ({
-    ...user,
-    email: user?.email || '',
-    name: user?.name || 'Utilisateur sans nom',
-    role: ['admin', 'manager', 'user', 'candidate'].includes(user?.role) ? user.role : 'user',
-    created_at: user?.created_at || new Date().toISOString()
-  }), [user]);
+    const { flash = {} } = usePage().props;
+    const me = auth?.user || auth;
+    const perm = user.permissions || {};
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [copied, setCopied] = useState('');
 
-  const userAuth = auth?.user || auth;
-  const isAdmin = userAuth?.role === 'admin';
-  const canEdit = userAuth && (isAdmin || userAuth.id === sanitizedUser.id);
-  const canAssignRole = userAuth?.email === 'ronaldoagbohou@gmail.com';
-  const [role, setRole] = React.useState(sanitizedUser.role);
-  const [loading, setLoading] = React.useState(false);
-  const [success, setSuccess] = React.useState('');
-  const [error, setError] = React.useState('');
+    const roleCfg = GLOBAL_ROLES[user.role] || GLOBAL_ROLES.user;
+    const stats = user.stats || {};
+    const byStatus = stats.tasks_by_status || {};
+    const statusEntries = Object.entries(byStatus).filter(([, n]) => n > 0);
 
-  const handleRoleChange = async (newRole, sendEmail = true) => {
-    try {
-      const response = await fetch(`/users/${sanitizedUser.id}/assign-role`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-        },
-        body: JSON.stringify({ 
-          role: newRole,
-          send_email: sendEmail 
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Erreur lors de la mise à jour du rôle');
-      }
-
-      // Mettre à jour l'utilisateur localement
-      router.reload({
-        only: ['user'],
-        onSuccess: () => {
-          setSuccess('Rôle mis à jour avec succès !');
-        }
-      });
-
-      return data;
-    } catch (error) {
-      console.error('Error updating role:', error);
-      throw error;
-    }
-  };
-
-  const getRoleBadge = (role) => {
-    const roles = {
-      admin: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: <FaUserShield className="mr-1" />, label: 'Administrateur' },
-      manager: { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: <FaUserTie className="mr-1" />, label: 'Manager' },
-      member: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: <FaUser className="mr-1" />, label: 'Membre' },
-      candidate: { color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200', icon: <FaUser className="mr-1" />, label: 'Candidat' },
-      user: { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200', icon: <FaUser className="mr-1" />, label: 'Utilisateur' }
+    const copy = async (key, value) => {
+        try { await navigator.clipboard.writeText(value); setCopied(key); setTimeout(() => setCopied(''), 1500); } catch { /* presse-papiers indisponible */ }
     };
-    const currentRole = roles[role] || roles.user;
+
+    const handleRoleChange = async (newRole, sendEmail = true) => {
+        const res = await fetch(`/users/${user.id}/assign-role`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf() },
+            body: JSON.stringify({ role: newRole, send_email: sendEmail }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || data.error || 'Erreur lors de la mise à jour du rôle');
+        router.reload({ only: ['user'] });
+        return data;
+    };
+
+    const remove = () => router.delete(`/users/${user.id}`, { onFinish: () => setConfirmDelete(false) });
+
     return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${currentRole.color}`}>
-        {currentRole.icon}
-        {currentRole.label}
-      </span>
-    );
-  };
+        <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-900">
+            <Head title={user.name} />
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center">
-            <Link 
-              href="/users" 
-              className="mr-4 p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title="Retour à la liste"
-            >
-              <FaArrowLeft className="h-5 w-5" />
-            </Link>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Détails de l'utilisateur
-            </h1>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Flash Messages */}
-        {flash.success && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg"
-          >
-            <p className="text-green-800 dark:text-green-200">{flash.success}</p>
-          </motion.div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Profile */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Profile Card */}
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <img 
-                      className="h-20 w-20 rounded-full border-4 border-white dark:border-gray-700 shadow-sm"
-                      src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3B82F6&color=fff&size=128`)} 
-                      alt={user.name}
-                    />
-                  </div>
-                  <div className="ml-5">
-                    <div className="flex items-center space-x-2">
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{user.name}</h2>
-                      {getRoleBadge(user.role || 'user')}
-                    </div>
-                    {isAdmin && (
-                      <div className="mt-1 flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <FaEnvelope className="mr-1.5 h-4 w-4 flex-shrink-0" />
-                        <span>{user.email}</span>
-                      </div>
-                    )}
-                    <div className="mt-1 flex items-center text-sm text-gray-500 dark:text-gray-400">
-                      <FaCalendarAlt className="mr-1.5 h-4 w-4 flex-shrink-0" />
-                      <span>Inscrit le {new Date(user.created_at).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Projects Section */}
-              <div className="px-6 py-5">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                  <FaProjectDiagram className="mr-2 text-blue-500" />
-                  Projets ({user.projects?.length || 0})
-                </h3>
-                
-                {user.projects && user.projects.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {user.projects.map(project => (
-                      <Link 
-                        key={project.id} 
-                        href={`/projects/${project.id}`}
-                        className="group block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                      >
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 rounded-md bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                            <FaProjectDiagram className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-                          </div>
-                          <div className="ml-4">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                              {project.name}
-                            </p>
-                            {project.pivot?.role && (
-                              <span className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${project.pivot.role === 'manager' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}`}>
-                                {project.pivot.role === 'manager' ? 'Chef de projet' : 'Membre'}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <FaProjectDiagram className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" />
-                    <h4 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Aucun projet</h4>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Cet utilisateur ne fait partie d'aucun projet pour le moment.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - Actions */}
-          <div className="space-y-6">
-            {/* Role Management */}
-            <RoleManagement 
-              user={sanitizedUser} 
-              currentUser={userAuth}
-              onRoleChange={handleRoleChange}
-            />
-
-            {/* Quick Actions */}
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Actions rapides</h3>
-              </div>
-              <div className="px-6 py-4 space-y-3">
-                {canEdit && (
-                  <Link 
-                    href={`/profile`}
-                    className="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors"
-                  >
-                    <FaEdit className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300 transition-colors" />
-                    Modifier le profil
-                  </Link>
-                )}
-                <Link 
-                  href="/users"
-                  className="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors"
-                >
-                  <FaUsers className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300 transition-colors" />
-                  Retour à la liste des utilisateurs
+            {/* Bandeau */}
+            <div className="h-28 bg-gradient-to-r from-slate-800 via-blue-700 to-indigo-600 sm:h-36" />
+            <div className="mx-auto -mt-14 max-w-6xl px-4 sm:-mt-16 sm:px-6">
+                <Link href="/users" className="mb-3 inline-flex items-center gap-2 rounded-lg bg-black/25 px-3 py-1.5 text-xs font-medium text-white backdrop-blur hover:bg-black/40">
+                    <FaArrowLeft /> Utilisateurs
                 </Link>
-              </div>
+
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+                    <div className="rounded-2xl bg-white p-1 shadow-lg dark:bg-slate-900">
+                        <Avatar name={user.name} src={user.profile_photo_url} size="xl" className="!h-24 !w-24 !rounded-xl sm:!h-28 sm:!w-28" />
+                    </div>
+                    <div className="min-w-0 flex-1 pb-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h1 className="truncate text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">{user.name}</h1>
+                            <Badge cfg={roleCfg} />
+                            {perm.is_self && <Badge cfg={{ cls: 'bg-blue-600 text-white' }}>Vous</Badge>}
+                        </div>
+                        {(user.job_title || user.company) && (
+                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                {[user.job_title, user.company].filter(Boolean).join(' · ')}
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {user.email && (
+                            <a href={`mailto:${user.email}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                                <FaEnvelope /> Écrire
+                            </a>
+                        )}
+                        {perm.can_edit && perm.edit_url && (
+                            <Link href={perm.edit_url} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+                                <FaEdit /> Modifier
+                            </Link>
+                        )}
+                    </div>
+                </div>
+
+                {flash.success && <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">{flash.success}</p>}
+                {flash.error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">{flash.error}</p>}
+
+                {/* Indicateurs */}
+                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <Stat label="Projets" value={stats.projects} tone="text-blue-600 dark:text-blue-400" />
+                    <Stat label="Tâches assignées" value={stats.tasks_total} />
+                    <Stat label="Tâches en retard" value={stats.tasks_overdue} tone={stats.tasks_overdue ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'} />
+                    <Stat label="Fichiers déposés" value={stats.files} tone="text-emerald-600 dark:text-emerald-400" />
+                </div>
+
+                <div className="mt-6 grid gap-6 lg:grid-cols-3">
+                    {/* Colonne principale */}
+                    <div className="space-y-6 lg:col-span-2">
+                        {user.bio && (
+                            <Card title="À propos">
+                                <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 dark:text-slate-300">{user.bio}</p>
+                            </Card>
+                        )}
+
+                        <Card title={`Projets (${user.projects?.length || 0})`} icon={FaProjectDiagram}>
+                            {user.projects?.length ? (
+                                <ul className="divide-y divide-slate-100 dark:divide-slate-700/70">
+                                    {user.projects.map((p) => {
+                                        const r = PROJECT_ROLES[p.role] || PROJECT_ROLES.member;
+                                        return (
+                                            <li key={p.id} className="py-3 first:pt-0 last:pb-0">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <Link href={`/projects/${p.id}`} className="min-w-0 truncate text-sm font-semibold text-slate-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400">
+                                                        {p.name}
+                                                    </Link>
+                                                    <Badge cfg={r}>{p.role === 'manager' && <FaCrown className="text-[10px]" />}{r.label}</Badge>
+                                                </div>
+                                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                                    Depuis le {fmtDate(p.joined_at, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                    {p.status && <> · {p.status}</>}
+                                                </p>
+                                                <div className="mt-2"><ProgressBar done={p.tasks_done} total={p.tasks_total} /></div>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            ) : (
+                                <EmptyState icon={FaProjectDiagram} title="Aucun projet" text={perm.sees_private ? "Cette personne ne fait partie d'aucun projet." : "Vous n'avez aucun projet en commun avec cette personne."} />
+                            )}
+                        </Card>
+
+                        <Card title="Tâches récentes" icon={FaTasks}>
+                            {statusEntries.length > 0 && (
+                                <div className="mb-4 flex flex-wrap gap-2">
+                                    {statusEntries.map(([s, n]) => <Badge key={s} cfg={statusOf(s)}>{n} {statusOf(s).label.toLowerCase()}</Badge>)}
+                                </div>
+                            )}
+                            {user.recent_tasks?.length ? (
+                                <ul className="divide-y divide-slate-100 dark:divide-slate-700/70">
+                                    {user.recent_tasks.map((t) => (
+                                        <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                                            <div className="min-w-0">
+                                                <Link href={`/tasks/${t.id}`} className="block truncate text-sm font-medium text-slate-900 hover:text-blue-600 dark:text-white">{t.title}</Link>
+                                                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                                                    {t.project?.name}{t.due_date && <> · échéance {fmtDate(t.due_date, { day: 'numeric', month: 'short' })}</>}
+                                                </p>
+                                            </div>
+                                            <Badge cfg={statusOf(t.status)} />
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <EmptyState icon={FaTasks} title="Aucune tâche assignée" />
+                            )}
+                        </Card>
+
+                        {perm.sees_private && (
+                            <Card title="Activité récente" icon={FaHistory}>
+                                {user.recent_activity?.length ? (
+                                    <ul className="space-y-3">
+                                        {user.recent_activity.map((a) => (
+                                            <li key={a.id} className="flex gap-3 text-sm">
+                                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                                                <div className="min-w-0">
+                                                    <p className="text-slate-800 dark:text-slate-200">{a.description}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{timeAgo(a.created_at)}</p>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : <EmptyState title="Aucune activité enregistrée" />}
+                            </Card>
+                        )}
+                    </div>
+
+                    {/* Colonne latérale */}
+                    <div className="space-y-6">
+                        <Card title="Coordonnées">
+                            <div className="divide-y divide-slate-100 dark:divide-slate-700/70">
+                                {user.email ? (
+                                    <InfoRow icon={FaEnvelope} label="E-mail">
+                                        <button type="button" onClick={() => copy('email', user.email)} className="text-left hover:text-blue-600" title="Copier">
+                                            {user.email} {copied === 'email' && <span className="text-xs text-emerald-600">copié</span>}
+                                        </button>
+                                    </InfoRow>
+                                ) : <p className="py-2 text-sm text-slate-500">Coordonnées non visibles.</p>}
+                                {user.phone && (
+                                    <InfoRow icon={FaPhone} label="Téléphone"><a href={`tel:${user.phone}`} className="hover:text-blue-600">{user.phone}</a></InfoRow>
+                                )}
+                                {user.job_title && <InfoRow icon={FaBriefcase} label="Poste">{user.job_title}</InfoRow>}
+                                {user.company && <InfoRow icon={FaBuilding} label="Entreprise">{user.company}</InfoRow>}
+                            </div>
+                        </Card>
+
+                        <Card title="Compte">
+                            <div className="divide-y divide-slate-100 dark:divide-slate-700/70">
+                                <InfoRow icon={FaCalendarAlt} label="Membre depuis">{fmtDate(user.created_at)}</InfoRow>
+                                {perm.sees_private && (
+                                    <>
+                                        <InfoRow icon={FaClock} label="Dernière activité">{user.last_seen_at ? timeAgo(user.last_seen_at) : 'Inconnue'}</InfoRow>
+                                        <InfoRow icon={FaCheckCircle} label="E-mail">
+                                            {user.email_verified_at ? <span className="text-emerald-600">Vérifié le {fmtDate(user.email_verified_at, { day: 'numeric', month: 'short', year: 'numeric' })}</span> : <span className="text-amber-600">Non vérifié</span>}
+                                        </InfoRow>
+                                    </>
+                                )}
+                                {stats.tasks_overdue > 0 && (
+                                    <InfoRow icon={FaExclamationTriangle} label="Attention"><span className="text-red-600">{stats.tasks_overdue} tâche(s) en retard</span></InfoRow>
+                                )}
+                            </div>
+                        </Card>
+
+                        {perm.sees_private && user.subscription && (
+                            <Card title="Abonnement" icon={FaCreditCard}>
+                                {user.subscription.active ? (
+                                    <div className="space-y-1 text-sm">
+                                        <p className="font-semibold text-slate-900 dark:text-white">{user.subscription.plan || 'Abonnement actif'}</p>
+                                        <p className="text-slate-500 dark:text-slate-400">
+                                            Jusqu'au {user.subscription.ends_at}{user.subscription.days_remaining != null && <> ({user.subscription.days_remaining} j restants)</>}
+                                        </p>
+                                    </div>
+                                ) : <p className="text-sm text-slate-500 dark:text-slate-400">Aucun abonnement actif.</p>}
+                            </Card>
+                        )}
+
+                        {perm.sees_private && user.bank && (
+                            <Card title="Coordonnées bancaires" icon={FaUniversity}>
+                                <dl className="space-y-1 text-sm">
+                                    <div className="flex justify-between gap-3"><dt className="text-slate-500">Banque</dt><dd className="font-medium">{user.bank.bank_name}</dd></div>
+                                    <div className="flex justify-between gap-3"><dt className="text-slate-500">Titulaire</dt><dd className="font-medium">{user.bank.account_holder_name}</dd></div>
+                                    <div className="flex justify-between gap-3"><dt className="text-slate-500">IBAN</dt><dd className="font-mono text-xs">{user.bank.iban_masked}</dd></div>
+                                </dl>
+                            </Card>
+                        )}
+
+                        {perm.can_assign_role && <RoleManagement user={{ ...user, role: user.role }} currentUser={me} onRoleChange={handleRoleChange} />}
+
+                        {perm.can_delete && (
+                            <Card title="Zone sensible">
+                                <button type="button" onClick={() => setConfirmDelete(true)} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-500/10 dark:text-red-300">
+                                    <FaTrash /> Supprimer ce compte
+                                </button>
+                            </Card>
+                        )}
+                    </div>
+                </div>
             </div>
-          </div>
+
+            <Modal show={confirmDelete} onClose={() => setConfirmDelete(false)} maxWidth="md">
+                <div className="p-6">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Supprimer {user.name} ?</h2>
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Le compte sera supprimé définitivement. Cette action est irréversible.</p>
+                    <div className="mt-6 flex justify-end gap-3">
+                        <button type="button" onClick={() => setConfirmDelete(false)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200">Annuler</button>
+                        <button type="button" onClick={remove} className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700">Supprimer</button>
+                    </div>
+                </div>
+            </Modal>
         </div>
-      </main>
-    </div>
-  );
+    );
 }
 
-Show.layout = page => <AdminLayout children={page} />;
+Show.layout = (page) => <AdminLayout children={page} />;
 export default Show;

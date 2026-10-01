@@ -298,11 +298,11 @@ export default function Index({ members = {}, filters: initialFilters = {}, glob
                     <tr><td colSpan={5} className="py-16 text-center text-gray-400">Aucun membre trouvé</td></tr>
                   ) : (
                     membersData.map(member => (
-                      <tr key={member.id} className="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 cursor-pointer transition" onClick={() => router.get(`/project-users/${member.id}`)}>
+                      <tr key={member.id} className="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 cursor-pointer transition" onClick={() => router.get(`/users/${member.id}`)}>
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
                             <img src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}`} className="w-8 h-8 rounded-full" />
-                            <span className="font-semibold">{member.name}</span>
+                            <div className="min-w-0"><span className="block font-semibold">{member.name}</span>{(member.job_title || member.company) && <span className="block text-xs text-gray-500">{[member.job_title, member.company].filter(Boolean).join(' · ')}</span>}</div>
                           </div>
                         </td>
                         <td className="px-5 py-4 text-gray-600 dark:text-gray-300">{member.email}</td>
@@ -335,11 +335,12 @@ export default function Index({ members = {}, filters: initialFilters = {}, glob
 {viewMode === 'cards' && (
   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
     {membersData.map(member => (
-      <div key={member.id} onClick={() => router.get(`/project-users/${member.id}`)} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group flex flex-col h-full">
+      <div key={member.id} onClick={() => router.get(`/users/${member.id}`)} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group flex flex-col h-full">
         <div className="flex items-center gap-3 mb-4">
           <img src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}`} className="w-12 h-12 rounded-full ring-2 ring-indigo-200" />
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white group-hover:text-indigo-600">{member.name}</h3>
+            {(member.job_title || member.company) && <p className="text-xs text-gray-600 dark:text-gray-300">{[member.job_title, member.company].filter(Boolean).join(' · ')}</p>}
             <div className="flex items-center gap-1 text-xs text-gray-500"><FaEnvelope /> {member.email}</div>
           </div>
         </div>

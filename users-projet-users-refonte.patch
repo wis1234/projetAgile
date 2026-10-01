@@ -1,0 +1,2505 @@
+diff --git a/app/Http/Controllers/ProjectUserController.php b/app/Http/Controllers/ProjectUserController.php
+index fee1a1f..6b97ac3 100644
+--- a/app/Http/Controllers/ProjectUserController.php
++++ b/app/Http/Controllers/ProjectUserController.php
+@@ -5,6 +5,7 @@
+ use Illuminate\Http\Request;
+ use App\Models\Project;
+ use App\Models\User;
++use App\Models\Task;
+ use Inertia\Inertia;
+ use Illuminate\Validation\Rule;
+ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+@@ -32,8 +33,10 @@ public function index(Request $request)
+         $userId = auth()->id();
+ 
+         // Sous-requête : projets où l'utilisateur courant est membre
+-        $myProjectsIds = Project::whereHas('users', fn($q) => $q->where('user_id', $userId))
+-                                ->pluck('id');
++        $isAdmin = auth()->user()->hasRole('admin');
++        $myProjectsIds = $isAdmin
++            ? Project::pluck('id')
++            : Project::whereHas('users', fn($q) => $q->where('user_id', $userId))->pluck('id');
+ 
+         // Requête de base : tous les utilisateurs qui sont membres d'au moins un de ces projets
+         $query = User::whereHas('projects', function ($q) use ($myProjectsIds) {
+@@ -54,7 +57,9 @@ public function index(Request $request)
+         if (!empty($search)) {
+             $query->where(function ($q) use ($search) {
+                 $q->where('name', 'like', "%{$search}%")
+-                  ->orWhere('email', 'like', "%{$search}%");
++                  ->orWhere('email', 'like', "%{$search}%")
++                  ->orWhere('job_title', 'like', "%{$search}%")
++                  ->orWhere('company', 'like', "%{$search}%");
+             });
+         }
+ 
+@@ -106,6 +111,8 @@ public function index(Request $request)
+                 'name'       => $user->name,
+                 'email'      => $user->email,
+                 'avatar'     => $user->profile_photo_url ?? null,
++                'job_title'  => $user->job_title,
++                'company'    => $user->company,
+                 'created_at' => $user->created_at,
+                 'common_projects' => $commonProjects->map(fn($p) => [
+                     'id'   => $p->id,
+@@ -119,7 +126,7 @@ public function index(Request $request)
+         // Statistiques globales pour les cartes récapitulatives (optionnel)
+         $globalStats = [
+             'total_members' => User::whereHas('projects', fn($q) => $q->whereIn('projects.id', $myProjectsIds))->count(),
+-            'total_projects' => Project::whereHas('users', fn($q) => $q->where('user_id', $userId))->count(),
++            'total_projects' => $myProjectsIds->count(),
+             'total_roles' => DB::table('project_user')
+                 ->whereIn('project_id', $myProjectsIds)
+                 ->select('role', DB::raw('count(distinct user_id) as count'))
+@@ -130,8 +137,7 @@ public function index(Request $request)
+         ];
+ 
+         // Liste des projets pour le filtre
+-        $projectsList = Project::whereHas('users', fn($q) => $q->where('user_id', $userId))
+-                               ->get(['id', 'name', 'status']);
++        $projectsList = Project::whereIn('id', $myProjectsIds)->orderBy('name')->get(['id', 'name', 'status']);
+ 
+         return Inertia::render('ProjectUsers/Index', [
+             'members'   => $members,
+@@ -266,37 +272,80 @@ function($attribute, $value, $fail) {
+      */
+     public function show(string $id)
+     {
+-        $project = Project::whereHas('users', function($query) {
+-            $query->where('user_id', auth()->id());
+-        })->with(['users' => function($query) {
+-            $query->withPivot(['role', 'is_muted']);
+-        }])->withCount('tasks')
+-        ->findOrFail($id);
+-        
++        $authUser = auth()->user();
++        $isAdmin = $authUser->hasRole('admin');
++
++        // Un administrateur doit pouvoir consulter n'importe quel projet, même sans en être membre
++        $project = Project::when(!$isAdmin, fn ($q) => $q->whereHas('users', fn ($u) => $u->where('user_id', $authUser->id)))
++            ->with(['users' => fn ($q) => $q->withPivot(['role', 'is_muted']), 'users.roles'])
++            ->withCount('tasks')
++            ->findOrFail($id);
++
+         try {
+             $this->authorize('view', $project);
+         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+             return Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+         }
+-        
+-        $project->users->each(function($user) {
+-            if (!isset($user->pivot->is_muted)) {
+-                $user->pivot->is_muted = false;
+-            }
+-        });
+-        
+-        $authUser = auth()->user();
+-        
++
++        // Tâches par membre et par statut dans ce projet (une seule requête)
++        $rows = Task::where('project_id', $project->id)->whereNotNull('assigned_to')
++            ->select('assigned_to', 'status', DB::raw('count(*) as c'))
++            ->groupBy('assigned_to', 'status')->get();
++        $overdue = Task::where('project_id', $project->id)->whereNotNull('assigned_to')
++            ->where('status', '!=', 'done')->whereNotNull('due_date')->where('due_date', '<', now())
++            ->select('assigned_to', DB::raw('count(*) as c'))->groupBy('assigned_to')->pluck('c', 'assigned_to');
++        $byUser = $rows->groupBy('assigned_to');
++        $tasksByStatus = Task::where('project_id', $project->id)
++            ->select('status', DB::raw('count(*) as c'))->groupBy('status')->pluck('c', 'status');
++
++        // On n'envoie JAMAIS le modèle brut des membres (IBAN, facturation…) : champs explicites seulement
++        $members = $project->users->map(function ($u) use ($byUser, $overdue) {
++            $mine = $byUser->get($u->id, collect());
++            $total = (int) $mine->sum('c');
++            $done = (int) $mine->where('status', 'done')->sum('c');
++            return [
++                'id' => $u->id,
++                'name' => $u->name,
++                'email' => $u->email,
++                'phone' => $u->phone,
++                'job_title' => $u->job_title,
++                'company' => $u->company,
++                'profile_photo_url' => $u->profile_photo_url,
++                'global_role' => $u->roles->first()?->name ?? $u->role,
++                'created_at' => $u->created_at,
++                'pivot' => [
++                    'role' => $u->pivot->role,
++                    'is_muted' => (bool) ($u->pivot->is_muted ?? false),
++                    'created_at' => $u->pivot->created_at,
++                ],
++                'tasks_total' => $total,
++                'tasks_done' => $done,
++                'tasks_open' => $total - $done,
++                'tasks_overdue' => (int) ($overdue[$u->id] ?? 0),
++            ];
++        })->sortBy([['pivot.role', 'asc'], ['name', 'asc']])->values();
++
+         return Inertia::render('ProjectUsers/Show', [
+-            'project' => $project,
++            'project' => [
++                'id' => $project->id,
++                'name' => $project->name,
++                'description' => $project->description,
++                'status' => $project->status,
++                'created_at' => $project->created_at,
++                'updated_at' => $project->updated_at,
++                'tasks_count' => $project->tasks_count,
++                'tasks_by_status' => $tasksByStatus,
++                'users' => $members,
++            ],
++            'can_manage' => $authUser->can('manageMembers', $project),
+             'auth' => [
+                 'user' => [
+                     'id' => $authUser->id,
+                     'name' => $authUser->name,
+                     'email' => $authUser->email,
+                     'profile_photo_url' => $authUser->profile_photo_url ?? null,
+-                ]
+-            ]
++                ],
++            ],
+         ]);
+     }
+ 
+diff --git a/app/Http/Controllers/UserController.php b/app/Http/Controllers/UserController.php
+index 4384871..c04ed24 100644
+--- a/app/Http/Controllers/UserController.php
++++ b/app/Http/Controllers/UserController.php
+@@ -9,6 +9,9 @@
+ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+ use Spatie\Permission\Models\Role;
+ use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Storage;
++use App\Models\Task;
++use App\Models\File;
+ 
+ class UserController extends Controller
+ {
+@@ -24,7 +27,7 @@ public function index(Request $request)
+             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+         }
+         $currentUser = Auth::user();
+-        $query = User::query();
++        $query = User::query()->with('roles');
+         if (!$currentUser->hasRole('admin')) {
+             $projectIds = $currentUser->projects()->pluck('projects.id');
+             $userIds = DB::table('project_user')
+@@ -39,7 +42,31 @@ public function index(Request $request)
+                   ->orWhere('email', 'like', "%$search%");
+             });
+         }
+-        $users = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
++        if ($request->filled('role')) {
++            $r = $request->role;
++            $query->where(function ($q) use ($r) {
++                $q->where('role', $r)->orWhereHas('roles', fn ($rq) => $rq->where('name', $r));
++            });
++        }
++        $users = $query
++            ->select(['id', 'name', 'email', 'role', 'job_title', 'company', 'profile_photo_path', 'created_at', 'email_verified_at'])
++            ->withCount('projects')
++            ->orderBy('created_at', 'desc')
++            ->paginate(10)
++            ->withQueryString();
++        $users->getCollection()->transform(fn ($u) => [
++            'id' => $u->id,
++            'name' => $u->name,
++            'email' => $u->email,
++            'role' => $u->roles->first()?->name ?? $u->role ?? 'user',
++            'job_title' => $u->job_title,
++            'company' => $u->company,
++            'profile_photo_path' => $u->profile_photo_path,
++            'profile_photo_url' => $u->profile_photo_url,
++            'projects_count' => $u->projects_count,
++            'verified' => (bool) $u->email_verified_at,
++            'created_at' => $u->created_at,
++        ]);
+         $roles = Role::orderBy('name')->get();
+         
+         // Préparer les statistiques (uniquement pour les admins)
+@@ -60,11 +87,12 @@ public function index(Request $request)
+             'email' => $currentUser->email,
+             'profile_photo_url' => $currentUser->profile_photo_url ?? null,
+             'role' => $currentUser->roles->first()?->name ?? 'user',
++            'can_assign_role' => $this->canAssignRoles($currentUser),
+         ];
+ 
+         return Inertia::render('Users/Index', [
+             'users' => $users,
+-            'filters' => $request->only(['search']),
++            'filters' => $request->only(['search', 'role']),
+             'roles' => $roles,
+             'auth' => $authUser,
+             'stats' => $stats,
+@@ -114,29 +142,147 @@ public function store(Request $request)
+      */
+     public function show(string $id)
+     {
+-        $user = User::with('projects')->findOrFail($id);
++        $user = User::with('roles')->findOrFail($id);
+         try {
+             $this->authorize('view', $user);
+         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+         }
+-        
++
+         $currentUser = Auth::user();
+-        $authUser = [
+-            'id' => $currentUser->id,
+-            'name' => $currentUser->name,
+-            'email' => $currentUser->email,
+-            'profile_photo_url' => $currentUser->profile_photo_url ?? null,
+-        ];
+-        
++
+         return Inertia::render('Users/Show', [
+-            'user' => $user,
++            'user' => $this->presentUser($user, $currentUser),
+             'auth' => [
+-                'user' => $authUser
++                'user' => [
++                    'id' => $currentUser->id,
++                    'name' => $currentUser->name,
++                    'email' => $currentUser->email,
++                    'profile_photo_url' => $currentUser->profile_photo_url ?? null,
++                    'role' => $currentUser->roles->first()?->name ?? $currentUser->role ?? 'user',
++                ],
+             ],
+         ]);
+     }
+ 
++    /** Seul ce compte peut attribuer des rôles (règle historique, centralisée ici). */
++    private function canAssignRoles(?User $u): bool
++    {
++        return $u && $u->email === 'ronaldoagbohou@gmail.com';
++    }
++
++    /**
++     * Fiche utilisateur « filtrée » selon le visiteur : on n'expose JAMAIS le modèle brut
++     * (IBAN, facturation, etc.). Niveaux : public → co-membre → soi-même / admin.
++     */
++    private function presentUser(User $user, User $viewer): array
++    {
++        $isSelf = $viewer->id === $user->id;
++        $isAdmin = $viewer->hasRole('admin') || $viewer->role === 'admin';
++        $canSeePrivate = $isSelf || $isAdmin;
++
++        // Projets visibles : tous pour soi/admin, sinon uniquement ceux partagés avec le visiteur
++        $viewerProjectIds = $viewer->projects()->pluck('projects.id');
++        $projects = $user->projects()->withPivot('role')->get();
++        if (!$canSeePrivate) {
++            $projects = $projects->whereIn('id', $viewerProjectIds)->values();
++        }
++        $projectIds = $projects->pluck('id');
++        $shared = $viewerProjectIds->intersect($user->projects()->pluck('projects.id'))->isNotEmpty();
++        $canSeeContact = $canSeePrivate || $shared || $viewer->hasRole('manager');
++
++        // Tâches assignées à la personne dans les projets visibles
++        $byStatus = Task::where('assigned_to', $user->id)->whereIn('project_id', $projectIds)
++            ->select('status', DB::raw('count(*) as c'))->groupBy('status')->pluck('c', 'status');
++        $overdue = Task::where('assigned_to', $user->id)->whereIn('project_id', $projectIds)
++            ->where('status', '!=', 'done')->whereNotNull('due_date')->where('due_date', '<', now())->count();
++        $perProject = Task::where('assigned_to', $user->id)->whereIn('project_id', $projectIds)
++            ->select('project_id', DB::raw('count(*) as total'), DB::raw("sum(case when status = 'done' then 1 else 0 end) as done"))
++            ->groupBy('project_id')->get()->keyBy('project_id');
++        $recentTasks = Task::with('project:id,name')->where('assigned_to', $user->id)->whereIn('project_id', $projectIds)
++            ->latest('updated_at')->take(6)->get(['id', 'title', 'status', 'priority', 'due_date', 'project_id'])
++            ->map(fn ($t) => [
++                'id' => $t->id, 'title' => $t->title, 'status' => $t->status, 'priority' => $t->priority,
++                'due_date' => $t->due_date, 'project' => $t->project?->only(['id', 'name']),
++            ]);
++        $filesCount = File::where('user_id', $user->id)->whereIn('project_id', $projectIds)->count();
++
++        $roleName = $user->roles->first()?->name ?? $user->role ?? 'user';
++
++        $data = [
++            'id' => $user->id,
++            'name' => $user->name,
++            'role' => $roleName,
++            'job_title' => $user->job_title,
++            'company' => $user->company,
++            'bio' => $user->bio,
++            'profile_photo_url' => $user->profile_photo_url,
++            'created_at' => $user->created_at,
++            'email' => $canSeeContact ? $user->email : null,
++            'phone' => $canSeeContact ? $user->phone : null,
++            'projects' => $projects->map(fn ($p) => [
++                'id' => $p->id,
++                'name' => $p->name,
++                'status' => $p->status,
++                'role' => $p->pivot->role,
++                'joined_at' => $p->pivot->created_at,
++                'tasks_total' => (int) ($perProject[$p->id]->total ?? 0),
++                'tasks_done' => (int) ($perProject[$p->id]->done ?? 0),
++                'shared' => $viewerProjectIds->contains($p->id),
++            ])->values(),
++            'stats' => [
++                'projects' => $projects->count(),
++                'tasks_total' => (int) $byStatus->sum(),
++                'tasks_by_status' => $byStatus,
++                'tasks_overdue' => $overdue,
++                'files' => $filesCount,
++            ],
++            'recent_tasks' => $recentTasks,
++            'permissions' => [
++                'is_self' => $isSelf,
++                'can_edit' => $isSelf || $isAdmin,
++                'edit_url' => $isSelf ? route('profile.edit') : ($isAdmin ? route('users.edit', $user->id) : null),
++                'can_delete' => $isAdmin && !$isSelf,
++                'can_assign_role' => $this->canAssignRoles($viewer),
++                'sees_private' => $canSeePrivate,
++            ],
++        ];
++
++        if ($canSeePrivate) {
++            $lastSeen = null;
++            try {
++                $ts = DB::table('sessions')->where('user_id', $user->id)->max('last_activity');
++                $lastSeen = $ts ? \Carbon\Carbon::createFromTimestamp($ts)->toIso8601String() : null;
++            } catch (\Throwable $e) {
++                // driver de session ≠ database : pas d'information
++            }
++            $recentActivity = [];
++            try {
++                $recentActivity = DB::table('activities')->where('user_id', $user->id)->latest('created_at')->take(8)
++                    ->get(['id', 'type', 'description', 'created_at']);
++            } catch (\Throwable $e) {
++            }
++            $data += [
++                'email_verified_at' => $user->email_verified_at,
++                'last_seen_at' => $lastSeen,
++                'recent_activity' => $recentActivity,
++                'subscription' => [
++                    'active' => (bool) $user->has_active_subscription,
++                    'plan' => $user->subscription_plan_name,
++                    'ends_at' => $user->subscription_ends_at_formatted,
++                    'days_remaining' => $user->subscription_days_remaining,
++                ],
++                'bank' => $user->iban ? [
++                    'bank_name' => $user->bank_name,
++                    'account_holder_name' => $user->account_holder_name,
++                    'iban_masked' => str_repeat('•', max(strlen($user->iban) - 4, 0)) . substr($user->iban, -4),
++                ] : null,
++            ];
++        }
++
++        return $data;
++    }
++
+     /**
+      * Show the form for editing the specified resource.
+      */
+@@ -177,29 +323,38 @@ public function update(Request $request, string $id)
+             return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
+         }
+         
++        $actor = Auth::user();
++        $actorIsAdmin = $actor->hasRole('admin') || $actor->role === 'admin';
++
+         $validated = $request->validate([
+             'name' => 'required|string|max:255',
+             'email' => 'required|string|email|max:255|unique:users,email,'.$id,
+-            'role' => 'required|in:admin,manager,member,user,developer,candidate',
++            // Le rôle n'est modifiable que par un administrateur (évite qu'un manager s'auto-promeuve)
++            'role' => ($actorIsAdmin ? 'required' : 'sometimes').'|in:admin,manager,member,user,developer,candidate',
+             'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+         ]);
++        if (!$actorIsAdmin) {
++            unset($validated['role']);
++        }
+ 
+         // Handle profile photo upload
+         if ($request->hasFile('profile_photo')) {
+             // Delete old photo if exists
+             if ($user->profile_photo_path) {
+-                \Storage::disk('public')->delete($user->profile_photo_path);
++                Storage::disk('public')->delete(preg_replace('#^public/#', '', $user->profile_photo_path));
+             }
+-            
+-            $profilePhotoPath = $request->file('profile_photo')->store('profile-photos', 'public');
+-            $validated['profile_photo_path'] = $profilePhotoPath;
++
++            // Même format que ProfileController (préfixe « public/ ») pour un affichage cohérent
++            $validated['profile_photo_path'] = 'public/'.$request->file('profile_photo')->store('profile-photos', 'public');
+         }
+         
+         // Remove the file from the data array
+         unset($validated['profile_photo']);
+         
+         $user->update($validated);
+-        if ($validated['role'] === User::ROLE_CANDIDATE) {
++        if (!isset($validated['role'])) {
++            // rôle inchangé (auteur non administrateur)
++        } elseif ($validated['role'] === User::ROLE_CANDIDATE) {
+             $user->syncRoles([]); // un candidat n'a aucun rôle Spatie
+         } elseif ($user->hasRole($validated['role']) === false) {
+             $user->syncRoles([$validated['role']]); // Met à jour le rôle spatie
+@@ -221,8 +376,11 @@ public function destroy(string $id)
+         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+             return \Inertia\Inertia::render('Error403')->toResponse(request())->setStatusCode(403);
+         }
+-        $user->delete();
++        if ((int) $user->id === (int) Auth::id()) {
++            return redirect()->back()->with('error', 'Vous ne pouvez pas supprimer votre propre compte ici.');
++        }
+         activity_log('delete', 'Suppression utilisateur', $user);
++        $user->delete();
+         return redirect()->route('users.index')->with('success', 'Utilisateur supprimé avec succès');
+     }
+ 
+@@ -231,8 +389,9 @@ public function destroy(string $id)
+      */
+     public function apiShow($id)
+     {
+-        $user = User::with('projects')->findOrFail($id);
+-        return response()->json($user);
++        $user = User::with('roles')->findOrFail($id);
++        $this->authorize('view', $user);
++        return response()->json($this->presentUser($user, Auth::user()));
+     }
+ 
+     public function assignRole(Request $request, $id)
+diff --git a/resources/js/Components/People/shared.jsx b/resources/js/Components/People/shared.jsx
+new file mode 100644
+index 0000000..fb4c442
+--- /dev/null
++++ b/resources/js/Components/People/shared.jsx
+@@ -0,0 +1,102 @@
++import React from 'react';
++import Avatar from '@/Components/Quiz/Avatar';
++
++export { Avatar };
++
++/** Rôles globaux (compte) et rôles de projet, avec libellés FR et couleurs. */
++export const GLOBAL_ROLES = {
++    admin: { label: 'Administrateur', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' },
++    manager: { label: 'Manager', cls: 'bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300' },
++    member: { label: 'Membre', cls: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300' },
++    developer: { label: 'Développeur', cls: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-300' },
++    candidate: { label: 'Candidat', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' },
++    user: { label: 'Utilisateur', cls: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200' },
++};
++export const PROJECT_ROLES = {
++    manager: { label: 'Chef de projet', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' },
++    member: { label: 'Membre', cls: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300' },
++    observer: { label: 'Observateur', cls: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200' },
++};
++export const TASK_STATUS = {
++    todo: { label: 'À faire', cls: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200', bar: 'bg-slate-400' },
++    in_progress: { label: 'En cours', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300', bar: 'bg-blue-500' },
++    review: { label: 'En revue', cls: 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300', bar: 'bg-purple-500' },
++    done: { label: 'Terminée', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', bar: 'bg-emerald-500' },
++};
++export const statusOf = (s) => TASK_STATUS[s] || { label: (s || '—').replace(/_/g, ' '), cls: TASK_STATUS.todo.cls, bar: 'bg-slate-400' };
++
++export function Badge({ cfg, children, className = '' }) {
++    return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.cls} ${className}`}>{children ?? cfg.label}</span>;
++}
++
++export const fmtDate = (d, opts = { day: 'numeric', month: 'long', year: 'numeric' }) =>
++    d ? new Date(d).toLocaleDateString('fr-FR', opts) : '—';
++
++export function timeAgo(d) {
++    if (!d) return null;
++    const s = Math.max(0, (Date.now() - new Date(d).getTime()) / 1000);
++    if (s < 60) return "à l'instant";
++    if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
++    if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
++    if (s < 86400 * 30) return `il y a ${Math.floor(s / 86400)} j`;
++    return fmtDate(d, { day: 'numeric', month: 'short', year: 'numeric' });
++}
++
++export function Card({ title, icon: Icon, action, children, className = '' }) {
++    return (
++        <section className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className}`}>
++            {title && (
++                <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5 dark:border-slate-700/70 sm:px-5">
++                    <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
++                        {Icon && <Icon className="h-4 w-4 text-blue-500" />} {title}
++                    </h2>
++                    {action}
++                </header>
++            )}
++            <div className="p-4 sm:p-5">{children}</div>
++        </section>
++    );
++}
++
++export function Stat({ label, value, tone = 'text-slate-900 dark:text-white' }) {
++    return (
++        <div className="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-4">
++            <p className={`text-2xl font-bold tabular-nums ${tone}`}>{value ?? 0}</p>
++            <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
++        </div>
++    );
++}
++
++export function ProgressBar({ done = 0, total = 0 }) {
++    const pct = total ? Math.round((done / total) * 100) : 0;
++    return (
++        <div className="flex items-center gap-2">
++            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
++                <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
++            </div>
++            <span className="w-16 shrink-0 text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">{done}/{total}</span>
++        </div>
++    );
++}
++
++export function EmptyState({ icon: Icon, title, text }) {
++    return (
++        <div className="py-8 text-center">
++            {Icon && <Icon className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" />}
++            <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">{title}</p>
++            {text && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{text}</p>}
++        </div>
++    );
++}
++
++export function InfoRow({ icon: Icon, label, children }) {
++    return (
++        <div className="flex items-start gap-3 py-2.5">
++            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
++            <div className="min-w-0 flex-1">
++                <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
++                <div className="break-words text-sm font-medium text-slate-900 dark:text-slate-100">{children}</div>
++            </div>
++        </div>
++    );
++}
+diff --git a/resources/js/Pages/ProjectUsers/Index.jsx b/resources/js/Pages/ProjectUsers/Index.jsx
+index a37f4ea..727a5c4 100644
+--- a/resources/js/Pages/ProjectUsers/Index.jsx
++++ b/resources/js/Pages/ProjectUsers/Index.jsx
+@@ -298,11 +298,11 @@ export default function Index({ members = {}, filters: initialFilters = {}, glob
+                     <tr><td colSpan={5} className="py-16 text-center text-gray-400">Aucun membre trouvé</td></tr>
+                   ) : (
+                     membersData.map(member => (
+-                      <tr key={member.id} className="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 cursor-pointer transition" onClick={() => router.get(`/project-users/${member.id}`)}>
++                      <tr key={member.id} className="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 cursor-pointer transition" onClick={() => router.get(`/users/${member.id}`)}>
+                         <td className="px-5 py-4">
+                           <div className="flex items-center gap-3">
+                             <img src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}`} className="w-8 h-8 rounded-full" />
+-                            <span className="font-semibold">{member.name}</span>
++                            <div className="min-w-0"><span className="block font-semibold">{member.name}</span>{(member.job_title || member.company) && <span className="block text-xs text-gray-500">{[member.job_title, member.company].filter(Boolean).join(' · ')}</span>}</div>
+                           </div>
+                         </td>
+                         <td className="px-5 py-4 text-gray-600 dark:text-gray-300">{member.email}</td>
+@@ -335,11 +335,12 @@ export default function Index({ members = {}, filters: initialFilters = {}, glob
+ {viewMode === 'cards' && (
+   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+     {membersData.map(member => (
+-      <div key={member.id} onClick={() => router.get(`/project-users/${member.id}`)} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group flex flex-col h-full">
++      <div key={member.id} onClick={() => router.get(`/users/${member.id}`)} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group flex flex-col h-full">
+         <div className="flex items-center gap-3 mb-4">
+           <img src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}`} className="w-12 h-12 rounded-full ring-2 ring-indigo-200" />
+           <div>
+             <h3 className="font-bold text-gray-900 dark:text-white group-hover:text-indigo-600">{member.name}</h3>
++            {(member.job_title || member.company) && <p className="text-xs text-gray-600 dark:text-gray-300">{[member.job_title, member.company].filter(Boolean).join(' · ')}</p>}
+             <div className="flex items-center gap-1 text-xs text-gray-500"><FaEnvelope /> {member.email}</div>
+           </div>
+         </div>
+diff --git a/resources/js/Pages/ProjectUsers/Show.jsx b/resources/js/Pages/ProjectUsers/Show.jsx
+index 8f85e95..1fef759 100644
+--- a/resources/js/Pages/ProjectUsers/Show.jsx
++++ b/resources/js/Pages/ProjectUsers/Show.jsx
+@@ -1,471 +1,181 @@
+-import React, { useState, useEffect, useMemo } from 'react';
+-import { Link, usePage, router } from '@inertiajs/react';
+-import { useTranslation } from 'react-i18next';
+-import i18n from 'i18next';
+-import AdminLayout from '../../Layouts/AdminLayout';
+-import { 
+-    FaUsers, 
+-    FaUserEdit, 
+-    FaArrowLeft, 
+-    FaProjectDiagram,
+-    FaUser,
+-    FaCrown,
+-    FaShieldAlt,
+-    FaCalendarAlt,
+-    FaTasks,
+-    FaEye,
+-    FaEnvelope,
+-    FaInfoCircle,
+-    FaVolumeMute,
+-    FaVolumeUp
+-} from 'react-icons/fa';
++import React, { useMemo, useState } from 'react';
++import { Head, Link, usePage } from '@inertiajs/react';
++import axios from 'axios';
+ import { toast } from 'react-toastify';
+-
+-// Helper function to sanitize project data
+-const sanitizeProjectData = (project) => {
+-    if (!project) return null;
+-    
+-    const cleanProject = { ...project };
+-    
+-    // Sanitize users array if it exists
+-    if (cleanProject.users) {
+-        cleanProject.users = cleanProject.users.map(user => ({
+-            id: user.id,
+-            name: user.name,
+-            email: user.email || '',
+-            profile_photo_url: user.profile_photo_url,
+-            pivot: user.pivot ? { 
+-                role: user.pivot.role,
+-                is_muted: user.pivot.is_muted || false,
+-                created_at: user.pivot.created_at
+-            } : null,
+-            created_at: user.created_at
+-        }));
+-    }
+-    
+-    // Keep creation date
+-    cleanProject.created_at = project.created_at;
+-    cleanProject.updated_at = project.updated_at;
+-    
+-    return cleanProject;
++import AdminLayout from '@/Layouts/AdminLayout';
++import {
++    FaArrowLeft, FaUsers, FaUserEdit, FaUserPlus, FaProjectDiagram, FaTasks, FaCalendarAlt, FaSearch, FaCrown,
++    FaVolumeMute, FaVolumeUp, FaEnvelope, FaPhone, FaExclamationTriangle, FaInfoCircle,
++} from 'react-icons/fa';
++import {
++    Avatar, Badge, Card, Stat, ProgressBar, EmptyState, PROJECT_ROLES, GLOBAL_ROLES, statusOf, fmtDate,
++} from '@/Components/People/shared';
++
++const ROLE_HELP = {
++    manager: 'Gère le projet, ses membres et valide le travail.',
++    member: 'Participe aux tâches et aux discussions du projet.',
++    observer: 'Consulte le projet sans y contribuer.',
+ };
+ 
+-export default function Show({ project: initialProject, auth }) {
+-    const { t } = useTranslation();
+-    // Sanitize project data
+-    const [project, setProject] = useState(() => sanitizeProjectData(initialProject));
++export default function Show({ project: initial, auth, can_manage = false }) {
+     const { flash = {} } = usePage().props;
+-    
+-    // Mettre à jour le projet si les props changent
+-    useEffect(() => {
+-        setProject(sanitizeProjectData(initialProject));
+-    }, [initialProject]);
+-    
+-    // Fonction pour basculer le statut mute d'un utilisateur
+-    const toggleMuteUser = async (userId) => {
++    const [members, setMembers] = useState(initial.users || []);
++    const [q, setQ] = useState('');
++    const [roleFilter, setRoleFilter] = useState('');
++    const [pending, setPending] = useState({});
++
++    React.useEffect(() => setMembers(initial.users || []), [initial]);
++
++    const counts = useMemo(() => members.reduce((a, m) => ({ ...a, [m.pivot.role]: (a[m.pivot.role] || 0) + 1 }), {}), [members]);
++    const filtered = useMemo(() => {
++        const s = q.trim().toLowerCase();
++        return members.filter((m) =>
++            (!roleFilter || m.pivot.role === roleFilter) &&
++            (!s || [m.name, m.email, m.job_title, m.company].some((v) => (v || '').toLowerCase().includes(s))));
++    }, [members, q, roleFilter]);
++
++    const taskEntries = Object.entries(initial.tasks_by_status || {}).filter(([, n]) => n > 0);
++    const totalOverdue = members.reduce((s, m) => s + (m.tasks_overdue || 0), 0);
++
++    const toggleMute = async (m) => {
++        setPending((p) => ({ ...p, [m.id]: true }));
+         try {
+-            const response = await axios.post(route('project-users.toggle-mute', [project.id, userId]), {}, {
+-                headers: {
+-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+-                    'X-Requested-With': 'XMLHttpRequest',
+-                    'Content-Type': 'application/json',
+-                    'Accept': 'application/json'
+-                }
+-            });
+-            
+-            if (response.data.success) {
+-                // Mettre à jour l'état local avec la réponse du serveur
+-                setProject(prevProject => ({
+-                    ...prevProject,
+-                    users: prevProject.users.map(user => 
+-                        user.id === userId 
+-                            ? {
+-                                ...user,
+-                                pivot: {
+-                                    ...user.pivot,
+-                                    is_muted: response.data.is_muted
+-                                }
+-                            }
+-                            : user
+-                    )
+-                }));
+-                
+-                toast.success(response.data.message, {
+-                    position: 'top-right',
+-                    autoClose: 3000,
+-                    hideProgressBar: false,
+-                    closeOnClick: true,
+-                    pauseOnHover: true,
+-                    draggable: true,
+-                    progress: undefined,
+-                });
++            const { data } = await axios.post(route('project-users.toggle-mute', [initial.id, m.id]), {}, { headers: { Accept: 'application/json' } });
++            if (data.success) {
++                setMembers((list) => list.map((x) => (x.id === m.id ? { ...x, pivot: { ...x.pivot, is_muted: data.is_muted } } : x)));
++                toast.success(data.message);
+             }
+-        } catch (error) {
+-            console.error('Erreur lors du changement de statut mute:', error);
+-            toast.error('Une erreur est survenue lors de la mise à jour du statut.', {
+-                position: 'top-right',
+-                autoClose: 3000,
+-                hideProgressBar: false,
+-                closeOnClick: true,
+-                pauseOnHover: true,
+-                draggable: true,
+-                progress: undefined,
+-            });
++        } catch {
++            toast.error('Impossible de modifier le statut de ce membre.');
+         }
++        setPending((p) => ({ ...p, [m.id]: false }));
+     };
+-    const [notification, setNotification] = useState(null);
+-
+-    useEffect(() => {
+-        if (flash.success) {
+-            setNotification({ type: 'success', message: flash.success });
+-            const timer = setTimeout(() => setNotification(null), 5000);
+-            return () => clearTimeout(timer);
+-        }
+-        if (flash.error) {
+-            setNotification({ type: 'error', message: flash.error });
+-            const timer = setTimeout(() => setNotification(null), 5000);
+-            return () => clearTimeout(timer);
+-        }
+-    }, [flash]);
+ 
+-    if (!project) {
+-        return (
+-            <AdminLayout>
+-                <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
+-                    <div className="text-center">
+-                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('project_not_found')}</h1>
+-                        <Link 
+-                            href={route('project-users.index')}
+-                            className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+-                        >
+-                            <FaArrowLeft className="mr-2" /> {t('back_to_list')}
+-                        </Link>
++    return (
++        <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-900">
++            <Head title={`Membres · ${initial.name}`} />
++            <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
++                <Link href={route('project-users.index')} className="inline-flex items-center gap-2 py-1 text-sm font-medium text-slate-600 hover:text-blue-600 dark:text-slate-300">
++                    <FaArrowLeft /> Tous les membres
++                </Link>
++
++                {/* En-tête projet */}
++                <div className="mt-3 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:flex-row sm:items-center sm:p-6">
++                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow"><FaProjectDiagram className="text-2xl" /></span>
++                    <div className="min-w-0 flex-1">
++                        <div className="flex flex-wrap items-center gap-2">
++                            <Link href={route('projects.show', initial.id)} className="truncate text-xl font-bold text-slate-900 hover:text-blue-600 dark:text-white sm:text-2xl">{initial.name}</Link>
++                            {initial.status && <Badge cfg={{ cls: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200' }}>{initial.status}</Badge>}
++                        </div>
++                        {initial.description && <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{initial.description}</p>}
++                        <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"><FaCalendarAlt /> Créé le {fmtDate(initial.created_at)}</p>
+                     </div>
++                    {can_manage && (
++                        <div className="flex flex-wrap gap-2">
++                            <Link href={route('project-users.edit', initial.id)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 sm:flex-none"><FaUserEdit /> Gérer</Link>
++                            <Link href={`${route('project-users.create')}?project_id=${initial.id}`} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 sm:flex-none"><FaUserPlus /> Ajouter</Link>
++                        </div>
++                    )}
+                 </div>
+-            </AdminLayout>
+-        );
+-    }
+-
+-    const getRoleIcon = (role) => {
+-        switch (role) {
+-            case 'member': return <FaUser className="text-blue-500" />;
+-            default: return <FaShieldAlt className="text-gray-500" />;
+-        }
+-    };
+ 
+-    const getRoleColor = (role) => {
+-        switch (role) {
+-            case 'manager': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+-            case 'member': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+-            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+-        }
+-    };
+-
+-    const getRoleLabel = (role) => {
+-        switch (role) {
+-            case 'manager': return t('role_manager');
+-            case 'member': return t('role_member');
+-            case 'observer': return t('role_observer');
+-            default: return t('role_other');
+-        }
+-    };
++                {flash.success && <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">{flash.success}</p>}
++                {flash.error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">{flash.error}</p>}
+ 
+-    return (
+-        <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+-            {/* Notification */}
+-            {notification && (
+-                <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg transition-all duration-300 ${
+-                    notification.type === 'success' 
+-                        ? 'bg-green-100 text-green-800 border border-green-200' 
+-                        : 'bg-red-100 text-red-800 border border-red-200'
+-                }`}>
+-                    <div className="flex items-center gap-2">
+-                        <span className="font-medium">{notification.message}</span>
+-                        <button 
+-                            onClick={() => setNotification(null)}
+-                            className="ml-2 text-gray-500 hover:text-gray-700"
+-                        >
+-                            ×
+-                        </button>
+-                    </div>
++                <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
++                    <Stat label="Membres" value={members.length} tone="text-blue-600 dark:text-blue-400" />
++                    <Stat label="Chefs de projet" value={counts.manager || 0} tone="text-amber-600" />
++                    <Stat label="Tâches" value={initial.tasks_count} />
++                    <Stat label="Tâches en retard" value={totalOverdue} tone={totalOverdue ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'} />
+                 </div>
+-            )}
+-
+-            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
+-                <div className="flex flex-col w-full max-w-6xl mx-auto mt-14 pt-4 px-4 sm:px-6 lg:px-8">
+-                    {/* Header */}
+-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+-                        <div className="flex items-center gap-4">
+-                            <Link 
+-                                href={route('project-users.index')} 
+-                                className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all duration-200"
+-                            >
+-                                <FaArrowLeft className="text-lg" />
+-                            </Link>
+-                            <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
+-                                <FaEye className="text-white text-xl" />
+-                            </div>
+-                            <div>
+-                                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
+-                                    {t('project_members_management')}
+-                                </h1>
+-                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+-                                    {t('view_project_members_info', { projectName: project.name })}
+-                                </p>
+-                            </div>
+-                        </div>
++                {taskEntries.length > 0 && (
++                    <div className="mt-3 flex flex-wrap gap-2">
++                        {taskEntries.map(([s, n]) => <Badge key={s} cfg={statusOf(s)}>{n} {statusOf(s).label.toLowerCase()}</Badge>)}
+                     </div>
+-
+-                    {/* Project Overview */}
+-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+-                        <div className="flex items-center gap-4 mb-6">
+-                            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-sm">
+-                                <FaProjectDiagram className="text-white text-2xl" />
+-                            </div>
+-                            <div className="flex-1">
+-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+-                                    {project ? (
+-                                        <Link 
+-                                            href={route('projects.show', project.id)}
+-                                            className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+-                                            onClick={(e) => e.stopPropagation()}
+-                                        >
+-                                            {project.name}
+-                                        </Link>
+-                                    ) : (
+-                                        <span className="text-gray-400">Projet non trouvé</span>
+-                                    )}
+-                                </h2>
+-                                <div className="flex items-center gap-6 mt-2 text-sm text-gray-600 dark:text-gray-400">
+-                                    <div className="flex items-center gap-1">
+-                                        <FaUsers />
+-                                        <span>{t('members_count', { count: project?.users?.length || 0 })}</span>
+-                                    </div>
+-                                    <div className="flex items-center gap-1">
+-                                        <FaTasks />
+-                                        <span>{t('tasks_count', { count: project.tasks_count || 0 })}</span>
+-                                    </div>
+-                                    <div className="flex items-center gap-1">
+-                                        <FaCalendarAlt />
+-                                        <span>{t('created_on')} {new Date(project.created_at).toLocaleDateString(i18n.language, {
+-                                            day: '2-digit',
+-                                            month: 'long',
+-                                            year: 'numeric',
+-                                            hour: '2-digit',
+-                                            minute: '2-digit'
+-                                        })}</span>
+-                                    </div>
+-                                </div>
+-                            </div>
++                )}
++
++                {/* Membres */}
++                <Card className="mt-6" title={`Équipe (${filtered.length}${filtered.length !== members.length ? `/${members.length}` : ''})`} icon={FaUsers}>
++                    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center">
++                        <div className="relative flex-1">
++                            <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
++                            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un membre…" aria-label="Rechercher un membre"
++                                className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-10 pr-3 text-base focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-100 md:py-2.5 md:text-sm" />
+                         </div>
+-
+-                        {/* Project Stats */}
+-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+-                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 text-center border border-blue-200 dark:border-blue-800">
+-                                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+-                                    {project.users?.length || 0}
+-                                </div>
+-                                <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">{t('members')}</div>
+-                            </div>
+-                            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center border border-green-200 dark:border-green-800">
+-                                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+-                                    {project.tasks_count ?? project.tasks?.length ?? 0}
+-                                </div>
+-                                <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+-                                    {t('tasks')}
+-                                    {project.tasks_by_status && (
+-                                        <div className="text-xs mt-1">
+-                                            {Object.entries(project.tasks_by_status).map(([status, count]) => (
+-                                                count > 0 && (
+-                                                    <span key={status} className="inline-block bg-white dark:bg-gray-700 rounded-full px-2 py-0.5 text-xs font-medium mr-1 mb-1">
+-                                                        {count} {status.replace('_', ' ')}
+-                                                    </span>
+-                                                )
+-                                            ))}
+-                                        </div>
+-                                    )}
+-                                </div>
+-                            </div>
+-                            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 text-center border border-purple-200 dark:border-purple-800">
+-                                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+-                                    {project.users?.filter(u => u.pivot?.role === 'manager').length || 0}
+-                                </div>
+-                                <div className="text-sm text-purple-600 dark:text-purple-400 font-medium">{t('managers')}</div>
+-                            </div>
++                        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
++                            {[['', 'Tous'], ...Object.entries(PROJECT_ROLES).map(([k, v]) => [k, v.label])].map(([k, l]) => (
++                                <button key={k} onClick={() => setRoleFilter(k)} aria-pressed={roleFilter === k}
++                                    className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium ${roleFilter === k ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300' : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
++                                    {l}{k && counts[k] ? ` · ${counts[k]}` : ''}
++                                </button>
++                            ))}
+                         </div>
+                     </div>
+ 
+-                    {/* Members Section */}
+-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
+-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+-                            <h3 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+-                                <FaUsers className="text-blue-500" />
+-                                {t('project_members')} ({project.users?.length || 0})
+-                            </h3>
+-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+-                                {t('project_members_list_description')}
+-                            </p>
+-                        </div>
+-
+-                        <div className="p-6">
+-                            {project.users && project.users.length > 0 ? (
+-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+-                                    {project.users.map(user => (
+-                                        <div key={user.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700">
+-                                            <div className="flex items-start gap-4">
+-                                                <div className="relative flex-shrink-0">
+-                                                    <div className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden border-2 border-white dark:border-gray-700">
+-                                                        {user.profile_photo_url ? (
+-                                                            <img 
+-                                                                src={user.profile_photo_url}
+-                                                                alt={user.name}
+-                                                                className="w-full h-full object-cover"
+-                                                                onError={(e) => {
+-                                                                    e.target.onerror = null;
+-                                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=random`;
+-                                                                }}
+-                                                            />
+-                                                        ) : (
+-                                                            <span className="text-gray-600 dark:text-gray-300 font-medium text-xl">
+-                                                                {(user.name || 'U').charAt(0).toUpperCase()}
+-                                                            </span>
+-                                                        )}
+-                                                    </div>
+-                                                    {user.pivot?.is_muted && (
+-                                                        <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1">
+-                                                            <FaVolumeMute className="text-xs" /> suspendu
+-                                                        </div>
+-                                                    )}
+-                                                </div>
+-                                                <div className="flex-1 min-w-0">
+-                                                    <div className="flex items-center justify-between">
+-                                                        <h4 className={`text-base font-semibold ${user.pivot?.is_muted ? 'opacity-50' : ''} ${user.id === auth.user.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+-                                                            {user.name}
+-                                                        </h4>
+-                                                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.pivot?.role)}`}>
+-                                                            {user.pivot?.role !== 'manager' && getRoleIcon(user.pivot?.role)}
+-                                                            {getRoleLabel(user.pivot?.role)}
+-                                                        </div>
+-                                                    </div>
+-                                                    <div className="mt-1 relative group">
+-                                                        <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-[180px]" title={user.email || ''}>
+-                                                            {user.email || t('email_not_available')}
+-                                                        </p>
+-                                                        {user.email && user.email.length > 25 && (
+-                                                            <div className="absolute z-10 invisible group-hover:visible bg-gray-800 text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-1 whitespace-nowrap">
+-                                                                {user.email}
+-                                                                <div className="absolute w-2 h-2 bg-gray-800 transform rotate-45 -bottom-1 left-1/2 -ml-1"></div>
+-                                                            </div>
+-                                                        )}
+-                                                    </div>
+-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+-                                                        <FaCalendarAlt className="inline mr-1" />
+-                                                        {t('member_since')} {user.pivot?.created_at ? new Date(user.pivot.created_at).toLocaleDateString(i18n.language, {
+-                                                            day: '2-digit',
+-                                                            month: 'short',
+-                                                            year: 'numeric'
+-                                                        }) : t('date_unknown')}
+-                                                    </p>
++                    {filtered.length === 0 ? (
++                        <EmptyState icon={FaUsers} title="Aucun membre trouvé" text="Modifiez votre recherche ou le filtre de rôle." />
++                    ) : (
++                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
++                            {filtered.map((m) => {
++                                const r = PROJECT_ROLES[m.pivot.role] || PROJECT_ROLES.member;
++                                const muted = m.pivot.is_muted;
++                                const isMe = m.id === auth.user.id;
++                                return (
++                                    <article key={m.id} className={`flex flex-col rounded-xl border bg-white p-4 shadow-sm transition hover:shadow-md dark:bg-slate-800 ${isMe ? 'border-blue-300 dark:border-blue-500/50' : 'border-slate-200 dark:border-slate-700'}`}>
++                                        <div className="flex items-start gap-3">
++                                            <Avatar name={m.name} src={m.profile_photo_url} size="lg" className={muted ? 'opacity-50' : ''} />
++                                            <div className="min-w-0 flex-1">
++                                                <Link href={`/users/${m.id}`} className={`block truncate font-semibold text-slate-900 hover:text-blue-600 dark:text-white ${muted ? 'opacity-60' : ''}`}>
++                                                    {m.name}{isMe && <span className="ml-1.5 text-xs font-normal text-blue-600">(vous)</span>}
++                                                </Link>
++                                                {(m.job_title || m.company) && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{[m.job_title, m.company].filter(Boolean).join(' · ')}</p>}
++                                                <div className="mt-1.5 flex flex-wrap gap-1.5">
++                                                    <Badge cfg={r}>{m.pivot.role === 'manager' && <FaCrown className="text-[10px]" />}{r.label}</Badge>
++                                                    {muted && <Badge cfg={{ cls: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300' }}><FaVolumeMute className="text-[10px]" /> Sourdine</Badge>}
++                                                    {m.global_role && m.global_role !== 'user' && m.global_role !== 'member' && GLOBAL_ROLES[m.global_role] && <Badge cfg={GLOBAL_ROLES[m.global_role]} />}
+                                                 </div>
+                                             </div>
+-                                            
+-                                            {auth.user.id !== user.id && user.pivot?.role !== 'manager' && user.pivot?.role !== 'admin' && (
+-                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-right">
+-                                                    <button
+-                                                        onClick={() => toggleMuteUser(user.id)}
+-                                                        className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${user.pivot?.is_muted 
+-                                                            ? 'text-green-700 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50' 
+-                                                            : 'text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}`}
+-                                                        title={user.pivot?.is_muted ? t('enable_notifications') : t('mute_notifications')}
+-                                                    >
+-                                                        {user.pivot?.is_muted ? (
+-                                                            <>
+-                                                                <FaVolumeUp className="text-xs" />
+-                                                                <span>{t('enable')}</span>
+-                                                            </>
+-                                                        ) : (
+-                                                            <>
+-                                                                <FaVolumeMute className="text-xs" />
+-                                                                <span>{t('muted')}</span>
+-                                                            </>
+-                                                        )}
+-                                                    </button>
+-                                                </div>
+-                                            )}
+                                         </div>
+-                                    ))}
+-                                </div>
+-                            ) : (
+-                                <div className="text-center p-4">
+-                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+-                                        {t('no_members_added')}
+-                                    </p>
+-                                </div>
+-                            )}
+-                        </div>
+-                    </div>
+ 
+-                    {/* Help Section */}
+-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+-                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+-                            <FaInfoCircle className="text-blue-500" />
+-                            {t('roles_and_permissions')}
+-                        </h4>
+-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+-                            <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+-                                <FaCrown className="text-yellow-500 mt-1" />
+-                                <div>
+-                                    <h5 className="font-medium text-yellow-800 dark:text-yellow-200">{t('project_manager')}</h5>
+-                                    <p className="text-sm text-yellow-700 dark:text-yellow-300">{t('project_manager_description')}</p>
+-                                </div>
+-                            </div>
+-                            <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+-                                <FaUser className="text-blue-500 mt-1" />
+-                                <div>
+-                                    <h5 className="font-medium text-blue-800 dark:text-blue-200">{t('member')}</h5>
+-                                    <p className="text-sm text-blue-700 dark:text-blue-300">{t('member_description')}</p>
+-                                </div>
+-                            </div>
+-                            <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+-                                <FaShieldAlt className="text-gray-500 mt-1" />
+-                                <div>
+-                                    <h5 className="font-medium text-gray-800 dark:text-gray-200">{t('observer')}</h5>
+-                                    <p className="text-sm text-gray-700 dark:text-gray-300">{t('observer_description')}</p>
+-                                </div>
+-                            </div>
+-                        </div>
+-                    </div>
++                                        <div className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
++                                            {m.email && <a href={`mailto:${m.email}`} className="flex items-center gap-2 truncate hover:text-blue-600"><FaEnvelope className="shrink-0 text-xs text-slate-400" /> <span className="truncate">{m.email}</span></a>}
++                                            {m.phone && <a href={`tel:${m.phone}`} className="flex items-center gap-2 hover:text-blue-600"><FaPhone className="shrink-0 text-xs text-slate-400" /> {m.phone}</a>}
++                                            <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"><FaCalendarAlt className="shrink-0" /> Dans le projet depuis le {fmtDate(m.pivot.created_at, { day: 'numeric', month: 'short', year: 'numeric' })}</p>
++                                        </div>
++
++                                        <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-700/70">
++                                            <p className="mb-1.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
++                                                <span className="flex items-center gap-1.5"><FaTasks /> Tâches terminées</span>
++                                                {m.tasks_overdue > 0 && <span className="flex items-center gap-1 font-medium text-red-600"><FaExclamationTriangle /> {m.tasks_overdue} en retard</span>}
++                                            </p>
++                                            <ProgressBar done={m.tasks_done} total={m.tasks_total} />
++                                        </div>
+ 
+-                    {/* Actions */}
+-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+-                            <Link 
+-                                href={route('project-users.edit', project.id)}
+-                                className="flex-1 sm:flex-none bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200 transform hover:scale-105"
+-                            >
+-                                <FaUserEdit />
+-                                {t('edit_members')}
+-                            </Link>
+-                            <Link 
+-                                href={route('project-users.create')}
+-                                className="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200 transform hover:scale-105"
+-                            >
+-                                <FaUsers />
+-                                {t('add_member')}
+-                            </Link>
+-                            <Link 
+-                                href={route('project-users.index')}
+-                                className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200"
+-                            >
+-                                <FaArrowLeft />
+-                                {t('back_to_list')}
+-                            </Link>
++                                        {can_manage && !isMe && m.pivot.role !== 'manager' && (
++                                            <button type="button" disabled={pending[m.id]} onClick={() => toggleMute(m)}
++                                                className={`mt-3 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition disabled:opacity-60 ${muted ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200'}`}>
++                                                {muted ? <><FaVolumeUp /> Réactiver les notifications</> : <><FaVolumeMute /> Mettre en sourdine</>}
++                                            </button>
++                                        )}
++                                    </article>
++                                );
++                            })}
+                         </div>
++                    )}
++                </Card>
++
++                <Card className="mt-6" title="Rôles dans le projet" icon={FaInfoCircle}>
++                    <div className="grid gap-3 md:grid-cols-3">
++                        {Object.entries(PROJECT_ROLES).map(([k, v]) => (
++                            <div key={k} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/40">
++                                <Badge cfg={v} />
++                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{ROLE_HELP[k]}</p>
++                            </div>
++                        ))}
+                     </div>
+-                </div>
+-            </main>
++                </Card>
++            </div>
+         </div>
+     );
+ }
+ 
+-Show.layout = page => <AdminLayout children={page} />;
+\ No newline at end of file
++Show.layout = (page) => <AdminLayout children={page} />;
+diff --git a/resources/js/Pages/Users/Index.jsx b/resources/js/Pages/Users/Index.jsx
+index 40f4105..697553a 100644
+--- a/resources/js/Pages/Users/Index.jsx
++++ b/resources/js/Pages/Users/Index.jsx
+@@ -1,584 +1,240 @@
+-import React, { useEffect, useState } from 'react';
+-import { Inertia } from '@inertiajs/inertia';
+-import { Link, usePage } from '@inertiajs/react';
+-import { router } from '@inertiajs/react';
+-import AdminLayout from '../../Layouts/AdminLayout';
+-import ActionButton from '../../Components/ActionButton';
+-import { FaUser, FaUsers, FaPlus, FaEdit, FaEye, FaProjectDiagram, FaSearch, FaEnvelope, FaCalendarAlt, FaUserShield, FaTrash, FaCrown, FaUserTie, FaTh, FaList, FaUserCheck, FaUserClock, FaChartBar } from 'react-icons/fa';
+-import Modal from '../../Components/Modal';
+-
+-export default function Index({ users, filters, roles = [], auth, stats = null }) {
+-    const { flash = {}, auth: currentAuth } = usePage().props;
+-    const userAuth = auth?.user || auth;
+-    const [search, setSearch] = useState(filters?.search || '');
+-    const [notification, setNotification] = useState(flash.success || '');
+-    const [notificationType, setNotificationType] = useState('success');
+-    const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
+-    const [isMobile, setIsMobile] = useState(false);
+-    const canAssignRole = auth && auth.email === 'ronaldoagbohou@gmail.com';
+-    const [roleLoading, setRoleLoading] = useState({});
+-    const [roleSuccess, setRoleSuccess] = useState({});
+-    const [roleError, setRoleError] = useState({});
++import React, { useEffect, useRef, useState } from 'react';
++import { Head, Link, router, usePage } from '@inertiajs/react';
++import AdminLayout from '@/Layouts/AdminLayout';
++import Modal from '@/Components/Modal';
++import {
++    FaUsers, FaPlus, FaSearch, FaTh, FaList, FaUserShield, FaUserTie, FaUser, FaProjectDiagram, FaCheckCircle, FaTrash, FaTimes,
++} from 'react-icons/fa';
++import { Avatar, Badge, Stat, EmptyState, GLOBAL_ROLES, fmtDate } from '@/Components/People/shared';
++
++const csrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
++const api = async (url, method, body) => {
++    const res = await fetch(url, {
++        method,
++        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf() },
++        body: body ? JSON.stringify(body) : undefined,
++    });
++    const data = await res.json().catch(() => ({}));
++    if (!res.ok) throw new Error(data.message || data.error || 'Une erreur est survenue');
++    return data;
++};
++
++export default function Index({ users, filters = {}, roles = [], auth, stats = null }) {
++    const { flash = {} } = usePage().props;
++    const canAssignRole = !!(auth?.can_assign_role);
++    const canCreate = auth?.role === 'admin';
++    const [search, setSearch] = useState(filters.search || '');
++    const [roleFilter, setRoleFilter] = useState(filters.role || '');
++    const [view, setView] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'));
++    const [toast, setToast] = useState(flash.success ? { type: 'success', msg: flash.success } : null);
++    const [busy, setBusy] = useState({});
+     const [newRole, setNewRole] = useState('');
+-    const [newRoleLoading, setNewRoleLoading] = useState(false);
+-    const [newRoleSuccess, setNewRoleSuccess] = useState('');
+-    const [newRoleError, setNewRoleError] = useState('');
+     const [roleToDelete, setRoleToDelete] = useState(null);
+-    const [deleteLoading, setDeleteLoading] = useState(false);
++    const first = useRef(true);
+ 
+-    // Détecter si on est sur mobile/tablette au chargement et au redimensionnement
+-    useEffect(() => {
+-        const checkIfMobile = () => {
+-            const mobile = window.innerWidth < 1024; // lg breakpoint de Tailwind
+-            setIsMobile(mobile);
+-            if (mobile) {
+-                setViewMode('cards');
+-            } else {
+-                setViewMode('table');
+-            }
+-        };
+-        
+-        checkIfMobile();
+-        window.addEventListener('resize', checkIfMobile);
+-        return () => window.removeEventListener('resize', checkIfMobile);
+-    }, []);
++    const notify = (type, msg) => { setToast({ type, msg }); setTimeout(() => setToast(null), 3500); };
+ 
++    // Recherche / filtre en direct (anti-rebond)
+     useEffect(() => {
+-        if (flash.success) {
+-            setNotification(flash.success);
+-            setNotificationType('success');
+-        }
+-    }, [flash.success]);
+-
+-    const handleSearchSubmit = (e) => {
+-        e.preventDefault();
+-        router.get('/users', { search }, { preserveState: true, replace: true });
+-    };
+-
+-    const handleRoleChange = async (userId, newRole) => {
+-        setRoleLoading(prev => ({ ...prev, [userId]: true }));
+-        setRoleSuccess(prev => ({ ...prev, [userId]: '' }));
+-        setRoleError(prev => ({ ...prev, [userId]: '' }));
++        if (first.current) { first.current = false; return; }
++        const t = setTimeout(() => {
++            router.get('/users', { search: search || undefined, role: roleFilter || undefined }, { preserveState: true, replace: true, only: ['users', 'filters'] });
++        }, 350);
++        return () => clearTimeout(t);
++    }, [search, roleFilter]);
++
++    const changeRole = async (u, role) => {
++        setBusy((b) => ({ ...b, [u.id]: true }));
+         try {
+-            const res = await fetch(`/users/${userId}/assign-role`, {
+-                method: 'POST',
+-                headers: {
+-                    'Content-Type': 'application/json',
+-                    'X-Requested-With': 'XMLHttpRequest',
+-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+-                },
+-                body: JSON.stringify({ role: newRole })
+-            });
+-            if (res.ok) {
+-                setRoleSuccess(prev => ({ ...prev, [userId]: 'Rôle mis à jour !' }));
+-            } else {
+-                const data = await res.json();
+-                setRoleError(prev => ({ ...prev, [userId]: data.message || 'Erreur lors de la mise à jour' }));
+-            }
+-        } catch (e) {
+-            setRoleError(prev => ({ ...prev, [userId]: 'Erreur lors de la mise à jour' }));
+-        }
+-        setRoleLoading(prev => ({ ...prev, [userId]: false }));
++            await api(`/users/${u.id}/assign-role`, 'POST', { role });
++            notify('success', `Rôle de ${u.name} mis à jour.`);
++            router.reload({ only: ['users', 'stats'] });
++        } catch (e) { notify('error', e.message); }
++        setBusy((b) => ({ ...b, [u.id]: false }));
+     };
+-
+-    const handleCreateRole = async (e) => {
++    const createRole = async (e) => {
+         e.preventDefault();
+-        setNewRoleLoading(true);
+-        setNewRoleSuccess('');
+-        setNewRoleError('');
+-        try {
+-            const res = await fetch('/roles/create', {
+-                method: 'POST',
+-                headers: {
+-                    'Content-Type': 'application/json',
+-                    'X-Requested-With': 'XMLHttpRequest',
+-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+-                },
+-                body: JSON.stringify({ role: newRole })
+-            });
+-            if (res.ok) {
+-                setNewRoleSuccess('Rôle créé !');
+-                setNewRole('');
+-                setTimeout(() => window.location.reload(), 800);
+-            } else {
+-                const data = await res.json();
+-                setNewRoleError(data.message || 'Erreur lors de la création');
+-            }
+-        } catch (e) {
+-            setNewRoleError('Erreur lors de la création');
+-        }
+-        setNewRoleLoading(false);
++        try { await api('/roles/create', 'POST', { role: newRole.trim() }); setNewRole(''); notify('success', 'Rôle créé.'); router.reload({ only: ['roles'] }); }
++        catch (err) { notify('error', err.message); }
+     };
+-
+-    const handleDeleteRole = async () => {
+-        setDeleteLoading(true);
+-        try {
+-            const res = await fetch(`/roles/${roleToDelete.id}/delete`, {
+-                method: 'DELETE',
+-                headers: {
+-                    'Content-Type': 'application/json',
+-                    'X-Requested-With': 'XMLHttpRequest',
+-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+-                },
+-            });
+-            if (res.ok) {
+-                setNotification('Rôle supprimé avec succès !');
+-                setNotificationType('success');
+-                setRoleToDelete(null);
+-                setTimeout(() => window.location.reload(), 800);
+-            } else {
+-                const data = await res.json();
+-                setNotification(data.message || 'Erreur lors de la suppression');
+-                setNotificationType('error');
+-            }
+-        } catch (e) {
+-            setNotification('Erreur lors de la suppression');
+-            setNotificationType('error');
+-        }
+-        setDeleteLoading(false);
++    const deleteRole = async () => {
++        try { await api(`/roles/${roleToDelete.id}/delete`, 'DELETE'); notify('success', 'Rôle supprimé.'); router.reload({ only: ['roles'] }); }
++        catch (err) { notify('error', err.message); }
++        setRoleToDelete(null);
+     };
+ 
+-    const getRoleIcon = (role) => {
+-        switch (role?.toLowerCase()) {
+-            case 'admin':
+-            case 'administrator':
+-                return <FaCrown className="text-yellow-500" />;
+-            case 'manager':
+-            case 'chef de projet':
+-                return <FaUserTie className="text-purple-500" />;
+-            case 'developer':
+-            case 'développeur':
+-                return <FaUser className="text-blue-500" />;
+-            default:
+-                return <FaUserShield className="text-gray-500" />;
+-        }
+-    };
++    const rows = users?.data || [];
++    const links = users?.links || [];
++    const roleOptions = ['admin', 'manager', 'member', 'developer', 'candidate', 'user'];
+ 
+-    const getRoleBadgeColor = (role) => {
+-        switch (role?.toLowerCase()) {
+-            case 'admin':
+-            case 'administrator':
+-                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+-            case 'manager':
+-            case 'chef de projet':
+-                return 'bg-purple-100 text-purple-800 border-purple-200';
+-            case 'developer':
+-            case 'développeur':
+-                return 'bg-blue-100 text-blue-800 border-blue-200';
+-            case 'candidate':
+-                return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+-            default:
+-                return 'bg-gray-100 text-gray-800 border-gray-200';
+-        }
+-    };
++    const RoleCell = ({ u }) => canAssignRole ? (
++        <select value={u.role} disabled={busy[u.id]} onChange={(e) => changeRole(u, e.target.value)} onClick={(e) => e.stopPropagation()}
++            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
++            {roleOptions.map((r) => <option key={r} value={r}>{GLOBAL_ROLES[r].label}</option>)}
++        </select>
++    ) : <Badge cfg={GLOBAL_ROLES[u.role] || GLOBAL_ROLES.user} />;
++
++    const open = (u) => router.get(`/users/${u.id}`);
+ 
+     return (
+-        <>
+-        <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-950 p-0 m-0">
+-            <main className="flex-1 flex flex-col w-full py-8 px-4 sm:px-6 lg:px-8">
+-                {/* Notification */}
+-                {notification && (
+-                    <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-lg shadow-xl text-white transition-all ${notificationType === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+-                        {notification}
++        <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-900">
++            <Head title="Utilisateurs" />
++            <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
++                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
++                    <div>
++                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">Utilisateurs</h1>
++                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{users?.total ?? rows.length} personne(s){filters.search || filters.role ? ' trouvée(s)' : ''}</p>
+                     </div>
+-                )}
+-
+-                {/* Titre principal */}
+-                <div className="mb-8">
+-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Gestion des Membres</h1>
+-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+-                        Gérez les utilisateurs et leurs rôles dans l'application
+-                    </p>
++                    {canCreate && (
++                        <Link href="/users/create" className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
++                            <FaPlus /> Nouvel utilisateur
++                        </Link>
++                    )}
+                 </div>
+ 
+-                {/* Stats Section - Visible uniquement pour l'admin */}
+-                {userAuth?.role === 'admin' && stats && (
+-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+-                        {/* Carte pour le total des utilisateurs */}
+-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-blue-500">
+-                            <div className="flex items-center justify-between">
+-                                <div>
+-                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Utilisateurs</p>
+-                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total_users}</p>
+-                                </div>
+-                                <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
+-                                    <FaUsers className="text-2xl" />
+-                                </div>
+-                            </div>
+-                        </div>
+-
+-                        {/* Carte pour les administrateurs */}
+-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-red-500">
+-                            <div className="flex items-center justify-between">
+-                                <div>
+-                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Administrateurs</p>
+-                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.admins_count || 0}</p>
+-                                </div>
+-                                <div className="p-3 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300">
+-                                    <FaUserShield className="text-2xl" />
+-                                </div>
+-                            </div>
+-                        </div>
+-
+-                        {/* Carte pour les managers */}
+-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-green-500">
+-                            <div className="flex items-center justify-between">
+-                                <div>
+-                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Managers</p>
+-                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.managers_count}</p>
+-                                </div>
+-                                <div className="p-3 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300">
+-                                    <FaUserTie className="text-2xl" />
+-                                </div>
+-                            </div>
+-                        </div>
++                {toast && (
++                    <div role="status" className={`mt-4 flex items-center justify-between rounded-lg border p-3 text-sm ${toast.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200' : 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200'}`}>
++                        {toast.msg}<button onClick={() => setToast(null)} aria-label="Fermer"><FaTimes /></button>
++                    </div>
++                )}
+ 
+-                        {/* Carte pour les membres */}
+-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-purple-500">
+-                            <div className="flex items-center justify-between">
+-                                <div>
+-                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Membres</p>
+-                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.members_count || 0}</p>
+-                                </div>
+-                                <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300">
+-                                    <FaUser className="text-2xl" />
+-                                </div>
+-                            </div>
+-                        </div>
++                {stats && (
++                    <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
++                        <Stat label="Total" value={stats.total_users} tone="text-blue-600 dark:text-blue-400" />
++                        <Stat label="Administrateurs" value={stats.admins_count} tone="text-amber-600" />
++                        <Stat label="Managers" value={stats.managers_count} tone="text-purple-600" />
++                        <Stat label="Membres" value={stats.members_count} />
+                     </div>
+                 )}
+ 
+-                {/* Header section avec barre de recherche et boutons d'action */}
+-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
+-                    <div className="flex-1">
+-                        <form onSubmit={handleSearchSubmit} className="w-full max-w-md">
+-                            {/* <div className="relative">
+-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+-                                    <FaSearch className="h-5 w-5 text-gray-400" />
+-                                </div>
+-                                <input
+-                                    type="text"
+-                                    value={search}
+-                                    onChange={(e) => setSearch(e.target.value)}
+-                                    placeholder="Rechercher un utilisateur..."
+-                                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+-                                />
+-                            </div> */}
+-                        </form>
++                {/* Barre d'outils */}
++                <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:flex-row md:items-center">
++                    <div className="relative flex-1">
++                        <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
++                        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par nom ou e-mail…" aria-label="Rechercher"
++                            className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-10 pr-3 text-base text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-100 md:py-2.5 md:text-sm" />
+                     </div>
+-                    <div className="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
+-                        {/* View Toggle */}
+-                        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+-                            <button
+-                                onClick={() => setViewMode('table')}
+-                                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition duration-200 ${
+-                                    viewMode === 'table' 
+-                                        ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+-                                        : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+-                                }`}
+-                            >
+-                                <FaList className="text-xs" />
+-                                Tableau
++                    <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} aria-label="Filtrer par rôle"
++                        className="rounded-lg border border-slate-300 bg-white px-3 py-3 text-base dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-100 md:py-2.5 md:text-sm">
++                        <option value="">Tous les rôles</option>
++                        {roleOptions.map((r) => <option key={r} value={r}>{GLOBAL_ROLES[r].label}</option>)}
++                    </select>
++                    <div className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-700">
++                        {[['table', FaList, 'Tableau'], ['cards', FaTh, 'Cartes']].map(([k, Icon, l]) => (
++                            <button key={k} onClick={() => setView(k)} aria-pressed={view === k}
++                                className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${view === k ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-600 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'}`}>
++                                <Icon className="text-xs" /> {l}
+                             </button>
+-                            <button
+-                                onClick={() => setViewMode('cards')}
+-                                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition duration-200 ${
+-                                    viewMode === 'cards' 
+-                                        ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm' 
+-                                        : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+-                                }`}
+-                            >
+-                                <FaTh className="text-xs" />
+-                                Cartes
+-                            </button>
+-                        </div>
+-                        {/* <Link href="/users/create" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-semibold flex items-center gap-2 transition duration-200 hover:shadow-md whitespace-nowrap">
+-                            <FaPlus className="text-lg" /> Nouveau membre
+-                        </Link> */}
++                        ))}
+                     </div>
+                 </div>
+ 
+-                {/* Search and Filters Section */}
+-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mb-8 border border-gray-200 dark:border-gray-700 transition duration-200">
+-                    <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+-                        <div className="md:col-span-3">
+-                            <label htmlFor="search-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recherche par nom ou email</label>
+-                            <div className="relative">
+-                                <input
+-                                    type="text"
+-                                    id="search-input"
+-                                    value={search}
+-                                    onChange={e => setSearch(e.target.value)}
+-                                    placeholder="Rechercher un membre..."
+-                                    className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors duration-200"
+-                                />
+-                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+-                            </div>
+-                        </div>
+-                        <button type="submit" className="md:col-span-1 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 transition duration-200 hover:shadow-md">
+-                            <FaSearch /> Rechercher
+-                        </button>
+-                    </form>
+-                </div>
+-
+-                {/* Table View */}
+-                {viewMode === 'table' && (
+-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 transition duration-200 mb-8 overflow-hidden">
++                {rows.length === 0 ? (
++                    <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
++                        <EmptyState icon={FaUsers} title="Aucun utilisateur trouvé" text="Modifiez votre recherche ou vos filtres." />
++                    </div>
++                ) : view === 'table' ? (
++                    <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                         <div className="overflow-x-auto">
+-                            <table className="min-w-full text-sm text-gray-700 dark:text-gray-300">
+-                                <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
++                            <table className="min-w-full text-sm">
++                                <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900/40 dark:text-slate-400">
+                                     <tr>
+-                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Avatar</th>
+-                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Nom</th>
+-                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Email</th>
+-                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Rôle</th>
+-                                        <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Date création</th>
+-                                        {canAssignRole && <th className="p-4 text-left font-bold text-gray-800 dark:text-gray-200">Gestion rôle</th>}
++                                        <th className="px-4 py-3 font-semibold">Personne</th>
++                                        <th className="px-4 py-3 font-semibold">Poste</th>
++                                        <th className="px-4 py-3 font-semibold">Rôle</th>
++                                        <th className="px-4 py-3 text-center font-semibold">Projets</th>
++                                        <th className="px-4 py-3 font-semibold">Inscrit le</th>
+                                     </tr>
+                                 </thead>
+-                                <tbody>
+-                                    {users?.data?.length === 0 ? (
+-                                        <tr>
+-                                            <td colSpan={canAssignRole ? "6" : "5"} className="text-center py-10 text-gray-500 dark:text-gray-400 text-lg">
+-                                                Aucun membre trouvé pour cette recherche.
+-                                            </td>
+-                                        </tr>
+-                                    ) : users?.data?.map(user => (
+-                                        <tr 
+-                                            key={user.id} 
+-                                            className="border-b border-gray-200 dark:border-gray-700 transition duration-150 ease-in-out hover:bg-blue-50 dark:hover:bg-gray-700 group cursor-pointer hover:shadow-md"
+-                                            onClick={() => router.get(`/users/${user.id}`)}
+-                                        >
+-                                            <td className="p-4 align-middle">
+-                                                <div className="relative">
+-                                                    <img 
+-                                                        src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3B82F6&color=ffffff&size=64`)} 
+-                                                        alt={user.name} 
+-                                                        className="w-12 h-12 rounded-full border-2 border-blue-200 dark:border-blue-600 shadow-sm group-hover:border-blue-400 transition-colors duration-200" 
+-                                                    />
+-                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
+-                                                        <div className="text-xs">
+-                                                            {getRoleIcon(user.role)}
+-                                                        </div>
++                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/70">
++                                    {rows.map((u) => (
++                                        <tr key={u.id} onClick={() => open(u)} className="cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-700/30">
++                                            <td className="px-4 py-3">
++                                                <div className="flex items-center gap-3">
++                                                    <Avatar name={u.name} src={u.profile_photo_url} size="md" />
++                                                    <div className="min-w-0">
++                                                        <p className="flex items-center gap-1.5 truncate font-semibold text-slate-900 dark:text-white">
++                                                            {u.name}{u.verified && <FaCheckCircle className="text-xs text-emerald-500" title="E-mail vérifié" />}
++                                                        </p>
++                                                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">{u.email}</p>
+                                                     </div>
+                                                 </div>
+                                             </td>
+-                                            <td className="p-4 align-middle">
+-                                                <div className="font-semibold text-gray-800 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+-                                                    {user.name}
+-                                                </div>
+-                                            </td>
+-                                            <td className="p-4 align-middle text-gray-600 dark:text-gray-300">
+-                                                <div className="flex items-center gap-1">
+-                                                    <FaEnvelope className="text-xs text-gray-400" />
+-                                                    <span>{user.email}</span>
+-                                                </div>
+-                                            </td>
+-                                            <td className="p-4 align-middle">
+-                                                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getRoleBadgeColor(user.role)}`}>
+-                                                    {getRoleIcon(user.role)}
+-                                                    {user.role === 'candidate' ? 'Candidat' : (user.role || 'Utilisateur')}
+-                                                </span>
+-                                            </td>
+-                                            <td className="p-4 align-middle text-xs text-gray-400 dark:text-gray-500">
+-                                                <div className="flex items-center gap-1">
+-                                                    <FaCalendarAlt className="text-gray-400" />
+-                                                    {new Date(user.created_at).toLocaleDateString('fr-FR')}
+-                                                </div>
+-                                            </td>
+-                                            {canAssignRole && (
+-                                                <td className="p-4 align-middle" onClick={(e) => e.stopPropagation()}>
+-                                                    <select
+-                                                        value={user.role || ''}
+-                                                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+-                                                        disabled={roleLoading[user.id]}
+-                                                        className="text-xs border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+-                                                    >
+-                                                        <option value="">Sélectionner un rôle</option>
+-                                                        {roles.map(role => (
+-                                                            <option key={role.id} value={role.name}>{role.name}</option>
+-                                                        ))}
+-                                                    </select>
+-                                                    {roleLoading[user.id] && <p className="text-xs text-blue-600 mt-1">Mise à jour...</p>}
+-                                                    {roleSuccess[user.id] && <p className="text-xs text-green-600 mt-1">{roleSuccess[user.id]}</p>}
+-                                                    {roleError[user.id] && <p className="text-xs text-red-600 mt-1">{roleError[user.id]}</p>}
+-                                                </td>
+-                                            )}
++                                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{[u.job_title, u.company].filter(Boolean).join(' · ') || '—'}</td>
++                                            <td className="px-4 py-3"><RoleCell u={u} /></td>
++                                            <td className="px-4 py-3 text-center tabular-nums text-slate-700 dark:text-slate-200">{u.projects_count}</td>
++                                            <td className="whitespace-nowrap px-4 py-3 text-slate-500 dark:text-slate-400">{fmtDate(u.created_at, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                                         </tr>
+                                     ))}
+                                 </tbody>
+                             </table>
+                         </div>
+                     </div>
+-                )}
+-
+-                {/* Cards View */}
+-                {viewMode === 'cards' && (
+-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+-                        {users?.data?.length === 0 ? (
+-                            <div className="col-span-full text-center py-16">
+-                                <FaUsers className="mx-auto text-6xl text-gray-300 dark:text-gray-600 mb-4" />
+-                                <p className="text-xl text-gray-500 dark:text-gray-400">Aucun membre trouvé</p>
+-                            </div>
+-                        ) : users?.data?.map(user => (
+-                            <div
+-                                key={user.id}
+-                                className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 hover:shadow-xl hover:scale-105 cursor-pointer group"
+-                                onClick={() => router.get(`/users/${user.id}`)}
+-                            >
+-                                {/* User Avatar and Basic Info */}
+-                                <div className="flex flex-col items-center text-center mb-4">
+-                                    <div className="relative mb-4">
+-                                        <img 
+-                                            src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3B82F6&color=ffffff&size=128`)} 
+-                                            alt={user.name} 
+-                                            className="w-20 h-20 rounded-full border-4 border-blue-200 dark:border-blue-600 shadow-lg group-hover:border-blue-400 transition-colors duration-200" 
+-                                        />
+-                                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
+-                                            {getRoleIcon(user.role)}
+-                                        </div>
+-                                    </div>
+-                                    
+-                                    <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+-                                        {user.name}
+-                                    </h3>
+-                                    
+-                                    <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mb-3">
+-                                        <FaEnvelope className="text-xs" />
+-                                        <span className="truncate max-w-[200px]">{user.email}</span>
++                ) : (
++                    <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
++                        {rows.map((u) => (
++                            <article key={u.id} onClick={() => open(u)} className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800">
++                                <div className="flex items-start gap-3">
++                                    <Avatar name={u.name} src={u.profile_photo_url} size="lg" />
++                                    <div className="min-w-0 flex-1">
++                                        <p className="truncate font-semibold text-slate-900 dark:text-white">{u.name}</p>
++                                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">{u.email}</p>
++                                        {(u.job_title || u.company) && <p className="mt-0.5 truncate text-xs text-slate-600 dark:text-slate-300">{[u.job_title, u.company].filter(Boolean).join(' · ')}</p>}
+                                     </div>
+                                 </div>
+-
+-                                {/* Role Badge */}
+-                                <div className="flex justify-center mb-4">
+-                                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getRoleBadgeColor(user.role)}`}>
+-                                        {getRoleIcon(user.role)}
+-                                        {user.role === 'candidate' ? 'Candidat' : (user.role || 'Utilisateur')}
+-                                    </span>
++                                <div className="mt-4 flex items-center justify-between gap-2">
++                                    <RoleCell u={u} />
++                                    <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"><FaProjectDiagram /> {u.projects_count} projet(s)</span>
+                                 </div>
+-
+-                                {/* Member Since */}
+-                                <div className="flex items-center justify-center gap-1 text-xs text-gray-400 dark:text-gray-500 mb-4">
+-                                    <FaCalendarAlt />
+-                                    <span>Membre depuis {new Date(user.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+-                                </div>
+-
+-                                {/* Role Management for Admin */}
+-                                {canAssignRole && (
+-                                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+-                                        <select
+-                                            value={user.role || ''}
+-                                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
+-                                            disabled={roleLoading[user.id]}
+-                                            className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+-                                            onClick={(e) => e.stopPropagation()}
+-                                        >
+-                                            <option value="">Sélectionner un rôle</option>
+-                                            {roles.map(role => (
+-                                                <option key={role.id} value={role.name}>{role.name}</option>
+-                                            ))}
+-                                        </select>
+-                                        {roleLoading[user.id] && <p className="text-xs text-blue-600 mt-1">Mise à jour...</p>}
+-                                        {roleSuccess[user.id] && <p className="text-xs text-green-600 mt-1">{roleSuccess[user.id]}</p>}
+-                                        {roleError[user.id] && <p className="text-xs text-red-600 mt-1">{roleError[user.id]}</p>}
+-                                    </div>
+-                                )}
+-                            </div>
++                            </article>
+                         ))}
+                     </div>
+                 )}
+ 
+-                {/* Pagination */}
+-                <div className="flex justify-center gap-3 mb-8">
+-                    {users?.links && users.links.map((link, i) => (
+-                        <button
+-                            key={i}
+-                            className={`px-4 py-2 text-sm font-semibold rounded-lg transition duration-200 
+-                                ${link.active ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-600 hover:text-blue-800 dark:hover:text-white hover:shadow-sm'}
+-                                ${!link.url ? 'opacity-50 cursor-not-allowed' : ''}
+-                            `}
+-                            disabled={!link.url}
+-                            onClick={() => link.url && router.get(link.url)}
+-                            dangerouslySetInnerHTML={{ __html: link.label }}
+-                        />
+-                    ))}
+-                </div>
++                {links.length > 3 && (
++                    <nav className="mt-6 flex flex-wrap justify-center gap-1" aria-label="Pagination">
++                        {links.map((l, i) => (
++                            <button key={i} disabled={!l.url || l.active} onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: false })}
++                                dangerouslySetInnerHTML={{ __html: l.label }}
++                                className={`min-w-[2.5rem] rounded-lg px-3 py-2 text-sm ${l.active ? 'bg-blue-600 font-semibold text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'}`} />
++                        ))}
++                    </nav>
++                )}
+ 
+-                {/* Role Management Section for Admin */}
+                 {canAssignRole && (
+-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 transition duration-200 hover:shadow-lg">
+-                        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+-                            <FaUserShield className="text-blue-600 dark:text-blue-400" />
+-                            Gestion des Rôles
+-                        </h2>
+-                        
+-                        {/* Create New Role */}
+-                        <form onSubmit={handleCreateRole} className="mb-6">
+-                            <div className="flex gap-3">
+-                                <input
+-                                    type="text"
+-                                    value={newRole}
+-                                    onChange={(e) => setNewRole(e.target.value)}
+-                                    placeholder="Nom du nouveau rôle"
+-                                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+-                                    required
+-                                />
+-                                <button
+-                                    type="submit"
+-                                    disabled={newRoleLoading}
+-                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition duration-200 disabled:opacity-50"
+-                                >
+-                                    {newRoleLoading ? 'Création...' : 'Créer'}
+-                                </button>
+-                            </div>
+-                            {newRoleSuccess && <p className="text-green-600 text-sm mt-2">{newRoleSuccess}</p>}
+-                            {newRoleError && <p className="text-red-600 text-sm mt-2">{newRoleError}</p>}
+-                        </form>
+-
+-                        {/* Existing Roles */}
+-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+-                            {roles.map(role => (
+-                                <div key={role.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2">
+-                                    <span className="text-gray-700 dark:text-gray-300 font-medium">{role.name}</span>
+-                                    <button
+-                                        onClick={() => setRoleToDelete(role)}
+-                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition duration-150 p-1 rounded hover:bg-red-100 dark:hover:bg-red-800"
+-                                    >
+-                                        <FaTrash className="text-xs" />
+-                                    </button>
+-                                </div>
++                    <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
++                        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Rôles de la plateforme</h2>
++                        <div className="mt-3 flex flex-wrap gap-2">
++                            {roles.map((r) => (
++                                <span key={r.id} className="inline-flex items-center gap-2 rounded-full bg-slate-100 py-1 pl-3 pr-1.5 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">
++                                    {r.name}
++                                    {!['admin', 'user'].includes(r.name) && (
++                                        <button onClick={() => setRoleToDelete(r)} aria-label={`Supprimer ${r.name}`} className="rounded-full p-1 text-slate-400 hover:bg-red-100 hover:text-red-600"><FaTrash className="text-[10px]" /></button>
++                                    )}
++                                </span>
+                             ))}
+                         </div>
+-                    </div>
++                        <form onSubmit={createRole} className="mt-4 flex gap-2">
++                            <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Nouveau rôle" required
++                                className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-100 sm:text-sm" />
++                            <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Créer</button>
++                        </form>
++                    </section>
+                 )}
+-            </main>
+-        </div>
++            </div>
+ 
+-        {/* Delete Role Modal */}
+-        <Modal show={!!roleToDelete} onClose={() => setRoleToDelete(null)} maxWidth="sm">
+-            <div className="p-6">
+-                <h2 className="text-lg font-bold mb-4 text-red-700">Confirmer la suppression</h2>
+-                <p className="mb-6">Voulez-vous vraiment supprimer le rôle <span className="font-semibold text-blue-700">{roleToDelete?.name}</span> ? Cette action est irréversible.</p>
+-                <div className="flex justify-end gap-3">
+-                    <button
+-                        className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold"
+-                        onClick={() => setRoleToDelete(null)}
+-                        disabled={deleteLoading}
+-                    >
+-                        Annuler
+-                    </button>
+-                    <button
+-                        className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
+-                        onClick={handleDeleteRole}
+-                        disabled={deleteLoading}
+-                    >
+-                        {deleteLoading ? 'Suppression...' : 'Supprimer'}
+-                    </button>
++            <Modal show={!!roleToDelete} onClose={() => setRoleToDelete(null)} maxWidth="md">
++                <div className="p-6">
++                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Supprimer le rôle « {roleToDelete?.name} » ?</h2>
++                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Impossible tant que des utilisateurs l'utilisent.</p>
++                    <div className="mt-6 flex justify-end gap-3">
++                        <button onClick={() => setRoleToDelete(null)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold dark:border-slate-600 dark:text-slate-200">Annuler</button>
++                        <button onClick={deleteRole} className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700">Supprimer</button>
++                    </div>
+                 </div>
+-            </div>
+-        </Modal>
+-        </>
++            </Modal>
++        </div>
+     );
+ }
+ 
+-Index.layout = page => <AdminLayout children={page} />;
+\ No newline at end of file
++Index.layout = (page) => <AdminLayout children={page} />;
+diff --git a/resources/js/Pages/Users/Show.jsx b/resources/js/Pages/Users/Show.jsx
+index 075393e..f0438c3 100644
+--- a/resources/js/Pages/Users/Show.jsx
++++ b/resources/js/Pages/Users/Show.jsx
+@@ -1,243 +1,266 @@
+-import React from 'react';
+-import { Link, usePage, router } from '@inertiajs/react';
+-import AdminLayout from '../../Layouts/AdminLayout';
+-import { 
+-  FaUser, 
+-  FaUsers, 
+-  FaEdit, 
+-  FaProjectDiagram, 
+-  FaEnvelope, 
+-  FaCalendarAlt,
+-  FaUserTie,
+-  FaUserShield,
+-  FaArrowLeft
++import React, { useState } from 'react';
++import { Head, Link, router, usePage } from '@inertiajs/react';
++import AdminLayout from '@/Layouts/AdminLayout';
++import RoleManagement from '@/Components/RoleManagement';
++import Modal from '@/Components/Modal';
++import {
++    FaArrowLeft, FaEdit, FaEnvelope, FaPhone, FaProjectDiagram, FaTasks, FaFolderOpen, FaExclamationTriangle,
++    FaBriefcase, FaBuilding, FaCalendarAlt, FaClock, FaCheckCircle, FaCrown, FaCreditCard, FaUniversity, FaTrash, FaHistory,
+ } from 'react-icons/fa';
+-import RoleManagement from '../../Components/RoleManagement';
+-import { motion } from 'framer-motion';
++import {
++    Avatar, Badge, Card, Stat, ProgressBar, EmptyState, InfoRow, GLOBAL_ROLES, PROJECT_ROLES,
++    statusOf, fmtDate, timeAgo,
++} from '@/Components/People/shared';
++
++const csrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+ 
+ function Show({ user, auth }) {
+-  const { flash = {} } = usePage().props;
+-  
+-  // Sanitize user data
+-  const sanitizedUser = React.useMemo(() => ({
+-    ...user,
+-    email: user?.email || '',
+-    name: user?.name || 'Utilisateur sans nom',
+-    role: ['admin', 'manager', 'user', 'candidate'].includes(user?.role) ? user.role : 'user',
+-    created_at: user?.created_at || new Date().toISOString()
+-  }), [user]);
+-
+-  const userAuth = auth?.user || auth;
+-  const isAdmin = userAuth?.role === 'admin';
+-  const canEdit = userAuth && (isAdmin || userAuth.id === sanitizedUser.id);
+-  const canAssignRole = userAuth?.email === 'ronaldoagbohou@gmail.com';
+-  const [role, setRole] = React.useState(sanitizedUser.role);
+-  const [loading, setLoading] = React.useState(false);
+-  const [success, setSuccess] = React.useState('');
+-  const [error, setError] = React.useState('');
+-
+-  const handleRoleChange = async (newRole, sendEmail = true) => {
+-    try {
+-      const response = await fetch(`/users/${sanitizedUser.id}/assign-role`, {
+-        method: 'POST',
+-        headers: {
+-          'Content-Type': 'application/json',
+-          'X-Requested-With': 'XMLHttpRequest',
+-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+-        },
+-        body: JSON.stringify({ 
+-          role: newRole,
+-          send_email: sendEmail 
+-        })
+-      });
+-
+-      const data = await response.json();
+-
+-      if (!response.ok) {
+-        throw new Error(data.message || 'Erreur lors de la mise à jour du rôle');
+-      }
+-
+-      // Mettre à jour l'utilisateur localement
+-      router.reload({
+-        only: ['user'],
+-        onSuccess: () => {
+-          setSuccess('Rôle mis à jour avec succès !');
+-        }
+-      });
+-
+-      return data;
+-    } catch (error) {
+-      console.error('Error updating role:', error);
+-      throw error;
+-    }
+-  };
+-
+-  const getRoleBadge = (role) => {
+-    const roles = {
+-      admin: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: <FaUserShield className="mr-1" />, label: 'Administrateur' },
+-      manager: { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: <FaUserTie className="mr-1" />, label: 'Manager' },
+-      member: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: <FaUser className="mr-1" />, label: 'Membre' },
+-      candidate: { color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200', icon: <FaUser className="mr-1" />, label: 'Candidat' },
+-      user: { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200', icon: <FaUser className="mr-1" />, label: 'Utilisateur' }
++    const { flash = {} } = usePage().props;
++    const me = auth?.user || auth;
++    const perm = user.permissions || {};
++    const [confirmDelete, setConfirmDelete] = useState(false);
++    const [copied, setCopied] = useState('');
++
++    const roleCfg = GLOBAL_ROLES[user.role] || GLOBAL_ROLES.user;
++    const stats = user.stats || {};
++    const byStatus = stats.tasks_by_status || {};
++    const statusEntries = Object.entries(byStatus).filter(([, n]) => n > 0);
++
++    const copy = async (key, value) => {
++        try { await navigator.clipboard.writeText(value); setCopied(key); setTimeout(() => setCopied(''), 1500); } catch { /* presse-papiers indisponible */ }
+     };
+-    const currentRole = roles[role] || roles.user;
++
++    const handleRoleChange = async (newRole, sendEmail = true) => {
++        const res = await fetch(`/users/${user.id}/assign-role`, {
++            method: 'POST',
++            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf() },
++            body: JSON.stringify({ role: newRole, send_email: sendEmail }),
++        });
++        const data = await res.json().catch(() => ({}));
++        if (!res.ok) throw new Error(data.message || data.error || 'Erreur lors de la mise à jour du rôle');
++        router.reload({ only: ['user'] });
++        return data;
++    };
++
++    const remove = () => router.delete(`/users/${user.id}`, { onFinish: () => setConfirmDelete(false) });
++
+     return (
+-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${currentRole.color}`}>
+-        {currentRole.icon}
+-        {currentRole.label}
+-      </span>
+-    );
+-  };
+-
+-  return (
+-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+-      {/* Header */}
+-      <div className="bg-white dark:bg-gray-800 shadow">
+-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+-          <div className="flex items-center">
+-            <Link 
+-              href="/users" 
+-              className="mr-4 p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+-              title="Retour à la liste"
+-            >
+-              <FaArrowLeft className="h-5 w-5" />
+-            </Link>
+-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+-              Détails de l'utilisateur
+-            </h1>
+-          </div>
+-        </div>
+-      </div>
+-
+-      {/* Main Content */}
+-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+-        {/* Flash Messages */}
+-        {flash.success && (
+-          <motion.div 
+-            initial={{ opacity: 0, y: -20 }}
+-            animate={{ opacity: 1, y: 0 }}
+-            className="mb-6 p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg"
+-          >
+-            <p className="text-green-800 dark:text-green-200">{flash.success}</p>
+-          </motion.div>
+-        )}
+-
+-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+-          {/* Left Column - Profile */}
+-          <div className="lg:col-span-2 space-y-6">
+-            {/* Profile Card */}
+-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+-              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+-                <div className="flex items-center">
+-                  <div className="flex-shrink-0">
+-                    <img 
+-                      className="h-20 w-20 rounded-full border-4 border-white dark:border-gray-700 shadow-sm"
+-                      src={user.profile_photo_url || (user.profile_photo_path ? `/storage/${user.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3B82F6&color=fff&size=128`)} 
+-                      alt={user.name}
+-                    />
+-                  </div>
+-                  <div className="ml-5">
+-                    <div className="flex items-center space-x-2">
+-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{user.name}</h2>
+-                      {getRoleBadge(user.role || 'user')}
++        <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-900">
++            <Head title={user.name} />
++
++            {/* Bandeau */}
++            <div className="h-28 bg-gradient-to-r from-slate-800 via-blue-700 to-indigo-600 sm:h-36" />
++            <div className="mx-auto -mt-14 max-w-6xl px-4 sm:-mt-16 sm:px-6">
++                <Link href="/users" className="mb-3 inline-flex items-center gap-2 rounded-lg bg-black/25 px-3 py-1.5 text-xs font-medium text-white backdrop-blur hover:bg-black/40">
++                    <FaArrowLeft /> Utilisateurs
++                </Link>
++
++                <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
++                    <div className="rounded-2xl bg-white p-1 shadow-lg dark:bg-slate-900">
++                        <Avatar name={user.name} src={user.profile_photo_url} size="xl" className="!h-24 !w-24 !rounded-xl sm:!h-28 sm:!w-28" />
+                     </div>
+-                    {isAdmin && (
+-                      <div className="mt-1 flex items-center text-sm text-gray-500 dark:text-gray-400">
+-                        <FaEnvelope className="mr-1.5 h-4 w-4 flex-shrink-0" />
+-                        <span>{user.email}</span>
+-                      </div>
+-                    )}
+-                    <div className="mt-1 flex items-center text-sm text-gray-500 dark:text-gray-400">
+-                      <FaCalendarAlt className="mr-1.5 h-4 w-4 flex-shrink-0" />
+-                      <span>Inscrit le {new Date(user.created_at).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
++                    <div className="min-w-0 flex-1 pb-1">
++                        <div className="flex flex-wrap items-center gap-2">
++                            <h1 className="truncate text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">{user.name}</h1>
++                            <Badge cfg={roleCfg} />
++                            {perm.is_self && <Badge cfg={{ cls: 'bg-blue-600 text-white' }}>Vous</Badge>}
++                        </div>
++                        {(user.job_title || user.company) && (
++                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
++                                {[user.job_title, user.company].filter(Boolean).join(' · ')}
++                            </p>
++                        )}
++                    </div>
++                    <div className="flex flex-wrap gap-2">
++                        {user.email && (
++                            <a href={`mailto:${user.email}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
++                                <FaEnvelope /> Écrire
++                            </a>
++                        )}
++                        {perm.can_edit && perm.edit_url && (
++                            <Link href={perm.edit_url} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
++                                <FaEdit /> Modifier
++                            </Link>
++                        )}
+                     </div>
+-                  </div>
+                 </div>
+-              </div>
+-              
+-              {/* Projects Section */}
+-              <div className="px-6 py-5">
+-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+-                  <FaProjectDiagram className="mr-2 text-blue-500" />
+-                  Projets ({user.projects?.length || 0})
+-                </h3>
+-                
+-                {user.projects && user.projects.length > 0 ? (
+-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+-                    {user.projects.map(project => (
+-                      <Link 
+-                        key={project.id} 
+-                        href={`/projects/${project.id}`}
+-                        className="group block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+-                      >
+-                        <div className="flex items-center">
+-                          <div className="flex-shrink-0 h-10 w-10 rounded-md bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+-                            <FaProjectDiagram className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+-                          </div>
+-                          <div className="ml-4">
+-                            <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+-                              {project.name}
+-                            </p>
+-                            {project.pivot?.role && (
+-                              <span className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${project.pivot.role === 'manager' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}`}>
+-                                {project.pivot.role === 'manager' ? 'Chef de projet' : 'Membre'}
+-                              </span>
++
++                {flash.success && <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">{flash.success}</p>}
++                {flash.error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">{flash.error}</p>}
++
++                {/* Indicateurs */}
++                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
++                    <Stat label="Projets" value={stats.projects} tone="text-blue-600 dark:text-blue-400" />
++                    <Stat label="Tâches assignées" value={stats.tasks_total} />
++                    <Stat label="Tâches en retard" value={stats.tasks_overdue} tone={stats.tasks_overdue ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'} />
++                    <Stat label="Fichiers déposés" value={stats.files} tone="text-emerald-600 dark:text-emerald-400" />
++                </div>
++
++                <div className="mt-6 grid gap-6 lg:grid-cols-3">
++                    {/* Colonne principale */}
++                    <div className="space-y-6 lg:col-span-2">
++                        {user.bio && (
++                            <Card title="À propos">
++                                <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 dark:text-slate-300">{user.bio}</p>
++                            </Card>
++                        )}
++
++                        <Card title={`Projets (${user.projects?.length || 0})`} icon={FaProjectDiagram}>
++                            {user.projects?.length ? (
++                                <ul className="divide-y divide-slate-100 dark:divide-slate-700/70">
++                                    {user.projects.map((p) => {
++                                        const r = PROJECT_ROLES[p.role] || PROJECT_ROLES.member;
++                                        return (
++                                            <li key={p.id} className="py-3 first:pt-0 last:pb-0">
++                                                <div className="flex items-center justify-between gap-3">
++                                                    <Link href={`/projects/${p.id}`} className="min-w-0 truncate text-sm font-semibold text-slate-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400">
++                                                        {p.name}
++                                                    </Link>
++                                                    <Badge cfg={r}>{p.role === 'manager' && <FaCrown className="text-[10px]" />}{r.label}</Badge>
++                                                </div>
++                                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
++                                                    Depuis le {fmtDate(p.joined_at, { day: 'numeric', month: 'short', year: 'numeric' })}
++                                                    {p.status && <> · {p.status}</>}
++                                                </p>
++                                                <div className="mt-2"><ProgressBar done={p.tasks_done} total={p.tasks_total} /></div>
++                                            </li>
++                                        );
++                                    })}
++                                </ul>
++                            ) : (
++                                <EmptyState icon={FaProjectDiagram} title="Aucun projet" text={perm.sees_private ? "Cette personne ne fait partie d'aucun projet." : "Vous n'avez aucun projet en commun avec cette personne."} />
+                             )}
+-                          </div>
+-                        </div>
+-                      </Link>
+-                    ))}
+-                  </div>
+-                ) : (
+-                  <div className="text-center py-8">
+-                    <FaProjectDiagram className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" />
+-                    <h4 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Aucun projet</h4>
+-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Cet utilisateur ne fait partie d'aucun projet pour le moment.</p>
+-                  </div>
+-                )}
+-              </div>
+-            </div>
+-          </div>
+-
+-          {/* Right Column - Actions */}
+-          <div className="space-y-6">
+-            {/* Role Management */}
+-            <RoleManagement 
+-              user={sanitizedUser} 
+-              currentUser={userAuth}
+-              onRoleChange={handleRoleChange}
+-            />
+-
+-            {/* Quick Actions */}
+-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+-              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Actions rapides</h3>
+-              </div>
+-              <div className="px-6 py-4 space-y-3">
+-                {canEdit && (
+-                  <Link 
+-                    href={`/profile`}
+-                    className="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors"
+-                  >
+-                    <FaEdit className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300 transition-colors" />
+-                    Modifier le profil
+-                  </Link>
+-                )}
+-                <Link 
+-                  href="/users"
+-                  className="group flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors"
+-                >
+-                  <FaUsers className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300 transition-colors" />
+-                  Retour à la liste des utilisateurs
+-                </Link>
+-              </div>
++                        </Card>
++
++                        <Card title="Tâches récentes" icon={FaTasks}>
++                            {statusEntries.length > 0 && (
++                                <div className="mb-4 flex flex-wrap gap-2">
++                                    {statusEntries.map(([s, n]) => <Badge key={s} cfg={statusOf(s)}>{n} {statusOf(s).label.toLowerCase()}</Badge>)}
++                                </div>
++                            )}
++                            {user.recent_tasks?.length ? (
++                                <ul className="divide-y divide-slate-100 dark:divide-slate-700/70">
++                                    {user.recent_tasks.map((t) => (
++                                        <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
++                                            <div className="min-w-0">
++                                                <Link href={`/tasks/${t.id}`} className="block truncate text-sm font-medium text-slate-900 hover:text-blue-600 dark:text-white">{t.title}</Link>
++                                                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
++                                                    {t.project?.name}{t.due_date && <> · échéance {fmtDate(t.due_date, { day: 'numeric', month: 'short' })}</>}
++                                                </p>
++                                            </div>
++                                            <Badge cfg={statusOf(t.status)} />
++                                        </li>
++                                    ))}
++                                </ul>
++                            ) : (
++                                <EmptyState icon={FaTasks} title="Aucune tâche assignée" />
++                            )}
++                        </Card>
++
++                        {perm.sees_private && (
++                            <Card title="Activité récente" icon={FaHistory}>
++                                {user.recent_activity?.length ? (
++                                    <ul className="space-y-3">
++                                        {user.recent_activity.map((a) => (
++                                            <li key={a.id} className="flex gap-3 text-sm">
++                                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
++                                                <div className="min-w-0">
++                                                    <p className="text-slate-800 dark:text-slate-200">{a.description}</p>
++                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{timeAgo(a.created_at)}</p>
++                                                </div>
++                                            </li>
++                                        ))}
++                                    </ul>
++                                ) : <EmptyState title="Aucune activité enregistrée" />}
++                            </Card>
++                        )}
++                    </div>
++
++                    {/* Colonne latérale */}
++                    <div className="space-y-6">
++                        <Card title="Coordonnées">
++                            <div className="divide-y divide-slate-100 dark:divide-slate-700/70">
++                                {user.email ? (
++                                    <InfoRow icon={FaEnvelope} label="E-mail">
++                                        <button type="button" onClick={() => copy('email', user.email)} className="text-left hover:text-blue-600" title="Copier">
++                                            {user.email} {copied === 'email' && <span className="text-xs text-emerald-600">copié</span>}
++                                        </button>
++                                    </InfoRow>
++                                ) : <p className="py-2 text-sm text-slate-500">Coordonnées non visibles.</p>}
++                                {user.phone && (
++                                    <InfoRow icon={FaPhone} label="Téléphone"><a href={`tel:${user.phone}`} className="hover:text-blue-600">{user.phone}</a></InfoRow>
++                                )}
++                                {user.job_title && <InfoRow icon={FaBriefcase} label="Poste">{user.job_title}</InfoRow>}
++                                {user.company && <InfoRow icon={FaBuilding} label="Entreprise">{user.company}</InfoRow>}
++                            </div>
++                        </Card>
++
++                        <Card title="Compte">
++                            <div className="divide-y divide-slate-100 dark:divide-slate-700/70">
++                                <InfoRow icon={FaCalendarAlt} label="Membre depuis">{fmtDate(user.created_at)}</InfoRow>
++                                {perm.sees_private && (
++                                    <>
++                                        <InfoRow icon={FaClock} label="Dernière activité">{user.last_seen_at ? timeAgo(user.last_seen_at) : 'Inconnue'}</InfoRow>
++                                        <InfoRow icon={FaCheckCircle} label="E-mail">
++                                            {user.email_verified_at ? <span className="text-emerald-600">Vérifié le {fmtDate(user.email_verified_at, { day: 'numeric', month: 'short', year: 'numeric' })}</span> : <span className="text-amber-600">Non vérifié</span>}
++                                        </InfoRow>
++                                    </>
++                                )}
++                                {stats.tasks_overdue > 0 && (
++                                    <InfoRow icon={FaExclamationTriangle} label="Attention"><span className="text-red-600">{stats.tasks_overdue} tâche(s) en retard</span></InfoRow>
++                                )}
++                            </div>
++                        </Card>
++
++                        {perm.sees_private && user.subscription && (
++                            <Card title="Abonnement" icon={FaCreditCard}>
++                                {user.subscription.active ? (
++                                    <div className="space-y-1 text-sm">
++                                        <p className="font-semibold text-slate-900 dark:text-white">{user.subscription.plan || 'Abonnement actif'}</p>
++                                        <p className="text-slate-500 dark:text-slate-400">
++                                            Jusqu'au {user.subscription.ends_at}{user.subscription.days_remaining != null && <> ({user.subscription.days_remaining} j restants)</>}
++                                        </p>
++                                    </div>
++                                ) : <p className="text-sm text-slate-500 dark:text-slate-400">Aucun abonnement actif.</p>}
++                            </Card>
++                        )}
++
++                        {perm.sees_private && user.bank && (
++                            <Card title="Coordonnées bancaires" icon={FaUniversity}>
++                                <dl className="space-y-1 text-sm">
++                                    <div className="flex justify-between gap-3"><dt className="text-slate-500">Banque</dt><dd className="font-medium">{user.bank.bank_name}</dd></div>
++                                    <div className="flex justify-between gap-3"><dt className="text-slate-500">Titulaire</dt><dd className="font-medium">{user.bank.account_holder_name}</dd></div>
++                                    <div className="flex justify-between gap-3"><dt className="text-slate-500">IBAN</dt><dd className="font-mono text-xs">{user.bank.iban_masked}</dd></div>
++                                </dl>
++                            </Card>
++                        )}
++
++                        {perm.can_assign_role && <RoleManagement user={{ ...user, role: user.role }} currentUser={me} onRoleChange={handleRoleChange} />}
++
++                        {perm.can_delete && (
++                            <Card title="Zone sensible">
++                                <button type="button" onClick={() => setConfirmDelete(true)} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-500/10 dark:text-red-300">
++                                    <FaTrash /> Supprimer ce compte
++                                </button>
++                            </Card>
++                        )}
++                    </div>
++                </div>
+             </div>
+-          </div>
++
++            <Modal show={confirmDelete} onClose={() => setConfirmDelete(false)} maxWidth="md">
++                <div className="p-6">
++                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Supprimer {user.name} ?</h2>
++                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Le compte sera supprimé définitivement. Cette action est irréversible.</p>
++                    <div className="mt-6 flex justify-end gap-3">
++                        <button type="button" onClick={() => setConfirmDelete(false)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200">Annuler</button>
++                        <button type="button" onClick={remove} className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700">Supprimer</button>
++                    </div>
++                </div>
++            </Modal>
+         </div>
+-      </main>
+-    </div>
+-  );
++    );
+ }
+ 
+-Show.layout = page => <AdminLayout children={page} />;
++Show.layout = (page) => <AdminLayout children={page} />;
+ export default Show;

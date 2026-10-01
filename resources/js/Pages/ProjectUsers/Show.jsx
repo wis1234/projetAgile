@@ -1,471 +1,181 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Link, usePage, router } from '@inertiajs/react';
-import { useTranslation } from 'react-i18next';
-import i18n from 'i18next';
-import AdminLayout from '../../Layouts/AdminLayout';
-import { 
-    FaUsers, 
-    FaUserEdit, 
-    FaArrowLeft, 
-    FaProjectDiagram,
-    FaUser,
-    FaCrown,
-    FaShieldAlt,
-    FaCalendarAlt,
-    FaTasks,
-    FaEye,
-    FaEnvelope,
-    FaInfoCircle,
-    FaVolumeMute,
-    FaVolumeUp
-} from 'react-icons/fa';
+import React, { useMemo, useState } from 'react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import { toast } from 'react-toastify';
+import AdminLayout from '@/Layouts/AdminLayout';
+import {
+    FaArrowLeft, FaUsers, FaUserEdit, FaUserPlus, FaProjectDiagram, FaTasks, FaCalendarAlt, FaSearch, FaCrown,
+    FaVolumeMute, FaVolumeUp, FaEnvelope, FaPhone, FaExclamationTriangle, FaInfoCircle,
+} from 'react-icons/fa';
+import {
+    Avatar, Badge, Card, Stat, ProgressBar, EmptyState, PROJECT_ROLES, GLOBAL_ROLES, statusOf, fmtDate,
+} from '@/Components/People/shared';
 
-// Helper function to sanitize project data
-const sanitizeProjectData = (project) => {
-    if (!project) return null;
-    
-    const cleanProject = { ...project };
-    
-    // Sanitize users array if it exists
-    if (cleanProject.users) {
-        cleanProject.users = cleanProject.users.map(user => ({
-            id: user.id,
-            name: user.name,
-            email: user.email || '',
-            profile_photo_url: user.profile_photo_url,
-            pivot: user.pivot ? { 
-                role: user.pivot.role,
-                is_muted: user.pivot.is_muted || false,
-                created_at: user.pivot.created_at
-            } : null,
-            created_at: user.created_at
-        }));
-    }
-    
-    // Keep creation date
-    cleanProject.created_at = project.created_at;
-    cleanProject.updated_at = project.updated_at;
-    
-    return cleanProject;
+const ROLE_HELP = {
+    manager: 'Gère le projet, ses membres et valide le travail.',
+    member: 'Participe aux tâches et aux discussions du projet.',
+    observer: 'Consulte le projet sans y contribuer.',
 };
 
-export default function Show({ project: initialProject, auth }) {
-    const { t } = useTranslation();
-    // Sanitize project data
-    const [project, setProject] = useState(() => sanitizeProjectData(initialProject));
+export default function Show({ project: initial, auth, can_manage = false }) {
     const { flash = {} } = usePage().props;
-    
-    // Mettre à jour le projet si les props changent
-    useEffect(() => {
-        setProject(sanitizeProjectData(initialProject));
-    }, [initialProject]);
-    
-    // Fonction pour basculer le statut mute d'un utilisateur
-    const toggleMuteUser = async (userId) => {
+    const [members, setMembers] = useState(initial.users || []);
+    const [q, setQ] = useState('');
+    const [roleFilter, setRoleFilter] = useState('');
+    const [pending, setPending] = useState({});
+
+    React.useEffect(() => setMembers(initial.users || []), [initial]);
+
+    const counts = useMemo(() => members.reduce((a, m) => ({ ...a, [m.pivot.role]: (a[m.pivot.role] || 0) + 1 }), {}), [members]);
+    const filtered = useMemo(() => {
+        const s = q.trim().toLowerCase();
+        return members.filter((m) =>
+            (!roleFilter || m.pivot.role === roleFilter) &&
+            (!s || [m.name, m.email, m.job_title, m.company].some((v) => (v || '').toLowerCase().includes(s))));
+    }, [members, q, roleFilter]);
+
+    const taskEntries = Object.entries(initial.tasks_by_status || {}).filter(([, n]) => n > 0);
+    const totalOverdue = members.reduce((s, m) => s + (m.tasks_overdue || 0), 0);
+
+    const toggleMute = async (m) => {
+        setPending((p) => ({ ...p, [m.id]: true }));
         try {
-            const response = await axios.post(route('project-users.toggle-mute', [project.id, userId]), {}, {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            });
-            
-            if (response.data.success) {
-                // Mettre à jour l'état local avec la réponse du serveur
-                setProject(prevProject => ({
-                    ...prevProject,
-                    users: prevProject.users.map(user => 
-                        user.id === userId 
-                            ? {
-                                ...user,
-                                pivot: {
-                                    ...user.pivot,
-                                    is_muted: response.data.is_muted
-                                }
-                            }
-                            : user
-                    )
-                }));
-                
-                toast.success(response.data.message, {
-                    position: 'top-right',
-                    autoClose: 3000,
-                    hideProgressBar: false,
-                    closeOnClick: true,
-                    pauseOnHover: true,
-                    draggable: true,
-                    progress: undefined,
-                });
+            const { data } = await axios.post(route('project-users.toggle-mute', [initial.id, m.id]), {}, { headers: { Accept: 'application/json' } });
+            if (data.success) {
+                setMembers((list) => list.map((x) => (x.id === m.id ? { ...x, pivot: { ...x.pivot, is_muted: data.is_muted } } : x)));
+                toast.success(data.message);
             }
-        } catch (error) {
-            console.error('Erreur lors du changement de statut mute:', error);
-            toast.error('Une erreur est survenue lors de la mise à jour du statut.', {
-                position: 'top-right',
-                autoClose: 3000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-            });
+        } catch {
+            toast.error('Impossible de modifier le statut de ce membre.');
         }
-    };
-    const [notification, setNotification] = useState(null);
-
-    useEffect(() => {
-        if (flash.success) {
-            setNotification({ type: 'success', message: flash.success });
-            const timer = setTimeout(() => setNotification(null), 5000);
-            return () => clearTimeout(timer);
-        }
-        if (flash.error) {
-            setNotification({ type: 'error', message: flash.error });
-            const timer = setTimeout(() => setNotification(null), 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [flash]);
-
-    if (!project) {
-        return (
-            <AdminLayout>
-                <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
-                    <div className="text-center">
-                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('project_not_found')}</h1>
-                        <Link 
-                            href={route('project-users.index')}
-                            className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            <FaArrowLeft className="mr-2" /> {t('back_to_list')}
-                        </Link>
-                    </div>
-                </div>
-            </AdminLayout>
-        );
-    }
-
-    const getRoleIcon = (role) => {
-        switch (role) {
-            case 'member': return <FaUser className="text-blue-500" />;
-            default: return <FaShieldAlt className="text-gray-500" />;
-        }
-    };
-
-    const getRoleColor = (role) => {
-        switch (role) {
-            case 'manager': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-            case 'member': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-        }
-    };
-
-    const getRoleLabel = (role) => {
-        switch (role) {
-            case 'manager': return t('role_manager');
-            case 'member': return t('role_member');
-            case 'observer': return t('role_observer');
-            default: return t('role_other');
-        }
+        setPending((p) => ({ ...p, [m.id]: false }));
     };
 
     return (
-        <div className="flex flex-col w-full min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
-            {/* Notification */}
-            {notification && (
-                <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg transition-all duration-300 ${
-                    notification.type === 'success' 
-                        ? 'bg-green-100 text-green-800 border border-green-200' 
-                        : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                    <div className="flex items-center gap-2">
-                        <span className="font-medium">{notification.message}</span>
-                        <button 
-                            onClick={() => setNotification(null)}
-                            className="ml-2 text-gray-500 hover:text-gray-700"
-                        >
-                            ×
-                        </button>
+        <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-900">
+            <Head title={`Membres · ${initial.name}`} />
+            <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+                <Link href={route('project-users.index')} className="inline-flex items-center gap-2 py-1 text-sm font-medium text-slate-600 hover:text-blue-600 dark:text-slate-300">
+                    <FaArrowLeft /> Tous les membres
+                </Link>
+
+                {/* En-tête projet */}
+                <div className="mt-3 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:flex-row sm:items-center sm:p-6">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow"><FaProjectDiagram className="text-2xl" /></span>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Link href={route('projects.show', initial.id)} className="truncate text-xl font-bold text-slate-900 hover:text-blue-600 dark:text-white sm:text-2xl">{initial.name}</Link>
+                            {initial.status && <Badge cfg={{ cls: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200' }}>{initial.status}</Badge>}
+                        </div>
+                        {initial.description && <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{initial.description}</p>}
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"><FaCalendarAlt /> Créé le {fmtDate(initial.created_at)}</p>
                     </div>
+                    {can_manage && (
+                        <div className="flex flex-wrap gap-2">
+                            <Link href={route('project-users.edit', initial.id)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 sm:flex-none"><FaUserEdit /> Gérer</Link>
+                            <Link href={`${route('project-users.create')}?project_id=${initial.id}`} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 sm:flex-none"><FaUserPlus /> Ajouter</Link>
+                        </div>
+                    )}
                 </div>
-            )}
 
-            <main className="flex-1 flex flex-col w-full bg-white dark:bg-gray-900 overflow-x-hidden p-0 m-0">
-                <div className="flex flex-col w-full max-w-6xl mx-auto mt-14 pt-4 px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-                        <div className="flex items-center gap-4">
-                            <Link 
-                                href={route('project-users.index')} 
-                                className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all duration-200"
-                            >
-                                <FaArrowLeft className="text-lg" />
-                            </Link>
-                            <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
-                                <FaEye className="text-white text-xl" />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
-                                    {t('project_members_management')}
-                                </h1>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                    {t('view_project_members_info', { projectName: project.name })}
-                                </p>
-                            </div>
+                {flash.success && <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">{flash.success}</p>}
+                {flash.error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">{flash.error}</p>}
+
+                <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <Stat label="Membres" value={members.length} tone="text-blue-600 dark:text-blue-400" />
+                    <Stat label="Chefs de projet" value={counts.manager || 0} tone="text-amber-600" />
+                    <Stat label="Tâches" value={initial.tasks_count} />
+                    <Stat label="Tâches en retard" value={totalOverdue} tone={totalOverdue ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'} />
+                </div>
+                {taskEntries.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {taskEntries.map(([s, n]) => <Badge key={s} cfg={statusOf(s)}>{n} {statusOf(s).label.toLowerCase()}</Badge>)}
+                    </div>
+                )}
+
+                {/* Membres */}
+                <Card className="mt-6" title={`Équipe (${filtered.length}${filtered.length !== members.length ? `/${members.length}` : ''})`} icon={FaUsers}>
+                    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center">
+                        <div className="relative flex-1">
+                            <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un membre…" aria-label="Rechercher un membre"
+                                className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-10 pr-3 text-base focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-100 md:py-2.5 md:text-sm" />
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                            {[['', 'Tous'], ...Object.entries(PROJECT_ROLES).map(([k, v]) => [k, v.label])].map(([k, l]) => (
+                                <button key={k} onClick={() => setRoleFilter(k)} aria-pressed={roleFilter === k}
+                                    className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium ${roleFilter === k ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300' : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
+                                    {l}{k && counts[k] ? ` · ${counts[k]}` : ''}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Project Overview */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-sm">
-                                <FaProjectDiagram className="text-white text-2xl" />
-                            </div>
-                            <div className="flex-1">
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                    {project ? (
-                                        <Link 
-                                            href={route('projects.show', project.id)}
-                                            className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            {project.name}
-                                        </Link>
-                                    ) : (
-                                        <span className="text-gray-400">Projet non trouvé</span>
-                                    )}
-                                </h2>
-                                <div className="flex items-center gap-6 mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                    <div className="flex items-center gap-1">
-                                        <FaUsers />
-                                        <span>{t('members_count', { count: project?.users?.length || 0 })}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <FaTasks />
-                                        <span>{t('tasks_count', { count: project.tasks_count || 0 })}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <FaCalendarAlt />
-                                        <span>{t('created_on')} {new Date(project.created_at).toLocaleDateString(i18n.language, {
-                                            day: '2-digit',
-                                            month: 'long',
-                                            year: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Project Stats */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 text-center border border-blue-200 dark:border-blue-800">
-                                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                                    {project.users?.length || 0}
-                                </div>
-                                <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">{t('members')}</div>
-                            </div>
-                            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center border border-green-200 dark:border-green-800">
-                                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                    {project.tasks_count ?? project.tasks?.length ?? 0}
-                                </div>
-                                <div className="text-sm text-green-600 dark:text-green-400 font-medium">
-                                    {t('tasks')}
-                                    {project.tasks_by_status && (
-                                        <div className="text-xs mt-1">
-                                            {Object.entries(project.tasks_by_status).map(([status, count]) => (
-                                                count > 0 && (
-                                                    <span key={status} className="inline-block bg-white dark:bg-gray-700 rounded-full px-2 py-0.5 text-xs font-medium mr-1 mb-1">
-                                                        {count} {status.replace('_', ' ')}
-                                                    </span>
-                                                )
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 text-center border border-purple-200 dark:border-purple-800">
-                                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                                    {project.users?.filter(u => u.pivot?.role === 'manager').length || 0}
-                                </div>
-                                <div className="text-sm text-purple-600 dark:text-purple-400 font-medium">{t('managers')}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Members Section */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                            <h3 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                <FaUsers className="text-blue-500" />
-                                {t('project_members')} ({project.users?.length || 0})
-                            </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {t('project_members_list_description')}
-                            </p>
-                        </div>
-
-                        <div className="p-6">
-                            {project.users && project.users.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {project.users.map(user => (
-                                        <div key={user.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700">
-                                            <div className="flex items-start gap-4">
-                                                <div className="relative flex-shrink-0">
-                                                    <div className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden border-2 border-white dark:border-gray-700">
-                                                        {user.profile_photo_url ? (
-                                                            <img 
-                                                                src={user.profile_photo_url}
-                                                                alt={user.name}
-                                                                className="w-full h-full object-cover"
-                                                                onError={(e) => {
-                                                                    e.target.onerror = null;
-                                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=random`;
-                                                                }}
-                                                            />
-                                                        ) : (
-                                                            <span className="text-gray-600 dark:text-gray-300 font-medium text-xl">
-                                                                {(user.name || 'U').charAt(0).toUpperCase()}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {user.pivot?.is_muted && (
-                                                        <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1">
-                                                            <FaVolumeMute className="text-xs" /> suspendu
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between">
-                                                        <h4 className={`text-base font-semibold ${user.pivot?.is_muted ? 'opacity-50' : ''} ${user.id === auth.user.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
-                                                            {user.name}
-                                                        </h4>
-                                                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.pivot?.role)}`}>
-                                                            {user.pivot?.role !== 'manager' && getRoleIcon(user.pivot?.role)}
-                                                            {getRoleLabel(user.pivot?.role)}
-                                                        </div>
-                                                    </div>
-                                                    <div className="mt-1 relative group">
-                                                        <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-[180px]" title={user.email || ''}>
-                                                            {user.email || t('email_not_available')}
-                                                        </p>
-                                                        {user.email && user.email.length > 25 && (
-                                                            <div className="absolute z-10 invisible group-hover:visible bg-gray-800 text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-1 whitespace-nowrap">
-                                                                {user.email}
-                                                                <div className="absolute w-2 h-2 bg-gray-800 transform rotate-45 -bottom-1 left-1/2 -ml-1"></div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                                        <FaCalendarAlt className="inline mr-1" />
-                                                        {t('member_since')} {user.pivot?.created_at ? new Date(user.pivot.created_at).toLocaleDateString(i18n.language, {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: 'numeric'
-                                                        }) : t('date_unknown')}
-                                                    </p>
+                    {filtered.length === 0 ? (
+                        <EmptyState icon={FaUsers} title="Aucun membre trouvé" text="Modifiez votre recherche ou le filtre de rôle." />
+                    ) : (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {filtered.map((m) => {
+                                const r = PROJECT_ROLES[m.pivot.role] || PROJECT_ROLES.member;
+                                const muted = m.pivot.is_muted;
+                                const isMe = m.id === auth.user.id;
+                                return (
+                                    <article key={m.id} className={`flex flex-col rounded-xl border bg-white p-4 shadow-sm transition hover:shadow-md dark:bg-slate-800 ${isMe ? 'border-blue-300 dark:border-blue-500/50' : 'border-slate-200 dark:border-slate-700'}`}>
+                                        <div className="flex items-start gap-3">
+                                            <Avatar name={m.name} src={m.profile_photo_url} size="lg" className={muted ? 'opacity-50' : ''} />
+                                            <div className="min-w-0 flex-1">
+                                                <Link href={`/users/${m.id}`} className={`block truncate font-semibold text-slate-900 hover:text-blue-600 dark:text-white ${muted ? 'opacity-60' : ''}`}>
+                                                    {m.name}{isMe && <span className="ml-1.5 text-xs font-normal text-blue-600">(vous)</span>}
+                                                </Link>
+                                                {(m.job_title || m.company) && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{[m.job_title, m.company].filter(Boolean).join(' · ')}</p>}
+                                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                    <Badge cfg={r}>{m.pivot.role === 'manager' && <FaCrown className="text-[10px]" />}{r.label}</Badge>
+                                                    {muted && <Badge cfg={{ cls: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300' }}><FaVolumeMute className="text-[10px]" /> Sourdine</Badge>}
+                                                    {m.global_role && m.global_role !== 'user' && m.global_role !== 'member' && GLOBAL_ROLES[m.global_role] && <Badge cfg={GLOBAL_ROLES[m.global_role]} />}
                                                 </div>
                                             </div>
-                                            
-                                            {auth.user.id !== user.id && user.pivot?.role !== 'manager' && user.pivot?.role !== 'admin' && (
-                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-right">
-                                                    <button
-                                                        onClick={() => toggleMuteUser(user.id)}
-                                                        className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${user.pivot?.is_muted 
-                                                            ? 'text-green-700 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50' 
-                                                            : 'text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}`}
-                                                        title={user.pivot?.is_muted ? t('enable_notifications') : t('mute_notifications')}
-                                                    >
-                                                        {user.pivot?.is_muted ? (
-                                                            <>
-                                                                <FaVolumeUp className="text-xs" />
-                                                                <span>{t('enable')}</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <FaVolumeMute className="text-xs" />
-                                                                <span>{t('muted')}</span>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            )}
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center p-4">
-                                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                                        {t('no_members_added')}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
 
-                    {/* Help Section */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                            <FaInfoCircle className="text-blue-500" />
-                            {t('roles_and_permissions')}
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                                <FaCrown className="text-yellow-500 mt-1" />
-                                <div>
-                                    <h5 className="font-medium text-yellow-800 dark:text-yellow-200">{t('project_manager')}</h5>
-                                    <p className="text-sm text-yellow-700 dark:text-yellow-300">{t('project_manager_description')}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                                <FaUser className="text-blue-500 mt-1" />
-                                <div>
-                                    <h5 className="font-medium text-blue-800 dark:text-blue-200">{t('member')}</h5>
-                                    <p className="text-sm text-blue-700 dark:text-blue-300">{t('member_description')}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                                <FaShieldAlt className="text-gray-500 mt-1" />
-                                <div>
-                                    <h5 className="font-medium text-gray-800 dark:text-gray-200">{t('observer')}</h5>
-                                    <p className="text-sm text-gray-700 dark:text-gray-300">{t('observer_description')}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                                        <div className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                                            {m.email && <a href={`mailto:${m.email}`} className="flex items-center gap-2 truncate hover:text-blue-600"><FaEnvelope className="shrink-0 text-xs text-slate-400" /> <span className="truncate">{m.email}</span></a>}
+                                            {m.phone && <a href={`tel:${m.phone}`} className="flex items-center gap-2 hover:text-blue-600"><FaPhone className="shrink-0 text-xs text-slate-400" /> {m.phone}</a>}
+                                            <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"><FaCalendarAlt className="shrink-0" /> Dans le projet depuis le {fmtDate(m.pivot.created_at, { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                        </div>
 
-                    {/* Actions */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <Link 
-                                href={route('project-users.edit', project.id)}
-                                className="flex-1 sm:flex-none bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200 transform hover:scale-105"
-                            >
-                                <FaUserEdit />
-                                {t('edit_members')}
-                            </Link>
-                            <Link 
-                                href={route('project-users.create')}
-                                className="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200 transform hover:scale-105"
-                            >
-                                <FaUsers />
-                                {t('add_member')}
-                            </Link>
-                            <Link 
-                                href={route('project-users.index')}
-                                className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-all duration-200"
-                            >
-                                <FaArrowLeft />
-                                {t('back_to_list')}
-                            </Link>
+                                        <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-700/70">
+                                            <p className="mb-1.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                                                <span className="flex items-center gap-1.5"><FaTasks /> Tâches terminées</span>
+                                                {m.tasks_overdue > 0 && <span className="flex items-center gap-1 font-medium text-red-600"><FaExclamationTriangle /> {m.tasks_overdue} en retard</span>}
+                                            </p>
+                                            <ProgressBar done={m.tasks_done} total={m.tasks_total} />
+                                        </div>
+
+                                        {can_manage && !isMe && m.pivot.role !== 'manager' && (
+                                            <button type="button" disabled={pending[m.id]} onClick={() => toggleMute(m)}
+                                                className={`mt-3 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition disabled:opacity-60 ${muted ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200'}`}>
+                                                {muted ? <><FaVolumeUp /> Réactiver les notifications</> : <><FaVolumeMute /> Mettre en sourdine</>}
+                                            </button>
+                                        )}
+                                    </article>
+                                );
+                            })}
                         </div>
+                    )}
+                </Card>
+
+                <Card className="mt-6" title="Rôles dans le projet" icon={FaInfoCircle}>
+                    <div className="grid gap-3 md:grid-cols-3">
+                        {Object.entries(PROJECT_ROLES).map(([k, v]) => (
+                            <div key={k} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/40">
+                                <Badge cfg={v} />
+                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{ROLE_HELP[k]}</p>
+                            </div>
+                        ))}
                     </div>
-                </div>
-            </main>
+                </Card>
+            </div>
         </div>
     );
 }
 
-Show.layout = page => <AdminLayout children={page} />;
+Show.layout = (page) => <AdminLayout children={page} />;
