@@ -82,7 +82,7 @@ const Loader = () => {
   const letters = ['P', 'r', 'o', 'J', 'A'];
 
   return (
-    <div className="fixed top-0 bottom-0 left-0 right-0 md:left-64 z-[60] flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
+    <div className="fixed top-0 bottom-0 left-0 right-0 md:left-[var(--sidebar-w,16rem)] z-[60] flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
       <div className="flex space-x-1 mb-8">
         {letters.map((letter, index) => (
           <span
@@ -130,6 +130,22 @@ export default function AdminLayout({ children }) {
   const menuLinks = candidateOnly ? navLinks.filter((l) => l.href === '/quizzes') : navLinks;
   const isLinkActive = (link) => (link.match ? link.match(currentUrl) : route().current(link.href.replace(/^\//, '')));
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Menu latéral réductible (PC) : seules les icônes restent visibles, le contenu gagne de la place
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar_collapsed') === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0'); } catch { /* stockage indisponible */ }
+    // Les pages plein écran (chat, loader) s'alignent sur cette largeur via var(--sidebar-w)
+    document.documentElement.style.setProperty('--sidebar-w', collapsed ? '4.5rem' : '16rem');
+  }, [collapsed]);
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); setCollapsed((c) => !c); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -444,57 +460,74 @@ const stopRingtone = () => {
 
       {/* ═══════════════════ SIDEBAR / DRAWER ═══════════════════ */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-72 md:w-64 bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}
+        className={`fixed top-0 left-0 h-screen w-72 ${collapsed ? 'md:w-[4.5rem]' : 'md:w-64'} bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-20 px-6 flex-shrink-0">
+        <div className={`relative flex items-center justify-between h-20 flex-shrink-0 px-6 ${collapsed ? 'md:px-0 md:justify-center' : ''}`}>
           <div className="flex items-center space-x-3">
             <svg className="w-8 h-8 text-white dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <span className="text-xl font-bold text-white dark:text-blue-400">ProJA</span>
+            <span className={`text-xl font-bold text-white dark:text-blue-400 ${collapsed ? 'md:hidden' : ''}`}>ProJA</span>
           </div>
           <button
             className="md:hidden text-white/70 hover:text-white active:scale-90 transition-all"
             onClick={() => setSidebarOpen(false)}
+            aria-label="Fermer le menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+
+          {/* Réduire / étendre (PC) */}
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? 'Étendre le menu' : 'Réduire le menu'}
+            aria-expanded={!collapsed}
+            title={collapsed ? 'Étendre le menu (Ctrl+B)' : 'Réduire le menu (Ctrl+B)'}
+            className="hidden md:flex absolute -right-3.5 top-1/2 -translate-y-1/2 h-7 w-7 items-center justify-center rounded-full bg-white text-blue-700 shadow-lg ring-1 ring-black/5 transition hover:scale-110 hover:bg-blue-50 dark:bg-gray-700 dark:text-blue-200"
+          >
+            <svg className={`h-3.5 w-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
         </div>
 
         {/* Menu */}
-        <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide space-y-1.5">
+        <nav className={`flex-1 px-4 py-4 overflow-y-auto overflow-x-hidden scrollbar-hide space-y-1.5 ${collapsed ? 'md:px-2.5' : ''}`}>
           {menuLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 active:scale-[0.98] ${
+              title={collapsed ? t(link.label) : undefined}
+              aria-label={t(link.label)}
+              className={`group relative flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 active:scale-[0.98] ${collapsed ? 'md:justify-center md:px-0' : ''} ${
                 isLinkActive(link)
                   ? 'bg-white/10 dark:bg-blue-900/50 text-white dark:text-blue-100 shadow-lg'
                   : 'text-white/80 hover:bg-white/5 dark:hover:bg-blue-900/30 hover:text-white dark:hover:text-blue-100'
               }`}
             >
-              <span className="text-lg">
+              <span className="text-lg flex-shrink-0">
                 {link.icon || (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 )}
               </span>
-              <span className="font-medium">{t(link.label)}</span>
+              <span className={`font-medium truncate ${collapsed ? 'md:hidden' : ''}`}>{t(link.label)}</span>
               {isLinkActive(link) && (
-                <span className="ml-auto w-1.5 h-1.5 bg-blue-400 dark:bg-blue-300 rounded-full"></span>
+                <span className={`${collapsed ? 'md:absolute md:right-1.5 md:top-1/2 md:-translate-y-1/2' : 'ml-auto'} w-1.5 h-1.5 bg-blue-400 dark:bg-blue-300 rounded-full`}></span>
               )}
             </Link>
           ))}
         </nav>
 
         {/* Sélecteur de langue */}
-        <div className="flex-shrink-0 border-t border-white/10 dark:border-gray-700 pt-3">
+        <div className={`flex-shrink-0 border-t border-white/10 dark:border-gray-700 pt-3 ${collapsed ? 'md:hidden' : ''}`}>
           <LanguageSwitcherSidebar
             currentLanguage={currentLanguage}
             isChangingLanguage={isChangingLanguage}
@@ -505,11 +538,11 @@ const stopRingtone = () => {
 
         {/* Version */}
         <div
-          className="p-4 border-t border-white/10 dark:border-gray-700 text-center flex-shrink-0"
+          className={`p-4 border-t border-white/10 dark:border-gray-700 text-center flex-shrink-0 ${collapsed ? 'md:px-1' : ''}`}
           style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 1rem)' }}
         >
-          <div className="text-sm font-medium text-white/60 dark:text-gray-400">
-            ProJA v2.3.1
+          <div className={`font-medium text-white/60 dark:text-gray-400 ${collapsed ? 'md:text-[10px]' : 'text-sm'}`}>
+            {collapsed ? 'v2.3' : 'ProJA v2.3.1'}
           </div>
         </div>
       </aside>
@@ -523,12 +556,12 @@ const stopRingtone = () => {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
+      <div className={`flex-1 flex flex-col min-h-screen ml-0 ${collapsed ? 'md:ml-[4.5rem]' : 'md:ml-64'} transition-all duration-300 min-w-0`}>
         {/* ═══════════════════════════════════════════════════════════
             HEADER — allégé sur mobile (pattern app native)
         ═══════════════════════════════════════════════════════════ */}
         <header
-          className="fixed top-0 left-0 md:left-64 right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300"
+          className={`fixed top-0 left-0 ${collapsed ? 'md:left-[4.5rem]' : 'md:left-64'} right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300`}
           style={{
             height: 'calc(4rem + env(safe-area-inset-top, 0px))',
             paddingTop: 'env(safe-area-inset-top, 0px)',

@@ -316,7 +316,7 @@ export default function InboxThread({ contactId, variant = 'web', onBack }) {
 
   const root = mobile
     ? 'flex h-full flex-col bg-slate-100 dark:bg-slate-950'
-    : 'fixed bottom-0 left-0 right-0 top-0 z-[45] flex flex-col bg-slate-100 dark:bg-slate-950 md:left-64';
+    : 'fixed bottom-0 left-0 right-0 top-0 z-[45] flex flex-col bg-slate-100 dark:bg-slate-950 md:left-[var(--sidebar-w,16rem)]';
 
   return (
     <div className={root}>

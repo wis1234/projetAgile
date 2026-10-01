@@ -109,3 +109,16 @@ export const formatFileSize = (bytes, decimals = 2) => {
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
+
+
+/**
+ * Document « natif » ProJA : fichier de suivi généré ou document créé directement dans l'éditeur
+ * (stocké en HTML). Il ne s'ouvre que dans l'éditeur de ProJA : un seul bouton « Accéder »,
+ * ni prévisualisation ni modification séparées.
+ */
+export const isNativeDocument = (file) => {
+  if (!file) return false;
+  const type = (file.type || '').toLowerCase();
+  const ext = (file.name || '').split('.').pop().toLowerCase();
+  return type.includes('text/html') || ext === 'html' || ext === 'htm' || /^fichier de suivi/i.test(file.name || '');
+};

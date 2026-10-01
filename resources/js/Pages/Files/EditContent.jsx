@@ -8,7 +8,7 @@ import {
   FaEye, FaEdit, FaComments, FaShieldAlt, FaCrown,
   FaAngleRight, FaAngleLeft, FaAngleDown, FaUndo,
   FaTag, FaPlus, FaTrash, FaExclamationTriangle, FaClock,
-  FaUserSlash, FaShare, FaChevronDown, FaSearch, FaCheck,
+  FaUserSlash, FaShare, FaChevronDown, FaSearch, FaCheck, FaExternalLinkAlt,
   FaUser, FaMinus, FaFileAlt, FaGoogleDrive, FaPen, FaCommentMedical,
 } from 'react-icons/fa';
 import { isPdfFile } from '@/utils/fileUtils';
@@ -1202,6 +1202,18 @@ const EditContent = ({
                 <span className={`w-1.5 h-1.5 rounded-full ${permDot(myPermission)}`} />
                 {permInfo?.label}
               </span>
+
+              {/* Ouvrir ce document dans un nouvel onglet */}
+              <button
+                type="button"
+                onClick={() => window.open(route('files.edit-content', file.id), '_blank', 'noopener')}
+                title="Ouvrir dans un nouvel onglet"
+                aria-label="Ouvrir dans un nouvel onglet"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-[12px] font-medium text-slate-600 hover:border-[#3454D1] hover:text-[#3454D1] hover:bg-[#EEF1FC] transition-colors"
+              >
+                <FaExternalLinkAlt className="text-[10px]" />
+                <span className="hidden xl:inline">Nouvel onglet</span>
+              </button>
 
               {/* Panel switcher — segmented control */}
               <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">

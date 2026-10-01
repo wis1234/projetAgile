@@ -6,7 +6,8 @@ import {
   FaEllipsisH, FaTimes, FaEye, FaFilePdf,
   FaFileAlt, FaExternalLinkAlt, FaLock
 } from 'react-icons/fa';
-import { isFileEditable, isPdfFile, isOfficeOrDocFile } from '../../utils/fileUtils';
+import { isFileEditable, isPdfFile, isOfficeOrDocFile, isNativeDocument } from '../../utils/fileUtils';
+import { FaArrowRight } from 'react-icons/fa';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 
@@ -132,14 +133,17 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
   const isPdf = isPdfFile(file.type, file.name);
   const [showImageModal, setShowImageModal] = useState(false);
   const isLocked = file.is_password_protected && !isUnlocked;
+  const isNative = isNativeDocument(file);
 
   const openPreviewTab = useCallback(() => {
-    if (isImage) {
+    if (isNative) {
+      router.visit(`/files/${file.id}/edit-content`);
+    } else if (isImage) {
       setShowImageModal(true);
     } else {
       window.open(`/files/${file.id}/preview`, '_blank');
     }
-  }, [file.id, isImage]);
+  }, [file.id, isImage, isNative]);
 
   const handleEditContent = useCallback(() => {
     router.visit(`/files/${file.id}/edit-content`);
@@ -200,6 +204,7 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
               <Menu.Items className="absolute right-0 z-20 mt-1 w-52 origin-top-right rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 focus:outline-none border border-gray-100 dark:border-gray-700 overflow-hidden">
                 <div className="py-1">
                   {/* Prévisualiser */}
+                  {!isNative && (
                   <Menu.Item>
                     {({ active }) => (
                       <button onClick={openPreviewTab}
@@ -209,6 +214,7 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
                       </button>
                     )}
                   </Menu.Item>
+                  )}
 
                   {/* Télécharger */}
                   {!isLocked && (
@@ -235,7 +241,7 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
                   </Menu.Item>
 
                   {/* Modifier le contenu */}
-                  {isEditable && !isPdf && (
+                  {isEditable && !isPdf && !isNative && (
                     <Menu.Item>
                       {({ active }) => (
                         <button onClick={handleEditContent}
@@ -285,6 +291,23 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
 
       {/* ── Barre d'actions rapides ──────────────────────────────────────── */}
       <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-wrap items-center gap-2">
+        {isNative ? (
+          isLocked ? (
+            <button disabled title="Ce fichier est verrouillé par mot de passe"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 border border-gray-200 text-gray-400 text-sm font-semibold rounded-lg cursor-not-allowed">
+              <FaLock className="h-4 w-4 text-amber-500" /> Verrouillé
+            </button>
+          ) : (
+            <button
+              onClick={handleEditContent}
+              className="group inline-flex items-center gap-2.5 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Accéder
+              <FaArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          )
+        ) : (
+          <>
         {/* Bouton principal : Prévisualiser */}
         <button
           onClick={openPreviewTab}
@@ -305,8 +328,12 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
           </button>
         )}
 
+          </>
+        )}
+
         {/* Télécharger */}
         {isLocked ? (
+          isNative ? null : (
           <button
             disabled
             className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 text-sm font-medium rounded-lg shadow-sm cursor-not-allowed opacity-60"
@@ -315,6 +342,7 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
             <FaLock className="h-4 w-4 text-amber-500" />
             Verrouillé
           </button>
+          )
         ) : (
           <button
             onClick={handleDownload}

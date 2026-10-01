@@ -1093,7 +1093,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
 
   return (
     <>
-<div className="fixed top-0 bottom-0 left-0 md:left-64 right-0 z-[45] bg-white dark:bg-gray-900 flex flex-col">
+<div className="fixed top-0 bottom-0 left-0 md:left-[var(--sidebar-w,16rem)] right-0 z-[45] bg-white dark:bg-gray-900 flex flex-col">
             {/* ─── HEADER STYLE WHATSAPP ─── */}
         <div className="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-800 text-white flex-shrink-0 shadow-md">
           <div className="flex items-center gap-3 min-w-0">

@@ -1,0 +1,333 @@
+diff --git a/resources/js/Components/FileDetails/FilePreview.jsx b/resources/js/Components/FileDetails/FilePreview.jsx
+index 2ecbd62..1677643 100644
+--- a/resources/js/Components/FileDetails/FilePreview.jsx
++++ b/resources/js/Components/FileDetails/FilePreview.jsx
+@@ -6,7 +6,8 @@ import {
+   FaEllipsisH, FaTimes, FaEye, FaFilePdf,
+   FaFileAlt, FaExternalLinkAlt, FaLock
+ } from 'react-icons/fa';
+-import { isFileEditable, isPdfFile, isOfficeOrDocFile } from '../../utils/fileUtils';
++import { isFileEditable, isPdfFile, isOfficeOrDocFile, isNativeDocument } from '../../utils/fileUtils';
++import { FaArrowRight } from 'react-icons/fa';
+ import { Menu, Transition } from '@headlessui/react';
+ import { Fragment } from 'react';
+ 
+@@ -132,14 +133,17 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
+   const isPdf = isPdfFile(file.type, file.name);
+   const [showImageModal, setShowImageModal] = useState(false);
+   const isLocked = file.is_password_protected && !isUnlocked;
++  const isNative = isNativeDocument(file);
+ 
+   const openPreviewTab = useCallback(() => {
+-    if (isImage) {
++    if (isNative) {
++      router.visit(`/files/${file.id}/edit-content`);
++    } else if (isImage) {
+       setShowImageModal(true);
+     } else {
+       window.open(`/files/${file.id}/preview`, '_blank');
+     }
+-  }, [file.id, isImage]);
++  }, [file.id, isImage, isNative]);
+ 
+   const handleEditContent = useCallback(() => {
+     router.visit(`/files/${file.id}/edit-content`);
+@@ -200,6 +204,7 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
+               <Menu.Items className="absolute right-0 z-20 mt-1 w-52 origin-top-right rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 focus:outline-none border border-gray-100 dark:border-gray-700 overflow-hidden">
+                 <div className="py-1">
+                   {/* Prévisualiser */}
++                  {!isNative && (
+                   <Menu.Item>
+                     {({ active }) => (
+                       <button onClick={openPreviewTab}
+@@ -209,6 +214,7 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
+                       </button>
+                     )}
+                   </Menu.Item>
++                  )}
+ 
+                   {/* Télécharger */}
+                   {!isLocked && (
+@@ -235,7 +241,7 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
+                   </Menu.Item>
+ 
+                   {/* Modifier le contenu */}
+-                  {isEditable && !isPdf && (
++                  {isEditable && !isPdf && !isNative && (
+                     <Menu.Item>
+                       {({ active }) => (
+                         <button onClick={handleEditContent}
+@@ -285,6 +291,23 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
+ 
+       {/* ── Barre d'actions rapides ──────────────────────────────────────── */}
+       <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-wrap items-center gap-2">
++        {isNative ? (
++          isLocked ? (
++            <button disabled title="Ce fichier est verrouillé par mot de passe"
++              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 border border-gray-200 text-gray-400 text-sm font-semibold rounded-lg cursor-not-allowed">
++              <FaLock className="h-4 w-4 text-amber-500" /> Verrouillé
++            </button>
++          ) : (
++            <button
++              onClick={handleEditContent}
++              className="group inline-flex items-center gap-2.5 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
++            >
++              Accéder
++              <FaArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
++            </button>
++          )
++        ) : (
++          <>
+         {/* Bouton principal : Prévisualiser */}
+         <button
+           onClick={openPreviewTab}
+@@ -305,8 +328,12 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
+           </button>
+         )}
+ 
++          </>
++        )}
++
+         {/* Télécharger */}
+         {isLocked ? (
++          isNative ? null : (
+           <button
+             disabled
+             className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 text-sm font-medium rounded-lg shadow-sm cursor-not-allowed opacity-60"
+@@ -315,6 +342,7 @@ const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownloa
+             <FaLock className="h-4 w-4 text-amber-500" />
+             Verrouillé
+           </button>
++          )
+         ) : (
+           <button
+             onClick={handleDownload}
+diff --git a/resources/js/Components/Inbox/InboxThread.jsx b/resources/js/Components/Inbox/InboxThread.jsx
+index 86dafd8..f34bb3d 100644
+--- a/resources/js/Components/Inbox/InboxThread.jsx
++++ b/resources/js/Components/Inbox/InboxThread.jsx
+@@ -316,7 +316,7 @@ export default function InboxThread({ contactId, variant = 'web', onBack }) {
+ 
+   const root = mobile
+     ? 'flex h-full flex-col bg-slate-100 dark:bg-slate-950'
+-    : 'fixed bottom-0 left-0 right-0 top-0 z-[45] flex flex-col bg-slate-100 dark:bg-slate-950 md:left-64';
++    : 'fixed bottom-0 left-0 right-0 top-0 z-[45] flex flex-col bg-slate-100 dark:bg-slate-950 md:left-[var(--sidebar-w,16rem)]';
+ 
+   return (
+     <div className={root}>
+diff --git a/resources/js/Layouts/AdminLayout.jsx b/resources/js/Layouts/AdminLayout.jsx
+index ac73c4e..6b8b6e8 100644
+--- a/resources/js/Layouts/AdminLayout.jsx
++++ b/resources/js/Layouts/AdminLayout.jsx
+@@ -82,7 +82,7 @@ const Loader = () => {
+   const letters = ['P', 'r', 'o', 'J', 'A'];
+ 
+   return (
+-    <div className="fixed top-0 bottom-0 left-0 right-0 md:left-64 z-[60] flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
++    <div className="fixed top-0 bottom-0 left-0 right-0 md:left-[var(--sidebar-w,16rem)] z-[60] flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
+       <div className="flex space-x-1 mb-8">
+         {letters.map((letter, index) => (
+           <span
+@@ -130,6 +130,22 @@ export default function AdminLayout({ children }) {
+   const menuLinks = candidateOnly ? navLinks.filter((l) => l.href === '/quizzes') : navLinks;
+   const isLinkActive = (link) => (link.match ? link.match(currentUrl) : route().current(link.href.replace(/^\//, '')));
+   const [sidebarOpen, setSidebarOpen] = useState(false);
++  // Menu latéral réductible (PC) : seules les icônes restent visibles, le contenu gagne de la place
++  const [collapsed, setCollapsed] = useState(() => {
++    try { return localStorage.getItem('sidebar_collapsed') === '1'; } catch { return false; }
++  });
++  useEffect(() => {
++    try { localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0'); } catch { /* stockage indisponible */ }
++    // Les pages plein écran (chat, loader) s'alignent sur cette largeur via var(--sidebar-w)
++    document.documentElement.style.setProperty('--sidebar-w', collapsed ? '4.5rem' : '16rem');
++  }, [collapsed]);
++  useEffect(() => {
++    const onKey = (e) => {
++      if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); setCollapsed((c) => !c); }
++    };
++    window.addEventListener('keydown', onKey);
++    return () => window.removeEventListener('keydown', onKey);
++  }, []);
+   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+   const [darkMode, setDarkMode] = useState(() => {
+     if (typeof window !== 'undefined') {
+@@ -444,57 +460,74 @@ const stopRingtone = () => {
+ 
+       {/* ═══════════════════ SIDEBAR / DRAWER ═══════════════════ */}
+       <aside
+-        className={`fixed top-0 left-0 h-screen w-72 md:w-64 bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}
++        className={`fixed top-0 left-0 h-screen w-72 ${collapsed ? 'md:w-[4.5rem]' : 'md:w-64'} bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}
+         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+       >
+         {/* Logo */}
+-        <div className="flex items-center justify-between h-20 px-6 flex-shrink-0">
++        <div className={`relative flex items-center justify-between h-20 flex-shrink-0 px-6 ${collapsed ? 'md:px-0 md:justify-center' : ''}`}>
+           <div className="flex items-center space-x-3">
+             <svg className="w-8 h-8 text-white dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+             </svg>
+-            <span className="text-xl font-bold text-white dark:text-blue-400">ProJA</span>
++            <span className={`text-xl font-bold text-white dark:text-blue-400 ${collapsed ? 'md:hidden' : ''}`}>ProJA</span>
+           </div>
+           <button
+             className="md:hidden text-white/70 hover:text-white active:scale-90 transition-all"
+             onClick={() => setSidebarOpen(false)}
++            aria-label="Fermer le menu"
+           >
+             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+             </svg>
+           </button>
++
++          {/* Réduire / étendre (PC) */}
++          <button
++            type="button"
++            onClick={() => setCollapsed((c) => !c)}
++            aria-label={collapsed ? 'Étendre le menu' : 'Réduire le menu'}
++            aria-expanded={!collapsed}
++            title={collapsed ? 'Étendre le menu (Ctrl+B)' : 'Réduire le menu (Ctrl+B)'}
++            className="hidden md:flex absolute -right-3.5 top-1/2 -translate-y-1/2 h-7 w-7 items-center justify-center rounded-full bg-white text-blue-700 shadow-lg ring-1 ring-black/5 transition hover:scale-110 hover:bg-blue-50 dark:bg-gray-700 dark:text-blue-200"
++          >
++            <svg className={`h-3.5 w-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
++              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
++            </svg>
++          </button>
+         </div>
+ 
+         {/* Menu */}
+-        <nav className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide space-y-1.5">
++        <nav className={`flex-1 px-4 py-4 overflow-y-auto overflow-x-hidden scrollbar-hide space-y-1.5 ${collapsed ? 'md:px-2.5' : ''}`}>
+           {menuLinks.map((link) => (
+             <Link
+               key={link.href}
+               href={link.href}
+               onClick={() => setSidebarOpen(false)}
+-              className={`flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 active:scale-[0.98] ${
++              title={collapsed ? t(link.label) : undefined}
++              aria-label={t(link.label)}
++              className={`group relative flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 active:scale-[0.98] ${collapsed ? 'md:justify-center md:px-0' : ''} ${
+                 isLinkActive(link)
+                   ? 'bg-white/10 dark:bg-blue-900/50 text-white dark:text-blue-100 shadow-lg'
+                   : 'text-white/80 hover:bg-white/5 dark:hover:bg-blue-900/30 hover:text-white dark:hover:text-blue-100'
+               }`}
+             >
+-              <span className="text-lg">
++              <span className="text-lg flex-shrink-0">
+                 {link.icon || (
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                   </svg>
+                 )}
+               </span>
+-              <span className="font-medium">{t(link.label)}</span>
++              <span className={`font-medium truncate ${collapsed ? 'md:hidden' : ''}`}>{t(link.label)}</span>
+               {isLinkActive(link) && (
+-                <span className="ml-auto w-1.5 h-1.5 bg-blue-400 dark:bg-blue-300 rounded-full"></span>
++                <span className={`${collapsed ? 'md:absolute md:right-1.5 md:top-1/2 md:-translate-y-1/2' : 'ml-auto'} w-1.5 h-1.5 bg-blue-400 dark:bg-blue-300 rounded-full`}></span>
+               )}
+             </Link>
+           ))}
+         </nav>
+ 
+         {/* Sélecteur de langue */}
+-        <div className="flex-shrink-0 border-t border-white/10 dark:border-gray-700 pt-3">
++        <div className={`flex-shrink-0 border-t border-white/10 dark:border-gray-700 pt-3 ${collapsed ? 'md:hidden' : ''}`}>
+           <LanguageSwitcherSidebar
+             currentLanguage={currentLanguage}
+             isChangingLanguage={isChangingLanguage}
+@@ -505,11 +538,11 @@ const stopRingtone = () => {
+ 
+         {/* Version */}
+         <div
+-          className="p-4 border-t border-white/10 dark:border-gray-700 text-center flex-shrink-0"
++          className={`p-4 border-t border-white/10 dark:border-gray-700 text-center flex-shrink-0 ${collapsed ? 'md:px-1' : ''}`}
+           style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 1rem)' }}
+         >
+-          <div className="text-sm font-medium text-white/60 dark:text-gray-400">
+-            ProJA v2.3.1
++          <div className={`font-medium text-white/60 dark:text-gray-400 ${collapsed ? 'md:text-[10px]' : 'text-sm'}`}>
++            {collapsed ? 'v2.3' : 'ProJA v2.3.1'}
+           </div>
+         </div>
+       </aside>
+@@ -523,12 +556,12 @@ const stopRingtone = () => {
+       )}
+ 
+       {/* Main content */}
+-      <div className="flex-1 flex flex-col min-h-screen ml-0 md:ml-64 transition-all duration-300">
++      <div className={`flex-1 flex flex-col min-h-screen ml-0 ${collapsed ? 'md:ml-[4.5rem]' : 'md:ml-64'} transition-all duration-300 min-w-0`}>
+         {/* ═══════════════════════════════════════════════════════════
+             HEADER — allégé sur mobile (pattern app native)
+         ═══════════════════════════════════════════════════════════ */}
+         <header
+-          className="fixed top-0 left-0 md:left-64 right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300"
++          className={`fixed top-0 left-0 ${collapsed ? 'md:left-[4.5rem]' : 'md:left-64'} right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300`}
+           style={{
+             height: 'calc(4rem + env(safe-area-inset-top, 0px))',
+             paddingTop: 'env(safe-area-inset-top, 0px)',
+diff --git a/resources/js/Pages/Discussions/Show.jsx b/resources/js/Pages/Discussions/Show.jsx
+index 6acf2c5..dee7fc1 100644
+--- a/resources/js/Pages/Discussions/Show.jsx
++++ b/resources/js/Pages/Discussions/Show.jsx
+@@ -1093,7 +1093,7 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null
+ 
+   return (
+     <>
+-<div className="fixed top-0 bottom-0 left-0 md:left-64 right-0 z-[45] bg-white dark:bg-gray-900 flex flex-col">
++<div className="fixed top-0 bottom-0 left-0 md:left-[var(--sidebar-w,16rem)] right-0 z-[45] bg-white dark:bg-gray-900 flex flex-col">
+             {/* ─── HEADER STYLE WHATSAPP ─── */}
+         <div className="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-800 text-white flex-shrink-0 shadow-md">
+           <div className="flex items-center gap-3 min-w-0">
+diff --git a/resources/js/Pages/Files/EditContent.jsx b/resources/js/Pages/Files/EditContent.jsx
+index c8c34e9..f81c147 100644
+--- a/resources/js/Pages/Files/EditContent.jsx
++++ b/resources/js/Pages/Files/EditContent.jsx
+@@ -8,7 +8,7 @@ import {
+   FaEye, FaEdit, FaComments, FaShieldAlt, FaCrown,
+   FaAngleRight, FaAngleLeft, FaAngleDown, FaUndo,
+   FaTag, FaPlus, FaTrash, FaExclamationTriangle, FaClock,
+-  FaUserSlash, FaShare, FaChevronDown, FaSearch, FaCheck,
++  FaUserSlash, FaShare, FaChevronDown, FaSearch, FaCheck, FaExternalLinkAlt,
+   FaUser, FaMinus, FaFileAlt, FaGoogleDrive, FaPen, FaCommentMedical,
+ } from 'react-icons/fa';
+ import { isPdfFile } from '@/utils/fileUtils';
+@@ -1203,6 +1203,18 @@ const EditContent = ({
+                 {permInfo?.label}
+               </span>
+ 
++              {/* Ouvrir ce document dans un nouvel onglet */}
++              <button
++                type="button"
++                onClick={() => window.open(route('files.edit-content', file.id), '_blank', 'noopener')}
++                title="Ouvrir dans un nouvel onglet"
++                aria-label="Ouvrir dans un nouvel onglet"
++                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-[12px] font-medium text-slate-600 hover:border-[#3454D1] hover:text-[#3454D1] hover:bg-[#EEF1FC] transition-colors"
++              >
++                <FaExternalLinkAlt className="text-[10px]" />
++                <span className="hidden xl:inline">Nouvel onglet</span>
++              </button>
++
+               {/* Panel switcher — segmented control */}
+               <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
+                 <button
+diff --git a/resources/js/utils/fileUtils.js b/resources/js/utils/fileUtils.js
+index 2742b11..f05006e 100644
+--- a/resources/js/utils/fileUtils.js
++++ b/resources/js/utils/fileUtils.js
+@@ -109,3 +109,16 @@ export const formatFileSize = (bytes, decimals = 2) => {
+   
+   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+ };
++
++
++/**
++ * Document « natif » ProJA : fichier de suivi généré ou document créé directement dans l'éditeur
++ * (stocké en HTML). Il ne s'ouvre que dans l'éditeur de ProJA : un seul bouton « Accéder »,
++ * ni prévisualisation ni modification séparées.
++ */
++export const isNativeDocument = (file) => {
++  if (!file) return false;
++  const type = (file.type || '').toLowerCase();
++  const ext = (file.name || '').split('.').pop().toLowerCase();
++  return type.includes('text/html') || ext === 'html' || ext === 'htm' || /^fichier de suivi/i.test(file.name || '');
++};
