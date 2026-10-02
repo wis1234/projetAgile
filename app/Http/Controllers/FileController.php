@@ -766,7 +766,7 @@ public function editContent(File $file)
             'id'                => $a->user->id,
             'name'              => $a->user->name,
             'email'             => $a->user->email,
-            'profile_photo_url' => $a->user->profile_photo_path,
+            'profile_photo_url' => $a->user->profile_photo_path ? $a->user->profile_photo_url : null,
             'permission'        => $a->effectivePermission(),
         ])->values();
 
@@ -777,7 +777,7 @@ public function editContent(File $file)
             'id'    => $u->id,
             'name'  => $u->name,
             'email' => $u->email,
-            'avatar'=> $u->profile_photo_path,
+            'avatar'=> $u->profile_photo_path ? $u->profile_photo_url : null,
         ]);
     }
 

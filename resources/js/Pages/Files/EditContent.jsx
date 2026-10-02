@@ -92,14 +92,27 @@ const fmtDateShort = (d) => d
 
 /* ── Sub-components ──────────────────────────────────────── */
 
+/** URL d'avatar exploitable, ou null (→ initiales). Gère URL absolue, chemin « storage » brut et avatars générés. */
+const resolvePhoto = (user) => {
+  const raw = user?.profile_photo_url || user?.avatar || user?.profile_photo_path;
+  if (!raw || /ui-avatars\.com/.test(raw)) return null;
+  if (/^(https?:|data:|blob:|\/)/.test(raw)) return raw;
+  return `/storage/${String(raw).replace(/^\/+/, '')}`;
+};
+const AVATAR_COLORS = ['bg-[#3454D1]', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-pink-500'];
+
 const Avatar = ({ user, size = 7, ring = true }) => {
-  const initials = user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?';
-  const colors = ['bg-[#3454D1]','bg-violet-500','bg-emerald-500','bg-amber-500','bg-rose-500','bg-pink-500'];
-  const color  = colors[(user?.id ?? 0) % colors.length];
-  const sz     = `w-${size} h-${size}`;
-  return user?.profile_photo_url
-    ? <img src={user.profile_photo_url} alt={user.name} className={`${sz} rounded-full object-cover ${ring ? 'ring-2 ring-white' : ''}`} />
-    : <div className={`${sz} rounded-full ${color} flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 ${ring ? 'ring-2 ring-white' : ''}`}>{initials}</div>;
+  const [failed, setFailed] = useState(false);
+  const photo = failed ? null : resolvePhoto(user);
+  const initials = (user?.name || '').split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+  const color = AVATAR_COLORS[(Number(user?.id) || 0) % AVATAR_COLORS.length];
+  // Tailwind ne génère pas de classes construites dynamiquement (w-${n}) : la taille est donc fixée en style
+  const px = size * 4;
+  const box = { width: px, height: px, minWidth: px };
+  const ringCls = ring ? 'ring-2 ring-white' : '';
+  return photo
+    ? <img src={photo} alt={user?.name || ''} onError={() => setFailed(true)} style={box} className={`rounded-full object-cover flex-shrink-0 bg-slate-100 ${ringCls}`} />
+    : <div title={user?.name} style={{ ...box, fontSize: Math.max(9, Math.round(px * 0.38)) }} className={`rounded-full ${color} flex items-center justify-center text-white font-semibold flex-shrink-0 select-none ${ringCls}`}>{initials}</div>;
 };
 
 const Toast = ({ message, type = 'success', onClose }) => (
@@ -1165,42 +1178,65 @@ const EditContent = ({
         {/* ══ TITLE BAR ══ */}
         <div className="sticky top-0 flex-shrink-0 bg-white border-b border-slate-200/70 z-40">
 
-          {/* Breadcrumb */}
-          {menusOpen && (project || task) && (
-            <div className="flex items-center gap-1.5 px-3 sm:px-5 pt-2 text-[11px] text-slate-400 overflow-x-auto whitespace-nowrap scrollbar-hide">
-              {project && <span className="hover:text-[#3454D1] transition-colors cursor-default truncate">{project.name}</span>}
-              {project && task && <FaAngleRight className="text-[8px] text-slate-300 flex-shrink-0" />}
-              {task && <span className="hover:text-[#3454D1] transition-colors cursor-default truncate max-w-[150px] sm:max-w-xs">{task.title ?? task.name}</span>}
-              <FaAngleRight className="text-[8px] text-slate-300 flex-shrink-0" />
-              <span className="text-slate-500 font-medium">Fichier de suivi</span>
+          {/* Ligne 1 : navigation, fil d'Ariane, TITRE du document et collaborateurs en ligne */}
+          <div className="flex items-center gap-2 px-3 sm:px-5 pt-2 pb-1">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event('proja:open-sidebar'))}
+              aria-label="Ouvrir le menu"
+              className="md:hidden flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.visit(route('files.show', file.id))}
+              title="Retour à la fiche du fichier"
+              aria-label="Retour à la fiche du fichier"
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-[#3454D1]"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <div className="w-8 h-8 bg-[#EEF1FC] rounded-lg flex items-center justify-center flex-shrink-0">
+              <FaFileAlt className="text-[#3454D1] text-[13px]" />
             </div>
-          )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-5 py-2.5">
-            <div className="flex items-center gap-2.5 flex-1 min-w-0">
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new Event('proja:open-sidebar'))}
-                aria-label="Ouvrir le menu"
-                className="md:hidden flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => router.visit(route('files.show', file.id))}
-                title="Retour à la fiche du fichier"
-                aria-label="Retour à la fiche du fichier"
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-[#3454D1]"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-              </button>
-              <div className="w-8 h-8 bg-[#EEF1FC] rounded-lg flex items-center justify-center flex-shrink-0">
-                <FaFileAlt className="text-[#3454D1] text-[13px]" />
+            {menusOpen && (project || task) && (
+              <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-400 whitespace-nowrap flex-shrink-0 max-w-[40%] overflow-hidden">
+                {project && <span className="truncate max-w-[160px]">{project.name}</span>}
+                {project && task && <FaAngleRight className="text-[8px] text-slate-300 flex-shrink-0" />}
+                {task && <span className="truncate max-w-[160px]">{task.title ?? task.name}</span>}
+                <FaAngleRight className="text-[8px] text-slate-300 flex-shrink-0" />
               </div>
-              <div className="min-w-0 flex-1">
-                <EditableTitle value={docTitle} onRename={handleRename} readOnly={isReadOnly} />
-                <div className="flex items-center gap-1.5 mt-0.5">
+            )}
+
+            <div className="min-w-0 flex-1">
+              <EditableTitle value={docTitle} onRename={handleRename} readOnly={isReadOnly} />
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              {presenceUsers.length > 0 && (
+                <div className="flex -space-x-1.5">
+                  {presenceUsers.slice(0, 4).map(u => <Avatar key={u.id} user={u} size={7} />)}
+                  {presenceUsers.length > 4 && (
+                    <div className="w-7 h-7 rounded-full bg-slate-100 ring-2 ring-white flex items-center justify-center text-[10px] font-semibold text-slate-500">
+                      +{presenceUsers.length - 4}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <span className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 ${permInfo?.color}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${permDot(myPermission)}`} />
+                {permInfo?.label}
+              </span>
+            </div>
+          </div>
+
+          {/* Ligne 2 : état d'enregistrement + actions */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 pb-2">
+            <div className="min-w-0 pl-0.5">
+                <div className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                     (isSaving || autoSaving) ? 'bg-[#3454D1] animate-pulse' : autoSaveError ? 'bg-red-500' : isDirty ? 'bg-amber-400' : 'bg-emerald-400'
                   }`} />
@@ -1220,26 +1256,9 @@ const EditContent = ({
                           )}
                   </span>
                 </div>
-              </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 ml-auto">
-              {presenceUsers.length > 0 && (
-                <div className="flex -space-x-1.5">
-                  {presenceUsers.slice(0, 4).map(u => <Avatar key={u.id} user={u} size={7} />)}
-                  {presenceUsers.length > 4 && (
-                    <div className="w-7 h-7 rounded-full bg-slate-100 ring-2 ring-white flex items-center justify-center text-[10px] font-semibold text-slate-500">
-                      +{presenceUsers.length - 4}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <span className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 ${permInfo?.color}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${permDot(myPermission)}`} />
-                {permInfo?.label}
-              </span>
-
               {/* Ouvrir ce document dans un nouvel onglet */}
               <button
                 type="button"
