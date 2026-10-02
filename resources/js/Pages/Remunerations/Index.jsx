@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import WalletCard, { WithdrawalHistory } from '@/Components/Wallet/WalletCard';
+import UserAvatar from '@/Components/UserAvatar';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { 
@@ -283,13 +284,7 @@ export default function RemunerationIndex({ remunerations, filters, stats, walle
                     <tr key={remuneration.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4">
                         <div className="flex items-center">
-                          {remuneration.user?.avatar && (
-                            <img 
-                              className="h-10 w-10 rounded-full mr-3" 
-                              src={remuneration.user.avatar} 
-                              alt={remuneration.user.name} 
-                            />
-                          )}
+                          <UserAvatar user={remuneration.user} size={40} className="mr-3" />
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
                               {remuneration.user?.name || 'Utilisateur inconnu'}

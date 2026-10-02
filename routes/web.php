@@ -638,7 +638,7 @@ Route::get('/run-queue', function () {
         'user_agent' => request()->userAgent(),
         'authenticated' => auth()->check(),
         'environment' => app()->environment(),
-        'token' => request()->query('token')
+        'token_provided' => request()->query('token') !== null, // jamais le jeton lui-même
     ]);
 
     // Vérifier le jeton d'autorisation

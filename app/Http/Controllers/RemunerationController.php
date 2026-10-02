@@ -338,11 +338,8 @@ class RemunerationController extends Controller
         $taskTotalPayments = intval($taskStats->total_payments ?? 0);
         $taskPendingPayments = intval($taskStats->pending_payments ?? 0);
         
-        // Ajouter les statistiques des tâches aux statistiques globales
-        $stats['total_earned'] += $taskTotalPaid;
-        $stats['pending_amount'] += $taskPendingAmount;
-        $stats['total_payments'] += $taskTotalPayments;
-        $stats['pending_payments'] += $taskPendingPayments;
+        // NB : getUserRemunerationStats() inclut déjà les paiements de tâches ; les ré-ajouter ici doublait
+        // « en attente » et le nombre de paiements. Seul le gagné « validé » manquait (statut mal nommé), corrigé là-bas.
         
         // Journalisation des statistiques finales
         \Log::debug('Statistiques finales', [

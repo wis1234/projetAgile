@@ -28,7 +28,7 @@ const GROUPS = [
   ] },
   { title: 'Compte', items: [
     { href: '/subscription/plans', label: 'my_subscription', fb: 'Abonnement', Icon: FaCreditCard, tone: 'from-lime-500 to-green-600' },
-    { href: '/remunerations/dashboard', label: 'remunerations', fb: 'Rémunérations', Icon: FaCoins, tone: 'from-yellow-500 to-amber-600' },
+    { href: '/remunerations', label: 'remunerations', fb: 'Rémunérations', Icon: FaCoins, tone: 'from-yellow-500 to-amber-600' },
   ] },
 ];
 

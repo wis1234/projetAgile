@@ -15,10 +15,48 @@ use Illuminate\Support\Facades\Log;
  */
 class FedapayPayoutService
 {
+    /** Valeurs par défaut si la config en cache (config:cache) date d'avant l'ajout des retraits. */
+    private const DEFAULT_MODES = ['mtn' => 'mtn_open', 'moov' => 'moov', 'celtis' => 'sbin'];
+
+    private function secretKey(): ?string
+    {
+        return config('services.fedapay.secret_key') ?: null;
+    }
+
+    private function modeFor(string $method): ?string
+    {
+        return config("services.fedapay.payout_modes.{$method}") ?: (self::DEFAULT_MODES[$method] ?? null);
+    }
+
     private function boot(): void
     {
-        FedaPay::setApiKey(config('services.fedapay.secret_key'));
-        FedaPay::setEnvironment(config('services.fedapay.environment', 'live'));
+        FedaPay::setApiKey($this->secretKey());
+        FedaPay::setEnvironment(config('services.fedapay.environment', 'live') ?: 'live');
+    }
+
+    /** Numéro national sans indicatif (« 97000000 »), tel que l'attend l'API Fedapay avec country = bj. */
+    public static function nationalNumber(string $e164): string
+    {
+        $dial = (string) config('services.fedapay.payout_dial_code', '229');
+        return preg_replace('/^\+?' . preg_quote($dial, '/') . '/', '', preg_replace('/\s+/', '', $e164));
+    }
+
+    /** Message lisible tiré d'une exception du SDK Fedapay (corps JSON de l'API si disponible). */
+    public static function describeError(\Throwable $e): string
+    {
+        $detail = null;
+        if (method_exists($e, 'getJsonBody') && ($body = $e->getJsonBody())) {
+            $detail = $body['message'] ?? null;
+            if (!empty($body['errors']) && is_array($body['errors'])) {
+                $parts = [];
+                foreach ($body['errors'] as $field => $msgs) {
+                    $parts[] = $field . ' : ' . (is_array($msgs) ? implode(', ', $msgs) : $msgs);
+                }
+                $detail = trim(($detail ? $detail . ' — ' : '') . implode(' ; ', $parts));
+            }
+        }
+        $detail = $detail ?: $e->getMessage();
+        return mb_substr(trim($detail), 0, 240);
     }
 
     /** +229XXXXXXXX à partir d'une saisie libre ; null si invalide. */
@@ -45,9 +83,14 @@ class FedapayPayoutService
             return; // déjà traité
         }
 
-        $mode = config("services.fedapay.payout_modes.{$w->method}");
-        if (!$mode || !config('services.fedapay.secret_key')) {
-            $this->fail($w, 'Service de paiement non configuré. Contactez un administrateur.');
+        $mode = $this->modeFor($w->method);
+        if (!$mode) {
+            $this->fail($w, "Opérateur « {$w->method} » non pris en charge.");
+            return;
+        }
+        if (!$this->secretKey()) {
+            Log::error('Fedapay : clé secrète absente de la config (FEDAPAY_LIVE_SECRET_KEY ? php artisan config:clear ?)', ['withdrawal' => $w->id]);
+            $this->fail($w, 'Clé Fedapay absente côté serveur : contactez un administrateur.');
             return;
         }
 
@@ -64,12 +107,13 @@ class FedapayPayoutService
                     'firstname' => $parts[0] ?? $user->name,
                     'lastname' => $parts[1] ?? $parts[0] ?? $user->name,
                     'email' => $user->email,
-                    'phone_number' => ['number' => $w->phone_number, 'country' => $w->country],
+                    'phone_number' => ['number' => self::nationalNumber($w->phone_number), 'country' => $w->country],
                 ],
             ]);
         } catch (\Throwable $e) {
-            Log::error('Fedapay payout create failed', ['withdrawal' => $w->id, 'error' => $e->getMessage()]);
-            $this->fail($w, 'Le service de paiement a refusé la demande. Réessayez plus tard.');
+            $detail = self::describeError($e);
+            Log::error('Fedapay payout create failed', ['withdrawal' => $w->id, 'error' => $detail, 'class' => get_class($e)]);
+            $this->fail($w, 'Fedapay a refusé la demande : ' . $detail);
             return;
         }
 
@@ -82,8 +126,9 @@ class FedapayPayoutService
         try {
             $payout->sendNow();
         } catch (\Throwable $e) {
-            Log::error('Fedapay payout send failed', ['withdrawal' => $w->id, 'error' => $e->getMessage()]);
-            $this->fail($w, "L'envoi vers l'opérateur a échoué. Votre solde n'a pas été débité.");
+            $detail = self::describeError($e);
+            Log::error('Fedapay payout send failed', ['withdrawal' => $w->id, 'payout' => $payout->id ?? null, 'error' => $detail]);
+            $this->fail($w, "L'envoi vers l'opérateur a échoué : " . $detail);
         }
     }
 
