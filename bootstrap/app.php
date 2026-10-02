@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Désactiver la vérification CSRF pour les routes API
         $middleware->validateCsrfTokens(except: [
+            'webhooks/fedapay/payouts',
             'api/*',
             'webhook/*',
             'stripe/*',

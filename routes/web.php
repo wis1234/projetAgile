@@ -581,6 +581,17 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/remunerations/{remuneration}/cancel', [\App\Http\Controllers\RemunerationController::class, 'cancel'])->name('remunerations.cancel');
 });
 
+// Retraits (payouts Fedapay)
+Route::middleware(['auth'])->group(function () {
+    Route::post('/withdrawals', [\App\Http\Controllers\WithdrawalController::class, 'store'])
+        ->middleware('throttle:6,1')->name('withdrawals.store');
+    Route::post('/withdrawals/{withdrawal}/cancel', [\App\Http\Controllers\WithdrawalController::class, 'cancel'])
+        ->name('withdrawals.cancel');
+});
+// Webhook Fedapay (retraits) : public mais signé, sans CSRF
+Route::post('/webhooks/fedapay/payouts', \App\Http\Controllers\FedapayPayoutWebhookController::class)
+    ->name('webhooks.fedapay.payouts'); // exclue du CSRF dans bootstrap/app.php (validateCsrfTokens)
+
 // Gestion des établissements scolaires
 Route::middleware(['auth'])->group(function () {
     Route::resource('schools', \App\Http\Controllers\SchoolController::class);

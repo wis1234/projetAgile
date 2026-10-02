@@ -7,7 +7,7 @@ import Modal from '@/Components/Modal';
 import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
 // Ajout de FaSave à la liste des icônes importées
-import { FaSave, FaTimes, FaExpand, FaCompress, FaCopy, FaPause, FaCheck } from 'react-icons/fa';
+import { FaSave, FaTimes, FaExpand, FaCompress, FaCopy, FaPause, FaCheck, FaMoneyBillWave } from 'react-icons/fa';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import AudioPlayer from '@/Components/AudioPlayer';
 import StickerMessage from '@/Components/Stickers/StickerMessage';
@@ -2398,6 +2398,34 @@ return () => {
 
               {/* Colonne latérale : sprint + échéance + méta */}
               <div className="space-y-6">
+
+                {/* Rémunération (tâche payante) */}
+                {task.is_paid && (
+                  <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 shadow-sm dark:border-emerald-800/50 dark:from-emerald-900/20 dark:via-gray-800 dark:to-teal-900/10">
+                    <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-emerald-200/40 dark:bg-emerald-500/10" />
+                    <h4 className="relative mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                      <FaMoneyBillWave /> Rémunération
+                    </h4>
+                    <p className="relative text-3xl font-extrabold tabular-nums text-gray-900 dark:text-white">
+                      {Number(task.amount || 0).toLocaleString('fr-FR')} <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">FCFA</span>
+                    </p>
+                    <div className="relative mt-3 flex flex-wrap items-center gap-2">
+                      {(() => {
+                        const st = task.payment_status || 'unpaid';
+                        const map = {
+                          paid: ['Payée', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'],
+                          pending: ['En attente de validation', 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'],
+                          failed: ['Échec du paiement', 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'],
+                          unpaid: ['Non payée', 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'],
+                        };
+                        const [label, cls] = map[st] || map.unpaid;
+                        return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{label}</span>;
+                      })()}
+                      {task.paid_at && <span className="text-xs text-gray-500 dark:text-gray-400">le {new Date(task.paid_at).toLocaleDateString('fr-FR')}</span>}
+                    </div>
+                    <p className="relative mt-3 text-xs text-gray-500 dark:text-gray-400">Une fois le paiement validé, le montant rejoint votre solde retirable dans « Mes gains ».</p>
+                  </div>
+                )}
 
                 {/* Sprint */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">

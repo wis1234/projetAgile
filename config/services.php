@@ -46,6 +46,16 @@ return [
         'secret_key' => env('FEDAPAY_LIVE_SECRET_KEY'),
         'webhook_secret' => env('FEDAPAY_WEBHOOK_SECRET'),
         'environment' => env('FEDAPAY_ENV', 'live'), // 'live' ou 'sandbox'
+        // ── Retraits (payouts) ──
+        'min_withdrawal' => (int) env('WITHDRAWAL_MIN', 500),
+        'payout_country' => env('FEDAPAY_PAYOUT_COUNTRY', 'bj'),
+        'payout_dial_code' => env('FEDAPAY_PAYOUT_DIAL_CODE', '229'),
+        // Correspondance opérateur ProJA → « mode » Fedapay. À vérifier dans votre tableau de bord Fedapay.
+        'payout_modes' => [
+            'mtn' => env('FEDAPAY_MODE_MTN', 'mtn_open'),
+            'moov' => env('FEDAPAY_MODE_MOOV', 'moov'),
+            'celtis' => env('FEDAPAY_MODE_CELTIS', 'sbin'),
+        ],
     ],
 
     'zoom' => [

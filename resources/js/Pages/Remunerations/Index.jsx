@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import WalletCard, { WithdrawalHistory } from '@/Components/Wallet/WalletCard';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { 
@@ -13,9 +14,12 @@ import {
   FaFileAlt
 } from 'react-icons/fa';
 
-export default function RemunerationIndex({ remunerations, filters, stats }) {
+export default function RemunerationIndex({ remunerations, filters, stats, wallet, withdrawals = [], payoutDefaults = {} }) {
   const { auth } = usePage().props;
   const isAdmin = auth.user.roles?.includes('admin');
+  const [tab, setTab] = useState(() => (typeof window !== 'undefined' && window.location.hash === '#retraits' ? 'withdrawals' : 'earnings'));
+  const { flash = {} } = usePage().props;
+  const pendingWithdrawals = withdrawals.filter((w) => ['pending', 'processing'].includes(w.status)).length;
   const [params, setParams] = useState({
     search: filters.search || '',
     status: filters.status || '',
@@ -64,92 +68,42 @@ export default function RemunerationIndex({ remunerations, filters, stats }) {
     <>
       <Head title="Historique des rémunérations" />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <Link 
-            href={route('remunerations.dashboard')} 
-            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            <FaArrowLeft className="mr-2 h-4 w-4" />
-            Retour au tableau de bord
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white sm:text-3xl">Mes gains</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Suivez vos rémunérations et retirez-les sur votre Mobile Money.</p>
+          </div>
+          <Link href={route('remunerations.dashboard')} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200">
+            Tableau de bord
           </Link>
         </div>
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Historique des rémunérations
-          </h1>
-          <div className="flex space-x-3">
-            <button
-              type="button"
-              className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <FaFileExport className="mr-2 h-4 w-4" />
-              Exporter
+
+        {flash.success && <p role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">{flash.success}</p>}
+        {flash.error && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">{flash.error}</p>}
+
+        {wallet && <WalletCard wallet={wallet} defaults={payoutDefaults} />}
+
+        {/* Onglets */}
+        <div role="tablist" className="mb-6 mt-8 inline-flex rounded-2xl bg-gray-100 p-1 dark:bg-gray-800">
+          {[['earnings', 'Mes gains'], ['withdrawals', 'Mes retraits']].map(([id, label]) => (
+            <button key={id} role="tab" type="button" aria-selected={tab === id} onClick={() => setTab(id)}
+              className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${tab === id ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'}`}>
+              {label}
+              {id === 'withdrawals' && pendingWithdrawals > 0 && <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-bold text-white">{pendingWithdrawals}</span>}
             </button>
-          </div>
+          ))}
         </div>
 
-        {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-                <FaMoneyBillWave className="h-6 w-6" />
-              </div>
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total gagné</h3>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(stats?.total_earned || 0)}
-                </p>
-              </div>
-            </div>
+        {tab === 'withdrawals' ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+            <h2 className="mb-1 text-base font-bold text-gray-900 dark:text-white">Historique des retraits</h2>
+            <WithdrawalHistory withdrawals={withdrawals} />
           </div>
-          
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400">
-                <FaClock className="h-6 w-6" />
-              </div>
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">En attente</h3>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(stats?.pending_amount || 0)}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                <FaCheckCircle className="h-6 w-6" />
-              </div>
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Tâches terminées</h3>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {stats?.completed_tasks || 0}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
-                <FaFileAlt className="h-6 w-6" />
-              </div>
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total des paiements</h3>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {stats?.total_count || 0}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
+        ) : (
+        <>
         {/* Filtres */}
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-8">
+        <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-2xl p-5 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <label htmlFor="search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -298,7 +252,7 @@ export default function RemunerationIndex({ remunerations, filters, stats }) {
         </div>
 
         {/* Tableau des rémunérations */}
-        <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
+        <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden rounded-2xl">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
@@ -476,6 +430,8 @@ export default function RemunerationIndex({ remunerations, filters, stats }) {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
     </>
   );

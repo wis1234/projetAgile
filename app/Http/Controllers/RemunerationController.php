@@ -262,7 +262,16 @@ class RemunerationController extends Controller
             ['path' => $request->url(), 'pageName' => 'page']
         );
         
+        $walletService = app(\App\Services\WalletService::class);
+
         return Inertia::render('Remunerations/Index', [
+            'wallet' => $walletService->summary($user->id),
+            'withdrawals' => \App\Models\Withdrawal::where('user_id', $user->id)->latest()->limit(30)->get()
+                ->map(fn ($w) => $w->toPayload())->values(),
+            'payoutDefaults' => [
+                'phone' => optional(\App\Models\TaskPayment::where('user_id', $user->id)->latest()->first())->phone_number,
+                'method' => optional(\App\Models\TaskPayment::where('user_id', $user->id)->latest()->first())->payment_method,
+            ],
             'remunerations' => $remunerations,
             'filters' => $filters,
             'stats' => $stats,
