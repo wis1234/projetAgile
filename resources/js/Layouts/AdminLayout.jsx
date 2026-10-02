@@ -122,7 +122,12 @@ const Loader = () => {
   );
 };
 
-export default function AdminLayout({ children }) {
+/**
+ * `immersive` : pages d'édition plein écran (éditeur de documents). L'en-tête global, le pied de page
+ * et la barre basse mobile sont retirés pour laisser toute la place au document ; c'est alors l'en-tête
+ * du fichier qui reste figé en haut.
+ */
+export default function AdminLayout({ children, immersive = false }) {
   const { auth, flash = {}, appName } = usePage().props;
   const { url: currentUrl } = usePage();
   // Compte candidat (inscrit à des quiz, sans projet) : un seul menu, « Quiz ».
@@ -139,6 +144,11 @@ export default function AdminLayout({ children }) {
     // Les pages plein écran (chat, loader) s'alignent sur cette largeur via var(--sidebar-w)
     document.documentElement.style.setProperty('--sidebar-w', collapsed ? '4.5rem' : '16rem');
   }, [collapsed]);
+  useEffect(() => {
+    const open = () => setSidebarOpen(true);
+    window.addEventListener('proja:open-sidebar', open);
+    return () => window.removeEventListener('proja:open-sidebar', open);
+  }, []);
   useEffect(() => {
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); setCollapsed((c) => !c); }
@@ -560,6 +570,7 @@ const stopRingtone = () => {
         {/* ═══════════════════════════════════════════════════════════
             HEADER — allégé sur mobile (pattern app native)
         ═══════════════════════════════════════════════════════════ */}
+        {!immersive && (
         <header
           className={`fixed top-0 left-0 ${collapsed ? 'md:left-[4.5rem]' : 'md:left-64'} right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300`}
           style={{
@@ -834,9 +845,10 @@ const stopRingtone = () => {
             </div>
           </div>
         </header>
+        )}
 
         {/* ═══════════════════ OVERLAY RECHERCHE MOBILE ═══════════════════ */}
-        {mobileSearchOpen && (
+        {!immersive && mobileSearchOpen && (
           <div
             className="md:hidden fixed inset-0 z-50 bg-white dark:bg-gray-900"
             style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
@@ -867,21 +879,23 @@ const stopRingtone = () => {
         <main
           className="flex-1 w-full h-full min-w-0 transition-colors bg-white dark:bg-gray-900 flex flex-col"
           style={{
-            paddingTop: 'calc(4rem + env(safe-area-inset-top, 0px))',
-            paddingBottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px))',
+            paddingTop: immersive ? 'env(safe-area-inset-top, 0px)' : 'calc(4rem + env(safe-area-inset-top, 0px))',
+            paddingBottom: immersive ? 0 : 'calc(4.5rem + env(safe-area-inset-bottom, 0px))',
           }}
         >
           <div className="flex-1 min-w-0">
             {children}
           </div>
-          <footer className="mt-auto border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-            <GlobalFooter />
-          </footer>
+          {!immersive && (
+            <footer className="mt-auto border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+              <GlobalFooter />
+            </footer>
+          )}
         </main>
       </div>
 
       {/* ═══════════════════ BOTTOM NAVIGATION — mobile uniquement ═══════════════════ */}
-      <MobileBottomNav onMoreClick={() => setSidebarOpen(true)} />
+      {!immersive && <MobileBottomNav onMoreClick={() => setSidebarOpen(true)} />}
 
       {/* ─── Toast discret : quelqu'un a rejoint un appel déjà en cours ─── */}
       {joinToast && (

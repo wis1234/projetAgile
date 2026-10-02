@@ -1136,14 +1136,14 @@ const EditContent = ({
   const permInfo = PERMISSIONS.find(p => p.value === myPermission);
 
   return (
-    <AdminLayout>
+    <AdminLayout immersive>
       <Head title={`Édition — ${docTitle}`} />
 
-      <div className="flex flex-col h-[calc(100vh-64px)] md:h-screen bg-[#F9FBFD] overflow-hidden relative">
+      <div className="flex flex-col h-[100dvh] bg-[#F9FBFD] overflow-hidden relative">
         <style>{commentCss}</style>
 
         {/* ══ TITLE BAR ══ */}
-        <div className="flex-shrink-0 bg-white border-b border-slate-200/70 z-40">
+        <div className="sticky top-0 flex-shrink-0 bg-white border-b border-slate-200/70 z-40">
 
           {/* Breadcrumb */}
           {(project || task) && (
@@ -1158,6 +1158,23 @@ const EditContent = ({
 
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-5 py-2.5">
             <div className="flex items-center gap-2.5 flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event('proja:open-sidebar'))}
+                aria-label="Ouvrir le menu"
+                className="md:hidden flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.visit(route('files.show', file.id))}
+                title="Retour à la fiche du fichier"
+                aria-label="Retour à la fiche du fichier"
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-[#3454D1]"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+              </button>
               <div className="w-8 h-8 bg-[#EEF1FC] rounded-lg flex items-center justify-center flex-shrink-0">
                 <FaFileAlt className="text-[#3454D1] text-[13px]" />
               </div>
