@@ -10,6 +10,7 @@ import {
   FaTag, FaPlus, FaTrash, FaExclamationTriangle, FaClock,
   FaUserSlash, FaShare, FaChevronDown, FaSearch, FaCheck, FaExternalLinkAlt,
   FaUser, FaMinus, FaFileAlt, FaGoogleDrive, FaPen, FaCommentMedical,
+  FaFont, FaCompressAlt, FaExpandAlt, FaChevronUp,
 } from 'react-icons/fa';
 import { isPdfFile } from '@/utils/fileUtils';
 import MenuBar from '@/Components/Editor/MenuBar';
@@ -487,6 +488,25 @@ const EditContent = ({
 }) => {
   const { flash }     = usePage().props;
   const project = projectProp ?? file.project ?? null;
+  // ── Barres d'outils repliables (préférences mémorisées ; repliées par défaut sur petit écran) ──
+  const readPref = (key, fallback) => {
+    try { const v = localStorage.getItem(key); return v === null ? fallback : v === '1'; } catch { return fallback; }
+  };
+  const smallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [toolbarOpen, setToolbarOpen] = useState(() => readPref('editor_toolbar_open', !smallScreen)); // barre de mise en forme
+  const [menusOpen,   setMenusOpen]   = useState(() => readPref('editor_menus_open', true));           // fil d'Ariane + menus
+  const [barsAnimating, setBarsAnimating] = useState(false);
+  useEffect(() => { try { localStorage.setItem('editor_toolbar_open', toolbarOpen ? '1' : '0'); } catch { /* indisponible */ } }, [toolbarOpen]);
+  useEffect(() => { try { localStorage.setItem('editor_menus_open', menusOpen ? '1' : '0'); } catch { /* indisponible */ } }, [menusOpen]);
+  const toggleToolbar = () => { setBarsAnimating(true); setToolbarOpen((v) => !v); };
+  const toggleMenus   = () => { setBarsAnimating(true); setMenusOpen((v) => !v); };
+  // Mode focus = tout replier d'un coup (ou tout rouvrir)
+  const focusMode = !toolbarOpen && !menusOpen;
+  const toggleFocus = () => {
+    setBarsAnimating(true);
+    if (focusMode) { setToolbarOpen(true); setMenusOpen(true); } else { setToolbarOpen(false); setMenusOpen(false); }
+  };
+
   const [isSaving,    setIsSaving]    = useState(false);
   const [isDirty,     setIsDirty]     = useState(false);
   const [lastSaved,   setLastSaved]   = useState(null);
@@ -1146,7 +1166,7 @@ const EditContent = ({
         <div className="sticky top-0 flex-shrink-0 bg-white border-b border-slate-200/70 z-40">
 
           {/* Breadcrumb */}
-          {(project || task) && (
+          {menusOpen && (project || task) && (
             <div className="flex items-center gap-1.5 px-3 sm:px-5 pt-2 text-[11px] text-slate-400 overflow-x-auto whitespace-nowrap scrollbar-hide">
               {project && <span className="hover:text-[#3454D1] transition-colors cursor-default truncate">{project.name}</span>}
               {project && task && <FaAngleRight className="text-[8px] text-slate-300 flex-shrink-0" />}
@@ -1231,6 +1251,33 @@ const EditContent = ({
                 <FaExternalLinkAlt className="text-[10px]" />
                 <span className="hidden xl:inline">Nouvel onglet</span>
               </button>
+
+              {/* Barres d'outils : mise en forme / mode focus */}
+              {!isReadOnly && editor && (
+                <button
+                  type="button"
+                  onClick={toggleToolbar}
+                  aria-pressed={toolbarOpen}
+                  title={toolbarOpen ? "Masquer la barre d'outils" : "Afficher la barre d'outils"}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors ${toolbarOpen ? 'border-[#3454D1]/30 bg-[#EEF1FC] text-[#3454D1]' : 'border-slate-200 bg-white text-slate-600 hover:border-[#3454D1] hover:text-[#3454D1]'}`}
+                >
+                  <FaFont className="text-[10px]" />
+                  <span className="hidden xl:inline">Outils</span>
+                  {toolbarOpen ? <FaChevronUp className="text-[8px]" /> : <FaChevronDown className="text-[8px]" />}
+                </button>
+              )}
+              {editor && (
+                <button
+                  type="button"
+                  onClick={toggleFocus}
+                  aria-pressed={focusMode}
+                  title={focusMode ? 'Quitter le mode focus' : 'Mode focus : masquer menus et outils'}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors ${focusMode ? 'border-[#3454D1]/30 bg-[#EEF1FC] text-[#3454D1]' : 'border-slate-200 bg-white text-slate-600 hover:border-[#3454D1] hover:text-[#3454D1]'}`}
+                >
+                  {focusMode ? <FaExpandAlt className="text-[10px]" /> : <FaCompressAlt className="text-[10px]" />}
+                  <span className="hidden xl:inline">{focusMode ? 'Quitter focus' : 'Focus'}</span>
+                </button>
+              )}
 
               {/* Panel switcher — segmented control */}
               <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
@@ -1341,7 +1388,12 @@ const EditContent = ({
           )}
 
           {editor && (
-            <div className="border-t border-slate-100">
+            <div
+              className="grid transition-[grid-template-rows] duration-200 ease-out"
+              style={{ gridTemplateRows: menusOpen ? '1fr' : '0fr' }}
+              onTransitionEnd={() => setBarsAnimating(false)}
+            >
+            <div className={`min-h-0 border-t border-slate-100 ${menusOpen && !barsAnimating ? '' : 'overflow-hidden'} ${menusOpen ? '' : 'border-transparent'}`}>
               <DocMenus
                 editor={editor}
                 isReadOnly={isReadOnly}
@@ -1352,15 +1404,41 @@ const EditContent = ({
                 rightSlot={project ? <DocCallButton project={project} auth={auth} compact /> : null}
               />
             </div>
+            </div>
           )}
         </div>
 
-        {/* ══ TOOLBAR (pleine largeur, sur plusieurs lignes si besoin) ══ */}
+        {/* ══ TOOLBAR (repliable) ══ */}
         {!isReadOnly && editor && (
-          <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 bg-[#F9FBFD] relative z-30">
-            <div className="bg-[#EDF2FA] rounded-2xl px-1">
-              <MenuBar editor={editor} onComment={startComment} onFind={() => setFindOpen(true)} onPrint={() => window.print()} />
+          <div className="flex-shrink-0 relative z-30 bg-[#F9FBFD]">
+            <div
+              className="grid transition-[grid-template-rows] duration-200 ease-out"
+              style={{ gridTemplateRows: toolbarOpen ? '1fr' : '0fr' }}
+              onTransitionEnd={() => setBarsAnimating(false)}
+            >
+              <div className={`min-h-0 ${toolbarOpen && !barsAnimating ? '' : 'overflow-hidden'}`}>
+                <div className="px-2 sm:px-4 py-1.5">
+                  <div className="bg-[#EDF2FA] rounded-2xl px-1">
+                    <MenuBar editor={editor} onComment={startComment} onFind={() => setFindOpen(true)} onPrint={() => window.print()} />
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Languette quand la barre est repliée */}
+            {!toolbarOpen && (
+              <div className="flex justify-center -mb-px">
+                <button
+                  type="button"
+                  onClick={toggleToolbar}
+                  className="group flex items-center gap-1.5 rounded-b-xl border border-t-0 border-slate-200 bg-white px-3 py-0.5 text-[11px] font-medium text-slate-500 shadow-sm transition hover:text-[#3454D1] hover:border-[#3454D1]/40"
+                  aria-label="Afficher la barre d'outils"
+                >
+                  <FaChevronDown className="text-[9px] transition-transform group-hover:translate-y-px" />
+                  Afficher les outils
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1383,7 +1461,7 @@ const EditContent = ({
                 </div>
               )}
               {/* Feuille : occupe toute la largeur disponible */}
-              <div className="doc-paper doc-editor bg-white sm:rounded-xl border border-slate-200 shadow-sm min-h-[calc(100vh-320px)]">
+              <div className="doc-paper doc-editor bg-white sm:rounded-xl border border-slate-200 shadow-sm min-h-[calc(100dvh-9rem)]">
                 <div className="px-5 py-6 sm:px-10 sm:py-10 lg:px-14" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
                   <EditorContent editor={editor} className="max-w-none min-h-96 focus:outline-none" />
                 </div>
