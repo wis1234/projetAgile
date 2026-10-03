@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
-import { FaHome, FaFolderOpen, FaCheckSquare, FaColumns, FaBolt, FaFileAlt, FaUsers, FaUserFriends, FaComments, FaBullseye, FaQuestionCircle, FaHistory, FaCreditCard, FaCoins, FaMoon, FaSun, FaCog, FaSignOutAlt, FaChevronRight, FaSearch } from 'react-icons/fa';
+import { FaHome, FaFolderOpen, FaCheckSquare, FaColumns, FaBolt, FaFileAlt, FaUsers, FaUserFriends, FaComments, FaBullseye, FaQuestionCircle, FaHistory, FaCreditCard, FaCoins, FaMoon, FaSun, FaCog, FaSignOutAlt, FaChevronRight, FaSearch, FaRobot } from 'react-icons/fa';
 import MobileLayout from '@/Layouts/MobileLayout';
 import { unregisterDeviceToken } from '@/Components/PushNotificationManager';
 import Avatar from '@/Components/Quiz/Avatar';
@@ -29,6 +29,7 @@ const GROUPS = [
   { title: 'Compte', items: [
     { href: '/subscription/plans', label: 'my_subscription', fb: 'Abonnement', Icon: FaCreditCard, tone: 'from-lime-500 to-green-600' },
     { href: '/remunerations', label: 'remunerations', fb: 'Rémunérations', Icon: FaCoins, tone: 'from-yellow-500 to-amber-600' },
+    { href: '/assistant', label: 'assistant', fb: 'Assistant IA', Icon: FaRobot, tone: 'from-blue-500 to-indigo-600' },
   ] },
 ];
 

@@ -1,0 +1,12 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class AiMessage extends Model
+{
+    protected $fillable = ['conversation_id', 'role', 'content', 'actions'];
+
+    protected $casts = ['actions' => 'array'];
+}

@@ -72,4 +72,15 @@ return [
 ],
 
 
+
+    // ── Assistant IA ProJA ──
+    'ai' => [
+        'enabled' => (bool) env('AI_ENABLED', true),
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('AI_MODEL', 'claude-sonnet-5-5'),
+        'max_tokens' => (int) env('AI_MAX_TOKENS', 1800),
+        'max_steps' => (int) env('AI_MAX_STEPS', 8),          // tours outil → réponse maximum par message
+        'daily_limit' => (int) env('AI_DAILY_LIMIT', 100),    // messages par utilisateur et par jour
+        'timeout' => (int) env('AI_TIMEOUT', 90),
+    ],
 ];

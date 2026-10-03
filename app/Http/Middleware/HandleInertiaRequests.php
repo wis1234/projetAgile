@@ -51,6 +51,7 @@ if ($request->user()) {
             ...parent::share($request),
             'auth' => $auth,
             'appName' => config('app.name'),
+            'ai' => ['enabled' => (bool) config('services.ai.enabled') && (bool) config('services.ai.api_key')],
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

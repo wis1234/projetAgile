@@ -8,6 +8,7 @@ import ErrorBoundary from '@/Components/ErrorBoundary';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import GlobalSearch from '@/Components/GlobalSearch';
 import MobileBottomNav from '@/Components/MobileBottomNav';
+import AssistantLauncher from '@/Components/Assistant/AssistantLauncher';
 import LanguageSwitcherSidebar from '@/Components/LanguageSwitcherSidebar';
 import PushNotificationManager, { unregisterDeviceToken } from '@/Components/PushNotificationManager';
 
@@ -896,6 +897,7 @@ const stopRingtone = () => {
 
       {/* ═══════════════════ BOTTOM NAVIGATION — mobile uniquement ═══════════════════ */}
       {!immersive && <MobileBottomNav onMoreClick={() => setSidebarOpen(true)} />}
+      {!immersive && <AssistantLauncher />}
 
       {/* ─── Toast discret : quelqu'un a rejoint un appel déjà en cours ─── */}
       {joinToast && (

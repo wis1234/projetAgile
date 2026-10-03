@@ -581,6 +581,17 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/remunerations/{remuneration}/cancel', [\App\Http\Controllers\RemunerationController::class, 'cancel'])->name('remunerations.cancel');
 });
 
+// Assistant IA
+Route::middleware(['auth'])->prefix('assistant')->group(function () {
+    Route::get('/', [\App\Http\Controllers\AssistantController::class, 'index'])->name('assistant.index');
+    Route::post('/chat', [\App\Http\Controllers\AssistantController::class, 'chat'])->middleware('throttle:20,1')->name('assistant.chat');
+    Route::get('/conversations', [\App\Http\Controllers\AssistantController::class, 'conversations'])->name('assistant.conversations');
+    Route::get('/conversations/{id}', [\App\Http\Controllers\AssistantController::class, 'show'])->whereNumber('id')->name('assistant.show');
+    Route::delete('/conversations/{id}', [\App\Http\Controllers\AssistantController::class, 'destroy'])->whereNumber('id')->name('assistant.destroy');
+    Route::post('/actions/{id}/confirm', [\App\Http\Controllers\AssistantController::class, 'confirm'])->whereNumber('id')->middleware('throttle:10,1')->name('assistant.confirm');
+    Route::post('/actions/{id}/cancel', [\App\Http\Controllers\AssistantController::class, 'cancel'])->whereNumber('id')->name('assistant.cancel');
+});
+
 // Retraits (payouts Fedapay)
 Route::middleware(['auth'])->group(function () {
     Route::post('/withdrawals', [\App\Http\Controllers\WithdrawalController::class, 'store'])
