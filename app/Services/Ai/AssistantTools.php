@@ -556,16 +556,95 @@ class AssistantTools
         ];
     }
 
-    public function deleteTask(int $taskId): array
-    {
-        $task = Task::find($taskId);
-        if (!$task || !$this->user->can('delete', $task)) {
-            return ['ok' => false, 'message' => "Tâche introuvable ou suppression non autorisée."];
-        }
-        $title = $task->title;
-        $outcome = $this->invoke(TaskController::class, 'destroy', 'DELETE', [], [$task]);
-        return $outcome['ok'] ? ['ok' => true, 'message' => "Tâche « {$title} » supprimée."] : $outcome;
+ public function deleteTask(int $taskId): array
+{
+    $task = Task::find($taskId);
+
+    if (!$task || !$this->user->can('delete', $task)) {
+        return [
+            'ok' => false,
+            'message' => "Tâche introuvable ou suppression non autorisée.",
+        ];
     }
+
+    $title = $task->title;
+
+    $previousUser = Auth::user();
+    $previousRequest = app('request');
+
+    Auth::setUser($this->user);
+
+    try {
+        /*
+         * TaskController::destroy() attend directement un Task :
+         * destroy(Task $task)
+         */
+        $response = app(TaskController::class)->destroy($task);
+
+    } catch (ValidationException $e) {
+        return [
+            'ok' => false,
+            'message' => 'Suppression refusée : ' .
+                collect($e->errors())->flatten()->implode(' '),
+        ];
+
+    } catch (AuthorizationException $e) {
+        return [
+            'ok' => false,
+            'message' => "Vous n'avez pas le droit de supprimer cette tâche.",
+        ];
+
+    } catch (\Throwable $e) {
+        Log::error('AI: erreur suppression tâche confirmée', [
+            'task_id' => $taskId,
+            'user_id' => $this->user->id,
+            'error' => $e->getMessage(),
+        ]);
+
+        return [
+            'ok' => false,
+            'message' => "La suppression de la tâche a échoué.",
+        ];
+
+    } finally {
+        app()->instance('request', $previousRequest);
+        Auth::setUser($previousUser);
+
+        session()->forget([
+            'success',
+            'error',
+            'message',
+        ]);
+    }
+
+    $status = method_exists($response, 'getStatusCode')
+        ? $response->getStatusCode()
+        : 200;
+
+    if ($status === 403) {
+        return [
+            'ok' => false,
+            'message' => "Vous n'avez pas le droit de supprimer cette tâche.",
+        ];
+    }
+
+    if ($status >= 400) {
+        $body = method_exists($response, 'getData')
+            ? (array) $response->getData(true)
+            : [];
+
+        return [
+            'ok' => false,
+            'message' => $body['message']
+                ?? "La suppression a été refusée (code {$status}).",
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'message' => "Tâche « {$title} » supprimée.",
+    ];
+}
 
     // ───────────────────────── Navigation ─────────────────────────
 
