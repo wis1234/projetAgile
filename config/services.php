@@ -82,9 +82,14 @@ return [
         'max_steps' => (int) env('AI_MAX_STEPS', 8),          // tours outil → réponse maximum par message
         'daily_limit' => (int) env('AI_DAILY_LIMIT', 100),    // messages par utilisateur et par jour
         'timeout' => (int) env('AI_TIMEOUT', 90),
-        'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'anthropic,groq,openrouter,ollama'))))),
-        'transcription_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_TRANSCRIPTION_ORDER', 'groq,openai'))))),
+        'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'openrouter,anthropic,groq,ollama'))))),
+        'transcription_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_TRANSCRIPTION_ORDER', 'cloudflare,groq,openai'))))),
         'transcription_providers' => [
+            'cloudflare' => [
+                'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
+                'api_token' => env('CLOUDFLARE_AI_API_TOKEN'),
+                'model' => env('CLOUDFLARE_TRANSCRIPTION_MODEL', '@cf/openai/whisper-large-v3-turbo'),
+            ],
             'groq' => [
                 'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
                 'api_key' => env('GROQ_API_KEY'),
@@ -110,7 +115,10 @@ return [
             'openrouter' => [
                 'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
                 'api_key' => env('OPENROUTER_API_KEY'),
-                'model' => env('OPENROUTER_MODEL', 'meta-llama/llama-3.3-70b-instruct:free'),
+                'model' => env('OPENROUTER_MODEL', 'openrouter/free'),
+                'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 4096),
+                // openrouter/free dynamically selects models; their context capacities vary.
+                'context_length' => (int) env('OPENROUTER_CONTEXT_LENGTH', 200000),
             ],
             'ollama' => [
                 'enabled' => (bool) env('OLLAMA_ENABLED', false),

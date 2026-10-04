@@ -212,6 +212,30 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Vérifie l'accès administrateur, que le rôle provienne du champ legacy ou de Spatie.
+     */
+    public function hasAdminAccess(): bool
+    {
+        if (strtolower((string) $this->getAttribute('role')) === 'admin') {
+            return true;
+        }
+
+        try {
+            if ($this->hasRole('admin')) {
+                return true;
+            }
+        } catch (\Throwable) {
+            // Tente la relation explicite en cas de guard Spatie incohérent.
+        }
+
+        try {
+            return $this->roles()->where('name', 'admin')->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Vérifie si l'utilisateur est un manager.
      */
     public function isManager(): bool
