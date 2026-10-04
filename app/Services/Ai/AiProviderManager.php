@@ -14,6 +14,7 @@ class AiProviderManager
     public function __construct(
         private AnthropicClient $anthropic,
         private OpenAiCompatibleClient $openAi,
+        private CloudflareAiClient $cloudflare,
         private AiSettingsService $settings,
     ) {
     }
@@ -71,9 +72,11 @@ class AiProviderManager
             }
             $providerConfig = config("services.ai.providers.{$name}", []);
             try {
-                $response = $name === 'anthropic'
-                    ? $this->anthropic->send($system, $messages, $tools, $providerConfig, (int) $settings->max_tokens, (int) $settings->timeout)
-                    : $this->openAi->send($name, $providerConfig, $system, $messages, $tools, (int) $settings->max_tokens, (int) $settings->timeout);
+                $response = match ($name) {
+                    'anthropic' => $this->anthropic->send($system, $messages, $tools, $providerConfig, (int) $settings->max_tokens, (int) $settings->timeout),
+                    'cloudflare' => $this->cloudflare->send($providerConfig, $system, $messages, $tools, (int) $settings->max_tokens, (int) $settings->timeout),
+                    default => $this->openAi->send($name, $providerConfig, $system, $messages, $tools, (int) $settings->max_tokens, (int) $settings->timeout),
+                };
                 $this->lastProvider = $name;
                 $this->lastModel = $providerConfig['model'] ?? null;
                 $this->lastUsage = $response['usage'] ?? [];
@@ -99,8 +102,10 @@ class AiProviderManager
             return false;
         }
 
-        return $name === 'ollama'
-            ? (bool) ($provider['enabled'] ?? false)
-            : filled($provider['api_key'] ?? null);
+        return match ($name) {
+            'ollama' => (bool) ($provider['enabled'] ?? false),
+            'cloudflare' => filled($provider['account_id'] ?? null) && filled($provider['api_key'] ?? null),
+            default => filled($provider['api_key'] ?? null),
+        };
     }
 }

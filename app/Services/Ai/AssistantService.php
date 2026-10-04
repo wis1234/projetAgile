@@ -147,7 +147,7 @@ class AssistantService
             if (($response['stop_reason'] ?? null) === 'tool_use') {
                 Log::debug('AI: réponse tool_use reçue', [
                     'step' => $i + 1,
-                    'content' => $blocks,
+                    'tool_names' => collect($blocks)->where('type', 'tool_use')->pluck('name')->values()->all(),
                 ]);
             }
 
@@ -226,7 +226,6 @@ class AssistantService
                             'tool' => $toolName,
                             'tool_use_id' => $use['id'] ?? null,
                             'input_type' => get_debug_type($toolInput),
-                            'input' => $toolInput,
                         ]
                     );
 
@@ -238,7 +237,6 @@ class AssistantService
                 Log::debug('AI: exécution tool', [
                     'tool' => $toolName,
                     'tool_use_id' => $use['id'] ?? null,
-                    'input' => $toolInput,
                 ]);
 
                 $out = $tools->run(

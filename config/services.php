@@ -122,13 +122,9 @@ return [
             ],
             'cloudflare' => [
                 'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
-                // CLOUDFLARE_API_KEY is supported as an alias, but must be a Workers AI API token.
-                // R2 access/secret keys are not valid credentials for this endpoint.
-                'api_key' => trim((string) env('CLOUDFLARE_AI_API_TOKEN', env('CLOUDFLARE_API_KEY', ''))),
-                'base_url' => env(
-                    'CLOUDFLARE_AI_BASE_URL',
-                    'https://api.cloudflare.com/client/v4/accounts/' . env('CLOUDFLARE_ACCOUNT_ID', '') . '/ai/v1'
-                ),
+                // Explicit Workers AI token only; never confuse R2 keys or account IDs with API tokens.
+                'api_key' => trim((string) env('CLOUDFLARE_AI_API_TOKEN', '')),
+                'base_url' => env('CLOUDFLARE_AI_BASE_URL', 'https://api.cloudflare.com/client/v4/accounts/' . env('CLOUDFLARE_ACCOUNT_ID', '')),
                 'model' => env('CLOUDFLARE_AI_MODEL', '@cf/meta/llama-3.3-70b-instruct-fp8-fast'),
             ],
             'gemini' => [

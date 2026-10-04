@@ -58,9 +58,11 @@ class AiSettingsService
         foreach ($providers as $name => $provider) {
             $available[$name] = [
                 'model' => (string) ($provider['model'] ?? ''),
-                'available' => $name === 'ollama'
-                    ? (bool) ($provider['enabled'] ?? false)
-                    : filled($provider['api_key'] ?? null),
+                'available' => match ($name) {
+                    'ollama' => (bool) ($provider['enabled'] ?? false),
+                    'cloudflare' => filled($provider['account_id'] ?? null) && filled($provider['api_key'] ?? null),
+                    default => filled($provider['api_key'] ?? null),
+                },
             ];
         }
 
