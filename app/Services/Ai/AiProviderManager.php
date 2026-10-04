@@ -14,7 +14,6 @@ class AiProviderManager
     public function __construct(
         private AnthropicClient $anthropic,
         private OpenAiCompatibleClient $openAi,
-        private CloudflareAiClient $cloudflare,
         private AiSettingsService $settings,
     ) {
     }
@@ -74,7 +73,6 @@ class AiProviderManager
             try {
                 $response = match ($name) {
                     'anthropic' => $this->anthropic->send($system, $messages, $tools, $providerConfig, (int) $settings->max_tokens, (int) $settings->timeout),
-                    'cloudflare' => $this->cloudflare->send($providerConfig, $system, $messages, $tools, (int) $settings->max_tokens, (int) $settings->timeout),
                     default => $this->openAi->send($name, $providerConfig, $system, $messages, $tools, (int) $settings->max_tokens, (int) $settings->timeout),
                 };
                 $this->lastProvider = $name;

@@ -56,7 +56,7 @@ Les fournisseurs sont configurés côté serveur (ne jamais placer leurs clés d
 - Anthropic : `ANTHROPIC_API_KEY`, modèle `AI_MODEL`.
 - Groq : `GROQ_API_KEY`, modèle `GROQ_MODEL` (offre gratuite soumise aux quotas du fournisseur).
 - OpenRouter : `OPENROUTER_API_KEY`, modèle par défaut `openrouter/free`; le routeur gratuit peut limiter les requêtes et changer de modèle disponible.
-- Cloudflare Workers AI : `CLOUDFLARE_ACCOUNT_ID` et jeton Workers AI `CLOUDFLARE_AI_API_TOKEN`, modèle par défaut `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. ProJA utilise l'endpoint natif `/ai/run/{model}` pour accepter les messages texte et les outils. Le jeton doit avoir les permissions Workers AI Read et Edit. Les variables R2 (`CLOUDFLARE_API_KEY`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_KEY`) ne sont pas utilisées comme jeton Workers AI.
+- Cloudflare Workers AI : `CLOUDFLARE_ACCOUNT_ID` et jeton Workers AI `CLOUDFLARE_AI_API_TOKEN`, modèle par défaut `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. ProJA utilise l'endpoint compatible OpenAI `/ai/v1/chat/completions`. Le jeton doit avoir les permissions Workers AI Read et Edit. Les variables R2 (`CLOUDFLARE_API_KEY`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_KEY`) ne sont pas utilisées comme jeton Workers AI.
 - Gemini : `GEMINI_API_KEY`, modèle `GEMINI_MODEL` (valeur par défaut `gemini-3.8-flash`, endpoint OpenAI-compatible).
 - OpenAI : `OPENAI_API_KEY`, modèle `OPENAI_MODEL` (valeur par défaut `gpt-4o-mini`; vérifiez la facturation/crédits de votre compte).
 - Ollama : activez explicitement `OLLAMA_ENABLED=true`, puis configurez `OLLAMA_BASE_URL` et `OLLAMA_MODEL`. Le serveur Ollama doit être accessible depuis l'hôte Laravel.

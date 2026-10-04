@@ -37,7 +37,18 @@ class OpenAiCompatibleClient
                     'X-Title' => config('app.name', 'ProJA'),
                 ]);
             }
-            $response = $request->post(rtrim($config['base_url'], '/') . '/chat/completions', $payload);
+            $baseUrl = rtrim((string) $config['base_url'], '/');
+            if ($provider === 'cloudflare') {
+                // Accept an account root, /ai or /ai/v1 from existing deployments,
+                // but always call Cloudflare's documented OpenAI-compatible route.
+                $baseUrl = preg_replace('#/ai(?:/v1)?$#', '', $baseUrl) ?: $baseUrl;
+                $url = str_ends_with($baseUrl, '/chat/completions')
+                    ? $baseUrl
+                    : $baseUrl . '/ai/v1/chat/completions';
+            } else {
+                $url = $baseUrl . '/chat/completions';
+            }
+            $response = $request->post($url, $payload);
         } catch (\Throwable $e) {
             Log::warning('AI provider connection failed', ['provider' => $provider, 'error' => $e->getMessage()]);
             throw new AiUnavailableException("Le fournisseur {$provider} ne répond pas.");
