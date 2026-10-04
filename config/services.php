@@ -124,7 +124,11 @@ return [
                 'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
                 // Explicit Workers AI token only; never confuse R2 keys or account IDs with API tokens.
                 'api_key' => trim((string) env('CLOUDFLARE_AI_API_TOKEN', '')),
-                'base_url' => env('CLOUDFLARE_AI_BASE_URL', 'https://api.cloudflare.com/client/v4/accounts/' . env('CLOUDFLARE_ACCOUNT_ID', '') . '/ai/v1'),
+                'base_url' => env(
+                    'CLOUDFLARE_AI_BASE_URL',
+                    rtrim((string) env('CLOUDFLARE_ENDPOINT', 'https://api.cloudflare.com/client/v4'), '/')
+                        . '/accounts/' . env('CLOUDFLARE_ACCOUNT_ID', '') . '/ai/v1'
+                ),
                 'model' => env('CLOUDFLARE_AI_MODEL', '@cf/meta/llama-3.3-70b-instruct-fp8-fast'),
             ],
             'gemini' => [
