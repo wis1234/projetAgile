@@ -15,6 +15,7 @@ use App\Services\Ai\AssistantTools;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class AssistantController extends Controller
@@ -85,17 +86,17 @@ class AssistantController extends Controller
     public function updateAdminSettings(Request $request, AiSettingsService $settings): JsonResponse
     {
         $this->authorizeAdmin($request->user());
+        $validProviders = array_keys($settings->providers());
         $validated = $request->validate([
             'enabled' => ['required', 'boolean'],
             'daily_limit' => ['required', 'integer', 'min:0', 'max:10000'],
             'max_tokens' => ['required', 'integer', 'min:128', 'max:32000'],
             'timeout' => ['required', 'integer', 'min:10', 'max:300'],
             'provider_order' => ['required', 'array', 'min:1'],
-            'provider_order.*' => ['required', 'string', 'distinct', 'in:anthropic,groq,openrouter,ollama'],
+            'provider_order.*' => ['required', 'string', 'distinct', Rule::in($validProviders)],
             'enabled_providers' => ['present', 'array'],
-            'enabled_providers.*' => ['required', 'string', 'distinct', 'in:anthropic,groq,openrouter,ollama'],
+            'enabled_providers.*' => ['required', 'string', 'distinct', Rule::in($validProviders)],
         ]);
-        $validProviders = array_keys($settings->providers());
         abort_if(
             array_diff($validated['provider_order'], $validProviders)
                 || array_diff($validated['enabled_providers'], $validProviders),

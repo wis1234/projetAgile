@@ -17,7 +17,7 @@ class AiSettingsService
                 'daily_limit' => (int) config('services.ai.daily_limit', 100),
                 'max_tokens' => (int) config('services.ai.max_tokens', 1800),
                 'timeout' => (int) config('services.ai.timeout', 90),
-                'provider_order' => config('services.ai.provider_order', ['openrouter', 'anthropic', 'groq', 'ollama']),
+                'provider_order' => config('services.ai.provider_order', ['openrouter', 'gemini', 'anthropic', 'openai', 'groq', 'ollama']),
                 'enabled_providers' => $this->defaultEnabledProviders(),
             ]);
         });

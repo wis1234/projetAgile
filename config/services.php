@@ -82,7 +82,7 @@ return [
         'max_steps' => (int) env('AI_MAX_STEPS', 8),          // tours outil → réponse maximum par message
         'daily_limit' => (int) env('AI_DAILY_LIMIT', 100),    // messages par utilisateur et par jour
         'timeout' => (int) env('AI_TIMEOUT', 90),
-        'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'openrouter,anthropic,groq,ollama'))))),
+        'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'openrouter,gemini,anthropic,openai,groq,ollama'))))),
         'transcription_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_TRANSCRIPTION_ORDER', 'cloudflare,groq,openai'))))),
         'transcription_providers' => [
             'cloudflare' => [
@@ -104,21 +104,31 @@ return [
         'providers' => [
             'anthropic' => [
                 'base_url' => 'https://api.anthropic.com/v1',
-                'api_key' => env('ANTHROPIC_API_KEY'),
+                'api_key' => trim((string) env('ANTHROPIC_API_KEY', '')),
                 'model' => env('AI_MODEL', 'claude-3-5-haiku-latest'),
             ],
             'groq' => [
                 'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
-                'api_key' => env('GROQ_API_KEY'),
+                'api_key' => trim((string) env('GROQ_API_KEY', '')),
                 'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
             ],
             'openrouter' => [
                 'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
-                'api_key' => env('OPENROUTER_API_KEY'),
+                'api_key' => trim((string) env('OPENROUTER_API_KEY', '')),
                 'model' => env('OPENROUTER_MODEL', 'openrouter/free'),
                 'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 4096),
                 // openrouter/free dynamically selects models; their context capacities vary.
                 'context_length' => (int) env('OPENROUTER_CONTEXT_LENGTH', 200000),
+            ],
+            'gemini' => [
+                'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai'),
+                'api_key' => trim((string) env('GEMINI_API_KEY', '')),
+                'model' => env('GEMINI_MODEL', 'gemini-3.8-flash'),
+            ],
+            'openai' => [
+                'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+                'api_key' => trim((string) env('OPENAI_API_KEY', '')),
+                'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
             ],
             'ollama' => [
                 'enabled' => (bool) env('OLLAMA_ENABLED', false),
