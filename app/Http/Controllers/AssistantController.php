@@ -23,9 +23,18 @@ class AssistantController extends Controller
     {
     }
 
+    /** Accès réservé aux administrateurs (Gate admin-only ou rôle admin, y compris Spatie). */
+    private function authorizeAdmin(?User $user): void
+    {
+        abort_unless(
+            $user && ($user->can('admin-only') || $user->hasAdminAccess()),
+            403
+        );
+    }
+
     public function admin(AiSettingsService $settings, AudioTranscriptionService $transcription)
     {
-        abort_unless(auth()->user()->can('admin-only'), 403);
+        $this->authorizeAdmin(auth()->user());
 
         $today = now()->toDateString();
         $global = $settings->global();
@@ -75,7 +84,7 @@ class AssistantController extends Controller
 
     public function updateAdminSettings(Request $request, AiSettingsService $settings): JsonResponse
     {
-        abort_unless($request->user()->can('admin-only'), 403);
+        $this->authorizeAdmin($request->user());
         $validated = $request->validate([
             'enabled' => ['required', 'boolean'],
             'daily_limit' => ['required', 'integer', 'min:0', 'max:10000'],
@@ -100,7 +109,7 @@ class AssistantController extends Controller
 
     public function updateUserSetting(Request $request, User $user): JsonResponse
     {
-        abort_unless($request->user()->can('admin-only'), 403);
+        $this->authorizeAdmin($request->user());
         $validated = $request->validate([
             'daily_limit' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'enabled' => ['required', 'boolean'],

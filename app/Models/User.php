@@ -208,7 +208,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function isAdmin(): bool
     {
-        return $this->hasRole('admin');
+        return $this->hasAdminAccess();
     }
 
     /**
@@ -216,12 +216,13 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function hasAdminAccess(): bool
     {
-        if (strtolower((string) $this->getAttribute('role')) === 'admin') {
+        $role = strtolower(trim((string) $this->getAttribute('role')));
+        if (in_array($role, ['admin', 'superadmin', 'super_admin', 'administrator'], true)) {
             return true;
         }
 
         try {
-            if ($this->hasRole('admin')) {
+            if ($this->hasRole('admin') || $this->hasRole('super_admin')) {
                 return true;
             }
         } catch (\Throwable) {
@@ -229,7 +230,7 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         try {
-            return $this->roles()->where('name', 'admin')->exists();
+            return $this->roles()->whereIn('name', ['admin', 'superadmin', 'super_admin'])->exists();
         } catch (\Throwable) {
             return false;
         }

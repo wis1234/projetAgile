@@ -1,0 +1,103 @@
+diff --git a/app/Http/Controllers/AssistantController.php b/app/Http/Controllers/AssistantController.php
+index d5a04d3..087e87c 100644
+--- a/app/Http/Controllers/AssistantController.php
++++ b/app/Http/Controllers/AssistantController.php
+@@ -23,9 +23,18 @@ class AssistantController extends Controller
+     {
+     }
+ 
++    /** Accès réservé aux administrateurs (Gate admin-only ou rôle admin, y compris Spatie). */
++    private function authorizeAdmin(?User $user): void
++    {
++        abort_unless(
++            $user && ($user->can('admin-only') || $user->hasAdminAccess()),
++            403
++        );
++    }
++
+     public function admin(AiSettingsService $settings, AudioTranscriptionService $transcription)
+     {
+-        abort_unless(auth()->user()->can('admin-only'), 403);
++        $this->authorizeAdmin(auth()->user());
+ 
+         $today = now()->toDateString();
+         $global = $settings->global();
+@@ -75,7 +84,7 @@ class AssistantController extends Controller
+ 
+     public function updateAdminSettings(Request $request, AiSettingsService $settings): JsonResponse
+     {
+-        abort_unless($request->user()->can('admin-only'), 403);
++        $this->authorizeAdmin($request->user());
+         $validated = $request->validate([
+             'enabled' => ['required', 'boolean'],
+             'daily_limit' => ['required', 'integer', 'min:0', 'max:10000'],
+@@ -100,7 +109,7 @@ class AssistantController extends Controller
+ 
+     public function updateUserSetting(Request $request, User $user): JsonResponse
+     {
+-        abort_unless($request->user()->can('admin-only'), 403);
++        $this->authorizeAdmin($request->user());
+         $validated = $request->validate([
+             'daily_limit' => ['nullable', 'integer', 'min:0', 'max:10000'],
+             'enabled' => ['required', 'boolean'],
+diff --git a/app/Models/User.php b/app/Models/User.php
+index 49d12ae..d420531 100644
+--- a/app/Models/User.php
++++ b/app/Models/User.php
+@@ -208,7 +208,7 @@ class User extends Authenticatable implements MustVerifyEmail
+      */
+     public function isAdmin(): bool
+     {
+-        return $this->hasRole('admin');
++        return $this->hasAdminAccess();
+     }
+ 
+     /**
+@@ -216,12 +216,13 @@ class User extends Authenticatable implements MustVerifyEmail
+      */
+     public function hasAdminAccess(): bool
+     {
+-        if (strtolower((string) $this->getAttribute('role')) === 'admin') {
++        $role = strtolower(trim((string) $this->getAttribute('role')));
++        if (in_array($role, ['admin', 'superadmin', 'super_admin', 'administrator'], true)) {
+             return true;
+         }
+ 
+         try {
+-            if ($this->hasRole('admin')) {
++            if ($this->hasRole('admin') || $this->hasRole('super_admin')) {
+                 return true;
+             }
+         } catch (\Throwable) {
+@@ -229,7 +230,7 @@ class User extends Authenticatable implements MustVerifyEmail
+         }
+ 
+         try {
+-            return $this->roles()->where('name', 'admin')->exists();
++            return $this->roles()->whereIn('name', ['admin', 'superadmin', 'super_admin'])->exists();
+         } catch (\Throwable) {
+             return false;
+         }
+diff --git a/app/Providers/AppServiceProvider.php b/app/Providers/AppServiceProvider.php
+index 39ce030..288c4da 100644
+--- a/app/Providers/AppServiceProvider.php
++++ b/app/Providers/AppServiceProvider.php
+@@ -4,6 +4,7 @@ namespace App\Providers;
+ 
+ use App\Models\TaskComment;
+ use App\Observers\TaskCommentObserver;
++use Illuminate\Support\Facades\Gate;
+ use Illuminate\Support\Facades\Vite;
+ use Illuminate\Support\ServiceProvider;
+ 
+@@ -25,5 +26,10 @@ class AppServiceProvider extends ServiceProvider
+         Vite::prefetch(concurrency: 3);
+ 
+         TaskComment::observe(TaskCommentObserver::class);
++
++        // Filet de sécurité : la Gate admin-only existe toujours (AuthServiceProvider peut la redéfinir).
++        if (!Gate::has('admin-only')) {
++            Gate::define('admin-only', fn ($user) => $user && $user->hasAdminAccess());
++        }
+     }
+ }
