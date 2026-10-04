@@ -87,7 +87,7 @@ return [
         'transcription_providers' => [
             'cloudflare' => [
                 'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
-                'api_token' => env('CLOUDFLARE_AI_API_TOKEN'),
+                'api_token' => trim((string) env('CLOUDFLARE_AI_API_TOKEN', env('CLOUDFLARE_API_KEY', ''))),
                 'model' => env('CLOUDFLARE_TRANSCRIPTION_MODEL', '@cf/openai/whisper-large-v3-turbo'),
             ],
             'groq' => [
@@ -122,8 +122,9 @@ return [
             ],
             'cloudflare' => [
                 'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
-                // Use a dedicated Workers AI token; R2 access keys are not Workers AI credentials.
-                'api_key' => trim((string) env('CLOUDFLARE_AI_API_TOKEN', '')),
+                // CLOUDFLARE_API_KEY is supported as an alias, but must be a Workers AI API token.
+                // R2 access/secret keys are not valid credentials for this endpoint.
+                'api_key' => trim((string) env('CLOUDFLARE_AI_API_TOKEN', env('CLOUDFLARE_API_KEY', ''))),
                 'base_url' => env(
                     'CLOUDFLARE_AI_BASE_URL',
                     'https://api.cloudflare.com/client/v4/accounts/' . env('CLOUDFLARE_ACCOUNT_ID', '') . '/ai/v1'
