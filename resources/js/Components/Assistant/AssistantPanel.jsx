@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 import {
-  FaPaperPlane, FaPlus, FaHistory, FaTimes, FaTrash, FaCheckCircle, FaExternalLinkAlt, FaExclamationTriangle, FaRedo, FaArrowLeft,
+  FaPaperPlane, FaPlus, FaHistory, FaTimes, FaTrash, FaCheckCircle, FaExternalLinkAlt, FaExclamationTriangle, FaRedo, FaArrowLeft, FaMicrophone, FaStop, FaSpinner,
 } from 'react-icons/fa';
 import { HiSparkles } from 'react-icons/hi2';
 import Markdown from './markdown';
@@ -16,10 +16,11 @@ const refreshCsrf = async () => {
   } catch { return meta(); }
 };
 const api = async (url, { method = 'GET', body } = {}, retry = true) => {
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
   const res = await fetch(url, {
     method, credentials: 'same-origin',
-    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': meta(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': meta(), ...(body && !isFormData ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
   });
   if (res.status === 419 && retry) { await refreshCsrf(); return api(url, { method, body }, false); }
   const data = await res.json().catch(() => ({}));
@@ -86,13 +87,30 @@ export default function AssistantPanel({ variant = 'page', onClose, active = tru
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(null);
   const [remaining, setRemaining] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [voiceError, setVoiceError] = useState('');
+  const [voiceStatus, setVoiceStatus] = useState('');
   const [path, setPath] = useState(typeof window !== 'undefined' ? window.location.pathname : '/');
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const lastSent = useRef('');
+  const recorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+  const recordingElapsedRef = useRef(0);
+  const discardRecordingRef = useRef(false);
 
   useEffect(() => { if (active) { setPath(window.location.pathname); setTimeout(() => inputRef.current?.focus(), 150); } }, [active]);
   useEffect(() => { const el = listRef.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); }, [messages, loading, view]);
+  useEffect(() => () => {
+    discardRecordingRef.current = true;
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    clearInterval(recordingTimerRef.current);
+  }, []);
 
   const go = useCallback((url) => { onClose?.(); router.visit(url); }, [onClose]);
 
@@ -154,6 +172,80 @@ export default function AssistantPanel({ variant = 'page', onClose, active = tru
 
   const onKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey && variant !== 'page-mobile') { e.preventDefault(); send(); } };
   const onInput = (e) => { setDraft(e.target.value); e.target.style.height = 'auto'; e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`; };
+  const transcribeAudio = async (blob) => {
+    if (!blob.size) { setVoiceError('Aucun son n’a été enregistré. Réessayez.'); return; }
+    const extension = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const formData = new FormData();
+    formData.append('audio', blob, `message-vocal.${extension}`);
+    setTranscribing(true);
+    setVoiceError('');
+    setVoiceStatus('Transcription en cours…');
+    try {
+      const data = await api('/assistant/transcribe', { method: 'POST', body: formData });
+      setDraft((current) => [current.trim(), data.text].filter(Boolean).join(' '));
+      setVoiceStatus(`Transcription terminée (${data.provider}). Vérifiez le texte avant l’envoi.`);
+      inputRef.current?.focus();
+    } catch (e) {
+      setVoiceStatus('');
+      setVoiceError(e.message || 'La transcription a échoué.');
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
+  const toggleVoiceRecording = async () => {
+    setVoiceError('');
+    setVoiceStatus('');
+    if (isRecording) {
+      if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+      setIsRecording(false);
+      clearInterval(recordingTimerRef.current);
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setVoiceError('L’enregistrement audio n’est pas pris en charge par cet appareil.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      audioChunksRef.current = [];
+      discardRecordingRef.current = false;
+      const mimeType = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'].find((type) => MediaRecorder.isTypeSupported?.(type));
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => { if (event.data?.size) audioChunksRef.current.push(event.data); };
+      recorder.onerror = () => setVoiceError('Une erreur est survenue pendant l’enregistrement.');
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        if (!discardRecordingRef.current) {
+          const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+          transcribeAudio(blob);
+        }
+      };
+      recorder.start();
+      recordingElapsedRef.current = 0;
+      setRecordingSeconds(0);
+      setIsRecording(true);
+      recordingTimerRef.current = setInterval(() => {
+        const elapsed = recordingElapsedRef.current + 1;
+        recordingElapsedRef.current = elapsed;
+        setRecordingSeconds(elapsed);
+        if (elapsed >= 120) {
+          if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+          setIsRecording(false);
+          clearInterval(recordingTimerRef.current);
+        }
+      }, 1000);
+    } catch (e) {
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      setVoiceError(e.name === 'NotAllowedError' ? 'Autorisez l’accès au microphone pour enregistrer votre message.' : 'Impossible de démarrer le microphone. Vérifiez ses autorisations.');
+    }
+  };
 
   const empty = messages.length === 0;
 
@@ -248,14 +340,22 @@ export default function AssistantPanel({ variant = 'page', onClose, active = tru
 
           <footer className="flex-shrink-0 border-t border-slate-200 bg-white px-3 pb-3 pt-2.5 dark:border-slate-800 dark:bg-slate-900" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
             <div className="flex items-end gap-2">
+              <button type="button" onClick={toggleVoiceRecording} disabled={loading || transcribing} aria-label={isRecording ? 'Arrêter et transcrire le message' : 'Enregistrer un message vocal'} title={isRecording ? 'Arrêter et transcrire' : 'Enregistrer un message vocal'}
+                className={`flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-full transition disabled:opacity-40 ${isRecording ? 'animate-pulse bg-red-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                {transcribing ? <FaSpinner className="animate-spin" /> : isRecording ? <FaStop /> : <FaMicrophone />}
+              </button>
               <textarea
-                ref={inputRef} value={draft} onChange={onInput} onKeyDown={onKeyDown} rows={1} maxLength={2000} disabled={loading}
+                ref={inputRef} value={draft} onChange={onInput} onKeyDown={onKeyDown} rows={1} maxLength={2000} disabled={loading || transcribing || isRecording}
                 placeholder="Écris ton message…" aria-label="Message pour l'assistant"
                 className="max-h-[140px] min-h-[46px] flex-1 resize-none rounded-2xl border-0 bg-slate-100 px-4 py-3 text-base text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:bg-slate-800 dark:text-slate-100"
               />
-              <button type="button" onClick={() => send()} disabled={!draft.trim() || loading} aria-label="Envoyer"
+              <button type="button" onClick={() => send()} disabled={!draft.trim() || loading || transcribing || isRecording} aria-label="Envoyer"
                 className="flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-md transition active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"><FaPaperPlane className="ml-0.5" /></button>
             </div>
+            {voiceError && <p role="alert" className="mt-1 text-center text-xs text-amber-700 dark:text-amber-300">{voiceError}</p>}
+            {isRecording && <p aria-live="polite" className="mt-1 text-center text-xs font-medium text-red-600">Enregistrement… {Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, '0')} / 2:00 — cliquez pour transcrire</p>}
+            {transcribing && <p aria-live="polite" className="mt-1 text-center text-xs text-blue-600 dark:text-blue-300">L’audio est envoyé au fournisseur de transcription configuré…</p>}
+            {voiceStatus && !transcribing && <p role="status" className="mt-1 text-center text-xs text-slate-500 dark:text-slate-400">{voiceStatus}</p>}
             <p className="mt-1.5 text-center text-[10px] text-slate-400">
               L’IA peut se tromper : vérifie les informations importantes.{remaining !== null && ` · ${remaining} message(s) restant(s) aujourd’hui`}
             </p>

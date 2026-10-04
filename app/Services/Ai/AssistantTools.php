@@ -4,7 +4,9 @@ namespace App\Services\Ai;
 
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\FileController;
 use App\Models\AiPendingAction;
+use App\Models\File;
 use App\Models\Project;
 use App\Models\Sprint;
 use App\Models\Task;
@@ -16,7 +18,9 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -87,6 +91,21 @@ class AssistantTools
                 'input_schema' => ['type' => 'object', 'properties' => ['query' => $str], 'required' => ['query']],
             ],
             [
+                'name' => 'list_files',
+                'description' => "Recherche les documents ProJA consultables par l'utilisateur. Toujours utiliser cet outil avant read_file pour retrouver les fichiers.",
+                'input_schema' => ['type' => 'object', 'properties' => ['project_id' => $int, 'search' => $str]],
+            ],
+            [
+                'name' => 'read_file',
+                'description' => "Lit un document texte ProJA si l'utilisateur a le droit de le consulter et si le fichier n'est pas verrouillé par mot de passe. Utiliser uniquement un file_id obtenu avec list_files.",
+                'input_schema' => ['type' => 'object', 'properties' => ['file_id' => $int], 'required' => ['file_id']],
+            ],
+            [
+                'name' => 'append_task_tracking',
+                'description' => "Ajoute une note horodatée à la fin du fichier de suivi HTML d'une tâche. Réservé aux utilisateurs autorisés à modifier ce document. Le contenu est ajouté sans remplacer l'existant et une version est sauvegardée.",
+                'input_schema' => ['type' => 'object', 'properties' => ['task_id' => $int, 'entry' => ['type' => 'string', 'description' => 'Note à ajouter au suivi']], 'required' => ['task_id', 'entry']],
+            ],
+            [
                 'name' => 'create_task',
                 'description' => "Crée une tâche dans un projet (réservé aux managers du projet et aux admins). Le sprint en cours est utilisé par défaut. Ne gère PAS les montants/paiements.",
                 'input_schema' => ['type' => 'object', 'properties' => [
@@ -146,6 +165,9 @@ class AssistantTools
                 'get_task' => $this->wrap($this->getTask($input)),
                 'list_sprints' => $this->wrap($this->listSprints($input)),
                 'search_users' => $this->wrap($this->searchUsers($input)),
+                'list_files' => $this->wrap($this->listFiles($input)),
+                'read_file' => $this->wrap($this->readFile($input)),
+                'append_task_tracking' => $this->appendTaskTracking($input),
                 'create_task' => $this->createTask($input),
                 'update_task' => $this->updateTask($input),
                 'add_comment' => $this->addComment($input),
@@ -368,6 +390,151 @@ class AssistantTools
             $q->whereHas('projects', fn ($p) => $p->whereIn('projects.id', $ids));
         }
         return ['users' => $q->limit(10)->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'job_title' => $u->job_title])->all()];
+    }
+
+    private function listFiles(array $in): array
+    {
+        $query = File::query()
+            ->with(['project:id,name', 'task:id,title,project_id'])
+            ->where(function ($scope) {
+                $scope->whereIn('project_id', $this->visibleProjectIds())
+                    ->orWhere('user_id', $this->user->id);
+            });
+        if (!empty($in['project_id'])) {
+            if (!in_array((int) $in['project_id'], $this->visibleProjectIds(), true)) {
+                return ['error' => 'Projet introuvable ou inaccessible.'];
+            }
+            $query->where('project_id', (int) $in['project_id']);
+        }
+        if (!empty($in['search'])) {
+            $term = mb_substr(trim((string) $in['search']), 0, 100);
+            $query->where(fn ($q) => $q->where('name', 'like', "%{$term}%")
+                ->orWhere('description', 'like', "%{$term}%"));
+        }
+
+        $files = $query->latest('updated_at')->limit(100)->get()
+            ->filter(fn (File $file) => Gate::forUser($this->user)->allows('view', $file)
+                && $file->isUnlockedForUser($this->user))
+            ->take(30)
+            ->values();
+
+        return ['files' => $files->map(fn (File $file) => [
+            'file_id' => $file->id,
+            'name' => $file->name,
+            'type' => $file->type,
+            'description' => $this->clip($file->description, 250),
+            'project' => $file->project?->name,
+            'task' => $file->task ? ['id' => $file->task->id, 'title' => $file->task->title] : null,
+            'readable_text' => $this->isReadableTextFile($file),
+            'url' => "/files/{$file->id}/edit-content",
+        ])->all()];
+    }
+
+    private function readFile(array $in): array
+    {
+        $file = File::with(['project:id,name', 'task:id,title,project_id'])->find((int) ($in['file_id'] ?? 0));
+        if (!$file || !Gate::forUser($this->user)->allows('view', $file)) {
+            return ['error' => 'Fichier introuvable ou inaccessible.'];
+        }
+        if (!$file->isUnlockedForUser($this->user)) {
+            return ['error' => 'Ce fichier est protégé par mot de passe et doit être déverrouillé dans ProJA avant lecture.'];
+        }
+        if (!$this->isReadableTextFile($file)) {
+            return ['error' => 'Ce format ne peut pas être lu comme texte par l’assistant.'];
+        }
+        if ((int) $file->size > 1_000_000) {
+            return ['error' => 'Ce fichier est trop volumineux pour être transmis à l’assistant.'];
+        }
+
+        $path = $this->safeStoragePath($file->file_path);
+        if (!$path || !Storage::disk('public')->exists($path)) {
+            return ['error' => 'Le contenu du fichier est indisponible.'];
+        }
+        $content = Storage::disk('public')->get($path);
+        if (!is_string($content)) {
+            return ['error' => 'Le contenu du fichier est illisible.'];
+        }
+        $max = 12000;
+
+        return [
+            'file_id' => $file->id,
+            'name' => $file->name,
+            'project' => $file->project?->name,
+            'content' => mb_substr($content, 0, $max),
+            'truncated' => mb_strlen($content) > $max,
+        ];
+    }
+
+    private function appendTaskTracking(array $in): array
+    {
+        $task = Task::with('project:id,name')->find((int) ($in['task_id'] ?? 0));
+        $entry = trim((string) ($in['entry'] ?? ''));
+        if (!$task || !$this->user->can('view', $task)) {
+            return $this->wrap(['error' => 'Tâche introuvable ou inaccessible.']);
+        }
+        if ($entry === '' || mb_strlen($entry) > 3000) {
+            return $this->wrap(['error' => 'La note doit contenir entre 1 et 3000 caractères.']);
+        }
+
+        $trackingFile = File::where('task_id', $task->id)
+            ->where(function ($query) {
+                $query->where('type', 'text/html')->orWhere('name', 'like', '%suivi%');
+            })
+            ->latest('updated_at')
+            ->first();
+        if (!$trackingFile || !Gate::forUser($this->user)->allows('update_colab', $trackingFile)) {
+            return $this->wrap(['error' => "Vous n'avez pas le droit de modifier le fichier de suivi de cette tâche."]);
+        }
+        if (!$trackingFile->isUnlockedForUser($this->user) || !$this->isReadableTextFile($trackingFile)) {
+            return $this->wrap(['error' => 'Le fichier de suivi est verrouillé ou son format ne permet pas une modification sûre.']);
+        }
+        if ((int) $trackingFile->size > 2_000_000) {
+            return $this->wrap(['error' => 'Le fichier de suivi est trop volumineux pour une modification sûre.']);
+        }
+
+        $path = $this->safeStoragePath($trackingFile->file_path);
+        if (!$path || !Storage::disk('public')->exists($path)) {
+            return $this->wrap(['error' => 'Le fichier de suivi est introuvable sur le stockage.']);
+        }
+        $existing = Storage::disk('public')->get($path);
+        if (!is_string($existing)) {
+            return $this->wrap(['error' => 'Le fichier de suivi est illisible.']);
+        }
+        $timestamp = now()->locale('fr')->translatedFormat('d F Y à H:i');
+        $safeEntry = nl2br(e($entry), false);
+        $updated = $existing . "\n<hr><section><h2>Note ajoutée par l’assistant — " . e($timestamp) . "</h2><p>{$safeEntry}</p></section>\n";
+
+        $outcome = $this->invoke(FileController::class, 'updateContent', 'PUT', [
+            'content' => $updated,
+            'summary' => 'Note ajoutée au suivi par l’assistant IA',
+        ], [$trackingFile]);
+        if (!$outcome['ok']) {
+            return $this->wrap(['error' => $outcome['message']]);
+        }
+
+        return $this->wrap(
+            ['updated' => true, 'file_id' => $trackingFile->id, 'task_id' => $task->id],
+            ['type' => 'task_updated', 'label' => 'Suivi : ' . $task->title, 'url' => "/files/{$trackingFile->id}/edit-content"]
+        );
+    }
+
+    private function isReadableTextFile(File $file): bool
+    {
+        $extension = strtolower(pathinfo($file->name, PATHINFO_EXTENSION));
+        return in_array($extension, ['txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'php', 'csv', 'log'], true)
+            || in_array(strtolower((string) $file->type), ['text/plain', 'text/html', 'text/css', 'text/csv', 'application/json', 'application/javascript', 'application/xml'], true);
+    }
+
+    private function safeStoragePath(?string $path): ?string
+    {
+        $path = str_replace('\\', '/', trim((string) $path));
+        $path = preg_replace('#^/?public/#', '', $path);
+        if ($path === '' || str_contains($path, "\0") || preg_match('#(^|/)\.\.?(/|$)#', $path)
+            || str_starts_with($path, '/') || str_starts_with($path, '//') || preg_match('/^[a-z]:/i', $path)) {
+            return null;
+        }
+
+        return $path;
     }
 
     // ───────────────────────── Écriture (via les contrôleurs de l'interface) ─────────────────────────

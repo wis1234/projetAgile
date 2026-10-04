@@ -15,6 +15,7 @@ use ZipArchive;
 use Illuminate\Support\Facades\App;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use App\Notifications\ProjaNotification;
 
 
@@ -831,7 +832,17 @@ public function updateContent(Request $request, File $file)
     }
 
     // ── Écriture sur disque ───────────────────────────────
-    $path = 'files/' . $file->project_id . '/' . $file->name;
+    $extension = strtolower(pathinfo($file->name, PATHINFO_EXTENSION));
+    if ($extension === '') {
+        $extension = match (strtolower((string) $file->type)) {
+            'text/html' => 'html',
+            'text/plain' => 'txt',
+            'application/json' => 'json',
+            default => '',
+        };
+    }
+    $safeName = Str::slug(pathinfo($file->name, PATHINFO_FILENAME)) ?: 'document';
+    $path = 'files/' . $file->project_id . '/' . $file->id . '-' . $safeName . ($extension !== '' ? '.' . $extension : '');
     \Storage::disk('public')->put($path, $request->content);
 
     $file->update([

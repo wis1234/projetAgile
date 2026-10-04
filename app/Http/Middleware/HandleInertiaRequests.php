@@ -44,6 +44,7 @@ if ($request->user()) {
         'unreadNotificationsCount' => $request->user()->unreadNotifications()->count(),
         'share_discussions_by_email' => (bool) $request->user()->share_discussions_by_email,
         'quiz_candidate_only' => $request->user()->isQuizCandidateOnly(),
+        'is_admin' => $request->user()->hasRole('admin'),
     ];
 }
 
@@ -51,7 +52,13 @@ if ($request->user()) {
             ...parent::share($request),
             'auth' => $auth,
             'appName' => config('app.name'),
-            'ai' => ['enabled' => (bool) config('services.ai.enabled') && (bool) config('services.ai.api_key')],
+            'ai' => [
+                'enabled' => $request->user()
+                    ? app(\App\Services\Ai\AiSettingsService::class)->enabledFor($request->user())
+                        && app(\App\Services\Ai\AiProviderManager::class)->configured()
+                    : false,
+                'admin' => $request->user()?->hasRole('admin') ?? false,
+            ],
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

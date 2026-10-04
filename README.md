@@ -47,6 +47,22 @@ L'application offre les fonctionnalités suivantes :
 - Tableaux de bord personnalisés
 - Et bien plus encore...
 
+## Assistant IA ProJA
+
+Après déploiement, exécutez les migrations Laravel. Les administrateurs disposent ensuite du tableau de bord `/assistant/admin` pour suivre les requêtes, activer/désactiver l'assistant, régler les limites globales et par utilisateur, et ordonner les fournisseurs de secours.
+
+Les fournisseurs sont configurés côté serveur (ne jamais placer leurs clés dans le frontend) :
+
+- Anthropic : `ANTHROPIC_API_KEY`, modèle `AI_MODEL`.
+- Groq : `GROQ_API_KEY`, modèle `GROQ_MODEL` (offre gratuite soumise aux quotas du fournisseur).
+- OpenRouter : `OPENROUTER_API_KEY`, modèle `OPENROUTER_MODEL` (les modèles gratuits et leur disponibilité peuvent changer).
+- Ollama : activez explicitement `OLLAMA_ENABLED=true`, puis configurez `OLLAMA_BASE_URL` et `OLLAMA_MODEL`. Le serveur Ollama doit être accessible depuis l'hôte Laravel.
+- Transcription vocale serveur : Groq (`GROQ_API_KEY`, modèle `GROQ_TRANSCRIPTION_MODEL`) puis OpenAI en secours (`OPENAI_API_KEY`, `OPENAI_TRANSCRIPTION_MODEL`). L'ordre initial est contrôlé par `AI_TRANSCRIPTION_ORDER`. L'audio est envoyé au fournisseur configuré pour obtenir une transcription ; il n'est pas traité par l'API vocale du navigateur.
+
+`AI_PROVIDER_ORDER` définit l'ordre initial des tentatives (par défaut `anthropic,groq,openrouter,ollama`). L'administrateur coche dans `/assistant/admin` les fournisseurs autorisés : seuls ces fournisseurs seront interrogés, dans l'ordre indiqué. Les clés absentes rendent un modèle sélectionné inopérant jusqu'à leur configuration. Les offres gratuites ne garantissent pas une disponibilité continue ; pour une continuité prévisible, prévoyez au moins deux fournisseurs réellement configurés ou un serveur Ollama supervisé.
+
+Le message vocal est enregistré côté client (microphone autorisé, généralement HTTPS), envoyé au endpoint Laravel puis transcrit par Groq ou OpenAI avant d'être proposé dans la zone de saisie ; l'utilisateur vérifie le texte avant son envoi au chat. La recherche et lecture de documents de l'assistant sont limitées aux fichiers texte visibles par l'utilisateur et déverrouillés dans ProJA. L'ajout au fichier de suivi est append-only, crée une version et respecte la permission d'édition du fichier.
+
 ## Technologies utilisées
 
 - Laravel 10.x

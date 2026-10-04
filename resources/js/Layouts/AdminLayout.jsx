@@ -133,7 +133,13 @@ export default function AdminLayout({ children, immersive = false }) {
   const { url: currentUrl } = usePage();
   // Compte candidat (inscrit à des quiz, sans projet) : un seul menu, « Quiz ».
   const candidateOnly = Boolean(auth?.user?.quiz_candidate_only);
-  const menuLinks = candidateOnly ? navLinks.filter((l) => l.href === '/quizzes') : navLinks;
+  const baseMenuLinks = candidateOnly ? navLinks.filter((l) => l.href === '/quizzes') : navLinks;
+  const menuLinks = auth?.user?.is_admin ? [...baseMenuLinks, {
+    href: '/assistant/admin',
+    label: 'Assistant IA · Admin',
+    match: (url) => /^\/assistant\/admin(?:\/|$)/.test(url || ''),
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 14l4-4 4 4 6-7" /></svg>,
+  }] : baseMenuLinks;
   const isLinkActive = (link) => (link.match ? link.match(currentUrl) : route().current(link.href.replace(/^\//, '')));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Menu latéral réductible (PC) : seules les icônes restent visibles, le contenu gagne de la place

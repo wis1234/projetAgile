@@ -584,7 +584,11 @@ Route::middleware(['auth'])->group(function () {
 // Assistant IA
 Route::middleware(['auth'])->prefix('assistant')->group(function () {
     Route::get('/', [\App\Http\Controllers\AssistantController::class, 'index'])->name('assistant.index');
+    Route::get('/admin', [\App\Http\Controllers\AssistantController::class, 'admin'])->middleware('can:admin-only')->name('assistant.admin');
+    Route::put('/admin/settings', [\App\Http\Controllers\AssistantController::class, 'updateAdminSettings'])->middleware('can:admin-only')->name('assistant.admin.settings');
+    Route::put('/admin/users/{user}', [\App\Http\Controllers\AssistantController::class, 'updateUserSetting'])->middleware('can:admin-only')->name('assistant.admin.users');
     Route::post('/chat', [\App\Http\Controllers\AssistantController::class, 'chat'])->middleware('throttle:20,1')->name('assistant.chat');
+    Route::post('/transcribe', [\App\Http\Controllers\AssistantController::class, 'transcribe'])->middleware('throttle:10,1')->name('assistant.transcribe');
     Route::get('/conversations', [\App\Http\Controllers\AssistantController::class, 'conversations'])->name('assistant.conversations');
     Route::get('/conversations/{id}', [\App\Http\Controllers\AssistantController::class, 'show'])->whereNumber('id')->name('assistant.show');
     Route::delete('/conversations/{id}', [\App\Http\Controllers\AssistantController::class, 'destroy'])->whereNumber('id')->name('assistant.destroy');

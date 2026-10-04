@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use App\Models\AiConversation;
 use App\Models\AiMessage;
+use App\Models\AiUsage;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -15,14 +16,16 @@ use Illuminate\Support\Facades\Log;
  */
 class AssistantService
 {
-    public function __construct(private AnthropicClient $client)
+    public function __construct(
+        private AiProviderManager $client,
+        private AiSettingsService $settings
+    )
     {
     }
 
     public function enabled(): bool
     {
-        return (bool) config('services.ai.enabled')
-            && $this->client->configured();
+        return $this->client->configured();
     }
 
     private function dailyKey(User $user): string
@@ -34,7 +37,7 @@ class AssistantService
     {
         return max(
             0,
-            (int) config('services.ai.daily_limit', 100)
+            $this->settings->limitFor($user)
             - (int) Cache::get($this->dailyKey($user), 0)
         );
     }
@@ -49,13 +52,22 @@ class AssistantService
         string $text,
         array $context = []
     ): array {
-        if (!$this->enabled()) {
+        if (!$this->enabled() || !$this->settings->enabledFor($user)) {
             throw new AiUnavailableException(
-                "L'assistant n'est pas encore activé sur cette plateforme (clé API manquante)."
+            "L'assistant n'est pas activé pour votre compte ou aucun fournisseur n'est configuré. Contactez un administrateur."
             );
         }
 
         if ($this->remaining($user) <= 0) {
+            throw new AiUnavailableException(
+                "Vous avez atteint la limite quotidienne de messages à l'assistant. Réessayez demain."
+            );
+        }
+
+        $dailyKey = $this->dailyKey($user);
+        Cache::add($dailyKey, 0, now()->endOfDay());
+        if (Cache::increment($dailyKey) > $this->settings->limitFor($user)) {
+            Cache::decrement($dailyKey);
             throw new AiUnavailableException(
                 "Vous avez atteint la limite quotidienne de messages à l'assistant. Réessayez demain."
             );
@@ -90,15 +102,10 @@ class AssistantService
             'content' => $text,
         ];
 
-        Cache::add(
-            $this->dailyKey($user),
-            0,
-            now()->endOfDay()
-        );
-
-        Cache::increment(
-            $this->dailyKey($user)
-        );
+        $usage = AiUsage::create(['user_id' => $user->id, 'status' => 'started']);
+        $startedAt = microtime(true);
+        $inputTokens = 0;
+        $outputTokens = 0;
 
         $tools = new AssistantTools($user);
 
@@ -117,11 +124,23 @@ class AssistantService
 
         for ($i = 0; $i < $steps; $i++) {
 
-            $response = $this->client->send(
-                $system,
-                $messages,
-                AssistantTools::definitions()
-            );
+            try {
+                $response = $this->client->send(
+                    $system,
+                    $messages,
+                    AssistantTools::definitions()
+                );
+            } catch (AiUnavailableException $e) {
+                $usage->update([
+                    'status' => 'failed',
+                    'duration_ms' => (int) ((microtime(true) - $startedAt) * 1000),
+                    'failure_reason' => mb_substr($e->getMessage(), 0, 500),
+                ]);
+                throw $e;
+            }
+            $providerUsage = $this->client->currentUsage();
+            $inputTokens += (int) ($providerUsage['input_tokens'] ?? 0);
+            $outputTokens += (int) ($providerUsage['output_tokens'] ?? 0);
 
             $blocks = $response['content'] ?? [];
 
@@ -278,6 +297,14 @@ class AssistantService
         ]);
 
         $conversation->touch();
+        $usage->update([
+            'provider' => $this->client->currentProvider(),
+            'model' => $this->client->currentModel(),
+            'status' => 'success',
+            'duration_ms' => (int) ((microtime(true) - $startedAt) * 1000),
+            'input_tokens' => $inputTokens ?: null,
+            'output_tokens' => $outputTokens ?: null,
+        ]);
 
         return [
             'conversation_id' => $conversation->id,
@@ -490,6 +517,8 @@ Règles de conduite :
 - Réponds en français (ou dans la langue de l'utilisateur), de façon concise, claire et chaleureuse. Va droit au but.
 - N'invente JAMAIS de données (tâches, projets, personnes, dates). Si tu as besoin d'une information, appelle un outil. Si un outil échoue ou ne renvoie rien, dis-le simplement.
 - Quand l'utilisateur dit « cette tâche » ou « ce projet », appuie-toi sur la page ouverte ci-dessus.
+- Pour retrouver ou lire un document ProJA, appelle d'abord list_files puis read_file avec son identifiant ; tu ne peux lire que les fichiers texte accessibles à cet utilisateur, jamais les fichiers verrouillés ni les documents privés d'autrui.
+- Pour noter un point dans le fichier de suivi d'une tâche, utilise append_task_tracking uniquement à la demande explicite de l'utilisateur ; l'outil vérifie son droit d'édition, ajoute une note horodatée sans effacer le document et crée une version.
 - Pour créer ou modifier, il te faut au minimum : le projet (et le titre pour une création). Si c'est ambigu, pose UNE question courte ; sinon applique des valeurs raisonnables (priorité moyenne, statut à faire) et dis ce que tu as choisi. Convertis les dates relatives (« demain », « vendredi ») en vraies dates à partir de la date du jour.
 - Après une action, confirme en une phrase ce qui a été fait. Les liens/boutons vers les éléments créés sont ajoutés automatiquement : ne recopie pas d'URL.
 - Suppression : appelle delete_task uniquement si l'utilisateur le demande clairement ; ensuite dis-lui de cliquer sur « Confirmer », puisque rien n'est supprimé avant.

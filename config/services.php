@@ -82,5 +82,42 @@ return [
         'max_steps' => (int) env('AI_MAX_STEPS', 8),          // tours outil → réponse maximum par message
         'daily_limit' => (int) env('AI_DAILY_LIMIT', 100),    // messages par utilisateur et par jour
         'timeout' => (int) env('AI_TIMEOUT', 90),
+        'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'anthropic,groq,openrouter,ollama'))))),
+        'transcription_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_TRANSCRIPTION_ORDER', 'groq,openai'))))),
+        'transcription_providers' => [
+            'groq' => [
+                'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+                'api_key' => env('GROQ_API_KEY'),
+                'model' => env('GROQ_TRANSCRIPTION_MODEL', 'whisper-large-v3-turbo'),
+            ],
+            'openai' => [
+                'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+                'api_key' => env('OPENAI_API_KEY'),
+                'model' => env('OPENAI_TRANSCRIPTION_MODEL', 'gpt-4o-mini-transcribe'),
+            ],
+        ],
+        'providers' => [
+            'anthropic' => [
+                'base_url' => 'https://api.anthropic.com/v1',
+                'api_key' => env('ANTHROPIC_API_KEY'),
+                'model' => env('AI_MODEL', 'claude-3-5-haiku-latest'),
+            ],
+            'groq' => [
+                'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+                'api_key' => env('GROQ_API_KEY'),
+                'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+            ],
+            'openrouter' => [
+                'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+                'api_key' => env('OPENROUTER_API_KEY'),
+                'model' => env('OPENROUTER_MODEL', 'meta-llama/llama-3.3-70b-instruct:free'),
+            ],
+            'ollama' => [
+                'enabled' => (bool) env('OLLAMA_ENABLED', false),
+                'base_url' => env('OLLAMA_BASE_URL', 'http://127.0.0.1:11434/v1'),
+                'api_key' => env('OLLAMA_API_KEY'),
+                'model' => env('OLLAMA_MODEL', 'llama3.1'),
+            ],
+        ],
     ],
 ];
