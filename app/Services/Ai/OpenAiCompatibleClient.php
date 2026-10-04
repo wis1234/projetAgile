@@ -12,7 +12,7 @@ class OpenAiCompatibleClient
         $payload = [
             'model' => $config['model'],
             'max_tokens' => $maxTokens,
-            'messages' => $this->messages($system, $messages),
+            'messages' => $this->messages($provider, $system, $messages),
         ];
         if ($tools) {
             $payload['tools'] = array_map(fn ($tool) => [
@@ -50,7 +50,16 @@ class OpenAiCompatibleClient
                 'status' => $response->status(),
                 'body' => mb_substr($response->body(), 0, 1500),
             ]);
-            throw new AiUnavailableException("Le fournisseur {$provider} a refusé la requête (HTTP {$response->status()}).");
+            $status = $response->status();
+            $body = $response->json();
+            $providerMessage = data_get($body, 'error.message');
+            throw new AiUnavailableException(match (true) {
+                $status === 401 || $status === 403 => "{$provider} refuse la clé API (HTTP {$status}).",
+                $status === 402 => "{$provider} demande un crédit ou un moyen de paiement (HTTP 402).",
+                $status === 429 => "{$provider} a atteint sa limite temporaire de requêtes (HTTP 429). " . ($providerMessage ?: 'Réessayez après la réinitialisation de la limite.'),
+                $status >= 500 => "{$provider} rencontre une panne temporaire (HTTP {$status}).",
+                default => "{$provider} a refusé la requête (HTTP {$status}). " . ($providerMessage ?: ''),
+            });
         }
 
         $json = $response->json();
@@ -65,16 +74,26 @@ class OpenAiCompatibleClient
             $content[] = ['type' => 'text', 'text' => $text];
         }
         foreach (($choice['message']['tool_calls'] ?? []) as $call) {
-            $arguments = json_decode($call['function']['arguments'] ?? '{}', true);
+            $rawArguments = $call['function']['arguments'] ?? '{}';
+            if (!is_string($rawArguments)) {
+                throw new AiUnavailableException("{$provider} a retourné des paramètres d'outil mal formés.");
+            }
+            $arguments = json_decode($rawArguments, true);
             if (!is_array($arguments)) {
                 throw new AiUnavailableException("Le fournisseur {$provider} a généré des paramètres d'action invalides.");
             }
-            $content[] = [
+            $toolBlock = [
                 'type' => 'tool_use',
                 'id' => $call['id'] ?? uniqid('call_', true),
                 'name' => $call['function']['name'] ?? '',
                 'input' => $arguments,
             ];
+            // Gemini's OpenAI-compatible API returns thought signatures in
+            // tool_calls[].extra_content; they must be echoed back unchanged.
+            if ($provider === 'gemini' && is_array($call['extra_content'] ?? null)) {
+                $toolBlock['extra_content'] = $call['extra_content'];
+            }
+            $content[] = $toolBlock;
         }
 
         return [
@@ -87,7 +106,7 @@ class OpenAiCompatibleClient
         ];
     }
 
-    private function messages(string $system, array $messages): array
+    private function messages(string $provider, string $system, array $messages): array
     {
         $result = [['role' => 'system', 'content' => $system]];
         foreach ($messages as $message) {
@@ -99,14 +118,21 @@ class OpenAiCompatibleClient
 
             if ($message['role'] === 'assistant') {
                 $text = collect($content)->where('type', 'text')->pluck('text')->implode("\n");
-                $calls = collect($content)->where('type', 'tool_use')->map(fn ($block) => [
-                    'id' => $block['id'],
-                    'type' => 'function',
-                    'function' => [
-                        'name' => $block['name'],
-                        'arguments' => json_encode($block['input'] ?? new \stdClass(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                    ],
-                ])->values()->all();
+                $calls = collect($content)->where('type', 'tool_use')->map(function ($block) use ($provider) {
+                    $call = [
+                        'id' => $block['id'],
+                        'type' => 'function',
+                        'function' => [
+                            'name' => $block['name'],
+                            'arguments' => json_encode($block['input'] ?? new \stdClass(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        ],
+                    ];
+                    if ($provider === 'gemini' && is_array($block['extra_content'] ?? null)) {
+                        $call['extra_content'] = $block['extra_content'];
+                    }
+
+                    return $call;
+                })->values()->all();
                 $entry = ['role' => 'assistant', 'content' => $text !== '' ? $text : null];
                 if ($calls) {
                     $entry['tool_calls'] = $calls;

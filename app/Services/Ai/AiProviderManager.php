@@ -9,6 +9,7 @@ class AiProviderManager
     private ?string $lastProvider = null;
     private ?string $lastModel = null;
     private array $lastUsage = [];
+    private ?string $turnProvider = null;
 
     public function __construct(
         private AnthropicClient $anthropic,
@@ -55,7 +56,16 @@ class AiProviderManager
     {
         $settings = $this->settings->global();
         $failures = [];
-        foreach ($this->settings->activeProviderOrder() as $name) {
+        $order = $this->settings->activeProviderOrder();
+
+        // Once a provider has returned a response, keep the complete tool round-trip
+        // on that provider. This avoids repeating OpenRouter's exhausted 429 for every
+        // tool step and prevents provider-specific tool metadata being sent elsewhere.
+        if ($this->turnProvider !== null) {
+            $order = [$this->turnProvider];
+        }
+
+        foreach ($order as $name) {
             if (!$this->isConfigured($name)) {
                 continue;
             }
@@ -67,6 +77,7 @@ class AiProviderManager
                 $this->lastProvider = $name;
                 $this->lastModel = $providerConfig['model'] ?? null;
                 $this->lastUsage = $response['usage'] ?? [];
+                $this->turnProvider ??= $name;
 
                 return $response;
             } catch (AiUnavailableException $e) {
@@ -75,10 +86,9 @@ class AiProviderManager
             }
         }
 
-        throw new AiUnavailableException(
-            $failures
-                ? "Tous les fournisseurs d'IA configurés sont momentanément indisponibles. Réessayez dans un instant."
-                : "Aucun fournisseur d'IA n'est configuré. Configurez une clé API ou un serveur Ollama."
+        throw new AiUnavailableException($failures
+            ? "Le fournisseur IA {$this->turnProvider} est indisponible pendant l'exécution. " . implode(' ; ', $failures)
+            : "Aucun fournisseur d'IA n'est configuré. Configurez une clé API ou un serveur Ollama."
         );
     }
 
