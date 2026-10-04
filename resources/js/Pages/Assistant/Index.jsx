@@ -19,6 +19,7 @@ export default function AssistantIndex() {
           <FaRobot className="mx-auto text-4xl text-slate-300" />
           <h1 className="mt-4 text-lg font-bold text-slate-900 dark:text-white">Assistant non activé</h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Aucun fournisseur IA n’est actif pour votre compte. Contactez un administrateur.</p>
+          {ai?.admin && <Link href="/assistant/admin" className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Gérer l’assistant IA</Link>}
         </div>
       )}
     </div>

@@ -25,7 +25,7 @@ class AssistantController extends Controller
 
     public function admin(AiSettingsService $settings, AudioTranscriptionService $transcription)
     {
-        abort_unless(auth()->user()->hasRole('admin'), 403);
+        abort_unless(auth()->user()->can('admin-only'), 403);
 
         $today = now()->toDateString();
         $global = $settings->global();
@@ -75,7 +75,7 @@ class AssistantController extends Controller
 
     public function updateAdminSettings(Request $request, AiSettingsService $settings): JsonResponse
     {
-        abort_unless($request->user()->hasRole('admin'), 403);
+        abort_unless($request->user()->can('admin-only'), 403);
         $validated = $request->validate([
             'enabled' => ['required', 'boolean'],
             'daily_limit' => ['required', 'integer', 'min:0', 'max:10000'],
@@ -100,7 +100,7 @@ class AssistantController extends Controller
 
     public function updateUserSetting(Request $request, User $user): JsonResponse
     {
-        abort_unless($request->user()->hasRole('admin'), 403);
+        abort_unless($request->user()->can('admin-only'), 403);
         $validated = $request->validate([
             'daily_limit' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'enabled' => ['required', 'boolean'],
