@@ -7,10 +7,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AiConversation extends Model
 {
-    protected $fillable = ['user_id', 'title'];
+    protected $fillable = [
+        'user_id',
+        'title',
+    ];
 
     public function messages(): HasMany
     {
-        return $this->hasMany(AiMessage::class, 'conversation_id');
+        return $this->hasMany(
+            AiMessage::class,
+            'conversation_id'
+        );
     }
 }
