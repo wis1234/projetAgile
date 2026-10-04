@@ -65,11 +65,6 @@ class AssistantService
             (int) config('services.ai.timeout', 90) + 60
         );
 
-        /*
-         * ---------------------------------------------------------
-         * Conversation
-         * ---------------------------------------------------------
-         */
         $conversation = $conversationId
             ? AiConversation::where('user_id', $user->id)
                 ->findOrFail($conversationId)
@@ -82,40 +77,19 @@ class AssistantService
                 ),
             ]);
 
-        /*
-         * ---------------------------------------------------------
-         * Historique DB
-         * ---------------------------------------------------------
-         *
-         * La DB conserve uniquement les messages texte.
-         * Les blocs tool_use/tool_result sont reconstruits
-         * uniquement pendant la requête courante.
-         */
         $messages = $this->history($conversation);
 
-        /*
-         * Ajouter le nouveau message utilisateur en DB.
-         */
         AiMessage::create([
             'conversation_id' => $conversation->id,
             'role' => 'user',
             'content' => $text,
         ]);
 
-        /*
-         * Ajouter le nouveau message utilisateur à l'historique
-         * envoyé à Anthropic.
-         */
         $messages[] = [
             'role' => 'user',
             'content' => $text,
         ];
 
-        /*
-         * ---------------------------------------------------------
-         * Limite quotidienne
-         * ---------------------------------------------------------
-         */
         Cache::add(
             $this->dailyKey($user),
             0,
@@ -126,11 +100,6 @@ class AssistantService
             $this->dailyKey($user)
         );
 
-        /*
-         * ---------------------------------------------------------
-         * Tools
-         * ---------------------------------------------------------
-         */
         $tools = new AssistantTools($user);
 
         $system = $this->systemPrompt(
@@ -146,18 +115,8 @@ class AssistantService
             (int) config('services.ai.max_steps', 8)
         );
 
-        /*
-         * ---------------------------------------------------------
-         * Boucle Agent / Tool Calling
-         * ---------------------------------------------------------
-         */
         for ($i = 0; $i < $steps; $i++) {
 
-            /*
-             * -----------------------------------------------------
-             * Appel Anthropic
-             * -----------------------------------------------------
-             */
             $response = $this->client->send(
                 $system,
                 $messages,
@@ -166,14 +125,6 @@ class AssistantService
 
             $blocks = $response['content'] ?? [];
 
-            /*
-             * -----------------------------------------------------
-             * DEBUG
-             * -----------------------------------------------------
-             *
-             * On inspecte la réponse Anthropic avant toute
-             * transformation.
-             */
             if (($response['stop_reason'] ?? null) === 'tool_use') {
                 Log::debug('AI: réponse tool_use reçue', [
                     'step' => $i + 1,
@@ -181,11 +132,6 @@ class AssistantService
                 ]);
             }
 
-            /*
-             * -----------------------------------------------------
-             * Texte retourné par le modèle
-             * -----------------------------------------------------
-             */
             $finalText = trim(
                 collect($blocks)
                     ->where('type', 'text')
@@ -193,18 +139,10 @@ class AssistantService
                     ->implode("\n")
             );
 
-            /*
-             * -----------------------------------------------------
-             * Tool calls
-             * -----------------------------------------------------
-             */
             $toolUses = collect($blocks)
                 ->where('type', 'tool_use')
                 ->values();
 
-            /*
-             * Pas de tool à exécuter.
-             */
             if (
                 ($response['stop_reason'] ?? null) !== 'tool_use'
                 || $toolUses->isEmpty()
@@ -214,47 +152,42 @@ class AssistantService
 
             /*
              * -----------------------------------------------------
-             * NORMALISATION DES TOOL USE
-             * -----------------------------------------------------
-             *
-             * Anthropic doit normalement retourner :
-             *
-             * "input": {
-             *     "project_id": 12
-             * }
-             *
-             * Si l'API retourne accidentellement :
-             *
-             * "input": "{\"project_id\":12}"
-             *
-             * on reconvertit la chaîne JSON en objet PHP.
-             */
-            $blocks = $this->normalizeToolUseBlocks($blocks);
-
-            /*
-             * Recalculer les toolUses après normalisation.
-             */
-            $toolUses = collect($blocks)
-                ->where('type', 'tool_use')
-                ->values();
-
-            /*
-             * -----------------------------------------------------
              * IMPORTANT
              * -----------------------------------------------------
              *
-             * On renvoie exactement le message assistant
-             * contenant les blocs tool_use reçus d'Anthropic.
+             * Le JSON "{}" retourné par Anthropic est décodé par
+             * PHP/Laravel en tableau vide [].
+             *
+             * Si on renvoie directement [] à l'API, PHP produit :
+             *
+             *     "input": []
+             *
+             * alors qu'Anthropic exige :
+             *
+             *     "input": {}
+             *
+             * On prépare donc une copie destinée uniquement à l'API.
+             */
+            $assistantBlocks = $this->prepareToolUseBlocksForApi($blocks);
+
+            /*
+             * Le message assistant envoyé à Anthropic doit utiliser
+             * les blocs préparés pour préserver les objets JSON vides.
              */
             $messages[] = [
                 'role' => 'assistant',
-                'content' => $blocks,
+                'content' => $assistantBlocks,
             ];
 
             /*
              * -----------------------------------------------------
              * Exécution des tools
              * -----------------------------------------------------
+             *
+             * IMPORTANT :
+             * on utilise les $toolUses originaux pour l'exécution.
+             * Ainsi "{}" reste [] côté PHP pour les fonctions PHP,
+             * ce qui est exactement ce qu'on veut.
              */
             $results = [];
 
@@ -264,11 +197,12 @@ class AssistantService
                 $toolInput = $use['input'] ?? [];
 
                 /*
-                 * Sécurité supplémentaire.
+                 * PHP transforme "{}" en [].
+                 * Pour les fonctions PHP, [] est parfaitement correct.
                  */
                 if (!is_array($toolInput)) {
                     Log::error(
-                        'AI: tool_use input invalide après normalisation',
+                        'AI: tool_use input invalide',
                         [
                             'tool' => $toolName,
                             'tool_use_id' => $use['id'] ?? null,
@@ -288,25 +222,16 @@ class AssistantService
                     'input' => $toolInput,
                 ]);
 
-                /*
-                 * Exécution réelle du tool.
-                 */
                 $out = $tools->run(
                     $toolName,
                     $toolInput,
                     $conversation->id
                 );
 
-                /*
-                 * Enregistrer les actions réalisées.
-                 */
                 if (!empty($out['action'])) {
                     $actions[] = $out['action'];
                 }
 
-                /*
-                 * Convertir le résultat en JSON.
-                 */
                 $json = json_encode(
                     $out['result'],
                     JSON_UNESCAPED_UNICODE
@@ -314,74 +239,37 @@ class AssistantService
                     | JSON_PARTIAL_OUTPUT_ON_ERROR
                 );
 
-                /*
-                 * Sécurité si json_encode échoue.
-                 */
                 if ($json === false) {
                     $json = json_encode([
                         'error' => 'Impossible de sérialiser le résultat du tool.',
                     ]);
                 }
 
-                /*
-                 * Limiter la taille du résultat envoyé à Anthropic.
-                 */
-                $json = mb_substr(
-                    $json,
-                    0,
-                    9000
-                );
-
-                /*
-                 * -------------------------------------------------
-                 * Tool result
-                 * -------------------------------------------------
-                 */
                 $results[] = [
                     'type' => 'tool_result',
                     'tool_use_id' => $use['id'],
-                    'content' => $json,
+                    'content' => mb_substr($json, 0, 9000),
                     'is_error' => isset($out['result']['error']),
                 ];
             }
 
-            /*
-             * -----------------------------------------------------
-             * Envoyer les résultats des tools à Anthropic
-             * -----------------------------------------------------
-             */
             $messages[] = [
                 'role' => 'user',
                 'content' => $results,
             ];
 
-            /*
-             * -----------------------------------------------------
-             * Dernière étape
-             * -----------------------------------------------------
-             */
             if ($i === $steps - 1) {
                 $finalText = $finalText
                     ?: "J'ai effectué plusieurs opérations mais je dois m'arrêter ici. Dites-moi si vous voulez que je continue.";
             }
         }
 
-        /*
-         * ---------------------------------------------------------
-         * Fallback
-         * ---------------------------------------------------------
-         */
         if ($finalText === '') {
             $finalText = $actions
                 ? "C'est fait. Voici ce que j'ai réalisé :"
                 : "Je n'ai pas réussi à formuler une réponse. Pouvez-vous reformuler votre demande ?";
         }
 
-        /*
-         * ---------------------------------------------------------
-         * Sauvegarde de la réponse finale
-         * ---------------------------------------------------------
-         */
         $saved = AiMessage::create([
             'conversation_id' => $conversation->id,
             'role' => 'assistant',
@@ -393,7 +281,6 @@ class AssistantService
 
         return [
             'conversation_id' => $conversation->id,
-
             'message' => [
                 'id' => $saved->id,
                 'role' => 'assistant',
@@ -401,20 +288,30 @@ class AssistantService
                 'actions' => $actions,
                 'created_at' => $saved->created_at?->toIso8601String(),
             ],
-
             'remaining' => $this->remaining($user),
         ];
     }
 
     /**
-     * Normalise les blocs tool_use retournés par Anthropic.
+     * Prépare les blocs tool_use avant de les renvoyer à Anthropic.
      *
-     * Anthropic doit normalement retourner input comme objet JSON,
-     * qui devient un tableau associatif PHP.
+     * Cas particulier important :
      *
-     * Si input arrive sous forme de chaîne JSON, on la décode.
+     * JSON reçu :
+     *     "input": {}
+     *
+     * devient en PHP :
+     *     []
+     *
+     * et serait ensuite envoyé comme :
+     *     "input": []
+     *
+     * Anthropic exige cependant un objet JSON :
+     *     "input": {}
+     *
+     * Pour les tableaux non vides, aucune modification n'est effectuée.
      */
-    private function normalizeToolUseBlocks(array $blocks): array
+    private function prepareToolUseBlocksForApi(array $blocks): array
     {
         return array_map(function ($block) {
 
@@ -422,14 +319,40 @@ class AssistantService
                 return $block;
             }
 
-            $input = $block['input'] ?? [];
+            if (!array_key_exists('input', $block)) {
+                $block['input'] = new \stdClass();
+
+                return $block;
+            }
+
+            $input = $block['input'];
 
             /*
-             * Cas normal :
+             * Le cas exact de my_overview :
              *
-             * "input": {
-             *     "project_id": 15
-             * }
+             * input = []
+             *
+             * doit devenir :
+             *
+             * input = {}
+             */
+            if (is_array($input) && empty($input)) {
+                $block['input'] = new \stdClass();
+
+                Log::debug(
+                    'AI: conversion de tool_use.input [] en objet {}',
+                    [
+                        'tool' => $block['name'] ?? null,
+                        'tool_use_id' => $block['id'] ?? null,
+                    ]
+                );
+
+                return $block;
+            }
+
+            /*
+             * Si input est déjà un tableau associatif non vide,
+             * Laravel le sérialisera correctement comme objet JSON.
              */
             if (is_array($input)) {
                 $block['input'] = $input;
@@ -438,9 +361,8 @@ class AssistantService
             }
 
             /*
-             * Cas problématique :
-             *
-             * "input": "{\"project_id\":15}"
+             * Si, pour une raison quelconque, input arrive comme
+             * chaîne JSON, on tente de la décoder.
              */
             if (is_string($input)) {
 
@@ -453,10 +375,12 @@ class AssistantService
                     json_last_error() === JSON_ERROR_NONE
                     && is_array($decoded)
                 ) {
-                    $block['input'] = $decoded;
+                    $block['input'] = empty($decoded)
+                        ? new \stdClass()
+                        : $decoded;
 
                     Log::warning(
-                        'AI: tool_use.input était une chaîne JSON, normalisation effectuée',
+                        'AI: tool_use.input chaîne JSON normalisée',
                         [
                             'tool' => $block['name'] ?? null,
                             'tool_use_id' => $block['id'] ?? null,
@@ -469,10 +393,6 @@ class AssistantService
                 }
             }
 
-            /*
-             * Si le format reste invalide, on ne remplace surtout
-             * pas silencieusement par [].
-             */
             Log::error(
                 'AI: tool_use.input invalide',
                 [
@@ -528,11 +448,6 @@ class AssistantService
             array_shift($out);
         }
 
-        /*
-         * Le prochain message ajouté est « user » :
-         * si le précédent est resté sans réponse (erreur),
-         * on comble pour garder l'alternance.
-         */
         if (
             $out
             && end($out)['role'] === 'user'
