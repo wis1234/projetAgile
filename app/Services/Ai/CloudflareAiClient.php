@@ -28,7 +28,14 @@ class CloudflareAiClient
             ], $tools);
         }
 
-        $url = rtrim((string) $config['base_url'], '/') . '/run/' . rawurlencode((string) $config['model']);
+        $baseUrl = rtrim((string) $config['base_url'], '/');
+        // The account-level Workers AI endpoint is /accounts/{id}/ai/run/{model}.
+        // Accept either the account root or a base URL already ending in /ai.
+        if (str_ends_with($baseUrl, '/ai/v1')) {
+            $baseUrl = substr($baseUrl, 0, -strlen('/ai/v1'));
+        }
+        $url = (str_ends_with($baseUrl, '/ai') ? $baseUrl : $baseUrl . '/ai')
+            . '/run/' . rawurlencode((string) $config['model']);
         try {
             $response = Http::acceptJson()
                 ->asJson()
