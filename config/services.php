@@ -82,7 +82,7 @@ return [
         'max_steps' => (int) env('AI_MAX_STEPS', 8),          // tours outil → réponse maximum par message
         'daily_limit' => (int) env('AI_DAILY_LIMIT', 100),    // messages par utilisateur et par jour
         'timeout' => (int) env('AI_TIMEOUT', 90),
-        'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'openrouter,gemini,anthropic,openai,groq,ollama'))))),
+        'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'openrouter,gemini,anthropic,openai,groq,cloudflare,ollama'))))),
         'transcription_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_TRANSCRIPTION_ORDER', 'cloudflare,groq,openai'))))),
         'transcription_providers' => [
             'cloudflare' => [
@@ -119,6 +119,16 @@ return [
                 'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 4096),
                 // openrouter/free dynamically selects models; their context capacities vary.
                 'context_length' => (int) env('OPENROUTER_CONTEXT_LENGTH', 200000),
+            ],
+            'cloudflare' => [
+                'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
+                // Use a dedicated Workers AI token; R2 access keys are not Workers AI credentials.
+                'api_key' => trim((string) env('CLOUDFLARE_AI_API_TOKEN', '')),
+                'base_url' => env(
+                    'CLOUDFLARE_AI_BASE_URL',
+                    'https://api.cloudflare.com/client/v4/accounts/' . env('CLOUDFLARE_ACCOUNT_ID', '') . '/ai/v1'
+                ),
+                'model' => env('CLOUDFLARE_AI_MODEL', '@cf/meta/llama-3.3-70b-instruct-fp8-fast'),
             ],
             'gemini' => [
                 'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai'),
