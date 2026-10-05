@@ -424,7 +424,7 @@ export default function AssistantAdmin({ settings: initialSettings, providers: i
               </div>
             </Card>
             <Card title="Transcription vocale" icon={FaMicrophone} subtitle="Services utilisés pour convertir les messages vocaux en texte">
-              {transcriptionProviders.length ? <div className="flex flex-wrap gap-2">{transcriptionProviders.map((n) => <span key={n} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{n}</span>)}</div>
+              {transcriptionProviders.some((p) => p.available) ? <div className="flex flex-wrap gap-2">{transcriptionProviders.map((n) => <span key={n.name} title={n.model} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{n.name}{!n.available && ' · clé manquante'}</span>)}</div>
                 : <p className="text-sm text-amber-700 dark:text-amber-300">Aucun service de transcription configuré : la saisie vocale est indisponible (clé Groq ou OpenAI requise).</p>}
             </Card>
           </div>
