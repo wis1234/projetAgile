@@ -32,15 +32,31 @@ use Illuminate\Validation\ValidationException;
  */
 class AssistantTools
 {
+    use \App\Services\Ai\Concerns\AssistantExtras;
+
     private const LINK_PREFIXES = ['/dashboard', '/projects', '/tasks', '/kanban', '/discussions', '/inbox', '/files', '/remunerations', '/users', '/project-users', '/profile', '/calendar', '/notifications', '/assistant'];
 
-    public function __construct(private User $user)
+    /** @param array $features lecture/écriture de fichiers, membres, rapports (réglages du tableau de bord) */
+    public function __construct(private User $user, private array $features = [])
     {
     }
 
     // ───────────────────────── Définitions envoyées au modèle ─────────────────────────
 
-    public static function definitions(): array
+    public static function definitions(array $features = []): array
+    {
+        $all = self::baseDefinitions();
+        // list_files / read_file sont remplacés par les versions avancées (pagination, liens, formats Office/PDF)
+        $drop = ['list_files', 'read_file'];
+        if (!($features['files_write'] ?? true)) {
+            $drop[] = 'append_task_tracking';
+        }
+        $all = array_values(array_filter($all, fn ($d) => !in_array($d['name'], $drop, true)));
+
+        return array_merge($all, self::extraDefinitions($features));
+    }
+
+    private static function baseDefinitions(): array
     {
         $int = ['type' => 'integer'];
         $str = ['type' => 'string'];
@@ -165,9 +181,14 @@ class AssistantTools
                 'get_task' => $this->wrap($this->getTask($input)),
                 'list_sprints' => $this->wrap($this->listSprints($input)),
                 'search_users' => $this->wrap($this->searchUsers($input)),
-                'list_files' => $this->wrap($this->listFiles($input)),
-                'read_file' => $this->wrap($this->readFile($input)),
-                'append_task_tracking' => $this->appendTaskTracking($input),
+                'list_files' => $this->wrap($this->listFilesSmart($input)),
+                'read_file' => $this->wrap($this->readFileSmart($input)),
+                'search_files_content' => $this->wrap($this->searchFilesContent($input)),
+                'append_task_tracking' => $this->feature('files_write') ? $this->appendTaskTracking($input) : $this->wrap($this->disabled("L'écriture dans les fichiers par l'assistant")),
+                'add_project_member' => $this->addProjectMember($input),
+                'change_member_role' => $this->changeMemberRole($input),
+                'remove_project_member' => $this->requestRemoveMember($input, $conversationId),
+                'generate_report' => $this->generateReport($input),
                 'create_task' => $this->createTask($input),
                 'update_task' => $this->updateTask($input),
                 'add_comment' => $this->addComment($input),
@@ -186,6 +207,11 @@ class AssistantTools
     {
         return match ($action->tool) {
             'delete_task' => $this->deleteTask((int) ($action->input['task_id'] ?? 0)),
+            'remove_project_member' => $this->removeProjectMember(
+                (int) ($action->input['project_id'] ?? 0),
+                (int) ($action->input['user_id'] ?? 0),
+                (bool) ($action->input['unassign_open_tasks'] ?? false)
+            ),
             default => ['ok' => false, 'message' => 'Action inconnue.'],
         };
     }
@@ -243,8 +269,10 @@ class AssistantTools
             'due_date' => $t->due_date?->format('Y-m-d H:i'),
             'overdue' => $t->status !== 'done' && $t->due_date && $t->due_date->isPast(),
             'project' => $t->project ? ['id' => $t->project->id, 'name' => $t->project->name] : null,
-            'assignee' => $t->assignedUser ? ['id' => $t->assignedUser->id, 'name' => $t->assignedUser->name] : null,
+            'assignee' => $t->assignedUser ? ['id' => $t->assignedUser->id, 'name' => $t->assignedUser->name, 'link' => $this->mdLink($t->assignedUser->name, "/users/{$t->assignedUser->id}")] : null,
             'url' => "/tasks/{$t->id}",
+            'link' => $this->mdLink($t->title, "/tasks/{$t->id}"),
+            'project_link' => $t->project ? $this->mdLink($t->project->name, "/projects/{$t->project->id}") : null,
         ];
     }
 
@@ -296,6 +324,7 @@ class AssistantTools
                 'id' => $p->id, 'name' => $p->name, 'status' => $p->status,
                 'my_role' => $this->myRole($p->id) ?? ($this->isAdmin() ? 'admin' : null),
                 'members' => $p->users_count, 'tasks' => $p->tasks_count, 'url' => "/projects/{$p->id}",
+                'link' => $this->mdLink($p->name, "/projects/{$p->id}"),
             ])->all(),
         ];
     }
@@ -312,13 +341,15 @@ class AssistantTools
             'id' => $p->id, 'name' => $p->name, 'status' => $p->status,
             'description' => $this->clip($p->description, 800),
             'my_role' => $this->myRole($id) ?? ($this->isAdmin() ? 'admin' : null),
-            'members' => $p->users->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->pivot->role, 'muted' => (bool) $u->pivot->is_muted])->all(),
+            'members' => $p->users->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->pivot->role, 'muted' => (bool) $u->pivot->is_muted, 'link' => $this->mdLink($u->name, "/users/{$u->id}")])->all(),
             'sprints' => $p->sprints->sortByDesc('start_date')->take(8)->map(fn ($s) => [
                 'id' => $s->id, 'name' => $s->name, 'start' => (string) $s->start_date, 'end' => (string) $s->end_date,
                 'current' => Carbon::parse($s->start_date)->lte($today) && Carbon::parse($s->end_date)->gte($today),
             ])->values()->all(),
             'tasks_by_status' => Task::where('project_id', $id)->select('status', DB::raw('count(*) c'))->groupBy('status')->pluck('c', 'status'),
             'url' => "/projects/{$id}",
+            'link' => $this->mdLink($p->name, "/projects/{$id}"),
+            'members_page' => $this->mdLink('Gérer les membres', "/project-users/{$id}"),
         ];
     }
 
@@ -389,7 +420,7 @@ class AssistantTools
             $ids = $this->visibleProjectIds();
             $q->whereHas('projects', fn ($p) => $p->whereIn('projects.id', $ids));
         }
-        return ['users' => $q->limit(10)->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'job_title' => $u->job_title])->all()];
+        return ['users' => $q->limit(10)->get()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'job_title' => $u->job_title, 'link' => $this->mdLink($u->name, "/users/{$u->id}")])->all()];
     }
 
     private function listFiles(array $in): array
@@ -501,8 +532,8 @@ class AssistantTools
             return $this->wrap(['error' => 'Le fichier de suivi est illisible.']);
         }
         $timestamp = now()->locale('fr')->translatedFormat('d F Y à H:i');
-        $safeEntry = nl2br(e($entry), false);
-        $updated = $existing . "\n<hr><section><h2>Note ajoutée par l’assistant — " . e($timestamp) . "</h2><p>{$safeEntry}</p></section>\n";
+        $safeEntry = $this->markdownToSafeHtml($entry);
+        $updated = $existing . "\n<hr><section><h2>🤖 Note ajoutée par l’assistant — " . e($timestamp) . "</h2><p><em>À la demande de " . e($this->user->name) . "</em></p>{$safeEntry}</section>\n";
 
         $outcome = $this->invoke(FileController::class, 'updateContent', 'PUT', [
             'content' => $updated,
@@ -512,8 +543,17 @@ class AssistantTools
             return $this->wrap(['error' => $outcome['message']]);
         }
 
+        // L'éditeur collaboratif charge `yjs_state` en priorité : sans cette remise à zéro, la note resterait invisible
+        // (et pourrait être écrasée par la prochaine sauvegarde automatique). Il repartira du HTML à jour.
+        File::whereKey($trackingFile->id)->update(['yjs_state' => null]);
+        try {
+            broadcast(new \App\Events\FileContentUpdated($trackingFile->id, $this->user->id, 'assistant'));
+        } catch (\Throwable $e) {
+            Log::info('AI tracking broadcast skipped', ['error' => $e->getMessage()]);
+        }
+
         return $this->wrap(
-            ['updated' => true, 'file_id' => $trackingFile->id, 'task_id' => $task->id],
+            ['updated' => true, 'file_id' => $trackingFile->id, 'task_id' => $task->id, 'link' => $this->mdLink('Fichier de suivi', "/files/{$trackingFile->id}/edit-content")],
             ['type' => 'task_updated', 'label' => 'Suivi : ' . $task->title, 'url' => "/files/{$trackingFile->id}/edit-content"]
         );
     }

@@ -58,6 +58,9 @@ if ($request->user()) {
                         && app(\App\Services\Ai\AiProviderManager::class)->configured()
                     : false,
                 'admin' => $request->user()?->can('admin-only') ?? false,
+                'voice' => $request->user()
+                    ? app(\App\Services\Ai\AiSettingsService::class)->voiceEnabled()
+                    : false,
             ],
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),

@@ -66,6 +66,17 @@ Les clés API doivent rester dans le `.env` du serveur, jamais dans le frontend 
 
 `AI_PROVIDER_ORDER` définit l'ordre initial des tentatives (par défaut `openrouter,gemini,anthropic,openai,groq,cloudflare,ollama`). L'administrateur coche dans `/assistant/admin` les fournisseurs autorisés : seuls ces fournisseurs seront interrogés, dans l'ordre indiqué. Les fournisseurs sans clé apparaissent comme non configurés. Si OpenRouter atteint ses limites, l'assistant ne bascule que vers les autres fournisseurs qui sont à la fois configurés et cochés. La disponibilité gratuite varie selon chaque service ; OpenAI API nécessite généralement une facturation/crédits actifs.
 
+### Capacités de l'assistant (tableau de bord `/assistant/admin`)
+
+- **Liens** : toute réponse qui cite un projet, une tâche, un fichier ou une personne contient un lien cliquable vers ProJA.
+- **Fichiers** : `list_files`, `search_files_content` (recherche dans le contenu) et `read_file` (pagination) lisent HTML, texte, Word, PowerPoint, Excel (si `phpoffice/phpspreadsheet` est installé) et PDF (si `pdftotext`/poppler-utils est installé). Seuls les fichiers visibles et déverrouillés pour l'utilisateur sont lisibles.
+- **Suivi de tâche** : `append_task_tracking` ajoute une note datée en fin de document, crée une version restaurable, réinitialise l'état collaboratif (`yjs_state`) et prévient les éditeurs ouverts, qui se rechargent.
+- **Membres** : ajout et changement de rôle immédiats ; le retrait demande une confirmation dans l'interface. Le dernier manager d'un projet ne peut être ni retiré ni rétrogradé.
+- **Rapports** : `generate_report` calcule les chiffres (équipe, projet ou personne, par période) ; le modèle rédige ensuite le rapport sans rien inventer.
+- **Interrupteurs** : fichiers (lecture / écriture), membres, rapports et voix se coupent séparément dans « Réglages ».
+- **Continuité** : un fournisseur dont le quota est atteint, la clé refusée ou le crédit épuisé est mis en pause quelques minutes (bouton « Reprendre » et « Tester » dans « Modèles d'IA »), puis le suivant prend le relais.
+- **Purge** : `php artisan ai:prune` (planifié chaque nuit) supprime l'historique d'usage au-delà de la durée de conservation réglée.
+
 Le message vocal est enregistré côté client (microphone autorisé, généralement HTTPS), envoyé au endpoint Laravel puis transcrit par le service configuré avant d'être proposé dans la zone de saisie ; l'utilisateur vérifie le texte avant son envoi au chat. La recherche et lecture de documents de l'assistant sont limitées aux fichiers texte visibles par l'utilisateur et déverrouillés dans ProJA. L'ajout au fichier de suivi est append-only, crée une version et respecte la permission d'édition du fichier.
 
 ## Technologies utilisées

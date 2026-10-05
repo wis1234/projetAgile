@@ -5,6 +5,7 @@ namespace App\Services\Ai;
 use App\Models\AiSetting;
 use App\Models\AiUserSetting;
 use App\Models\User;
+use App\Models\AiUsage;
 use Illuminate\Support\Facades\Cache;
 
 class AiSettingsService
@@ -43,6 +44,65 @@ class AiSettingsService
         $userSettings = $this->userSettings($user);
 
         return max(0, (int) ($userSettings?->daily_limit ?? $global->daily_limit));
+    }
+
+    /** Messages (chat) déjà consommés aujourd'hui : en cours + réussis. Les échecs ne consomment pas le quota. */
+    public function usedToday(User $user, string $kind = 'chat'): int
+    {
+        return AiUsage::where('user_id', $user->id)->where('kind', $kind)
+            ->where('created_at', '>=', now()->startOfDay())
+            ->where(function ($q) {
+                // Une requête « en cours » depuis plus de 10 min est considérée interrompue : elle ne consomme plus le quota
+                $q->where('status', 'success')
+                    ->orWhere(fn ($w) => $w->where('status', 'started')->where('created_at', '>=', now()->subMinutes(10)));
+            })->count();
+    }
+
+    public function remainingFor(User $user): int
+    {
+        return max(0, $this->limitFor($user) - $this->usedToday($user));
+    }
+
+    public function voiceEnabled(): bool
+    {
+        return (bool) ($this->global()->voice_enabled ?? true);
+    }
+
+    public function voiceLimit(): int
+    {
+        return max(0, (int) ($this->global()->voice_daily_limit ?? 50));
+    }
+
+    public function voiceRemainingFor(User $user): int
+    {
+        return max(0, $this->voiceLimit() - $this->usedToday($user, 'transcription'));
+    }
+
+    public function maxSteps(): int
+    {
+        return max(1, min(15, (int) ($this->global()->max_steps ?: config('services.ai.max_steps', 8))));
+    }
+
+    public function maxMessageChars(): int
+    {
+        return max(200, min(8000, (int) ($this->global()->max_message_chars ?: 2000)));
+    }
+
+    /** Capacités activables : lecture/écriture de fichiers, gestion des membres, rapports. */
+    public function features(): array
+    {
+        $g = $this->global();
+        return [
+            'files_read' => (bool) ($g->files_read_enabled ?? true),
+            'files_write' => (bool) ($g->files_write_enabled ?? true),
+            'members' => (bool) ($g->members_manage_enabled ?? true),
+            'reports' => (bool) ($g->reports_enabled ?? true),
+        ];
+    }
+
+    public function customInstructions(): string
+    {
+        return trim((string) ($this->global()->custom_instructions ?? ''));
     }
 
     public function enabledFor(User $user): bool

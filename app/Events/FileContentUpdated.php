@@ -12,11 +12,13 @@ class FileContentUpdated implements ShouldBroadcastNow
 
     public int $fileId;
     public int $userId;
+    public ?string $source;
 
-    public function __construct(int $fileId, int $userId)
+    public function __construct(int $fileId, int $userId, ?string $source = null)
     {
         $this->fileId = $fileId;
         $this->userId = $userId;
+        $this->source = $source; // « assistant » quand l'IA a modifié le document
     }
 
     public function broadcastOn(): array
@@ -33,7 +35,8 @@ class FileContentUpdated implements ShouldBroadcastNow
     {
         return [
             'file_id' => $this->fileId,
-            'user_id' => $this->userId
+            'user_id' => $this->userId,
+            'source' => $this->source,
         ];
     }
 }

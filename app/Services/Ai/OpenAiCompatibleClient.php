@@ -51,7 +51,7 @@ class OpenAiCompatibleClient
             $response = $request->post($url, $payload);
         } catch (\Throwable $e) {
             Log::warning('AI provider connection failed', ['provider' => $provider, 'error' => $e->getMessage()]);
-            throw new AiUnavailableException("Le fournisseur {$provider} ne répond pas.");
+            throw new AiUnavailableException("Le fournisseur {$provider} ne répond pas.", 'unavailable', 60);
         }
 
         if ($response->failed()) {
@@ -64,13 +64,14 @@ class OpenAiCompatibleClient
             $status = $response->status();
             $body = $response->json();
             $providerMessage = data_get($body, 'error.message');
+            [$code, $pause] = AiUnavailableException::classify($status, $response->header('Retry-After'));
             throw new AiUnavailableException(match (true) {
                 $status === 401 || $status === 403 => "{$provider} refuse la clé API (HTTP {$status}).",
                 $status === 402 => "{$provider} demande un crédit ou un moyen de paiement (HTTP 402).",
                 $status === 429 => "{$provider} a atteint sa limite temporaire de requêtes (HTTP 429). " . ($providerMessage ?: 'Réessayez après la réinitialisation de la limite.'),
                 $status >= 500 => "{$provider} rencontre une panne temporaire (HTTP {$status}).",
                 default => "{$provider} a refusé la requête (HTTP {$status}). " . ($providerMessage ?: ''),
-            });
+            }, $code, $pause, $status);
         }
 
         $json = $response->json();

@@ -686,6 +686,15 @@ const EditContent = ({
     providerRef.current = provider;
     }
 
+    // L'assistant IA vient d'écrire dans ce document (fichier de suivi…) : on repart du contenu serveur à jour,
+    // sinon la prochaine sauvegarde automatique écraserait sa note.
+    channel.listen('.FileContentUpdated', (e) => {
+      if (e?.source !== 'assistant' || reloadingRef.current) return;
+      reloadingRef.current = true;
+      addToast("L'assistant a ajouté une note à ce document. Actualisation…", 'success');
+      setTimeout(() => window.location.reload(), 1500);
+    });
+
     return () => {
       provider?.destroy();
       providerRef.current = null;

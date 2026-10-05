@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import {
   FaPaperPlane, FaPlus, FaHistory, FaTimes, FaTrash, FaCheckCircle, FaExternalLinkAlt, FaExclamationTriangle, FaRedo, FaArrowLeft, FaMicrophone, FaStop, FaSpinner,
 } from 'react-icons/fa';
@@ -63,7 +63,7 @@ function ActionChips({ actions = [], onNavigate, onConfirm, onCancel, busy }) {
             className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-left text-sm font-medium text-blue-800 transition hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
             {done ? <FaCheckCircle className="flex-shrink-0 text-emerald-500" /> : <FaExternalLinkAlt className="flex-shrink-0 text-xs" />}
             <span className="min-w-0 flex-1 truncate">
-              {a.type === 'task_created' && 'Tâche créée : '}{a.type === 'task_updated' && 'Tâche mise à jour : '}{a.type === 'comment_added' && 'Commentaire ajouté sur : '}{a.label}
+              {a.type === 'task_created' && 'Tâche créée : '}{a.type === 'task_updated' && 'Tâche mise à jour : '}{a.type === 'comment_added' && 'Commentaire ajouté sur : '}{a.type === 'member_added' && 'Équipe mise à jour : '}{a.label}
             </span>
             <FaExternalLinkAlt className="flex-shrink-0 text-[10px] opacity-60" />
           </button>
@@ -88,6 +88,9 @@ export default function AssistantPanel({ variant = 'page', onClose, active = tru
   const [busy, setBusy] = useState(null);
   const [remaining, setRemaining] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  const { ai } = usePage().props;
+  const voiceAvailable = ai?.voice !== false;
+  const fromVoice = useRef(false);
   const [transcribing, setTranscribing] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [voiceError, setVoiceError] = useState('');
@@ -118,13 +121,15 @@ export default function AssistantPanel({ variant = 'page', onClose, active = tru
     const msg = (text ?? draft).trim();
     if (!msg || loading) return;
     lastSent.current = msg;
+    const viaVoice = fromVoice.current;
+    fromVoice.current = false;
     setError('');
     setDraft('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: 'user', content: msg }]);
     setLoading(true);
     try {
-      const data = await api('/assistant/chat', { method: 'POST', body: { message: msg, conversation_id: conversationId, page: window.location.pathname } });
+      const data = await api('/assistant/chat', { method: 'POST', body: { message: msg, conversation_id: conversationId, page: window.location.pathname, voice: viaVoice } });
       setConversationId(data.conversation_id);
       setRemaining(data.remaining);
       setMessages((m) => [...m, data.message]);
@@ -182,6 +187,7 @@ export default function AssistantPanel({ variant = 'page', onClose, active = tru
     setVoiceStatus('Transcription en cours…');
     try {
       const data = await api('/assistant/transcribe', { method: 'POST', body: formData });
+      fromVoice.current = true;
       setDraft((current) => [current.trim(), data.text].filter(Boolean).join(' '));
       setVoiceStatus(`Transcription terminée (${data.provider}). Vérifiez le texte avant l’envoi.`);
       inputRef.current?.focus();
@@ -340,10 +346,12 @@ export default function AssistantPanel({ variant = 'page', onClose, active = tru
 
           <footer className="flex-shrink-0 border-t border-slate-200 bg-white px-3 pb-3 pt-2.5 dark:border-slate-800 dark:bg-slate-900" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
             <div className="flex items-end gap-2">
-              <button type="button" onClick={toggleVoiceRecording} disabled={loading || transcribing} aria-label={isRecording ? 'Arrêter et transcrire le message' : 'Enregistrer un message vocal'} title={isRecording ? 'Arrêter et transcrire' : 'Enregistrer un message vocal'}
-                className={`flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-full transition disabled:opacity-40 ${isRecording ? 'animate-pulse bg-red-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 dark:bg-slate-800 dark:text-slate-300'}`}>
-                {transcribing ? <FaSpinner className="animate-spin" /> : isRecording ? <FaStop /> : <FaMicrophone />}
-              </button>
+              {voiceAvailable && (
+                <button type="button" onClick={toggleVoiceRecording} disabled={loading || transcribing} aria-label={isRecording ? 'Arrêter et transcrire le message' : 'Enregistrer un message vocal'} title={isRecording ? 'Arrêter et transcrire' : 'Enregistrer un message vocal'}
+                  className={`flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-full transition disabled:opacity-40 ${isRecording ? 'animate-pulse bg-red-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                  {transcribing ? <FaSpinner className="animate-spin" /> : isRecording ? <FaStop /> : <FaMicrophone />}
+                </button>
+              )}
               <textarea
                 ref={inputRef} value={draft} onChange={onInput} onKeyDown={onKeyDown} rows={1} maxLength={2000} disabled={loading || transcribing || isRecording}
                 placeholder="Écris ton message…" aria-label="Message pour l'assistant"

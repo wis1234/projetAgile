@@ -585,6 +585,10 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->prefix('assistant')->group(function () {
     Route::get('/', [\App\Http\Controllers\AssistantController::class, 'index'])->name('assistant.index');
     Route::get('/admin', [\App\Http\Controllers\AssistantController::class, 'admin'])->middleware('can:admin-only')->name('assistant.admin');
+    Route::get('/admin/stats', [\App\Http\Controllers\AssistantController::class, 'stats'])->middleware('can:admin-only')->name('assistant.admin.stats');
+    Route::post('/admin/providers/{name}/test', [\App\Http\Controllers\AssistantController::class, 'testProvider'])->middleware(['can:admin-only', 'throttle:12,1'])->name('assistant.admin.providers.test');
+    Route::post('/admin/providers/{name}/reset', [\App\Http\Controllers\AssistantController::class, 'resetProvider'])->middleware('can:admin-only')->name('assistant.admin.providers.reset');
+    Route::delete('/admin/logs', [\App\Http\Controllers\AssistantController::class, 'purgeLogs'])->middleware('can:admin-only')->name('assistant.admin.logs.purge');
     Route::put('/admin/settings', [\App\Http\Controllers\AssistantController::class, 'updateAdminSettings'])->middleware('can:admin-only')->name('assistant.admin.settings');
     Route::put('/admin/users/{user}', [\App\Http\Controllers\AssistantController::class, 'updateUserSetting'])->middleware('can:admin-only')->name('assistant.admin.users');
     Route::post('/chat', [\App\Http\Controllers\AssistantController::class, 'chat'])->middleware('throttle:20,1')->name('assistant.chat');

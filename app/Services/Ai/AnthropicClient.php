@@ -48,7 +48,9 @@ class AnthropicClient
             ]);
 
             throw new AiUnavailableException(
-                "Impossible de joindre le service d'IA. Réessayez dans un instant."
+                "Impossible de joindre le service d'IA. Réessayez dans un instant.",
+                'unavailable',
+                60
             );
         }
 
@@ -65,6 +67,7 @@ class AnthropicClient
             ]);
 
             $status = $response->status();
+            [$code, $pause] = AiUnavailableException::classify($status, $response->header('Retry-After'));
 
             throw new AiUnavailableException(
                 match (true) {
@@ -79,7 +82,10 @@ class AnthropicClient
 
                     default
                         => "L'assistant n'a pas pu répondre (erreur {$status}).",
-                }
+                },
+                $code,
+                $pause,
+                $status
             );
         }
 

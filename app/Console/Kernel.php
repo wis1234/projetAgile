@@ -31,6 +31,8 @@ class Kernel extends ConsoleKernel
                  ->sendOutputTo(storage_path('logs/queue-worker.log'));
                  
         // Vérifie et ferme les offres expirées toutes les 5 minutes
+        $schedule->command('ai:prune')->dailyAt('03:30')->withoutOverlapping();
+
         $schedule->command('recruitments:close-expired')
                  ->everyFiveMinutes()
                  ->withoutOverlapping()
