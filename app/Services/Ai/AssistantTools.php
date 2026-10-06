@@ -33,8 +33,9 @@ use Illuminate\Validation\ValidationException;
 class AssistantTools
 {
     use \App\Services\Ai\Concerns\AssistantExtras;
+    use \App\Services\Ai\Concerns\QuizExtras;
 
-    private const LINK_PREFIXES = ['/dashboard', '/projects', '/tasks', '/kanban', '/discussions', '/inbox', '/files', '/remunerations', '/users', '/project-users', '/profile', '/calendar', '/notifications', '/assistant'];
+    private const LINK_PREFIXES = ['/dashboard', '/projects', '/tasks', '/kanban', '/discussions', '/inbox', '/files', '/remunerations', '/users', '/project-users', '/profile', '/calendar', '/notifications', '/assistant', '/quizzes'];
 
     /** @param array $features lecture/écriture de fichiers, membres, rapports (réglages du tableau de bord) */
     public function __construct(private User $user, private array $features = [])
@@ -53,7 +54,7 @@ class AssistantTools
         }
         $all = array_values(array_filter($all, fn ($d) => !in_array($d['name'], $drop, true)));
 
-        return array_merge($all, self::extraDefinitions($features));
+        return array_merge($all, self::extraDefinitions($features), self::quizDefinitions());
     }
 
     private static function baseDefinitions(): array
@@ -194,6 +195,13 @@ class AssistantTools
                 'add_comment' => $this->addComment($input),
                 'delete_task' => $this->requestDeleteTask($input, $conversationId),
                 'open_page' => $this->openPage($input),
+                'list_quizzes' => $this->wrap($this->listQuizzes($input)),
+                'get_quiz' => $this->wrap($this->getQuiz($input)),
+                'create_quiz' => $this->wrap($this->createQuiz($input)),
+                'update_quiz' => $this->wrap($this->updateQuiz($input)),
+                'add_quiz_candidate' => $this->wrap($this->addQuizCandidate($input)),
+                'get_quiz_attempt_to_grade' => $this->wrap($this->getQuizAttemptToGrade($input)),
+                'submit_quiz_grades' => $this->wrap($this->submitQuizGrades($input)),
                 default => $this->wrap(['error' => "Outil inconnu : {$name}"]),
             };
         } catch (\Throwable $e) {
