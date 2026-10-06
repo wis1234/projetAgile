@@ -7,10 +7,17 @@ use Illuminate\Support\Facades\Log;
 
 class OpenAiCompatibleClient
 {
+    public function __construct(private GroqModelCatalog $groqModels)
+    {
+    }
+
     public function send(string $provider, array $config, string $system, array $messages, array $tools, int $maxTokens, int $timeout): array
     {
+        $model = $provider === 'groq'
+            ? $this->groqModels->resolve($config, !empty($tools))
+            : (string) $config['model'];
         $payload = [
-            'model' => $config['model'],
+            'model' => $model,
             'max_tokens' => $maxTokens,
             'messages' => $this->messages($provider, $system, $messages),
         ];
@@ -49,6 +56,15 @@ class OpenAiCompatibleClient
                 $url = $baseUrl . '/chat/completions';
             }
             $response = $request->post($url, $payload);
+            if ($provider === 'groq' && $response->status() === 404) {
+                // The catalog cache may briefly retain a model just retired by Groq.
+                $replacement = $this->groqModels->resolve($config, !empty($tools), true);
+                if ($replacement !== $model) {
+                    $model = $replacement;
+                    $payload['model'] = $model;
+                    $response = $request->post($url, $payload);
+                }
+            }
         } catch (\Throwable $e) {
             Log::warning('AI provider connection failed', ['provider' => $provider, 'error' => $e->getMessage()]);
             throw new AiUnavailableException("Le fournisseur {$provider} ne répond pas.", 'unavailable', 60);
@@ -57,7 +73,7 @@ class OpenAiCompatibleClient
         if ($response->failed()) {
             Log::warning('AI provider request failed', [
                 'provider' => $provider,
-                'model' => $config['model'],
+                'model' => $model,
                 'status' => $response->status(),
                 'body' => mb_substr($response->body(), 0, 1500),
             ]);
@@ -109,6 +125,7 @@ class OpenAiCompatibleClient
         }
 
         return [
+            'model' => $model,
             'content' => $content,
             'stop_reason' => !empty($choice['message']['tool_calls']) ? 'tool_use' : 'end_turn',
             'usage' => [

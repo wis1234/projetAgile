@@ -83,6 +83,7 @@ return [
         'daily_limit' => (int) env('AI_DAILY_LIMIT', 100),    // messages par utilisateur et par jour
         'timeout' => (int) env('AI_TIMEOUT', 90),
         'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'openrouter,gemini,anthropic,openai,groq,cloudflare,ollama'))))),
+        'groq_model_preferences' => env('GROQ_MODEL_PREFERENCES', 'llama-3.3-70b-versatile,llama-3.1-8b-instant,openai/gpt-oss-20b,openai/gpt-oss-120b'),
         'transcription_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_TRANSCRIPTION_ORDER', 'cloudflare,groq,openai'))))),
         'transcription_providers' => [
             'cloudflare' => [

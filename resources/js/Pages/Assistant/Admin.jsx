@@ -201,6 +201,7 @@ function ProviderCard({ p, onToggle, onMove, onTest, onReset, testing, first, la
             {p.free && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">Gratuit</span>}
           </div>
           <p className="truncate font-mono text-xs text-slate-500 dark:text-slate-400" title={p.model}>{p.model || '—'}</p>
+          {p.name === 'groq' && p.configured && <p className="mt-1 text-[10px] text-slate-400" title={(p.catalog_models || []).map((m) => m.id).join(', ')}>{p.catalog_models?.length ? `${p.catalog_models.length} modèle(s) compatibles détectés · sélection auto` : (p.catalog_error || 'Catalogue Groq indisponible')}</p>}
           <span className={`mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${status[1]}`}>{status[0]}</span>
           {p.paused && <span className="ml-2 text-[11px] text-slate-400">reprise dans {Math.ceil(p.paused.seconds / 60)} min</span>}
           {p.last && p.last.ok === false && p.last.message && <p className="mt-2 line-clamp-2 text-[11px] text-rose-600/90 dark:text-rose-300/90">{p.last.message}</p>}

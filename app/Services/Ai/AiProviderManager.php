@@ -17,6 +17,7 @@ class AiProviderManager
     public function __construct(
         private AnthropicClient $anthropic,
         private OpenAiCompatibleClient $openAi,
+        private GroqModelCatalog $groqModels,
         private AiSettingsService $settings,
     ) {
     }
@@ -118,7 +119,8 @@ class AiProviderManager
             $this->remember($name, true);
             $this->resetCircuit($name);
 
-            return ['ok' => true, 'message' => $text !== '' ? 'Réponse reçue : « ' . mb_substr($text, 0, 40) . ' »' : 'Connexion réussie.', 'ms' => (int) ((microtime(true) - $started) * 1000)];
+            $model = $response['model'] ?? $cfg['model'];
+            return ['ok' => true, 'message' => ($text !== '' ? 'Réponse reçue : « ' . mb_substr($text, 0, 40) . ' »' : 'Connexion réussie.') . " · modèle {$model}", 'ms' => (int) ((microtime(true) - $started) * 1000)];
         } catch (AiUnavailableException $e) {
             $this->remember($name, false, $e->errorCode, $e->getMessage());
             return ['ok' => false, 'message' => $e->getMessage(), 'code' => $e->errorCode, 'ms' => (int) ((microtime(true) - $started) * 1000)];
@@ -133,7 +135,7 @@ class AiProviderManager
         foreach ($this->settings->providerOrder() as $i => $name) {
             $cfg = config("services.ai.providers.{$name}", []);
             $cb = $this->circuit($name);
-            $rows[] = [
+            $row = [
                 'name' => $name,
                 'label' => $cfg['label'] ?? ucfirst($name),
                 'model' => (string) ($cfg['model'] ?? ''),
@@ -145,6 +147,22 @@ class AiProviderManager
                 'last' => Cache::get("ai:last:{$name}"),
                 'last_ok_at' => Cache::get("ai:ok:{$name}"),
             ];
+            if ($name === 'groq' && $row['configured']) {
+                $row['configured_model'] = (string) ($cfg['model'] ?? '');
+                $row['catalog_models'] = array_map(
+                    fn ($model) => [
+                        'id' => $model['id'],
+                        'context_window' => $model['context_window'] ?? null,
+                    ],
+                    $this->groqModels->toolModels($cfg)
+                );
+                try {
+                    $row['model'] = $this->groqModels->resolve($cfg, true);
+                } catch (AiUnavailableException $e) {
+                    $row['catalog_error'] = $e->getMessage();
+                }
+            }
+            $rows[] = $row;
         }
 
         return $rows;
@@ -179,7 +197,7 @@ class AiProviderManager
                     default => $this->openAi->send($name, $providerConfig, $system, $messages, $tools, (int) $settings->max_tokens, (int) $settings->timeout),
                 };
                 $this->lastProvider = $name;
-                $this->lastModel = $providerConfig['model'] ?? null;
+                $this->lastModel = $response['model'] ?? $providerConfig['model'] ?? null;
                 $this->lastUsage = $response['usage'] ?? [];
                 $this->turnProvider ??= $name;
                 $this->attempts[] = ['provider' => $name, 'ok' => true, 'code' => null, 'ms' => (int) ((microtime(true) - $started) * 1000)];

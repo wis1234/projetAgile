@@ -54,7 +54,7 @@ Après déploiement, exécutez les migrations Laravel. Les administrateurs dispo
 Les fournisseurs sont configurés côté serveur (ne jamais placer leurs clés dans le frontend) :
 
 - Anthropic : `ANTHROPIC_API_KEY`, modèle `AI_MODEL`.
-- Groq : `GROQ_API_KEY`, modèle `GROQ_MODEL` (offre gratuite soumise aux quotas du fournisseur).
+- Groq : `GROQ_API_KEY`, modèle préféré `GROQ_MODEL` (offre gratuite soumise aux quotas). À chaque appel, ProJA consulte le catalogue accessible avec cette clé, garde le modèle s'il est actif et compatible avec les outils, sinon en choisit automatiquement un actif compatible (priorités facultatives : `GROQ_MODEL_PREFERENCES`). Le dashboard affiche les modèles compatibles détectés.
 - OpenRouter : `OPENROUTER_API_KEY`, modèle par défaut `openrouter/free`; le routeur gratuit peut limiter les requêtes et changer de modèle disponible.
 - Cloudflare Workers AI : `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ENDPOINT` (racine API, par défaut `https://api.cloudflare.com/client/v4`) et jeton Workers AI `CLOUDFLARE_AI_API_TOKEN`, modèle par défaut `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. ProJA construit l'endpoint compatible OpenAI `/accounts/{account_id}/ai/v1/chat/completions`. Le jeton doit avoir les permissions Workers AI Read et Edit. Les variables R2 (`CLOUDFLARE_API_KEY`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_KEY`) ne sont pas utilisées comme jeton Workers AI.
 - Gemini : `GEMINI_API_KEY`, modèle `GEMINI_MODEL` (valeur par défaut `gemini-3.8-flash`, endpoint OpenAI-compatible).
