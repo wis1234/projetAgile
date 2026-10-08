@@ -180,7 +180,7 @@ class UserController extends Controller
     private function presentUser(User $user, User $viewer): array
     {
         $isSelf = $viewer->id === $user->id;
-        $isAdmin = $viewer->hasRole('admin') || $viewer->role === 'admin';
+        $isAdmin = $viewer->hasAdminAccess();
         $canManage = Gate::forUser($viewer)->allows('admin-only'); // même règle que les routes /users/*/edit, destroy…
         $canSeePrivate = $isSelf || $isAdmin;
 
@@ -327,7 +327,7 @@ class UserController extends Controller
         }
         
         $actor = Auth::user();
-        $actorIsAdmin = $actor->hasRole('admin') || $actor->role === 'admin';
+        $actorIsAdmin = $actor->hasAdminAccess();
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',

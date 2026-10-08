@@ -142,7 +142,7 @@ class Quiz extends Model
      */
     public function deciders(): Collection
     {
-        $managers = $this->project->managers()->get();
+        $managers = $this->project->managers()->get()->toBase();
 
         if ($managers->isNotEmpty()) {
             return $managers;

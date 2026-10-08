@@ -29,14 +29,20 @@ class QuizDeliberationService
         $rows = QuizResult::where('quiz_id', $quiz->id)
             ->orderBy('id')
             ->get(['id', 'score', 'score_exact', 'grading_status'])
+            // Collection de base AVANT map() : une Eloquent\Collection vide (aucun résultat) le reste après map(), et son
+            // merge() appelle getKey() sur chaque élément fusionné -> « getKey() on string » avec les bonus (chaînes).
+            ->toBase()
             ->map(fn ($r) => $r->id . ':' . number_format($r->exactScore(), 2, '.', '') . ':' . $r->grading_status);
 
         // Le bonus de participation modifie la note finale : il fait partie de l'empreinte,
         // donc l'ajouter ou le retirer après un aval rend cet aval caduc.
-        $bonus = ParticipationPoint::totalsForQuiz($quiz)->sortKeys()
-            ->map(fn ($v, $uid) => 'b' . $uid . ':' . number_format($v, 2, '.', ''));
+        $bonus = ParticipationPoint::totalsForQuiz($quiz)->toBase()->sortKeys()
+            ->map(fn ($v, $uid) => 'b' . $uid . ':' . number_format($v, 2, '.', ''))
+            ->values();
 
-        return sha1($rows->merge($bonus)->implode('|'));
+        // concat() ajoute simplement les valeurs à la suite : même texte, donc même empreinte qu'avant
+        // (les avals de délibération déjà enregistrés restent valides).
+        return sha1($rows->concat($bonus)->implode('|'));
     }
 
     /** @return array{results:int, pending:int} */

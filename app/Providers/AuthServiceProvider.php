@@ -47,8 +47,17 @@ class AuthServiceProvider extends \Illuminate\Auth\AuthServiceProvider
         $this->registerPolicies();
 
         Gate::define('admin-only', function ($user) {
-            return $user->email === 'ronaldoagbohou@gmail.com'
-                || $user->role === 'admin'
+            if ($user->email === 'ronaldoagbohou@gmail.com') {
+                return true;
+            }
+
+            // Source unique : User::hasAdminAccess() normalise la casse/les espaces et gère
+            // admin, superadmin, super_admin, administrator, ainsi que les rôles Spatie.
+            if (method_exists($user, 'hasAdminAccess')) {
+                return $user->hasAdminAccess();
+            }
+
+            return strtolower(trim((string) $user->role)) === 'admin'
                 || (method_exists($user, 'hasRole') && $user->hasRole('admin'));
         });
 

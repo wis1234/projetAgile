@@ -28,7 +28,7 @@ class UserPolicy
      */
     public function create(User $user): bool
     {
-        return $user->role === 'admin' || (method_exists($user, 'hasRole') && $user->hasRole('admin'));
+        return $user->hasAdminAccess();
     }
 
     /**
@@ -49,8 +49,7 @@ class UserPolicy
      */
     public function delete(User $user, User $model): bool
     {
-        $isAdmin = $user->role === 'admin' || $user->hasRole('admin');
-        return $isAdmin && $user->id !== $model->id;
+        return $user->hasAdminAccess() && $user->id !== $model->id;
     }
 
     /**

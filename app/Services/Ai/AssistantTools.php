@@ -233,7 +233,7 @@ class AssistantTools
 
     private function isAdmin(): bool
     {
-        return $this->user->hasRole('admin') || $this->user->role === 'admin';
+        return $this->user->hasAdminAccess();
     }
 
     /** Projets accessibles (non muté). */

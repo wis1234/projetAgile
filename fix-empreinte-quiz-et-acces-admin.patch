@@ -1,0 +1,213 @@
+diff --git a/app/Http/Controllers/UserController.php b/app/Http/Controllers/UserController.php
+index e110e86..f0ee2be 100644
+--- a/app/Http/Controllers/UserController.php
++++ b/app/Http/Controllers/UserController.php
+@@ -180,7 +180,7 @@ private function canAssignRoles(?User $u): bool
+     private function presentUser(User $user, User $viewer): array
+     {
+         $isSelf = $viewer->id === $user->id;
+-        $isAdmin = $viewer->hasRole('admin') || $viewer->role === 'admin';
++        $isAdmin = $viewer->hasAdminAccess();
+         $canManage = Gate::forUser($viewer)->allows('admin-only'); // même règle que les routes /users/*/edit, destroy…
+         $canSeePrivate = $isSelf || $isAdmin;
+ 
+@@ -327,7 +327,7 @@ public function update(Request $request, string $id)
+         }
+         
+         $actor = Auth::user();
+-        $actorIsAdmin = $actor->hasRole('admin') || $actor->role === 'admin';
++        $actorIsAdmin = $actor->hasAdminAccess();
+ 
+         $validated = $request->validate([
+             'name' => 'required|string|max:255',
+diff --git a/app/Models/Quiz.php b/app/Models/Quiz.php
+index 7b73057..28d6ab4 100644
+--- a/app/Models/Quiz.php
++++ b/app/Models/Quiz.php
+@@ -142,7 +142,7 @@ public function hasCompletedAttempts(): bool
+      */
+     public function deciders(): Collection
+     {
+-        $managers = $this->project->managers()->get();
++        $managers = $this->project->managers()->get()->toBase();
+ 
+         if ($managers->isNotEmpty()) {
+             return $managers;
+diff --git a/app/Policies/UserPolicy.php b/app/Policies/UserPolicy.php
+index ac8c449..0a3cf64 100644
+--- a/app/Policies/UserPolicy.php
++++ b/app/Policies/UserPolicy.php
+@@ -28,7 +28,7 @@ public function view(User $user, User $model): bool
+      */
+     public function create(User $user): bool
+     {
+-        return $user->role === 'admin' || (method_exists($user, 'hasRole') && $user->hasRole('admin'));
++        return $user->hasAdminAccess();
+     }
+ 
+     /**
+@@ -49,8 +49,7 @@ public function update(User $user, User $model): bool
+      */
+     public function delete(User $user, User $model): bool
+     {
+-        $isAdmin = $user->role === 'admin' || $user->hasRole('admin');
+-        return $isAdmin && $user->id !== $model->id;
++        return $user->hasAdminAccess() && $user->id !== $model->id;
+     }
+ 
+     /**
+diff --git a/app/Providers/AuthServiceProvider.php b/app/Providers/AuthServiceProvider.php
+index 041a1ff..7b2b8f9 100644
+--- a/app/Providers/AuthServiceProvider.php
++++ b/app/Providers/AuthServiceProvider.php
+@@ -47,8 +47,17 @@ public function boot()
+         $this->registerPolicies();
+ 
+         Gate::define('admin-only', function ($user) {
+-            return $user->email === 'ronaldoagbohou@gmail.com'
+-                || $user->role === 'admin'
++            if ($user->email === 'ronaldoagbohou@gmail.com') {
++                return true;
++            }
++
++            // Source unique : User::hasAdminAccess() normalise la casse/les espaces et gère
++            // admin, superadmin, super_admin, administrator, ainsi que les rôles Spatie.
++            if (method_exists($user, 'hasAdminAccess')) {
++                return $user->hasAdminAccess();
++            }
++
++            return strtolower(trim((string) $user->role)) === 'admin'
+                 || (method_exists($user, 'hasRole') && $user->hasRole('admin'));
+         });
+ 
+diff --git a/app/Services/Ai/AssistantTools.php b/app/Services/Ai/AssistantTools.php
+index 7fdfb23..5a6def6 100644
+--- a/app/Services/Ai/AssistantTools.php
++++ b/app/Services/Ai/AssistantTools.php
+@@ -233,7 +233,7 @@ private function wrap(array $result, ?array $action = null): array
+ 
+     private function isAdmin(): bool
+     {
+-        return $this->user->hasRole('admin') || $this->user->role === 'admin';
++        return $this->user->hasAdminAccess();
+     }
+ 
+     /** Projets accessibles (non muté). */
+diff --git a/app/Services/Quiz/QuizDeliberationService.php b/app/Services/Quiz/QuizDeliberationService.php
+index 6adc300..dde9351 100644
+--- a/app/Services/Quiz/QuizDeliberationService.php
++++ b/app/Services/Quiz/QuizDeliberationService.php
+@@ -29,14 +29,20 @@ public function fingerprint(Quiz $quiz): string
+         $rows = QuizResult::where('quiz_id', $quiz->id)
+             ->orderBy('id')
+             ->get(['id', 'score', 'score_exact', 'grading_status'])
++            // Collection de base AVANT map() : une Eloquent\Collection vide (aucun résultat) le reste après map(), et son
++            // merge() appelle getKey() sur chaque élément fusionné -> « getKey() on string » avec les bonus (chaînes).
++            ->toBase()
+             ->map(fn ($r) => $r->id . ':' . number_format($r->exactScore(), 2, '.', '') . ':' . $r->grading_status);
+ 
+         // Le bonus de participation modifie la note finale : il fait partie de l'empreinte,
+         // donc l'ajouter ou le retirer après un aval rend cet aval caduc.
+-        $bonus = ParticipationPoint::totalsForQuiz($quiz)->sortKeys()
+-            ->map(fn ($v, $uid) => 'b' . $uid . ':' . number_format($v, 2, '.', ''));
++        $bonus = ParticipationPoint::totalsForQuiz($quiz)->toBase()->sortKeys()
++            ->map(fn ($v, $uid) => 'b' . $uid . ':' . number_format($v, 2, '.', ''))
++            ->values();
+ 
+-        return sha1($rows->merge($bonus)->implode('|'));
++        // concat() ajoute simplement les valeurs à la suite : même texte, donc même empreinte qu'avant
++        // (les avals de délibération déjà enregistrés restent valides).
++        return sha1($rows->concat($bonus)->implode('|'));
+     }
+ 
+     /** @return array{results:int, pending:int} */
+diff --git a/tests/Feature/Quiz/QuizFingerprintTest.php b/tests/Feature/Quiz/QuizFingerprintTest.php
+new file mode 100644
+index 0000000..b5e4c37
+--- /dev/null
++++ b/tests/Feature/Quiz/QuizFingerprintTest.php
+@@ -0,0 +1,84 @@
++<?php
++
++namespace Tests\Feature\Quiz;
++
++use App\Models\ParticipationPoint;
++use App\Models\User;
++use App\Services\Quiz\QuizDeliberationService;
++use Illuminate\Database\Eloquent\Collection as EloquentCollection;
++use Illuminate\Support\Facades\Gate;
++
++/**
++ * Régressions : « Call to a member function getKey() on string » (empreinte de délibération)
++ * et accès 403 à l'administration pour les variantes de rôle administrateur.
++ */
++class QuizFingerprintTest extends QuizHttpTestCase
++{
++    private function quiz()
++    {
++        return $this->makeQuiz([
++            ['question_text' => 'Q1', 'question_type' => 'qcm', 'option_a' => 'A', 'option_b' => 'B', 'option_c' => 'C', 'option_d' => 'D', 'correct_answer' => 1],
++        ]);
++    }
++
++    public function test_fingerprint_works_on_a_quiz_without_any_result(): void
++    {
++        $fp = app(QuizDeliberationService::class)->fingerprint($this->quiz());
++
++        $this->assertSame(40, strlen($fp));
++    }
++
++    public function test_fingerprint_works_with_participation_bonus_and_no_result(): void
++    {
++        // Cas qui plantait : aucune copie (Eloquent\Collection vide) + bonus de participation (chaînes)
++        $quiz = $this->quiz();
++        ParticipationPoint::create([
++            'project_id' => $this->project->id, 'quiz_id' => $quiz->id, 'user_id' => $this->candidate->id,
++            'awarded_by' => $this->manager1->id, 'points' => 2, 'awarded_on' => now()->toDateString(),
++        ]);
++
++        $service = app(QuizDeliberationService::class);
++        $with = $service->fingerprint($quiz);
++
++        $this->assertSame(40, strlen($with));
++        $this->assertSame($with, $service->fingerprint($quiz), 'L\'empreinte doit être stable.');
++    }
++
++    public function test_fingerprint_changes_when_a_bonus_is_added(): void
++    {
++        $quiz = $this->quiz();
++        $service = app(QuizDeliberationService::class);
++        $before = $service->fingerprint($quiz);
++
++        ParticipationPoint::create([
++            'project_id' => $this->project->id, 'quiz_id' => $quiz->id, 'user_id' => $this->candidate->id,
++            'awarded_by' => $this->manager1->id, 'points' => 1.5, 'awarded_on' => now()->toDateString(),
++        ]);
++
++        $this->assertNotSame($before, $service->fingerprint($quiz));
++    }
++
++    public function test_deciders_is_a_plain_collection(): void
++    {
++        $deciders = $this->quiz()->deciders();
++
++        $this->assertNotInstanceOf(EloquentCollection::class, $deciders);
++        $this->assertTrue($deciders->contains('id', $this->manager1->id));
++    }
++
++    public function test_admin_gate_accepts_every_admin_role_variant(): void
++    {
++        foreach (['admin', ' Admin ', 'SUPERADMIN', 'super_admin', 'Administrator'] as $role) {
++            $user = User::factory()->create(['role' => $role]);
++            $this->assertTrue(Gate::forUser($user)->allows('admin-only'), "Le rôle « {$role} » doit être reconnu administrateur.");
++        }
++    }
++
++    public function test_admin_gate_refuses_regular_users(): void
++    {
++        foreach (['user', 'manager', 'member', ''] as $role) {
++            $user = User::factory()->create(['role' => $role]);
++            $this->assertFalse(Gate::forUser($user)->allows('admin-only'), "Le rôle « {$role} » ne doit pas être administrateur.");
++        }
++    }
++}
