@@ -72,6 +72,7 @@ class QuizGradingController extends Controller
             'readOnly' => $readOnly,
             'maxScore' => QuizScoringService::writtenMax(),
             'lockTtl' => (int) config('quiz.lock_ttl_minutes', 10),
+            'ai' => $readOnly ? ['available' => false, 'reason' => 'Résultats validés : correction verrouillée.'] : app(QuizAiGradingController::class)->capability(),
         ]);
     }
 
@@ -157,6 +158,11 @@ class QuizGradingController extends Controller
                     'score' => $r->grading_status === 'graded' ? $r->score : null,
                     'comment' => $r->admin_comments,
                     'status' => $r->grading_status,
+                    'ai' => $r->ai_graded ? [
+                        'confidence' => $r->ai_confidence,
+                        'note' => $r->ai_note,
+                        'review' => ($r->ai_confidence !== null && $r->ai_confidence < 60) || filled($r->ai_note),
+                    ] : null,
                 ];
             });
 

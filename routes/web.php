@@ -344,6 +344,7 @@ Route::middleware('auth')->group(function () {
         // Espace de correction des copies
         Route::get('/{quiz}/grading', [\App\Http\Controllers\QuizGradingController::class, 'index'])->name('grading');
         Route::post('/{quiz}/grading/{attempt}', [\App\Http\Controllers\QuizGradingController::class, 'save'])->name('grading.save');
+        Route::post('/{quiz}/grading/{attempt}/ai', [\App\Http\Controllers\QuizAiGradingController::class, 'grade'])->middleware('throttle:60,1')->name('grading.ai');
         Route::post('/{quiz}/grading/{attempt}/release', [\App\Http\Controllers\QuizGradingController::class, 'release'])->name('grading.release');
         Route::post('/{quiz}/grading/{attempt}/heartbeat', [\App\Http\Controllers\QuizGradingController::class, 'heartbeat'])->name('grading.heartbeat');
 

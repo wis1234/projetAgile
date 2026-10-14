@@ -41,7 +41,7 @@ class QuizGradingService
             ->with([
                 'user:id,name,profile_photo_path',
                 'locker:id,name',
-                'responses:id,attempt_id,grading_status,score',
+                'responses:id,attempt_id,grading_status,score,ai_graded,ai_confidence,ai_note',
             ])
             ->orderBy('completed_at')
             ->orderBy('id')
@@ -70,6 +70,9 @@ class QuizGradingService
                 'points_max' => $total * $max,
                 'submitted_at' => optional($a->completed_at)->toIso8601String(),
                 'cheating_count' => is_array($a->cheating_logs) ? count($a->cheating_logs) : 0,
+                // Corrigée par l'IA ? (et à relire : confiance faible ou remarque interne)
+                'ai_graded' => $total > 0 && $a->responses->every(fn ($r) => (bool) $r->ai_graded),
+                'ai_review' => $a->responses->contains(fn ($r) => $r->ai_graded && (($r->ai_confidence !== null && $r->ai_confidence < 60) || filled($r->ai_note))),
             ];
         })->values();
 

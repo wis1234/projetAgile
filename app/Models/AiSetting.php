@@ -10,6 +10,7 @@ class AiSetting extends Model
         'enabled', 'daily_limit', 'max_tokens', 'timeout', 'provider_order', 'enabled_providers',
         'max_steps', 'max_message_chars', 'voice_enabled', 'voice_daily_limit',
         'files_read_enabled', 'files_write_enabled', 'members_manage_enabled', 'reports_enabled',
+        'quiz_grading_enabled', 'quiz_grading_daily_limit',
         'custom_instructions', 'retention_days',
     ];
 
@@ -20,6 +21,7 @@ class AiSetting extends Model
         'files_write_enabled' => 'boolean',
         'members_manage_enabled' => 'boolean',
         'reports_enabled' => 'boolean',
+        'quiz_grading_enabled' => 'boolean',
         'provider_order' => 'array',
         'enabled_providers' => 'array',
     ];

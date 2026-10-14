@@ -100,6 +100,27 @@ class AiSettingsService
         ];
     }
 
+    public function quizGradingEnabled(): bool
+    {
+        return (bool) ($this->global()->quiz_grading_enabled ?? true);
+    }
+
+    public function quizGradingLimit(): int
+    {
+        return max(0, (int) ($this->global()->quiz_grading_daily_limit ?? 300));
+    }
+
+    /** Copies déjà corrigées par l'IA aujourd'hui (réussies) par cet utilisateur. */
+    public function gradingUsedToday(User $user): int
+    {
+        return $this->usedToday($user, 'grading');
+    }
+
+    public function gradingRemainingFor(User $user): int
+    {
+        return max(0, $this->quizGradingLimit() - $this->gradingUsedToday($user));
+    }
+
     public function customInstructions(): string
     {
         return trim((string) ($this->global()->custom_instructions ?? ''));

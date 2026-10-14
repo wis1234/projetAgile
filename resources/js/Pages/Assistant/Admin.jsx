@@ -375,6 +375,7 @@ export default function AssistantAdmin({ settings: initialSettings, providers: i
               <Kpi icon={FaCoins} tone="cyan" label="Jetons consommés" value={compact(t.tokens_in + t.tokens_out)} hint={`${compact(t.tokens_in)} entrée · ${compact(t.tokens_out)} sortie`} />
               <Kpi icon={FaMicrophone} tone="rose" label="Dictées vocales" value={t.voice} hint={`${t.via_voice} message(s) dicté(s)`} />
               <Kpi icon={FaBolt} tone="amber" label="Bascules" value={t.fallbacks} hint="secours automatiques" />
+              <Kpi icon={FaFileAlt} tone="violet" label="Copies corrigées par l’IA" value={t.graded_copies || 0} hint="espace de correction" />
               <Kpi icon={FaExclamationTriangle} tone="rose" label="Bloquées (quota)" value={t.blocked} hint="limite quotidienne" />
             </div>
 
@@ -493,6 +494,8 @@ export default function AssistantAdmin({ settings: initialSettings, providers: i
                 <Row title="Écrire dans le suivi des tâches" hint="Ajout de notes datées dans le fichier de suivi (version restaurable)."><Toggle checked={settings.files_write_enabled} onChange={(v) => set('files_write_enabled', v)} label="Écrire dans les fichiers" /></Row>
                 <Row title="Gérer les membres" hint="Ajouter, changer le rôle, retirer (avec confirmation)."><Toggle checked={settings.members_manage_enabled} onChange={(v) => set('members_manage_enabled', v)} label="Gérer les membres" /></Row>
                 <Row title="Rapports d’activité" hint="Bilans par équipe, projet ou personne."><Toggle checked={settings.reports_enabled} onChange={(v) => set('reports_enabled', v)} label="Rapports" /></Row>
+                <Row title="Corriger les copies d’examen" hint="Bouton « Corriger avec l’IA » dans l’espace de correction des quiz (notes + commentaires, relecture humaine possible)."><Toggle checked={settings.quiz_grading_enabled} onChange={(v) => set('quiz_grading_enabled', v)} label="Correction des copies" /></Row>
+                <Row title="Copies corrigées par jour" hint="Par correcteur."><input type="number" min="0" max="5000" value={settings.quiz_grading_daily_limit} onChange={(e) => set('quiz_grading_daily_limit', Number(e.target.value))} className={numInput} /></Row>
                 <Row title="Messages vocaux" hint="Dictée transcrite en texte."><Toggle checked={settings.voice_enabled} onChange={(v) => set('voice_enabled', v)} label="Messages vocaux" /></Row>
                 <Row title="Dictées par jour" hint="Par utilisateur."><input type="number" min="0" max="5000" value={settings.voice_daily_limit} onChange={(e) => set('voice_daily_limit', Number(e.target.value))} className={numInput} /></Row>
               </div>

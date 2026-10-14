@@ -22,9 +22,14 @@ class QuizResponse extends Model
         'score',
         'admin_comments',
         'graded_by',
+        'ai_graded',
+        'ai_confidence',
+        'ai_note',
+        'ai_model',
     ];
 
     protected $casts = [
+        'ai_graded' => 'boolean',
         'score' => 'integer',
     ];
 

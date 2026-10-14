@@ -20,6 +20,7 @@ class QuizQuestion extends Model
         'option_c',
         'option_d',
         'correct_answer',
+        'ai_rubric',
         'order',
     ];
 

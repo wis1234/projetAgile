@@ -5,6 +5,8 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import Avatar from '@/Components/Quiz/Avatar';
 import QuizModal from '@/Components/Quiz/QuizModal';
 import { fmtNumber } from '@/Components/Quiz/ScoreBadge';
+import { AiGradeBar, AiBatchModal, AiBadge } from '@/Components/Quiz/AiGrading';
+import { HiSparkles } from 'react-icons/hi2';
 import {
   FaArrowLeft, FaCheckCircle, FaClock, FaLock, FaSearch, FaEyeSlash, FaEye, FaForward, FaSave, FaSpinner,
   FaListUl, FaTimes, FaExclamationTriangle, FaUserSecret, FaPenFancy, FaCheck, FaSyncAlt, FaCalendarAlt, FaStopwatch,
@@ -127,6 +129,11 @@ function CopyList({ copies, currentId, anonymous, onOpen, onClose }) {
                   <span className="inline-flex flex-col items-end text-emerald-600 dark:text-emerald-400">
                     <FaCheckCircle />
                     <span className="text-[10px] font-bold">{fmtNumber(c.points, 1)}/{c.points_max}</span>
+                    {c.ai_graded && (
+                      <span className={`mt-0.5 inline-flex items-center gap-0.5 rounded-full px-1.5 text-[9px] font-bold ${c.ai_review ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-700'}`} title={c.ai_review ? 'Corrigée par l\'IA : à relire' : 'Corrigée par l\'IA'}>
+                        <HiSparkles /> {c.ai_review ? 'à relire' : 'IA'}
+                      </span>
+                    )}
                   </span>
                 )}
                 {c.status === 'pending' && (
@@ -194,7 +201,7 @@ function ScorePicker({ value, max, onChange, invalid, disabled }) {
   );
 }
 
-function GradingForm({ current, project, quiz, maxScore, exclude, readOnly, anonymous, onLost }) {
+function GradingForm({ current, project, quiz, maxScore, exclude, readOnly, anonymous, onLost, ai }) {
   const storageKey = `proja:grading:${quiz.id}:${current.id}`;
   const handled = useRef(false);
 
@@ -216,7 +223,33 @@ function GradingForm({ current, project, quiz, maxScore, exclude, readOnly, anon
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [aiMeta, setAiMeta] = useState({}); // métadonnées des notes proposées par l'IA (non enregistrées) : confiance, remarque
   const topRef = useRef(null);
+
+  // « Proposer sans enregistrer » : on remplit le formulaire, le correcteur relit puis enregistre lui-même
+  const applyProposal = (data) => {
+    setGrades((g) => {
+      const next = { ...g };
+      data.grades.forEach((x) => { next[x.response_id] = { score: x.score, comment: x.comment }; });
+      return next;
+    });
+    setAiMeta(Object.fromEntries(data.grades.map((x) => [x.response_id, { confidence: x.confidence, note: x.note, review: x.review }])));
+    setErrors({});
+    topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // « Corriger avec l'IA » : la copie est déjà notée ET enregistrée côté serveur (verrou libéré) → copie suivante
+  const onAiApplied = (data) => {
+    handled.current = true;
+    try {
+      localStorage.removeItem(storageKey);
+      sessionStorage.setItem('proja:grading:aiLast', JSON.stringify({
+        id: current.id, reference: current.reference, name: current.candidate.name,
+        total: data.summary.total, max: data.summary.max, review: data.summary.review_count, at: Date.now(),
+      }));
+    } catch { /* noop */ }
+    router.get(route('projects.quizzes.grading', [project.id, quiz.id]), { exclude }, { preserveState: false, preserveScroll: false });
+  };
 
   // Brouillon local : une coupure réseau ou une fermeture d'onglet ne fait pas perdre le travail en cours.
   useEffect(() => {
@@ -362,6 +395,10 @@ function GradingForm({ current, project, quiz, maxScore, exclude, readOnly, anon
         )}
       </div>
 
+      {!readOnly && ai?.available && (
+        <AiGradeBar ai={ai} project={project} quiz={quiz} current={current} maxScore={maxScore} onPropose={applyProposal} onApplied={onAiApplied} />
+      )}
+
       {/* Questions */}
       {current.responses.map((r) => {
         const g = grades[r.id] || { score: null, comment: '' };
@@ -377,6 +414,7 @@ function GradingForm({ current, project, quiz, maxScore, exclude, readOnly, anon
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-300">Question {r.question_number} · écrite</span>
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white mt-0.5">{r.question_text}</h3>
+                <AiBadge ai={aiMeta[r.id] || r.ai} />
               </div>
               <span className="text-[11px] text-gray-400 whitespace-nowrap">{r.word_count} mot(s)</span>
             </div>
@@ -470,12 +508,20 @@ function GradingForm({ current, project, quiz, maxScore, exclude, readOnly, anon
 
 /* ───────────────────────── Page ───────────────────────── */
 
-function Grading({ project, quiz, copies = [], stats, current, blocked, exclude = [], allDone, waitingOthers, skippedAll, readOnly, maxScore }) {
+function Grading({ project, quiz, copies = [], stats, current, blocked, exclude = [], allDone, waitingOthers, skippedAll, readOnly, maxScore, ai }) {
   const [anonymous, setAnonymous] = useState(() => {
     try { return localStorage.getItem('proja:grading:anonymous') === '1'; } catch { return false; }
   });
   const [drawer, setDrawer] = useState(false);
   const [lost, setLost] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [aiLast, setAiLast] = useState(() => {
+    try {
+      const v = JSON.parse(sessionStorage.getItem('proja:grading:aiLast') || 'null');
+      sessionStorage.removeItem('proja:grading:aiLast');
+      return v && Date.now() - v.at < 120000 ? v : null;
+    } catch { return null; }
+  });
 
   const toggleAnonymous = () => {
     setAnonymous((a) => {
@@ -513,6 +559,17 @@ function Grading({ project, quiz, copies = [], stats, current, blocked, exclude 
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-4 sm:py-6">
+      {ai?.available && (
+        <AiBatchModal
+          open={batchOpen}
+          onClose={() => setBatchOpen(false)}
+          ai={ai}
+          project={project}
+          quiz={quiz}
+          copies={copies}
+          onDone={() => router.reload({ preserveScroll: true })}
+        />
+      )}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-4">
         {/* Barre supérieure */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5">
@@ -549,6 +606,15 @@ function Grading({ project, quiz, copies = [], stats, current, blocked, exclude 
             </div>
 
             <div className="flex items-center gap-2">
+              {!readOnly && ai?.available && (
+                <button
+                  onClick={() => setBatchOpen(true)}
+                  title="L'IA corrige toutes les copies restantes, une par une"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm hover:from-purple-700 hover:to-indigo-700"
+                >
+                  <HiSparkles /> <span className="hidden sm:inline">Corriger toutes les copies</span><span className="sm:hidden">Tout corriger</span>
+                </button>
+              )}
               <button
                 onClick={toggleAnonymous}
                 title="Masque le nom des candidats pour corriger sans a priori"
@@ -569,6 +635,15 @@ function Grading({ project, quiz, copies = [], stats, current, blocked, exclude 
             </div>
           </div>
         </div>
+
+        {aiLast && (
+          <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-sm text-purple-900 dark:text-purple-100 flex flex-wrap items-center gap-2">
+            <HiSparkles className="text-purple-600" />
+            <span>Copie <strong>{aiLast.reference}</strong> corrigée par l&apos;IA : <strong>{aiLast.total}/{aiLast.max}</strong>{aiLast.review > 0 && <> · <span className="font-semibold text-amber-700 dark:text-amber-300">{aiLast.review} question(s) à relire</span></>}.</span>
+            <button onClick={() => { goto(aiLast.id); setAiLast(null); }} className="ml-auto px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-bold">Relire cette copie</button>
+            <button onClick={() => setAiLast(null)} aria-label="Fermer" className="p-1.5 text-purple-500"><FaTimes /></button>
+          </div>
+        )}
 
         {lost && (
           <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200 flex flex-wrap items-center gap-3">
@@ -596,6 +671,7 @@ function Grading({ project, quiz, copies = [], stats, current, blocked, exclude 
                 readOnly={readOnly}
                 anonymous={anonymous}
                                 onLost={() => setLost(true)}
+                ai={ai}
               />
             ) : blocked === 'locked' ? (
               <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-10 text-center space-y-3">
