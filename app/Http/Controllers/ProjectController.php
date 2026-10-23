@@ -226,7 +226,7 @@ class ProjectController extends Controller
 
         // Tâches paginées
         $tasks = $project->tasks()
-                        ->with(['assignedUser', 'sprint'])
+                        ->with(['assignedUser', 'assignedUsers:id,name,email,profile_photo_path', 'sprint'])
                         ->orderBy('created_at', 'desc')
                         ->paginate(10);
 

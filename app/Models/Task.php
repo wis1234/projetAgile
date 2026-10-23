@@ -18,6 +18,7 @@ class Task extends Model
     protected $fillable = [
         'title',
         'description',
+        'type',
         'due_date',
         'status',
         'priority',
@@ -33,6 +34,8 @@ class Task extends Model
         'submitted_at',
         'deliverable_id',
         'validator_id',
+        'deadline_notification_sent_at',
+        'reminders_sent',
     ];
 
     protected $dates = [
@@ -50,7 +53,13 @@ class Task extends Model
         'amount' => 'decimal:2',
         'paid_at' => 'datetime',
         'submitted_at' => 'datetime',
+        'deadline_notification_sent_at' => 'datetime',
+        'reminders_sent' => 'array',
     ];
+
+    // Task type constants
+    const TYPE_INDIVIDUAL = 'individual';
+    const TYPE_GROUP = 'group';
 
     // Payment status constants
     const PAYMENT_STATUS_UNPAID = 'unpaid';
@@ -146,24 +155,69 @@ class Task extends Model
     }
     
     /**
-     * Get the user assigned to the task.
+     * Get the users assigned to the task (many-to-many pivot for group tasks).
      */
     public function assignedUsers()
     {
-        return $this->belongsTo(User::class, 'assigned_to')->withDefault();
+        return $this->belongsToMany(User::class, 'task_user')->withTimestamps();
+    }
+
+    public function isGroup(): bool
+    {
+        return ($this->type ?? self::TYPE_INDIVIDUAL) === self::TYPE_GROUP;
+    }
+
+    public function isIndividual(): bool
+    {
+        return ($this->type ?? self::TYPE_INDIVIDUAL) !== self::TYPE_GROUP;
+    }
+
+    /**
+     * Obtenir tous les utilisateurs assignés comme destinataires (Individuel ou Groupe).
+     */
+    public function getAssignedRecipients()
+    {
+        if ($this->isGroup()) {
+            $users = $this->relationLoaded('assignedUsers') ? $this->assignedUsers : $this->assignedUsers()->get();
+            if ($users->isNotEmpty()) {
+                return $users;
+            }
+        }
+
+        if ($this->assignedUser) {
+            return collect([$this->assignedUser]);
+        }
+
+        if ($this->assigned_to) {
+            $user = User::find($this->assigned_to);
+            if ($user) {
+                return collect([$user]);
+            }
+        }
+
+        $users = $this->relationLoaded('assignedUsers') ? $this->assignedUsers : $this->assignedUsers()->get();
+        return $users->isNotEmpty() ? $users : collect();
     }
 
     public function isAssignedTo(User $user): bool
-{
-    $assigned = $this->assignedUsers;
+    {
+        if ($this->isGroup()) {
+            if ($this->relationLoaded('assignedUsers')) {
+                return $this->assignedUsers->contains('id', $user->id);
+            }
+            return $this->assignedUsers()->where('users.id', $user->id)->exists();
+        }
 
-    if ($assigned instanceof Collection) {
-        return $assigned->contains('id', $user->id);
+        if ((int) $this->assigned_to === (int) $user->id) {
+            return true;
+        }
+
+        if ($this->relationLoaded('assignedUsers')) {
+            return $this->assignedUsers->contains('id', $user->id);
+        }
+
+        return $this->assignedUsers()->where('users.id', $user->id)->exists();
     }
-
-    // Un seul modèle (belongsTo / hasOne) ou null
-    return $assigned !== null && $assigned->id === $user->id;
-}
 
 /**
  * Dernier message posté dans la tâche (commentaire racine OU réponse),

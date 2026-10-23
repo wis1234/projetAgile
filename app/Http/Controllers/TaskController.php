@@ -36,6 +36,7 @@ class TaskController extends Controller
 
         $query = Task::with([
             'assignedUser',
+            'assignedUsers:id,name,email,profile_photo_path',
             'project' => function($p) use ($user) {
                 $p->with(['users' => function($q) use ($user) {
                     $q->where('user_id', $user->id);
@@ -85,7 +86,11 @@ class TaskController extends Controller
         }
 
         if ($request->filled('assigned_to')) {
-            $query->where('assigned_to', $request->assigned_to);
+            $assignedId = $request->assigned_to;
+            $query->where(function ($q) use ($assignedId) {
+                $q->where('assigned_to', $assignedId)
+                  ->orWhereHas('assignedUsers', fn ($q2) => $q2->where('users.id', $assignedId));
+            });
         }
 
         if ($request->filled('due_from')) {
@@ -94,6 +99,10 @@ class TaskController extends Controller
 
         if ($request->filled('due_to')) {
             $query->whereDate('due_date', '<=', $request->due_to);
+        }
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
         }
 
         $summaryQuery = clone $query;
@@ -109,7 +118,10 @@ class TaskController extends Controller
                 ->count(),
         ];
 
-        $myTasksSummaryQuery = (clone $query)->where('assigned_to', $user->id);
+        $myTasksSummaryQuery = (clone $query)->where(function ($q) use ($user) {
+            $q->where('assigned_to', $user->id)
+              ->orWhereHas('assignedUsers', fn ($q2) => $q2->where('users.id', $user->id));
+        });
         $myTasksSummary = [
             'total' => (clone $myTasksSummaryQuery)->count(),
             'todo' => (clone $myTasksSummaryQuery)->where('status', 'todo')->count(),
@@ -221,14 +233,14 @@ class TaskController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'tasks' => $tasks,
-                'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to', 'overdue']),
+                'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to', 'overdue', 'type']),
                 'summary' => $summary,
             ]);
         }
 
         return Inertia::render('Tasks/Index', [
             'tasks' => $tasks,
-            'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to', 'overdue']),
+            'filters' => $request->only(['search', 'status', 'priority', 'project_id', 'assigned_to', 'due_from', 'due_to', 'overdue', 'type']),
             'summary' => $summary,
             'myTasksSummary' => $myTasksSummary,
             'userStats' => $userStats,
@@ -248,8 +260,8 @@ public function create(Request $request)
 
     $currentUser = auth()->user();
     $projects = $currentUser->hasRole('admin')
-        ? Project::with(['users:id,name'])->get(['id', 'name'])
-        : $currentUser->projects()->with(['users:id,name'])->wherePivot('role', 'manager')->get(['projects.id', 'projects.name']);
+        ? Project::with(['users:id,name,email,profile_photo_path'])->get(['id', 'name'])
+        : $currentUser->projects()->with(['users:id,name,email,profile_photo_path'])->wherePivot('role', 'manager')->get(['projects.id', 'projects.name']);
     $sprints = Sprint::whereIn('project_id', $projects->pluck('id'))->get();
 
     // Présélection du projet si l'on arrive depuis la page show d'un projet
@@ -277,12 +289,15 @@ public function store(Request $request)
     $validated = $request->validate([
         'title' => 'required|string|max:255',
         'description' => 'nullable|string',
+        'type' => 'nullable|string|in:individual,group',
         'status' => 'required|string|in:todo,in_progress,done',
         'priority' => 'required|string|in:low,medium,high',
         'due_date' => ['nullable', 'date_format:Y-m-d H:i:s'],
         'project_id' => 'required|exists:projects,id',
         'sprint_id' => 'required|exists:sprints,id',
         'assigned_to' => 'nullable|exists:users,id',
+        'assigned_user_ids' => 'nullable|array',
+        'assigned_user_ids.*' => 'exists:users,id',
         'is_paid' => 'boolean',
         'payment_reason' => 'required_if:is_paid,false|nullable|string|in:' . implode(',', [
             \App\Models\Task::REASON_VOLUNTEER,
@@ -291,6 +306,22 @@ public function store(Request $request)
         ]),
         'amount' => 'required_if:is_paid,true|nullable|numeric|min:0',
     ]);
+
+    $taskType = $request->input('type', \App\Models\Task::TYPE_INDIVIDUAL);
+    if (!in_array($taskType, [\App\Models\Task::TYPE_INDIVIDUAL, \App\Models\Task::TYPE_GROUP])) {
+        $taskType = \App\Models\Task::TYPE_INDIVIDUAL;
+    }
+    $validated['type'] = $taskType;
+
+    $assignedUserIds = [];
+    if ($taskType === \App\Models\Task::TYPE_GROUP) {
+        $assignedUserIds = array_values(array_filter((array) $request->input('assigned_user_ids', [])));
+        $validated['assigned_to'] = !empty($assignedUserIds) ? $assignedUserIds[0] : null;
+    } else {
+        if (!empty($validated['assigned_to'])) {
+            $assignedUserIds = [(int) $validated['assigned_to']];
+        }
+    }
 
     $validated['created_by'] = auth()->id();
     $validated['payment_status'] = $validated['is_paid'] ?
@@ -305,6 +336,10 @@ public function store(Request $request)
     }
 
     $task = Task::create($validated);
+
+    if (!empty($assignedUserIds)) {
+        $task->assignedUsers()->sync($assignedUserIds);
+    }
 
     activity_log('create', "Tâche « {$task->title} » créée", $task);
 
@@ -415,25 +450,23 @@ HTML;
             'uploaded_by' => auth()->id(),
         ]);
 
-        // Si la tâche est assignée à quelqu'un, envoyer les notifications
-        if ($task->assigned_to) {
-            $assignedUser = \App\Models\User::find($task->assigned_to);
-            if ($assignedUser) {
+        // Si la tâche est assignée à quelqu'un, envoyer les notifications à tous les membres assignés
+        $recipients = $task->getAssignedRecipients();
+        foreach ($recipients as $assignedUser) {
+            // Email existant
+            $assignedUser->notify(
+                new TaskAssignedNotification($task)
+            );
 
-                // Email existant
-                $assignedUser->notify(
-                    new TaskAssignedNotification($task)
-                );
-
-                // Web Push + database
-                $assignedUser->notify(
-                    new ProjaNotification(
-                        'Nouvelle tâche assignée',
-                        'La tâche "'.$task->title.'" vous a été assignée.',
-                        '/tasks/'.$task->id
-                    )
-                );
-            }
+            // Web Push + database
+            $notifTitle = $task->isGroup() ? '👥 Nouvelle tâche de groupe assignée' : 'Nouvelle tâche assignée';
+            $assignedUser->notify(
+                new ProjaNotification(
+                    $notifTitle,
+                    'La tâche "'.$task->title.'" vous a été assignée.',
+                    '/tasks/'.$task->id
+                )
+            );
         }
     }
 
@@ -527,11 +560,12 @@ HTML;
         // Charger les relations nécessaires avec les rôles
         $task->load([
             'project.users' => function($query) {
-                $query->select('users.id', 'users.name', 'users.email')
+                $query->select('users.id', 'users.name', 'users.email', 'users.profile_photo_path')
                       ->withPivot('role');
             },
             'sprint',
-            'assignedUser',
+            'assignedUser:id,name,email,profile_photo_path',
+            'assignedUsers:id,name,email,profile_photo_path',
             'files',
             'comments.user'
         ]);
@@ -651,9 +685,13 @@ HTML;
             : false;
 
         $currentUser = auth()->user();
+        $task->load([
+            'assignedUsers:id,name,email,profile_photo_path',
+            'assignedUser:id,name,email,profile_photo_path',
+        ]);
         $projects = $currentUser->hasRole('admin')
-            ? Project::with(['users:id,name'])->get(['id', 'name'])
-            : $currentUser->projects()->with(['users:id,name'])->wherePivot('role', 'manager')->get(['projects.id', 'projects.name']);
+            ? Project::with(['users:id,name,email,profile_photo_path'])->get(['id', 'name'])
+            : $currentUser->projects()->with(['users:id,name,email,profile_photo_path'])->wherePivot('role', 'manager')->get(['projects.id', 'projects.name']);
         $sprints = Sprint::whereIn('project_id', $projects->pluck('id'))->get();
 
         return Inertia::render('Tasks/Edit', [
@@ -674,12 +712,15 @@ HTML;
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'type' => 'nullable|string|in:individual,group',
             'status' => 'required|string|in:todo,in_progress,done',
             'priority' => 'required|string|in:low,medium,high',
             'due_date' => ['nullable', 'date_format:Y-m-d H:i:s'],
             'project_id' => 'required|exists:projects,id',
             'sprint_id' => 'required|exists:sprints,id',
             'assigned_to' => 'nullable|exists:users,id',
+            'assigned_user_ids' => 'nullable|array',
+            'assigned_user_ids.*' => 'exists:users,id',
             'is_paid' => 'boolean',
             'payment_status' => 'sometimes|string|in:' . implode(',', [
                 \App\Models\Task::PAYMENT_STATUS_UNPAID,
@@ -695,24 +736,53 @@ HTML;
             'amount' => 'required_if:is_paid,true|nullable|numeric|min:0',
         ]);
 
-        // Sauvegarder l'ancien statut pour la comparaison
+        // Sauvegarder l'ancien statut et date d'échéance pour la comparaison
         $oldStatus = $task->status;
         $oldAssignee = $task->assigned_to;
+        $oldDueDate = $task->due_date ? $task->due_date->format('Y-m-d H:i:s') : null;
+        $newDueDate = !empty($validated['due_date']) ? Carbon::parse($validated['due_date'])->format('Y-m-d H:i:s') : null;
+
+        // Si la date d'échéance change, réinitialiser le suivi des rappels pour recommencer le cycle des 24h, 12h, etc.
+        if ($oldDueDate !== $newDueDate) {
+            $validated['reminders_sent'] = null;
+            $validated['deadline_notification_sent_at'] = null;
+        }
+
+        $taskType = $request->input('type', $task->type ?? \App\Models\Task::TYPE_INDIVIDUAL);
+        if (!in_array($taskType, [\App\Models\Task::TYPE_INDIVIDUAL, \App\Models\Task::TYPE_GROUP])) {
+            $taskType = \App\Models\Task::TYPE_INDIVIDUAL;
+        }
+        $validated['type'] = $taskType;
+
+        $oldAssignedIds = $task->assignedUsers()->pluck('users.id')->all();
+        if (empty($oldAssignedIds) && $task->assigned_to) {
+            $oldAssignedIds = [$task->assigned_to];
+        }
+
+        $assignedUserIds = [];
+        if ($taskType === \App\Models\Task::TYPE_GROUP) {
+            $assignedUserIds = array_values(array_filter((array) $request->input('assigned_user_ids', [])));
+            $validated['assigned_to'] = !empty($assignedUserIds) ? $assignedUserIds[0] : null;
+        } else {
+            if (!empty($validated['assigned_to'])) {
+                $assignedUserIds = [(int) $validated['assigned_to']];
+            }
+        }
 
         // Mettre à jour la tâche
         $task->update($validated);
+        $task->assignedUsers()->sync($assignedUserIds);
 
-        // Vérifier si la tâche a été assignée à un nouvel utilisateur
-        if ($oldAssignee != $task->assigned_to && $task->assigned_to) {
-            $assignedUser = \App\Models\User::find($task->assigned_to);
-            if ($assignedUser) {
-                // Envoyer une notification personnalisée au nouvel utilisateur assigné
+        // Nouveaux membres assignés : envoyer une notification
+        $newlyAssignedIds = array_diff($assignedUserIds, $oldAssignedIds);
+        if (!empty($newlyAssignedIds)) {
+            $newUsers = User::whereIn('id', $newlyAssignedIds)->get();
+            foreach ($newUsers as $assignedUser) {
                 $assignedUser->notify(new TaskAssignedNotification($task));
-
-                // Envoyer une notification push + database
+                $notifTitle = $task->isGroup() ? '👥 Nouvelle tâche de groupe assignée' : 'Nouvelle tâche assignée';
                 $assignedUser->notify(
-                    new ProjaNotification(  
-                        'Nouvelle tâche assignée',
+                    new ProjaNotification(
+                        $notifTitle,
                         'La tâche "'.$task->title.'" vous a été assignée.',
                         '/tasks/'.$task->id
                     )
@@ -724,6 +794,10 @@ HTML;
         if ($oldStatus !== $task->status || $oldAssignee != $task->assigned_to) {
             $project = $task->project;
             if ($project) {
+                $assignedLabel = $task->isGroup()
+                    ? ($task->assignedUsers()->pluck('name')->join(', ') ?: 'Groupe')
+                    : ($task->assigned_to ? $task->assignedUser?->name : 'Non assigné');
+
                 $project->notifyMembers('task_updated', [
                     'task_id' => $task->id,
                     'task_title' => $task->title,
@@ -731,7 +805,7 @@ HTML;
                     'task_status' => $task->status,
                     'old_status' => $oldStatus !== $task->status ? $oldStatus : null,
                     'task_priority' => $task->priority,
-                    'assigned_to' => $task->assigned_to ? $task->assignedUser->name : 'Non assigné',
+                    'assigned_to' => $assignedLabel,
                     'due_date' => $task->due_date ? $task->due_date->format('d/m/Y') : 'Non définie',
                     'updated_by' => auth()->user()->name,
                     'project_name' => $project->name,
@@ -937,7 +1011,7 @@ public function discussion(Request $request, Task $task)
         return \Inertia\Inertia::render('Error403')->toResponse($request)->setStatusCode(403);
     }
 
-    $task->load(['project:id,name', 'assignedUser:id,name,profile_photo_path']);
+    $task->load(['project:id,name', 'assignedUser:id,name,profile_photo_path', 'assignedUsers:id,name,profile_photo_path']);
 
     $projectMembers = $task->project
         ? $task->project->users()->select('users.id', 'users.name', 'users.profile_photo_path')->get()

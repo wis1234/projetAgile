@@ -868,6 +868,11 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
                               <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1 mt-1">{task.description}</p>
                             )}
                             <div className="flex flex-wrap gap-2 mt-2">
+                              {task.type === 'group' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                                  <FaUsers className="text-xs" /> Groupe
+                                </span>
+                              )}
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${getPriorityInfo(task.priority, t).color}`}>
                                 {getPriorityInfo(task.priority, t).icon} {getPriorityInfo(task.priority, t).text}
                               </span>
@@ -876,7 +881,29 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
                               </span>
                             </div>
                           </div>
-                          {task.assigned_user && <MemberAvatar user={task.assigned_user} size="md" />}
+                          {(() => {
+                            const isGroup = task.type === 'group';
+                            const users = isGroup && task.assigned_users && task.assigned_users.length > 0
+                              ? task.assigned_users
+                              : (task.assigned_user ? [task.assigned_user] : []);
+
+                            if (users.length === 0) return null;
+
+                            return (
+                              <div className="flex items-center gap-1 flex-shrink-0" title={users.map(u => u.name).join(', ')}>
+                                <div className="flex -space-x-2 overflow-hidden py-0.5">
+                                  {users.slice(0, 3).map((u, i) => (
+                                    <MemberAvatar key={u.id || i} user={u} size="md" />
+                                  ))}
+                                </div>
+                                {users.length > 3 && (
+                                  <span className="text-[11px] font-bold text-gray-500 bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded-full">
+                                    +{users.length - 3}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     ))}

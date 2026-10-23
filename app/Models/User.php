@@ -437,6 +437,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Task::class, 'assigned_to');
     }
 
+    public function assignedGroupTasks()
+    {
+        return $this->belongsToMany(\App\Models\Task::class, 'task_user')->withTimestamps();
+    }
+
     /**
      * Relation avec l'école de l'utilisateur
      */

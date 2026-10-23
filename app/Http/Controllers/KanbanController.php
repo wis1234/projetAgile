@@ -26,7 +26,7 @@ class KanbanController extends Controller
 
         $this->authorize('viewAny', Task::class);
 
-        $query = Task::with(['assignedUser', 'project'])
+        $query = Task::with(['assignedUser', 'assignedUsers:id,name,email,profile_photo_path', 'project'])
             ->orderBy('position')
             ->orderBy('updated_at', 'desc');
 
@@ -175,7 +175,7 @@ public function updateOrder(Request $request)
 
         // Recharger uniquement les tâches réellement mises à jour
         $updatedTasks = Task::whereIn('id', $updated)
-            ->with(['assignedUser', 'project'])
+            ->with(['assignedUser', 'assignedUsers:id,name,email,profile_photo_path', 'project'])
             ->orderBy('status')
             ->orderBy('position')
             ->orderBy('updated_at', 'desc')
@@ -217,7 +217,7 @@ public function updateOrder(Request $request)
         $user = Auth::user();
         
         // Créer une requête de base avec les relations nécessaires
-        $query = Task::with(['assignedUser', 'project'])->select('*');
+        $query = Task::with(['assignedUser', 'assignedUsers:id,name,email,profile_photo_path', 'project'])->select('*');
 
         // Filtrer par projets auxquels l'utilisateur a accès
         if (!$user->hasRole('admin')) {

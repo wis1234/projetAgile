@@ -547,15 +547,20 @@ const TaskCard = ({ task, isDragging, accentColor, canModify = true }) => {
           </p>
         )}
 
-        {/* Tags/Priority */}
-        {task.priority && (
-          <div className="mb-3">
+        {/* Tags/Priority & Type */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          {task.priority && (
             <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md font-medium ${priority.bg} ${priority.text}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`}></span>
               {priority.label}
             </span>
-          </div>
-        )}
+          )}
+          {task.type === 'group' && (
+            <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-semibold bg-purple-100 text-purple-700">
+              👥 Groupe
+            </span>
+          )}
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-gray-100">
@@ -566,29 +571,45 @@ const TaskCard = ({ task, isDragging, accentColor, canModify = true }) => {
             {formattedDate}
           </div>
 
-          {/* Avatar */}
-          {(task.assigned_user || task.user) && (
-            <div className="flex items-center gap-1.5">
-              {((task.assigned_user || task.user).photo_url || (task.assigned_user || task.user).profile_photo_url) ? (
-                <img 
-                  src={(task.assigned_user || task.user).photo_url || (task.assigned_user || task.user).profile_photo_url} 
-                  alt={(task.assigned_user || task.user).name}
-                  className="w-6 h-6 rounded-full object-cover border-2 border-white shadow-sm"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    const initialDiv = e.target.nextElementSibling;
-                    if (initialDiv) initialDiv.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <div 
-                className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold text-white shadow-sm"
-                style={{ display: ((task.assigned_user || task.user).photo_url || (task.assigned_user || task.user).profile_photo_url) ? 'none' : 'flex' }}
-              >
-                {((task.assigned_user || task.user).name || 'U').charAt(0).toUpperCase()}
+          {/* Avatar(s) */}
+          {(() => {
+            const isGroup = task.type === 'group';
+            const users = isGroup && task.assigned_users && task.assigned_users.length > 0
+              ? task.assigned_users
+              : (task.assigned_user || task.user ? [task.assigned_user || task.user] : []);
+
+            if (users.length === 0) return null;
+
+            return (
+              <div className="flex items-center gap-1" title={users.map(u => u.name).join(', ')}>
+                <div className="flex -space-x-1.5 overflow-hidden py-0.5">
+                  {users.slice(0, 3).map((u, i) => {
+                    const photo = u.photo_url || u.profile_photo_url || (u.profile_photo_path ? `/storage/${u.profile_photo_path}` : null);
+                    return photo ? (
+                      <img 
+                        key={u.id || i}
+                        src={photo} 
+                        alt={u.name}
+                        className="w-6 h-6 rounded-full object-cover ring-2 ring-white shadow-sm flex-shrink-0"
+                      />
+                    ) : (
+                      <div 
+                        key={u.id || i}
+                        className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-white shadow-sm flex-shrink-0"
+                      >
+                        {(u.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    );
+                  })}
+                </div>
+                {users.length > 3 && (
+                  <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-1 py-0.2 rounded-full">
+                    +{users.length - 3}
+                  </span>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

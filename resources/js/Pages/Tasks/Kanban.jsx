@@ -212,6 +212,11 @@ const Kanban = ({ tasks }) => {
                                     </h3>
                                   </div>
                                   <div className="flex items-center gap-1.5">
+                                    {task.type === 'group' && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">
+                                        👥 Groupe
+                                      </span>
+                                    )}
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
                                       task.priority === t('kanban.priority_high') ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200' :
                                       task.priority === t('kanban.priority_medium') ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200' :
@@ -241,25 +246,36 @@ const Kanban = ({ tasks }) => {
                                   ) : (
                                     <div></div>
                                   )}
-                                  <div className="flex -space-x-1.5">
-                                    {task.assignees?.slice(0, 3).map((assignee, idx) => (
-                                      <div
-                                        key={idx}
-                                        className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs font-medium text-white shadow-sm"
-                                        title={assignee.name || t('kanban.not_assigned')}
-                                      >
-                                        {assignee.name?.charAt(0).toUpperCase() || '?'}
+                                  {(() => {
+                                    const isGroup = task.type === 'group';
+                                    const assignees = isGroup && task.assigned_users && task.assigned_users.length > 0
+                                      ? task.assigned_users
+                                      : (task.assignees && task.assignees.length > 0 ? task.assignees : (task.assigned_user ? [task.assigned_user] : []));
+                                    
+                                    if (assignees.length === 0) return null;
+
+                                    return (
+                                      <div className="flex -space-x-1.5" title={assignees.map(a => a.name).join(', ')}>
+                                        {assignees.slice(0, 3).map((assignee, idx) => (
+                                          <div
+                                            key={assignee.id || idx}
+                                            className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs font-medium text-white shadow-sm"
+                                            title={assignee.name || t('kanban.not_assigned')}
+                                          >
+                                            {assignee.name?.charAt(0).toUpperCase() || '?'}
+                                          </div>
+                                        ))}
+                                        {assignees.length > 3 && (
+                                          <div
+                                            className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 shadow-sm"
+                                            title={t('kanban.more_assignees', { count: assignees.length - 3 })}
+                                          >
+                                            +{assignees.length - 3}
+                                          </div>
+                                        )}
                                       </div>
-                                    ))}
-                                    {task.assignees?.length > 3 && (
-                                      <div
-                                        className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 shadow-sm"
-                                        title={t('kanban.more_assignees', { count: task.assignees.length - 3 })}
-                                      >
-                                        +{task.assignees.length - 3}
-                                      </div>
-                                    )}
-                                  </div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             )}

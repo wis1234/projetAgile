@@ -126,12 +126,16 @@ class TaskPolicy
             return false;
         }
 
-        return $isManager;
+        return $isManager || $task->isAssignedTo($user);
     }
 
     public function delete(User $user, Task $task)
     {
-        return $this->update($user, $task);
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        return $this->isProjectManager($user, $task);
     }
 
     public function comment(User $user, Task $task)

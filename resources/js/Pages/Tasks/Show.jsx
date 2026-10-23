@@ -376,7 +376,8 @@ export default function Show({ task, payments, projectMembers, projectManagers =
   // Use the sanitized task instead of the original
   const taskToDisplay = sanitizedTask;
   
-  const isAssigned = auth?.user?.id === task?.assigned_to;
+  const isAssigned = auth?.user?.id === task?.assigned_to || 
+    (task?.assigned_users && Array.isArray(task.assigned_users) && task.assigned_users.some(u => u.id === auth?.user?.id));
   const isProjectMember = task?.project?.users?.some(u => u.id === auth.user.id) || false;
 
   // For adding payment for other members
@@ -2132,9 +2133,18 @@ return () => {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5 mt-3">
+            <div className="flex flex-wrap items-center gap-1.5 mt-3">
               {getStatusBadge(task.status)}
               {getPriorityBadge(task.priority)}
+              {task.type === 'group' ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                  <FaUsers className="text-xs" /> Groupe ({task.assigned_users?.length || 0})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                  <FaUser className="text-xs" /> Individuel
+                </span>
+              )}
             </div>
           </div>
 
@@ -2142,12 +2152,35 @@ return () => {
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-                Détails rapides
+                {task.type === 'group' ? 'Membres du groupe' : 'Détails rapides'}
               </h3>
+              {task.type === 'group' && (
+                <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                  Statut partagé
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2.5">
-              {task.assigned_user ? (
+              {task.type === 'group' && task.assigned_users && task.assigned_users.length > 0 ? (
+                <div className="flex flex-col gap-1.5 w-full">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {task.assigned_users.map(u => (
+                      <div key={u.id} className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-700/80 border border-gray-200 dark:border-gray-600 px-2 py-1 rounded-lg text-xs" title={u.email || u.name}>
+                        <img
+                          src={u.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}`}
+                          alt={u.name}
+                          className="w-5 h-5 rounded-full object-cover"
+                        />
+                        <span className="font-medium text-gray-800 dark:text-gray-200 text-xs">{u.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-500 italic mt-0.5">
+                    ℹ️ Toute modification ou changement de statut appliqué par un membre s'applique immédiatement à tout le monde.
+                  </p>
+                </div>
+              ) : task.assigned_user ? (
                 <>
                   <img
                     src={task.assigned_user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_user.name)}`}

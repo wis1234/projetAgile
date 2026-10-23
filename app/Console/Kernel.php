@@ -50,9 +50,9 @@ class Kernel extends ConsoleKernel
                  ->withoutOverlapping()
                  ->sendOutputTo(storage_path('logs/zoom-start-notifications.log'));
                  
-        // Envoie des notifications pour les tâches dont l'échéance approche
+        // Envoie des notifications pour les tâches dont l'échéance approche (24h, 12h, 6h, 4h, 2h, 1h, 30mn)
         $schedule->command('tasks:send-deadline-reminders')
-                 ->everyFiveMinutes()
+                 ->everyMinute()
                  ->withoutOverlapping()
                  ->sendOutputTo(storage_path('logs/task-deadline-reminders.log'));
     }

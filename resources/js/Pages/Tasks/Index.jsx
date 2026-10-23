@@ -8,7 +8,7 @@ import {
   FaSort, FaSortUp, FaSortDown, FaChevronDown,
   FaChevronUp, FaTimes, FaCheck, FaClock,
   FaExclamationTriangle, FaUserCircle, FaTrophy,
-  FaFire, FaChartBar, FaLock
+  FaFire, FaChartBar, FaLock, FaUsers, FaUser
 } from 'react-icons/fa';
 import { HiOutlineViewGrid, HiOutlineViewList } from 'react-icons/hi';
 
@@ -185,6 +185,15 @@ const FilterPanel = ({ open, filters, projectOptions, memberOptions, onChange, o
         />
 
         <Select
+          label="Type"
+          field="type"
+          options={[
+            { value: 'individual', label: 'Individuel' },
+            { value: 'group',      label: 'Groupe' },
+          ]}
+        />
+
+        <Select
           label="Projet"
           field="project_id"
           options={projectOptions.map(p => ({ value: p.id, label: p.name }))}
@@ -343,6 +352,11 @@ const UserStatCard = ({ stat, rank }) => {
 
 const TaskCard = ({ task, onOpen }) => {
   const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date();
+  const isGroup = task.type === 'group';
+  const assignedUsers = isGroup && task.assigned_users && task.assigned_users.length > 0
+    ? task.assigned_users
+    : (task.assigned_user || task.assignedUser ? [task.assigned_user || task.assignedUser] : []);
+
   return (
     <div
       className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group ${task.is_locked ? 'ring-1 ring-amber-200 opacity-80' : ''}`}
@@ -360,6 +374,15 @@ const TaskCard = ({ task, onOpen }) => {
 
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <PriorityBadge priority={task.priority} />
+        {isGroup ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+            <FaUsers className="text-[11px]" /> Groupe
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-700/60 dark:text-slate-300">
+            <FaUser className="text-[10px]" /> Individuel
+          </span>
+        )}
         {task.project && (
           <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2 py-1 min-w-0">
             <FaProjectDiagram className="text-blue-400 flex-shrink-0" />
@@ -369,14 +392,24 @@ const TaskCard = ({ task, onOpen }) => {
       </div>
 
       <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 flex-wrap">
-        {task.assigned_user || task.assignedUser ? (
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Avatar
-              name={task.assigned_user?.name || task.assignedUser?.name || ''}
-              url={task.assigned_user?.profile_photo_url || ''}
-            />
+        {assignedUsers.length > 0 ? (
+          <div className="flex items-center gap-1.5 min-w-0" title={assignedUsers.map(u => u.name).join(', ')}>
+            <div className="flex -space-x-2 overflow-hidden py-0.5">
+              {assignedUsers.slice(0, 3).map((u, i) => (
+                <Avatar
+                  key={u.id || i}
+                  name={u.name || ''}
+                  url={u.profile_photo_url || ''}
+                />
+              ))}
+            </div>
+            {assignedUsers.length > 3 && (
+              <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+                +{assignedUsers.length - 3}
+              </span>
+            )}
             <span className="text-xs text-gray-600 dark:text-gray-400 font-medium truncate max-w-[100px]">
-              {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ')[0]}
+              {isGroup ? `${assignedUsers.length} membre${assignedUsers.length > 1 ? 's' : ''}` : assignedUsers[0]?.name?.split(' ')[0]}
             </span>
           </div>
         ) : (
@@ -790,6 +823,11 @@ const Index = ({
                             <span className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                               {task.title}
                             </span>
+                            {task.type === 'group' && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 ml-1.5 flex-shrink-0">
+                                <FaUsers className="text-[9px]" /> Groupe
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-5 py-4">
@@ -803,17 +841,40 @@ const Index = ({
                         <td className="px-5 py-4"><StatusBadge status={task.status} /></td>
                         <td className="px-5 py-4"><PriorityBadge priority={task.priority} /></td>
                         <td className="px-5 py-4">
-                          {task.assigned_user || task.assignedUser ? (
-                            <div className="flex items-center gap-2">
-                              <Avatar
-                                name={task.assigned_user?.name || task.assignedUser?.name || ''}
-                                url={task.assigned_user?.profile_photo_url || task.assignedUser?.profile_photo_url || ''}
-                              />
-                              <span className="text-xs text-gray-700 dark:text-gray-300 font-medium">
-                                {(task.assigned_user?.name || task.assignedUser?.name || '').split(' ')[0]}
-                              </span>
-                            </div>
-                          ) : <span className="text-gray-300 dark:text-gray-600 text-xs italic">Non assigné</span>}
+                          {(() => {
+                            const isGroup = task.type === 'group';
+                            const assignedList = isGroup && task.assigned_users && task.assigned_users.length > 0
+                              ? task.assigned_users
+                              : (task.assigned_user || task.assignedUser ? [task.assigned_user || task.assignedUser] : []);
+                            
+                            if (assignedList.length === 0) {
+                              return <span className="text-gray-300 dark:text-gray-600 text-xs italic">Non assigné</span>;
+                            }
+
+                            return (
+                              <div className="flex items-center gap-2" title={assignedList.map(u => u.name).join(', ')}>
+                                <div className="flex -space-x-2 overflow-hidden py-0.5">
+                                  {assignedList.slice(0, 3).map((u, i) => (
+                                    <Avatar
+                                      key={u.id || i}
+                                      name={u.name || ''}
+                                      url={u.profile_photo_url || ''}
+                                    />
+                                  ))}
+                                </div>
+                                {assignedList.length > 3 && (
+                                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+                                    +{assignedList.length - 3}
+                                  </span>
+                                )}
+                                <span className="text-xs text-gray-700 dark:text-gray-300 font-medium truncate max-w-[130px]">
+                                  {isGroup 
+                                    ? `${assignedList.length} membre${assignedList.length > 1 ? 's' : ''}`
+                                    : assignedList[0]?.name?.split(' ')[0]}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-5 py-4">
                           {task.due_date ? (

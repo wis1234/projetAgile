@@ -1113,10 +1113,20 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
             <div className="min-w-0">
               <h3 className="font-bold text-base leading-tight flex items-center gap-2 truncate">
                 <span className="truncate">{task.title}</span>
+                {task.type === 'group' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-500/30 text-purple-100 flex-shrink-0 border border-purple-400/30">
+                    👥 Groupe
+                  </span>
+                )}
                 {isRealtimeConnected && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" title="Temps réel connecté" />}
               </h3>
               <p className="text-xs text-blue-100 flex items-center gap-2 mt-0.5">
                 {loadingComments ? t('task_details.loading_comments') : `${comments.length} message${comments.length !== 1 ? 's' : ''}`}
+                {task.type === 'group' && task.assigned_users && task.assigned_users.length > 0 && (
+                  <span className="text-blue-200">
+                    · {task.assigned_users.length} membre{task.assigned_users.length > 1 ? 's' : ''}
+                  </span>
+                )}
               </p>
             </div>
           </div>

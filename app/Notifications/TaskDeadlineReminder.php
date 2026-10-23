@@ -9,9 +9,12 @@ class TaskDeadlineReminder extends Notification implements ShouldQueue
 {
     use Queueable;
     public $task;
-    public function __construct(Task $task)
+    public ?string $intervalLabel;
+
+    public function __construct(Task $task, ?string $intervalLabel = null)
     {
         $this->task = $task;
+        $this->intervalLabel = $intervalLabel;
     }
     public function via($notifiable)
     {
@@ -23,27 +26,34 @@ class TaskDeadlineReminder extends Notification implements ShouldQueue
     }
     public function toMail($notifiable)
     {
-        $dueDate = \Carbon\Carbon::parse($this->task->due_date);
-        
-        // Calcul du temps restant en français
-        $now = now();
-        // Inverser l'ordre pour obtenir un temps restant positif
-        $diffInHours = $now->diffInHours($dueDate, false);
-        $diffInMinutes = $now->diffInMinutes($dueDate, false) % 60;
-        
-        $timeLeft = [];
-        if ($diffInHours > 0) {
-            $timeLeft[] = $diffInHours . ' heure' . ($diffInHours > 1 ? 's' : '');
-            if ($diffInMinutes > 0) {
-                $timeLeft[] = $diffInMinutes . ' minute' . ($diffInMinutes > 1 ? 's' : '');
-            }
+        if ($this->intervalLabel) {
+            $timeLeftString = 'dans ' . $this->intervalLabel;
+            $subject = '⏰ Échéance dans ' . $this->intervalLabel . ' : ' . $this->task->title;
         } else {
-            $timeLeft[] = $diffInMinutes . ' minute' . ($diffInMinutes > 1 ? 's' : '');
+            $dueDate = \Carbon\Carbon::parse($this->task->due_date);
+            
+            // Calcul du temps restant en français
+            $now = now();
+            // Inverser l'ordre pour obtenir un temps restant positif
+            $diffInHours = $now->diffInHours($dueDate, false);
+            $diffInMinutes = $now->diffInMinutes($dueDate, false) % 60;
+            
+            $timeLeft = [];
+            if ($diffInHours > 0) {
+                $timeLeft[] = $diffInHours . ' heure' . ($diffInHours > 1 ? 's' : '');
+                if ($diffInMinutes > 0) {
+                    $timeLeft[] = $diffInMinutes . ' minute' . ($diffInMinutes > 1 ? 's' : '');
+                }
+            } else {
+                $timeLeft[] = max(1, $diffInMinutes) . ' minute' . ($diffInMinutes > 1 ? 's' : '');
+            }
+            
+            $timeLeftString = 'dans ' . implode(' et ', $timeLeft);
+            $subject = 'Échéance imminente : ' . $this->task->title;
         }
-        
-        $timeLeftString = 'dans ' . implode(' et ', $timeLeft);
+
         return (new MailMessage)
-            ->subject('Échéance imminente : ' . $this->task->title)
+            ->subject($subject)
             ->markdown('emails.task-deadline-reminder', [
                 'task' => $this->task,
                 'notifiable' => $notifiable,

@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { router, usePage, Link } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
-import { FaTasks, FaArrowLeft, FaUserCircle, FaDollarSign, FaInfoCircle } from 'react-icons/fa';
+import { FaTasks, FaArrowLeft, FaUserCircle, FaDollarSign, FaInfoCircle, FaUsers, FaUser } from 'react-icons/fa';
 
 function Edit({ task, projects = [], sprints = [], users = [] }) {
   const { errors = {}, flash = {} } = usePage().props;
   const [title, setTitle] = useState(task.title || '');
   const [description, setDescription] = useState(task.description || '');
+  const [taskType, setTaskType] = useState(task.type || 'individual');
+  const initialGroupUserIds = task.assigned_users && task.assigned_users.length > 0
+    ? task.assigned_users.map(u => u.id)
+    : (task.assigned_to ? [task.assigned_to] : []);
+  const [assignedUserIds, setAssignedUserIds] = useState(initialGroupUserIds);
   const [status, setStatus] = useState(task.status || 'todo');
   // Formater la date et l'heure pour l'affichage
   const formatDateTime = (dateString) => {
@@ -50,11 +55,26 @@ function Edit({ task, projects = [], sprints = [], users = [] }) {
   const selectedProject = projects.find(p => p.id == projectId);
   const projectUsers = selectedProject?.users || [];
 
+  const handleToggleMember = (userId) => {
+    setAssignedUserIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllMembers = () => {
+    if (assignedUserIds.length === projectUsers.length) {
+      setAssignedUserIds([]);
+    } else {
+      setAssignedUserIds(projectUsers.map(u => u.id));
+    }
+  };
+
   // Mettre à jour assignedTo quand le projet change
   const handleProjectChange = (e) => {
     setProjectId(e.target.value);
     const proj = projects.find(p => p.id == e.target.value);
     setAssignedTo(proj?.users[0]?.id || '');
+    setAssignedUserIds([]);
   };
 
   const handleSubmit = (e) => {
@@ -75,10 +95,12 @@ function Edit({ task, projects = [], sprints = [], users = [] }) {
     router.put(`/tasks/${task.id}`, {
       title,
       description,
+      type: taskType,
       status,
       due_date: formattedDueDate,
       priority,
-      assigned_to: assignedTo,
+      assigned_to: taskType === 'individual' ? assignedTo : (assignedUserIds[0] || null),
+      assigned_user_ids: taskType === 'group' ? assignedUserIds : (assignedTo ? [assignedTo] : []),
       project_id: projectId,
       sprint_id: sprintId,
       is_paid: isPaid,
@@ -148,16 +170,129 @@ function Edit({ task, projects = [], sprints = [], users = [] }) {
               {errors.sprint_id && <div className="text-red-600 text-sm mt-2 font-medium">{errors.sprint_id}</div>}
             </div>
 
-            <div>
-              <label htmlFor="assigned_to" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Assigné à <span className="text-red-500">*</span></label>
-              <select id="assigned_to" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" required disabled={projectUsers.length === 0}>
-                {projectUsers.length === 0 && <option value="">Aucun membre disponible</option>}
-                {projectUsers.map(user => (
-                  <option key={user.id} value={user.id}>{user.name}</option>
-                ))}
-              </select>
-              {errors.assigned_to && <div className="text-red-600 text-sm mt-2 font-medium">{errors.assigned_to}</div>}
+            {/* Type de tâche (Individuel ou Groupe) */}
+            <div className="md:col-span-2 bg-gray-50 dark:bg-gray-700/40 p-4 rounded-xl border border-gray-200 dark:border-gray-600">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Type de tâche <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTaskType('individual')}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
+                    taskType === 'individual'
+                      ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 shadow-sm'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${taskType === 'individual' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
+                    <FaUser className="text-sm" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm block">Individuel</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Assignée à un seul membre responsable</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTaskType('group')}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
+                    taskType === 'group'
+                      ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-100 shadow-sm'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${taskType === 'group' ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
+                    <FaUsers className="text-sm" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm block">Groupe</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Assignée à plusieurs membres (synchronisation d'état partagée)</span>
+                  </div>
+                </button>
+              </div>
             </div>
+
+            {/* Assignation : Individuel vs Groupe */}
+            {taskType === 'individual' ? (
+              <div>
+                <label htmlFor="assigned_to" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Assigné à <span className="text-red-500">*</span></label>
+                <select id="assigned_to" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200" required disabled={projectUsers.length === 0}>
+                  <option value="">Sélectionnez un membre</option>
+                  {projectUsers.length === 0 && <option value="">Aucun membre disponible</option>}
+                  {projectUsers.map(user => (
+                    <option key={user.id} value={user.id}>{user.name}</option>
+                  ))}
+                </select>
+                {errors.assigned_to && <div className="text-red-600 text-sm mt-2 font-medium">{errors.assigned_to}</div>}
+              </div>
+            ) : (
+              <div className="md:col-span-2 bg-indigo-50/40 dark:bg-indigo-950/20 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-900/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-900 dark:text-white">
+                      Membres concernés par la tâche de groupe <span className="text-red-500">*</span>
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Cochez les membres de l'équipe auxquels cette tâche doit être assignée ({assignedUserIds.length} sélectionné{assignedUserIds.length > 1 ? 's' : ''})
+                    </p>
+                  </div>
+                  {projectUsers.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAllMembers}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors self-start"
+                    >
+                      {assignedUserIds.length === projectUsers.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                    </button>
+                  )}
+                </div>
+
+                {projectUsers.length === 0 ? (
+                  <p className="text-xs text-red-500">Aucun membre disponible dans ce projet.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-64 overflow-y-auto p-1">
+                    {projectUsers.map(u => {
+                      const isChecked = assignedUserIds.includes(u.id);
+                      return (
+                        <label
+                          key={u.id}
+                          className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                            isChecked
+                              ? 'border-indigo-500 bg-white dark:bg-gray-800 shadow-sm ring-1 ring-indigo-500'
+                              : 'border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleMember(u.id)}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600"
+                          />
+                          <img
+                            src={u.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=6366f1&color=fff`}
+                            alt={u.name}
+                            className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 block truncate">{u.name}</span>
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate block">{u.email || 'Membre'}</span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="mt-3.5 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 flex items-start gap-2.5">
+                  <FaInfoCircle className="text-blue-500 text-sm mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    <strong>Règle de synchronisation :</strong> Cette tâche de groupe est commune à tous les membres cochés. Toute modification (changement de statut, etc.) faite par un membre s'applique immédiatement à tout le monde.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div>
               <label htmlFor="status" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Statut</label>
