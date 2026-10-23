@@ -7,7 +7,7 @@ import Modal from '@/Components/Modal';
 import { useTranslation, Trans } from 'react-i18next';
 import i18n from 'i18next';
 // Ajout de FaSave à la liste des icônes importées
-import { FaSave, FaTimes, FaExpand, FaCompress, FaCopy, FaPause, FaCheck, FaMoneyBillWave } from 'react-icons/fa';
+import { FaSave, FaTimes, FaUsers , FaExpand, FaCompress, FaCopy, FaPause, FaCheck, FaMoneyBillWave } from 'react-icons/fa';
 import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import AudioPlayer from '@/Components/AudioPlayer';
 import StickerMessage from '@/Components/Stickers/StickerMessage';
