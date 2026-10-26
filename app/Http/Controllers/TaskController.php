@@ -62,20 +62,28 @@ class TaskController extends Controller
         }
 
         if ($request->filled('status')) {
-            if ($request->status === 'overdue') {
-                $query->whereNotNull('due_date')
-                    ->where('due_date', '<', now())
-                    ->where('status', '!=', 'done');
-            } else {
+if ($request->status === 'overdue') {
+    $query->whereNotNull('due_date')
+        ->where('due_date', '<', now())
+        ->where('status', '!=', 'done')
+        ->where(function ($q) {
+            $q->whereNull('submitted_at')
+                ->orWhereColumn('submitted_at', '>', 'due_date');
+        });
+} else {
                 $query->where('status', $request->status);
             }
         }
 
-        if ($request->filled('overdue') && $request->overdue === 'yes') {
-            $query->whereNotNull('due_date')
-                ->where('due_date', '<', now())
-                ->where('status', '!=', 'done');
-        }
+if ($request->filled('overdue') && $request->overdue === 'yes') {
+    $query->whereNotNull('due_date')
+        ->where('due_date', '<', now())
+        ->where('status', '!=', 'done')
+        ->where(function ($q) {
+            $q->whereNull('submitted_at')
+                ->orWhereColumn('submitted_at', '>', 'due_date');
+        });
+}
 
         if ($request->filled('priority')) {
             $query->where('priority', $request->priority);
@@ -111,11 +119,15 @@ class TaskController extends Controller
             'todo' => (clone $summaryQuery)->where('status', 'todo')->count(),
             'in_progress' => (clone $summaryQuery)->where('status', 'in_progress')->count(),
             'done' => (clone $summaryQuery)->where('status', 'done')->count(),
-            'overdue' => (clone $summaryQuery)
-                ->whereNotNull('due_date')
-                ->where('due_date', '<', now())
-                ->where('status', '!=', 'done')
-                ->count(),
+'overdue' => (clone $summaryQuery)
+    ->whereNotNull('due_date')
+    ->where('due_date', '<', now())
+    ->where('status', '!=', 'done')
+    ->where(function ($q) {
+        $q->whereNull('submitted_at')
+            ->orWhereColumn('submitted_at', '>', 'due_date');
+    })
+    ->count(),
         ];
 
         $myTasksSummaryQuery = (clone $query)->where(function ($q) use ($user) {
@@ -127,11 +139,15 @@ class TaskController extends Controller
             'todo' => (clone $myTasksSummaryQuery)->where('status', 'todo')->count(),
             'in_progress' => (clone $myTasksSummaryQuery)->where('status', 'in_progress')->count(),
             'done' => (clone $myTasksSummaryQuery)->where('status', 'done')->count(),
-            'overdue' => (clone $myTasksSummaryQuery)
-                ->whereNotNull('due_date')
-                ->where('due_date', '<', now())
-                ->where('status', '!=', 'done')
-                ->count(),
+'overdue' => (clone $myTasksSummaryQuery)
+    ->whereNotNull('due_date')
+    ->where('due_date', '<', now())
+    ->where('status', '!=', 'done')
+    ->where(function ($q) {
+        $q->whereNull('submitted_at')
+            ->orWhereColumn('submitted_at', '>', 'due_date');
+    })
+    ->count(),
         ];
 
         $progressTasks = (clone $query)

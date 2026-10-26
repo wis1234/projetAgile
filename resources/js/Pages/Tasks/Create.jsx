@@ -22,6 +22,18 @@ import {
 } from 'react-icons/fa';
 import AdminLayout from '../../Layouts/AdminLayout';
 
+// ─── Helpers de date : TOUT reste en heure locale, jamais de conversion UTC ───
+// Date locale au format YYYY-MM-DD (sans passer par toISOString, qui est en UTC)
+const toLocalDateString = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+// Affiche une date YYYY-MM-DD en heure locale (le "T00:00:00" évite l'interprétation UTC)
+const parseLocalDate = (dateString) => new Date(`${dateString}T00:00:00`);
+
 function Create({ projects = [], sprints = [], users = [], selectedProjectId = null }) {
   const { errors = {}, flash = {} } = usePage().props;
   
@@ -34,8 +46,8 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
   const [taskType, setTaskType] = useState('individual'); // 'individual' | 'group'
   const [assignedUserIds, setAssignedUserIds] = useState([]);
   const [status, setStatus] = useState('todo');
-  const [dueDate, setDueDate] = useState('');
-  const [dueTime, setDueTime] = useState('12:00');
+  const [dueDate, setDueDate] = useState('');      // format YYYY-MM-DD (heure locale)
+  const [dueTime, setDueTime] = useState('12:00'); // format HH:mm (heure locale)
   const [priority, setPriority] = useState('medium');
   const [projectId, setProjectId] = useState(defaultProjectId);
   const [sprintId, setSprintId] = useState('');
@@ -55,31 +67,6 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
   const backRoute = isProjectPreSelected
     ? route('projects.show', selectedProjectId)
     : '/tasks';
-  
-  // Formatage date/heure pour l'affichage
-  const formatDateTime = (dateString) => {
-    if (!dateString) return { date: '', time: '12:00' };
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return {
-      date: `${year}-${month}-${day}`,
-      time: `${hours}:${minutes}`
-    };
-  };
-
-  // Met à jour la date complète quand la date ou l'heure change
-  useEffect(() => {
-    if (dueDate) {
-      const [hours, minutes] = dueTime.split(':');
-      const date = new Date(dueDate);
-      date.setHours(parseInt(hours, 10), parseInt(minutes, 10));
-      setDueDate(date.toISOString().slice(0, 16));
-    }
-  }, [dueTime]);
 
   const handleToggleMember = (userId) => {
     setAssignedUserIds(prev =>
@@ -129,12 +116,8 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
     e.preventDefault();
     setLoading(true);
     
-    let formattedDueDate = null;
-    if (dueDate) {
-      const [year, month, day] = dueDate.split('T')[0].split('-');
-      const [hours, minutes] = dueTime.split(':');
-      formattedDueDate = `${year}-${month}-${day} ${hours}:${minutes}:00`;
-    }
+    // Heure locale telle que saisie, sans aucune conversion de fuseau
+    const formattedDueDate = dueDate ? `${dueDate} ${dueTime || '12:00'}:00` : null;
     
     router.post('/tasks', {
       title,
@@ -162,6 +145,7 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
         setTaskType('individual');
         setAssignedUserIds([]);
         setDueDate('');
+        setDueTime('12:00');
         setAssignedTo('');
         setProjectId(projects[0]?.id || '');
         setSprintId(sprints[0]?.id || '');
@@ -501,17 +485,17 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
               {errors.priority && <div className="text-red-600 text-sm mt-2">{errors.priority}</div>}
             </div>
 
-            {/* Date d'échéance */}
+            {/* Date d'échéance (heure locale) */}
             <div className="mb-6">
               <div className="flex justify-between items-center mb-2">
                 <label htmlFor="due_date" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Date d'échéance</label>
-                {dueDate && <span className="text-xs px-2 py-1 bg-blue-100 rounded-full">{new Date(dueDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>}
+                {dueDate && <span className="text-xs px-2 py-1 bg-blue-100 rounded-full">{parseLocalDate(dueDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>}
               </div>
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center"><svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg></div>
-                    <input type="date" value={dueDate ? formatDateTime(dueDate).date : ''} min={formatDateTime(new Date().toISOString()).date} onChange={e => setDueDate(e.target.value)} className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700" disabled={!hasProjects} />
+                    <input type="date" value={dueDate} min={toLocalDateString(new Date())} onChange={e => setDueDate(e.target.value)} className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700" disabled={!hasProjects} />
                   </div>
                   <div className="relative flex-1">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center"><svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
@@ -523,7 +507,7 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
                     const date = new Date();
                     date.setDate(date.getDate() + days);
                     return (
-                      <button key={days} type="button" onClick={() => { setDueDate(date.toISOString().split('T')[0]); setDueTime('09:00'); }} className="text-xs px-3 py-1.5 rounded-full border hover:bg-gray-50">
+                      <button key={days} type="button" onClick={() => { setDueDate(toLocalDateString(date)); setDueTime('09:00'); }} className="text-xs px-3 py-1.5 rounded-full border hover:bg-gray-50">
                         {days === 1 ? 'Demain' : `+${days} jours`}
                       </button>
                     );

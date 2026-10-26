@@ -147,7 +147,7 @@ const CountdownTimer = ({ targetDate, onComplete, taskStatus, taskUpdatedAt, sub
       seconds,
       expired: false
     };
-  }, [targetDate, onComplete]);
+  }, [targetDate, onComplete, submittedAt]);
 
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
 
@@ -2494,14 +2494,20 @@ return () => {
                       <FaClock className="text-amber-500" /> {t('task_details.due_date')}
                     </h4>
                     <div className={`text-sm mb-3 ${
-                      new Date(task.due_date) < new Date() && task.status !== 'done'
+                      new Date(task.due_date) < new Date() &&
+task.status !== 'done' &&
+(!task.submitted_at ||
+  new Date(task.submitted_at) > new Date(task.due_date))
                         ? 'text-red-600 dark:text-red-400 font-medium'
                         : 'text-gray-700 dark:text-gray-300'
                     }`}>
                       {new Date(task.due_date).toLocaleString('fr-FR', {
                         weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
                       })}
-                      {new Date(task.due_date) < new Date() && task.status !== 'done' && (
+                      {new Date(task.due_date) < new Date() &&
+task.status !== 'done' &&
+(!task.submitted_at ||
+  new Date(task.submitted_at) > new Date(task.due_date)) && (
                         <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-300">
                           {t('task_details.overdue')}
                         </span>
