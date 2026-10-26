@@ -13,32 +13,33 @@ function Edit({ task, projects = [], sprints = [], users = [] }) {
     : (task.assigned_to ? [task.assigned_to] : []);
   const [assignedUserIds, setAssignedUserIds] = useState(initialGroupUserIds);
   const [status, setStatus] = useState(task.status || 'todo');
-  // Formater la date et l'heure pour l'affichage
+
+  // Convertit la date reçue du serveur en date (YYYY-MM-DD) et heure (HH:mm) LOCALES
+  // (new Date + getHours/getDate = heure locale du navigateur, jamais l'UTC)
   const formatDateTime = (dateString) => {
-    if (!dateString) return { date: null, time: '12:00' };
+    if (!dateString) return { date: '', time: '12:00' };
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return { date: null, time: '12:00' };
-      
+      if (isNaN(date.getTime())) return { date: '', time: '12:00' };
+
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       const hours = String(date.getHours()).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
-      
+
       return {
         date: `${year}-${month}-${day}`,
         time: `${hours}:${minutes}`,
-        isValid: true
       };
     } catch (e) {
-      return { date: null, time: '12:00', isValid: false };
+      return { date: '', time: '12:00' };
     }
   };
 
   const initialDateTime = formatDateTime(task.due_date);
-  const [dueDate, setDueDate] = useState(initialDateTime.date);
-  const [dueTime, setDueTime] = useState(initialDateTime.time);
+  const [dueDate, setDueDate] = useState(initialDateTime.date); // YYYY-MM-DD (heure locale)
+  const [dueTime, setDueTime] = useState(initialDateTime.time); // HH:mm (heure locale)
   const [priority, setPriority] = useState(task.priority || 'medium');
   const [projectId, setProjectId] = useState(task.project_id || projects[0]?.id || '');
   const [sprintId, setSprintId] = useState(task.sprint_id || sprints[0]?.id || '');
@@ -80,18 +81,10 @@ function Edit({ task, projects = [], sprints = [], users = [] }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    
-    // Formater la date et l'heure au format attendu par le backend (Y-m-d H:i:s)
-    let formattedDueDate = null;
-    if (dueDate) {
-      const date = new Date(dueDate);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const [hours, minutes] = dueTime.split(':');
-      formattedDueDate = `${year}-${month}-${day} ${hours}:${minutes}:00`;
-    }
-    
+
+    // Heure locale telle que saisie, sans aucune conversion de fuseau (format Y-m-d H:i:s)
+    const formattedDueDate = dueDate ? `${dueDate} ${dueTime || '12:00'}:00` : null;
+
     router.put(`/tasks/${task.id}`, {
       title,
       description,
