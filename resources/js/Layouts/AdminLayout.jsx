@@ -10,6 +10,7 @@ import GlobalSearch from '@/Components/GlobalSearch';
 import MobileBottomNav from '@/Components/MobileBottomNav';
 import AssistantLauncher from '@/Components/Assistant/AssistantLauncher';
 import Sidebar from '@/Components/Sidebar/Sidebar';
+import LanguageSwitcherSidebar from '@/Components/LanguageSwitcherSidebar';
 import PushNotificationManager, { unregisterDeviceToken } from '@/Components/PushNotificationManager';
 
 const INCOMING_CALL_SOUND =
@@ -478,8 +479,6 @@ export default function AdminLayout({ children, immersive = false }) {
   const user = auth?.user || auth;
   const userName = user?.name || 'Utilisateur';
   const avatarUrl = user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0D8ABC&color=fff`;
-  // Objet stable pour que le menu latéral (React.memo) ne se redessine pas à chaque rendu du layout
-  const sidebarUser = useMemo(() => ({ name: userName, avatarUrl, isAdmin }), [userName, avatarUrl, isAdmin]);
 
   return (
     <div className="flex min-h-screen bg-white dark:bg-gray-900">
@@ -497,10 +496,6 @@ export default function AdminLayout({ children, immersive = false }) {
         open={sidebarOpen}
         onClose={closeSidebar}
         t={t}
-        language={currentLanguage}
-        isChangingLanguage={isChangingLanguage}
-        onChangeLanguage={changeLanguage}
-        user={sidebarUser}
       />
 
       {/* Overlay for mobile */}
@@ -565,6 +560,13 @@ export default function AdminLayout({ children, immersive = false }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
+
+            {/* ─── Sélecteur de langue ─── */}
+            <LanguageSwitcherSidebar
+              currentLanguage={currentLanguage}
+              isChangingLanguage={isChangingLanguage}
+              onChangeLanguage={changeLanguage}
+            />
 
             {/* ─── Cloche notifications ─── */}
             <div className="relative" ref={notifRef}>
