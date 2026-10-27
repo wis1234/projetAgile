@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import Notification from '../Components/Notification';
 import { router } from '@inertiajs/react';
@@ -9,8 +9,11 @@ import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import GlobalSearch from '@/Components/GlobalSearch';
 import MobileBottomNav from '@/Components/MobileBottomNav';
 import AssistantLauncher from '@/Components/Assistant/AssistantLauncher';
-import LanguageSwitcherSidebar from '@/Components/LanguageSwitcherSidebar';
+import Sidebar from '@/Components/Sidebar';
 import PushNotificationManager, { unregisterDeviceToken } from '@/Components/PushNotificationManager';
+
+const INCOMING_CALL_SOUND =
+  'https://proja.kemtcenter.org/storage/public/files/incoming-call_old.mp3';
 
 const getFreshCsrfToken = async () => {
   try {
@@ -56,7 +59,7 @@ const navLinks = [
   { href: '/activities', label: 'activity_log', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a4 4 0 0 1 4-4h4M7 7h.01M7 11h.01M7 15h.01" /></svg>
   ) },
-    { href: '/quizzes', label: 'quiz',
+  { href: '/quizzes', label: 'quiz',
     // actif sur toutes les pages quiz (liste, détail, correction, cumul…)
     match: (url) => /^\/(quizzes|projects\/\d+\/(quizzes|quiz-cumuls|participation-points))(\/|\?|$)/.test(url || ''),
     icon: (
@@ -79,13 +82,36 @@ const navLinks = [
   ) },
 ];
 
-const Loader = () => {
-  const letters = ['P', 'r', 'o', 'J', 'A'];
+// Lien réservé aux administrateurs (défini hors du composant pour rester stable entre les rendus)
+const assistantAdminLink = {
+  href: '/assistant/admin',
+  label: 'Assistant IA · Admin',
+  match: (url) => /^\/assistant\/admin(?:\/|$)/.test(url || ''),
+  icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 14l4-4 4 4 6-7" /></svg>,
+};
 
+const quizOnlyLinks = navLinks.filter((l) => l.href === '/quizzes');
+
+const LOADER_LETTERS = ['P', 'r', 'o', 'J', 'A'];
+const LOADER_CSS = `
+  @keyframes bounce {
+    0%, 100% {
+      transform: translateY(0) scale(1);
+      color: #2563eb;
+    }
+    50% {
+      transform: translateY(-15px) scale(1.2);
+      color: #1d4ed8;
+      text-shadow: 0 5px 10px rgba(37, 99, 235, 0.3);
+    }
+  }
+`;
+
+const Loader = React.memo(function Loader() {
   return (
     <div className="fixed top-0 bottom-0 left-0 right-0 md:left-[var(--sidebar-w,16rem)] z-[60] flex flex-col items-center justify-center bg-white dark:bg-gray-900 bg-opacity-90 transition-opacity duration-300">
       <div className="flex space-x-1 mb-8">
-        {letters.map((letter, index) => (
+        {LOADER_LETTERS.map((letter, index) => (
           <span
             key={index}
             className="text-4xl font-bold text-blue-600 dark:text-blue-400 inline-block"
@@ -104,24 +130,10 @@ const Loader = () => {
         Chargement...
       </p>
 
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          @keyframes bounce {
-            0%, 100% {
-              transform: translateY(0) scale(1);
-              color: #2563eb;
-            }
-            50% {
-              transform: translateY(-15px) scale(1.2);
-              color: #1d4ed8;
-              text-shadow: 0 5px 10px rgba(37, 99, 235, 0.3);
-            }
-          }
-        `
-      }} />
+      <style dangerouslySetInnerHTML={{ __html: LOADER_CSS }} />
     </div>
   );
-};
+});
 
 /**
  * `immersive` : pages d'édition plein écran (éditeur de documents). L'en-tête global, le pied de page
@@ -129,23 +141,26 @@ const Loader = () => {
  * du fichier qui reste figé en haut.
  */
 export default function AdminLayout({ children, immersive = false }) {
-  const { auth, flash = {}, appName } = usePage().props;
+  const { auth, flash = {} } = usePage().props;
   const { url: currentUrl } = usePage();
   // Compte candidat (inscrit à des quiz, sans projet) : un seul menu, « Quiz ».
   const candidateOnly = Boolean(auth?.user?.quiz_candidate_only);
-  const baseMenuLinks = candidateOnly ? navLinks.filter((l) => l.href === '/quizzes') : navLinks;
-  const menuLinks = auth?.user?.is_admin ? [...baseMenuLinks, {
-    href: '/assistant/admin',
-    label: 'Assistant IA · Admin',
-    match: (url) => /^\/assistant\/admin(?:\/|$)/.test(url || ''),
-    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 14l4-4 4 4 6-7" /></svg>,
-  }] : baseMenuLinks;
-  const isLinkActive = (link) => (link.match ? link.match(currentUrl) : route().current(link.href.replace(/^\//, '')));
+  const hasAdminFlag = Boolean(auth?.user?.is_admin);
+  const menuLinks = useMemo(() => {
+    const base = candidateOnly ? quizOnlyLinks : navLinks;
+    return hasAdminFlag ? [...base, assistantAdminLink] : base;
+  }, [candidateOnly, hasAdminFlag]);
+  const isLinkActive = useCallback(
+    (link) => (link.match ? link.match(currentUrl) : route().current(link.href.replace(/^\//, ''))),
+    [currentUrl]
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Menu latéral réductible (PC) : seules les icônes restent visibles, le contenu gagne de la place
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar_collapsed') === '1'; } catch { return false; }
   });
+  const toggleCollapsed = useCallback(() => setCollapsed((c) => !c), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   useEffect(() => {
     try { localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0'); } catch { /* stockage indisponible */ }
     // Les pages plein écran (chat, loader) s'alignent sur cette largeur via var(--sidebar-w)
@@ -182,7 +197,6 @@ export default function AdminLayout({ children, immersive = false }) {
   const profileRef = useRef();
   const notifRef = useRef();
   const [globalLoading, setGlobalLoading] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('fr');
   const [isChangingLanguage, setIsChangingLanguage] = useState(false);
   const { t, i18n } = useTranslation();
@@ -193,52 +207,48 @@ export default function AdminLayout({ children, immersive = false }) {
   const [joinToast, setJoinToast] = useState(null); // { projectName, userName }
   const ringtoneRef = useRef(null);
 
-const INCOMING_CALL_SOUND =
-  'https://proja.kemtcenter.org/storage/public/files/incoming-call_old.mp3';
+  const playRingtone = useCallback(() => {
+    if (ringtoneRef.current) return;
 
-const playRingtone = () => {
-  if (ringtoneRef.current) return;
+    const audio = new Audio(INCOMING_CALL_SOUND);
+    audio.loop = true;
+    audio.volume = 0.85;
+    audio.preload = 'auto';
 
-  const audio = new Audio(INCOMING_CALL_SOUND);
-  audio.loop = true;
-  audio.volume = 0.85;
-  audio.preload = 'auto';
+    ringtoneRef.current = audio;
 
-  ringtoneRef.current = audio;
+    audio.play().catch((error) => {
+      console.warn('Lecture de la sonnerie d’appel bloquée:', error);
+    });
 
-  audio.play().catch((error) => {
-    console.warn('Lecture de la sonnerie d’appel bloquée:', error);
-  });
+    if (navigator.vibrate) {
+      navigator.vibrate([400, 200, 400, 200, 400]);
+    }
+  }, []);
 
-  if (navigator.vibrate) {
-    navigator.vibrate([400, 200, 400, 200, 400]);
-  }
-};
+  const stopRingtone = useCallback(() => {
+    if (ringtoneRef.current) {
+      ringtoneRef.current.pause();
+      ringtoneRef.current.currentTime = 0;
+      ringtoneRef.current = null;
+    }
 
-const stopRingtone = () => {
-  if (ringtoneRef.current) {
-    ringtoneRef.current.pause();
-    ringtoneRef.current.currentTime = 0;
-    ringtoneRef.current = null;
-  }
+    if (navigator.vibrate) {
+      navigator.vibrate(0);
+    }
+  }, []);
 
-  if (navigator.vibrate) {
-    navigator.vibrate(0);
-  }
-};
+  useEffect(() => stopRingtone, [stopRingtone]);
 
-
-  useEffect(() => stopRingtone, []);
-
-  useEffect(() => {
-    const userIsAdmin =
+  // Calculé directement à partir de l'utilisateur : plus d'état ni de rendu supplémentaire
+  const isAdmin = useMemo(
+    () =>
       auth.user?.email === 'ronaldoagbohou@gmail.com' ||
       auth.user?.role === 'admin' ||
       (Array.isArray(auth.user?.roles) && auth.user.roles.includes('admin')) ||
-      auth.user?.is_admin === true;
-
-    setIsAdmin(userIsAdmin);
-  }, [auth.user]);
+      auth.user?.is_admin === true,
+    [auth.user]
+  );
 
   useEffect(() => {
     if (darkMode) {
@@ -267,7 +277,7 @@ const stopRingtone = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-    const handleLogout = async () => {
+  const handleLogout = async () => {
     try {
       await unregisterDeviceToken();
     } catch {
@@ -278,7 +288,7 @@ const stopRingtone = () => {
 
   const userId = auth?.user?.id || auth?.id;
 
-  const fetchNotifications = React.useCallback(() => {
+  const fetchNotifications = useCallback(() => {
     if (!userId) return;
     fetch('/activities/notifications')
       .then(res => res.json())
@@ -289,18 +299,28 @@ const stopRingtone = () => {
       .catch(() => {});
   }, [userId]);
 
+  // Rafraîchissement périodique, mis en pause quand l'onglet est caché,
+  // et rattrapage immédiat quand l'utilisateur revient sur l'onglet.
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 90000);
-    return () => clearInterval(interval);
+    const refreshIfVisible = () => {
+      if (!document.hidden) fetchNotifications();
+    };
+    const interval = setInterval(refreshIfVisible, 90000);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
   }, [fetchNotifications]);
 
-  // ─── Temps réel : nouvelle activité poussée immédiatement ───
+  // ─── Temps réel : activités + appels ProJA (LiveKit), un seul abonnement au canal utilisateur ───
   useEffect(() => {
-    if (!window.Echo || !userId) return;
+    if (!window.Echo || !userId) return undefined;
 
     const channel = window.Echo.private(`user.${userId}`);
 
+    // Nouvelle activité poussée immédiatement
     channel.listen('.activity.created', (payload) => {
       setNotifications(prev => [
         { ...payload, is_read: false },
@@ -309,44 +329,9 @@ const stopRingtone = () => {
       setNotifCount(prev => prev + 1);
     });
 
-    return () => {
-      window.Echo.leave(`user.${userId}`);
-    };
-  }, [userId]);
-
-
-    // ─── Rafraîchissement instantané quand un push FCM arrive au premier plan (natif) ───
-  useEffect(() => {
-    const handleFcmForeground = () => {
-      fetchNotifications();
-    };
-    window.addEventListener('proja:fcm-foreground', handleFcmForeground);
-    return () => window.removeEventListener('proja:fcm-foreground', handleFcmForeground);
-  }, [fetchNotifications]);
-
-
-  const markNotificationsRead = () => {
-    if (notifCount === 0) return;
-    fetch('/activities/notifications/mark-read', {
-      method: 'POST',
-      headers: {
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-    }).catch(() => {});
-    setNotifCount(0);
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-  };
-
-  // ─── Écoute globale des appels ProJA (LiveKit), peu importe la page ───
-  useEffect(() => {
-    if (!window.Echo || !auth?.user?.id) return;
-
-    const channel = window.Echo.private(`user.${auth.user.id}`);
-
     channel.listen('.livekit.call.started', (e) => {
       // Ne pas sonner chez l'initiateur lui-même
-      if (String(e.initiatorId) === String(auth?.user?.id)) return;
+      if (String(e.initiatorId) === String(userId)) return;
       setLiveKitInvite({
         projectId: e.projectId,
         projectName: e.projectName,
@@ -372,9 +357,31 @@ const stopRingtone = () => {
     });
 
     return () => {
-      window.Echo.leave(`user.${auth.user.id}`);
+      window.Echo.leave(`user.${userId}`);
     };
-  }, [auth?.user?.id]);
+  }, [userId, playRingtone, stopRingtone]);
+
+  // ─── Rafraîchissement instantané quand un push FCM arrive au premier plan (natif) ───
+  useEffect(() => {
+    const handleFcmForeground = () => {
+      fetchNotifications();
+    };
+    window.addEventListener('proja:fcm-foreground', handleFcmForeground);
+    return () => window.removeEventListener('proja:fcm-foreground', handleFcmForeground);
+  }, [fetchNotifications]);
+
+  const markNotificationsRead = () => {
+    if (notifCount === 0) return;
+    fetch('/activities/notifications/mark-read', {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    }).catch(() => {});
+    setNotifCount(0);
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+  };
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -389,16 +396,20 @@ const stopRingtone = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Loader global : les écouteurs Inertia sont désormais retirés au démontage
+  // (avant, la fonction de nettoyage était vide et les écouteurs s'accumulaient).
   useEffect(() => {
-    const onStart = () => setGlobalLoading(true);
-    const onFinish = () => setGlobalLoading(false);
-    const onError = () => setGlobalLoading(false);
+    const offs = [
+      router.on('start', () => setGlobalLoading(true)),
+      router.on('finish', () => setGlobalLoading(false)),
+      router.on('error', () => setGlobalLoading(false)),
+    ];
 
-    router.on('start', onStart);
-    router.on('finish', onFinish);
-    router.on('error', onError);
-
-    return () => {};
+    return () => {
+      offs.forEach((off) => {
+        if (typeof off === 'function') off();
+      });
+    };
   }, []);
 
   useEffect(() => {
@@ -437,7 +448,7 @@ const stopRingtone = () => {
   }, [i18n]);
 
   // Function to change language
-  const changeLanguage = async (lng) => {
+  const changeLanguage = useCallback(async (lng) => {
     if (currentLanguage === lng || isChangingLanguage) return;
 
     try {
@@ -462,11 +473,13 @@ const stopRingtone = () => {
       }
       setIsChangingLanguage(false);
     }
-  };
+  }, [currentLanguage, isChangingLanguage, i18n, flash, t]);
 
   const user = auth?.user || auth;
   const userName = user?.name || 'Utilisateur';
   const avatarUrl = user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0D8ABC&color=fff`;
+  // Objet stable pour que le menu latéral (React.memo) ne se redessine pas à chaque rendu du layout
+  const sidebarUser = useMemo(() => ({ name: userName, avatarUrl, isAdmin }), [userName, avatarUrl, isAdmin]);
 
   return (
     <div className="flex min-h-screen bg-white dark:bg-gray-900">
@@ -476,110 +489,36 @@ const stopRingtone = () => {
       {globalLoading && <Loader />}
 
       {/* ═══════════════════ SIDEBAR / DRAWER ═══════════════════ */}
-      <aside
-        className={`fixed top-0 left-0 h-screen w-72 ${collapsed ? 'md:w-[4.5rem]' : 'md:w-64'} bg-gradient-to-b from-indigo-900 to-blue-800 dark:from-gray-900 dark:to-gray-800 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-all duration-300 z-50 flex flex-col shadow-xl`}
-        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
-      >
-        {/* Logo */}
-        <div className={`relative flex items-center justify-between h-20 flex-shrink-0 px-6 ${collapsed ? 'md:px-0 md:justify-center' : ''}`}>
-          <div className="flex items-center space-x-3">
-            <svg className="w-8 h-8 text-white dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            <span className={`text-xl font-bold text-white dark:text-blue-400 ${collapsed ? 'md:hidden' : ''}`}>ProJA</span>
-          </div>
-          <button
-            className="md:hidden text-white/70 hover:text-white active:scale-90 transition-all"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Fermer le menu"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
-          {/* Réduire / étendre (PC) */}
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? 'Étendre le menu' : 'Réduire le menu'}
-            aria-expanded={!collapsed}
-            title={collapsed ? 'Étendre le menu (Ctrl+B)' : 'Réduire le menu (Ctrl+B)'}
-            className="hidden md:flex absolute -right-3.5 top-1/2 -translate-y-1/2 h-7 w-7 items-center justify-center rounded-full bg-white text-blue-700 shadow-lg ring-1 ring-black/5 transition hover:scale-110 hover:bg-blue-50 dark:bg-gray-700 dark:text-blue-200"
-          >
-            <svg className={`h-3.5 w-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Menu */}
-        <nav className={`flex-1 px-4 py-4 overflow-y-auto overflow-x-hidden scrollbar-hide space-y-1.5 ${collapsed ? 'md:px-2.5' : ''}`}>
-          {menuLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setSidebarOpen(false)}
-              title={collapsed ? t(link.label) : undefined}
-              aria-label={t(link.label)}
-              className={`group relative flex items-center gap-3 px-4 py-3 text-base rounded-lg transition-all duration-200 active:scale-[0.98] ${collapsed ? 'md:justify-center md:px-0' : ''} ${
-                isLinkActive(link)
-                  ? 'bg-white/10 dark:bg-blue-900/50 text-white dark:text-blue-100 shadow-lg'
-                  : 'text-white/80 hover:bg-white/5 dark:hover:bg-blue-900/30 hover:text-white dark:hover:text-blue-100'
-              }`}
-            >
-              <span className="text-lg flex-shrink-0">
-                {link.icon || (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                )}
-              </span>
-              <span className={`font-medium truncate ${collapsed ? 'md:hidden' : ''}`}>{t(link.label)}</span>
-              {isLinkActive(link) && (
-                <span className={`${collapsed ? 'md:absolute md:right-1.5 md:top-1/2 md:-translate-y-1/2' : 'ml-auto'} w-1.5 h-1.5 bg-blue-400 dark:bg-blue-300 rounded-full`}></span>
-              )}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Sélecteur de langue */}
-        <div className={`flex-shrink-0 border-t border-white/10 dark:border-gray-700 pt-3 ${collapsed ? 'md:hidden' : ''}`}>
-          <LanguageSwitcherSidebar
-            currentLanguage={currentLanguage}
-            isChangingLanguage={isChangingLanguage}
-            onChangeLanguage={changeLanguage}
-            t={t}
-          />
-        </div>
-
-        {/* Version */}
-        <div
-          className={`p-4 border-t border-white/10 dark:border-gray-700 text-center flex-shrink-0 ${collapsed ? 'md:px-1' : ''}`}
-          style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 1rem)' }}
-        >
-          <div className={`font-medium text-white/60 dark:text-gray-400 ${collapsed ? 'md:text-[10px]' : 'text-sm'}`}>
-            {collapsed ? 'v2.3' : 'ProJA v2.3.1'}
-          </div>
-        </div>
-      </aside>
+      <Sidebar
+        links={menuLinks}
+        isLinkActive={isLinkActive}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapsed}
+        open={sidebarOpen}
+        onClose={closeSidebar}
+        t={t}
+        language={currentLanguage}
+        isChangingLanguage={isChangingLanguage}
+        onChangeLanguage={changeLanguage}
+        user={sidebarUser}
+      />
 
       {/* Overlay for mobile */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeSidebar}
         ></div>
       )}
 
       {/* Main content */}
-      <div className={`flex-1 flex flex-col min-h-screen ml-0 ${collapsed ? 'md:ml-[4.5rem]' : 'md:ml-64'} transition-all duration-300 min-w-0`}>
+      <div className={`flex-1 flex flex-col min-h-screen ml-0 ${collapsed ? 'md:ml-[4.5rem]' : 'md:ml-64'} transition-[margin] duration-300 motion-reduce:transition-none min-w-0`}>
         {/* ═══════════════════════════════════════════════════════════
             HEADER — allégé sur mobile (pattern app native)
         ═══════════════════════════════════════════════════════════ */}
         {!immersive && (
         <header
-          className={`fixed top-0 left-0 ${collapsed ? 'md:left-[4.5rem]' : 'md:left-64'} right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-all duration-300`}
+          className={`fixed top-0 left-0 ${collapsed ? 'md:left-[4.5rem]' : 'md:left-64'} right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-[left] duration-300 motion-reduce:transition-none`}
           style={{
             height: 'calc(4rem + env(safe-area-inset-top, 0px))',
             paddingTop: 'env(safe-area-inset-top, 0px)',
