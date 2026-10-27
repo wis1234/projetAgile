@@ -522,13 +522,13 @@ function Create({ projects = [], sprints = [], users = [], selectedProjectId = n
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-sm font-semibold">Description</label>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">{description.length}/2000 caractères</span>
+                  <span className="text-xs text-gray-500">{description.length}/5000 caractères</span>
                   <button type="button" onClick={() => setShowPreview(!showPreview)} className="text-xs text-blue-600 hover:underline">{showPreview ? 'Éditer' : 'Aperçu'}</button>
                 </div>
               </div>
               {!showPreview ? (
                 <>
-                  <textarea id="description" value={description} onChange={e => setDescription(e.target.value.slice(0, 2000))} rows="6" className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 font-mono text-sm" placeholder="Décrivez la tâche en détail (support Markdown)" disabled={!hasProjects} />
+                  <textarea id="description" value={description} onChange={e => setDescription(e.target.value.slice(0, 5000))} rows="6" className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 font-mono text-sm" placeholder="Décrivez la tâche en détail (support Markdown)" disabled={!hasProjects} />
                   <div className="mt-1 flex flex-wrap gap-2">
                     <button type="button" onClick={() => { const ta = document.getElementById('description'); const s = ta.selectionStart, e = ta.selectionEnd, t = description.substring(s, e); setDescription(description.substring(0,s) + `**${t||'texte en gras'}**` + description.substring(e)); setTimeout(()=>ta.setSelectionRange(s+2, s+6+(t.length)),0); }} className="text-xs px-2 py-1 bg-gray-100 rounded border hover:bg-gray-200" title="Gras"><strong>B</strong></button>
                     <button type="button" onClick={() => { const ta = document.getElementById('description'); const s = ta.selectionStart, e = ta.selectionEnd, t = description.substring(s, e); setDescription(description.substring(0,s) + `*${t||'texte en italique'}*` + description.substring(e)); setTimeout(()=>ta.setSelectionRange(s+1, s+1+t.length),0); }} className="text-xs px-2 py-1 bg-gray-100 rounded border hover:bg-gray-200" title="Italique"><em>I</em></button>
