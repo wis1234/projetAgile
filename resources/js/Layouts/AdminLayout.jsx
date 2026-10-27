@@ -9,7 +9,7 @@ import LiveKitCallModal from '@/Components/LiveKitCallModal';
 import GlobalSearch from '@/Components/GlobalSearch';
 import MobileBottomNav from '@/Components/MobileBottomNav';
 import AssistantLauncher from '@/Components/Assistant/AssistantLauncher';
-import Sidebar from '@/Components/Sidebar';
+import Sidebar from '@/Components/Sidebar/Sidebar';
 import PushNotificationManager, { unregisterDeviceToken } from '@/Components/PushNotificationManager';
 
 const INCOMING_CALL_SOUND =
