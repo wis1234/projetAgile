@@ -10,7 +10,10 @@
         <link rel="icon" type="image/png" href="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png">
         <link rel="apple-touch-icon" href="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png">
 
-        <!-- Fonts -->
+        <!-- Fonts – Inter (style Slack/Linear) + Figtree fallback -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 

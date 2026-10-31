@@ -16,13 +16,13 @@ const Widget = ({ title, count, color, link, icon: Icon }) => {
   const { t } = useTranslation();
 
   const content = (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-100 dark:border-gray-700 flex items-center gap-3 sm:gap-4 shadow-sm hover:shadow-md active:scale-[0.98] transition-all min-w-0">
-      <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-        <Icon className="text-lg sm:text-xl text-white" />
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-5 border border-gray-100 dark:border-gray-700 flex items-center gap-3 sm:gap-4 hover:shadow-md hover:border-gray-200 dark:hover:border-gray-600 active:scale-[0.98] transition-all duration-150 min-w-0 group">
+      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0 ${color} shadow-sm`}>
+        <Icon className="text-base sm:text-lg text-white" />
       </div>
       <div className="min-w-0">
-        <p className="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white leading-tight">{count ?? 0}</p>
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5 truncate">{title}</p>
+        <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white leading-tight tabular-nums">{count ?? 0}</p>
+        <p className="text-[12px] font-medium text-gray-500 dark:text-gray-400 mt-0.5 truncate tracking-wide">{title}</p>
       </div>
     </div>
   );
@@ -39,12 +39,12 @@ const Widget = ({ title, count, color, link, icon: Icon }) => {
 const QuickAccess = () => {
   const { t } = useTranslation();
   return (
-    <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-sm overflow-hidden">
+    <div className="bg-gradient-to-br from-[#0F1E36] to-[#1E3A8A] rounded-xl shadow-sm border border-[#1B2E4B] overflow-hidden">
       <div className="p-4 sm:p-5 text-white">
-        <h2 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 flex items-center gap-2">
-          <FaChartLine /> {t('quick_access')}
+        <h2 className="text-[13px] sm:text-sm font-semibold mb-3 sm:mb-4 flex items-center gap-2 uppercase tracking-widest text-blue-200/90">
+          <FaChartLine className="text-blue-300" /> {t('quick_access')}
         </h2>
-        <div className="space-y-2 sm:space-y-3">
+        <div className="space-y-1.5 sm:space-y-2">
           {[
             { icon: <FaTasks />, label: t('new_task'), link: '/tasks/create' },
             { icon: <FaProjectDiagram />, label: t('new_project'), link: '/projects/create' },
@@ -55,11 +55,11 @@ const QuickAccess = () => {
             <Link
               key={index}
               href={item.link}
-              className="flex items-center p-2.5 sm:p-3 rounded-xl bg-white bg-opacity-10 hover:bg-opacity-20 active:scale-[0.98] transition-all min-w-0"
+              className="flex items-center p-2.5 sm:p-3 rounded-lg bg-white/10 hover:bg-white/20 active:scale-[0.98] transition-all min-w-0 group"
             >
-              <span className="mr-3 flex-shrink-0">{item.icon}</span>
-              <span className="font-medium text-sm sm:text-base truncate min-w-0">{item.label}</span>
-              <FaChevronRight className="ml-auto h-3 w-3 opacity-70 flex-shrink-0" />
+              <span className="mr-3 flex-shrink-0 text-blue-200 group-hover:text-white">{item.icon}</span>
+              <span className="font-medium text-[13px] sm:text-sm truncate min-w-0">{item.label}</span>
+              <FaChevronRight className="ml-auto h-3 w-3 text-blue-200/60 group-hover:text-white group-hover:translate-x-0.5 transition-all flex-shrink-0" />
             </Link>
           ))}
         </div>
@@ -179,26 +179,26 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
   };
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="w-full min-h-screen bg-[#F8F8F8] dark:bg-gray-950">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-7 space-y-5">
 
-        {/* En-tête — même structure que la page Projets */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        {/* En-tête – style Slack (titre compact, police Inter) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight break-words">
-              {t('dashboard').toUpperCase()}
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+              {t('dashboard')}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-0.5">
               {t('dashboard_subtitle')}
             </p>
           </div>
-          <div className="w-full sm:w-64 flex-shrink-0 min-w-0">
+          <div className="w-full sm:w-60 flex-shrink-0 min-w-0">
             <RecruitmentCard />
           </div>
         </div>
 
-        {/* Grille des widgets — même grille/gap que les SummaryCard de Projets */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Widgets stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {visibleWidgets.map((widget, index) => (
             <Widget
               key={index}

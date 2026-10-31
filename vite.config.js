@@ -2,6 +2,16 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
+
+const hasYjs = fs.existsSync(path.resolve(__dirname, 'node_modules/yjs'));
+const hasYProtocols = fs.existsSync(path.resolve(__dirname, 'node_modules/y-protocols'));
+const hasTiptapCollab = fs.existsSync(path.resolve(__dirname, 'node_modules/@tiptap/extension-collaboration'));
+const hasTiptapYTiptap = fs.existsSync(path.resolve(__dirname, 'node_modules/@tiptap/y-tiptap'));
+const hasTiptapTable = fs.existsSync(path.resolve(__dirname, 'node_modules/@tiptap/extension-table'));
+const hasTiptapSubscript = fs.existsSync(path.resolve(__dirname, 'node_modules/@tiptap/extension-subscript'));
+const hasTiptapSuperscript = fs.existsSync(path.resolve(__dirname, 'node_modules/@tiptap/extension-superscript'));
+const hasFflate = fs.existsSync(path.resolve(__dirname, 'node_modules/fflate'));
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -34,6 +44,27 @@ export default defineConfig(({ mode }) => ({
             '@contexts': path.resolve(__dirname, './resources/js/contexts'),
             '@config': path.resolve(__dirname, './resources/js/config'),
             '~bootstrap': path.resolve(__dirname, 'node_modules/bootstrap'),
+            ...(!hasYjs ? { 'yjs': path.resolve(__dirname, './resources/js/shims/yjs.js') } : {}),
+            ...(!hasYProtocols ? { 'y-protocols/awareness': path.resolve(__dirname, './resources/js/shims/y-protocols.js') } : {}),
+            ...(!hasTiptapCollab ? {
+                '@tiptap/extension-collaboration': path.resolve(__dirname, './resources/js/shims/tiptap-collab.js'),
+                '@tiptap/extension-collaboration-caret': path.resolve(__dirname, './resources/js/shims/tiptap-collab.js'),
+            } : {}),
+            ...(!hasTiptapYTiptap ? {
+                '@tiptap/y-tiptap': path.resolve(__dirname, './resources/js/shims/tiptap-collab.js'),
+            } : {}),
+            ...(!hasTiptapTable ? {
+                '@tiptap/extension-table': path.resolve(__dirname, './resources/js/shims/tiptap-table.js'),
+            } : {}),
+            ...(!hasTiptapSubscript ? {
+                '@tiptap/extension-subscript': path.resolve(__dirname, './resources/js/shims/tiptap-table.js'),
+            } : {}),
+            ...(!hasTiptapSuperscript ? {
+                '@tiptap/extension-superscript': path.resolve(__dirname, './resources/js/shims/tiptap-table.js'),
+            } : {}),
+            ...(!hasFflate ? {
+                'fflate': path.resolve(__dirname, './resources/js/shims/fflate.js'),
+            } : {}),
         },
     },
     envPrefix: 'VITE_',

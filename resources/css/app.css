@@ -2,41 +2,208 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Hide scrollbar for Chrome, Safari and Opera */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
+/* ─────────────────────────────────────────────
+   BASE — Slack-like feel
+   Police Inter, scrollbars fines, transitions
+   ───────────────────────────────────────────── */
+
+/* Scrollbar élégante (Slack-style) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.28); }
+* { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.15) transparent; }
+
+/* Hide scrollbar for Chrome, Safari and Opera (classes utilitaires) */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Charte Bleu Foncé ProJA */
+  --color-sidebar: #0F1E36;
+  --color-sidebar-header: #0A1526;
+  --color-sidebar-border: #1B2E4B;
+  --color-sidebar-text: #94A3B8;
+  --color-proja-blue: #2563EB;
 }
 
-html,
-body,
-#app {
-  min-height: 100%;
-}
+html, body, #app { min-height: 100%; }
 
 html {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Rendu de texte plus net */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   overflow-x: hidden;
   overflow-y: auto;
+  /* Fond propre comme Slack */
+  @apply bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100;
+  /* Transition couleur fluide */
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Hide scrollbar for IE, Edge and Firefox */
-.scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+/* ─── Transitions de navigation Inertia — ultra-fluide ─── */
+.page-transition-enter { opacity: 0; transform: translateY(4px); }
+.page-transition-enter-active { opacity: 1; transform: translateY(0); transition: opacity 180ms ease, transform 180ms ease; }
+
+/* ─── Shared mobile page shell ─── */
+.mobile-page-shell {
+  min-height: calc(100dvh - 8rem - var(--safe-top) - var(--safe-bottom));
+  overflow-wrap: anywhere;
 }
 
-body {
-  @apply bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors;
+.mobile-page-enter { animation: mobile-page-enter 180ms ease-out both; }
+@keyframes mobile-page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+
+.mobile-page-shell img,
+.mobile-page-shell video,
+.mobile-page-shell canvas { max-width: 100%; }
+
+@media (max-width: 767px) {
+  .mobile-page-shell table {
+    display: block; max-width: 100%; overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mobile-page-shell button,
+  .mobile-page-shell a { touch-action: manipulation; }
+}
+
+/* ─── Native mobile app shell ─── */
+.native-mobile-app { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: auto; overflow: hidden; }
+.native-mobile-app .mobile-app-shell {
+  height: 100dvh; min-height: 100dvh; overflow-x: hidden; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
+}
+.native-mobile-app body,
+.native-mobile-app #app { min-height: 100dvh; height: auto; overflow-x: hidden; overflow-y: hidden; }
+
+.mobile-app-shell > main > :not(.flex-1):not(.overflow-y-auto):not(.overflow-y-scroll) { flex-shrink: 0; }
+
+html.native-mobile-app:not(:has(.mobile-app-shell)) { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+html.native-mobile-app:not(:has(.mobile-app-shell)) body,
+html.native-mobile-app:not(:has(.mobile-app-shell)) #app { overflow-y: visible; }
+
+.native-mobile-app .mobile-native-content { color: #0f172a; }
+.dark.native-mobile-app .mobile-native-content { color: #f8fafc; }
+
+@media (max-width: 767px) {
+  .native-mobile-app .mobile-native-content > * { max-width: 100% !important; }
+  .native-mobile-app .mobile-native-content .max-w-screen-2xl,
+  .native-mobile-app .mobile-native-content .max-w-7xl,
+  .native-mobile-app .mobile-native-content .max-w-6xl,
+  .native-mobile-app .mobile-native-content .max-w-5xl,
+  .native-mobile-app .mobile-native-content .max-w-4xl { width: 100%; padding-left: 0.25rem; padding-right: 0.25rem; }
+  .native-mobile-app .mobile-native-content table { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .native-mobile-app .mobile-native-content input,
+  .native-mobile-app .mobile-native-content select,
+  .native-mobile-app .mobile-native-content textarea { min-height: 3rem; max-width: 100%; font-size: 1rem; }
+  .native-mobile-app .mobile-native-content button,
+  .native-mobile-app .mobile-native-content a[role='button'],
+  .native-mobile-app .mobile-native-content .btn { min-height: 2.75rem; }
+  .native-mobile-app .mobile-native-content [role='dialog'] { align-items: stretch; padding: 0; }
+  .native-mobile-app .mobile-native-content [role='dialog'] > * { width: 100%; max-width: none; min-height: 100dvh; border-radius: 0; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
+  .native-mobile-app .mobile-native-content .grid-cols-4,
+  .native-mobile-app .mobile-native-content .grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .native-mobile-app .mobile-native-content .flex-row { min-width: 0; flex-wrap: wrap; }
+  .native-mobile-app .mobile-native-content > .h-screen { height: auto !important; min-height: calc(100dvh - 8rem); }
+  .native-mobile-app .mobile-native-content > .overflow-hidden { overflow: visible; }
+  .native-mobile-app .mobile-native-content > .overflow-x-hidden { overflow-x: hidden; overflow-y: visible; }
+}
+
+/* ─── Formulaires & composants — charte ProJA (Bleu ProJA) ─── */
+input, select, textarea {
+  @apply rounded-lg border-gray-300 dark:border-gray-600 focus:border-blue-600 focus:ring focus:ring-blue-600/20 dark:bg-gray-800 dark:text-gray-100;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+}
+
+.btn {
+  @apply px-4 py-2 rounded-lg font-semibold shadow-sm transition-all;
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500/40;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+}
+
+.btn-secondary {
+  @apply bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
+}
+
+.input { @apply border px-3 py-2 rounded-lg w-full; }
+.text-error { @apply text-red-600 dark:text-red-400; }
+
+/* ─── TipTap Editor ─── */
+.ProseMirror {
+  @apply p-4 min-h-[200px] outline-none border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800;
+  font-family: 'Inter', sans-serif;
+}
+.ProseMirror:focus { @apply ring-2 ring-blue-500/30 border-transparent; }
+.ProseMirror p { @apply my-2; }
+.ProseMirror h1, .ProseMirror h2, .ProseMirror h3,
+.ProseMirror h4, .ProseMirror h5, .ProseMirror h6 { @apply mt-4 mb-2 font-bold; }
+.ProseMirror h1 { @apply text-2xl; }
+.ProseMirror h2 { @apply text-xl; }
+.ProseMirror h3 { @apply text-lg; }
+.ProseMirror .highlight { @apply px-1 rounded; background-color: rgba(255, 213, 0, 0.2); }
+.ProseMirror .code-block {
+  @apply bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-4 rounded-lg my-3 font-mono text-sm overflow-x-auto;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  position: relative;
+}
+.code-language { @apply absolute top-2 right-2 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-700 px-2 py-1 rounded; z-index: 10; }
+.hljs { @apply bg-transparent p-0; }
+.ProseMirror code { @apply bg-gray-100 dark:bg-gray-700 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded text-sm font-mono; }
+.code-block-wrapper { @apply relative; }
+.copy-code-button { @apply absolute top-2 right-2 p-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-white/80 dark:bg-gray-700/80 rounded opacity-0 transition-opacity duration-200; }
+.code-block-wrapper:hover .copy-code-button { @apply opacity-100; }
+.hljs-keyword { @apply text-purple-600 dark:text-purple-400; }
+.hljs-title { @apply text-blue-600 dark:text-blue-400; }
+.hljs-params { @apply text-gray-700 dark:text-gray-300; }
+.hljs-string { @apply text-green-600 dark:text-green-400; }
+.hljs-comment { @apply text-gray-500 dark:text-gray-400 italic; }
+.hljs-number { @apply text-blue-600 dark:text-blue-400; }
+.hljs-built_in { @apply text-yellow-600 dark:text-yellow-400; }
+.hljs-literal { @apply text-red-600 dark:text-red-400; }
+
+/* ─── Finitions app mobile ─── */
+.native-mobile-app .mobile-app-shell,
+.native-mobile-app .mobile-app-shell * { -webkit-touch-callout: none; }
+.native-mobile-app .mobile-app-shell p,
+.native-mobile-app .mobile-app-shell h1,
+.native-mobile-app .mobile-app-shell h2,
+.native-mobile-app .mobile-app-shell h3,
+.native-mobile-app .mobile-app-shell textarea,
+.native-mobile-app .mobile-app-shell input { -webkit-touch-callout: default; }
+
+.native-mobile-app .mobile-native-content button:not(:disabled),
+.native-mobile-app .mobile-native-content a[href] { transition: transform 120ms ease, background-color 150ms ease, opacity 150ms ease; }
+.native-mobile-app .mobile-native-content button:not(:disabled):active,
+.native-mobile-app .mobile-native-content a[href]:active { transform: scale(0.98); }
+
+.native-mobile-app .mobile-app-shell input:not([type='checkbox']):not([type='radio']),
+.native-mobile-app .mobile-app-shell select,
+.native-mobile-app .mobile-app-shell textarea { font-size: max(16px, 1rem); border-radius: 0.875rem; }
+
+.native-mobile-app .mobile-native-content pre,
+.native-mobile-app .mobile-native-content .overflow-x-auto { -webkit-overflow-scrolling: touch; max-width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-page-enter { animation: none; }
+  .native-mobile-app .mobile-native-content button,
+  .native-mobile-app .mobile-native-content a { transition: none; }
+}
+
 
 /* Shared constraints for pages rendered inside the native mobile shell. */
 .mobile-page-shell {

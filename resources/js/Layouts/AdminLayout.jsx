@@ -513,50 +513,57 @@ export default function AdminLayout({ children, immersive = false }) {
         ═══════════════════════════════════════════════════════════ */}
         {!immersive && (
         <header
-          className={`fixed top-0 left-0 ${collapsed ? 'md:left-[4.5rem]' : 'md:left-64'} right-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 sm:px-5 z-40 shadow-sm transition-[left] duration-300 motion-reduce:transition-none`}
+          className={[
+            'fixed top-0 left-0 right-0 z-40',
+            collapsed ? 'md:left-[4.5rem]' : 'md:left-64',
+            // Style header Slack : blanc pur, ombre fine, très propre
+            'bg-white dark:bg-gray-900',
+            'border-b border-gray-200/80 dark:border-gray-700/60',
+            'flex items-center justify-between px-3 sm:px-6',
+            'shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]',
+            'transition-[left] duration-300 motion-reduce:transition-none',
+          ].join(' ')}
           style={{
-            height: 'calc(4rem + env(safe-area-inset-top, 0px))',
+            height: 'calc(3.75rem + env(safe-area-inset-top, 0px))',
             paddingTop: 'env(safe-area-inset-top, 0px)',
           }}
         >
-          {/* ── Gauche : burger + logo ── */}
+          {/* ── Gauche : burger + logo (mobile) ── */}
           <div className="flex items-center gap-3 min-w-0">
             <button
-              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all flex-shrink-0"
+              className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all flex-shrink-0"
               onClick={() => setSidebarOpen(true)}
               aria-label="Ouvrir le menu"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
 
             {/* Logo — visible uniquement sur mobile */}
             <div className="flex items-center gap-2 md:hidden">
-              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <span className="text-lg font-bold text-gray-800 dark:text-white tracking-wide">ProJA</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-white font-bold text-sm select-none flex-shrink-0 shadow-sm">P</span>
+              <span className="text-[15px] font-bold text-gray-900 dark:text-white tracking-tight">ProJA</span>
             </div>
           </div>
 
-          {/* ── Centre : barre de recherche (desktop uniquement) ── */}
-          <div className="hidden md:flex flex-1 justify-center px-4 min-w-0">
-            <div className="w-full max-w-md">
+          {/* ── Centre : barre de recherche Slack-style (desktop) ── */}
+          <div className="hidden md:flex flex-1 justify-center px-6 min-w-0">
+            <div className="w-full max-w-lg">
               {!candidateOnly && <GlobalSearch />}
             </div>
           </div>
 
           {/* ── Droite : actions ── */}
-          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
 
-            {/* Icône recherche — mobile uniquement, ouvre un overlay plein écran */}
+            {/* Icône recherche — mobile */}
             <button
-              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
+              className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
               onClick={() => setMobileSearchOpen(true)}
               aria-label="Rechercher"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+              <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
@@ -571,7 +578,7 @@ export default function AdminLayout({ children, immersive = false }) {
             {/* ─── Cloche notifications ─── */}
             <div className="relative" ref={notifRef}>
               <button
-                className="relative flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
+                className="relative flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-90 transition-all"
                 title="Notifications"
                 onClick={() => {
                   const opening = !notifDropdown;
@@ -581,11 +588,11 @@ export default function AdminLayout({ children, immersive = false }) {
                 }}
                 aria-label="Notifications"
               >
-                <svg className={`w-5 h-5 ${notifCount > 0 ? 'text-orange-500 animate-pulse' : ''}`} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                <svg className={`w-[18px] h-[18px] ${notifCount > 0 ? 'text-blue-600 dark:text-blue-400' : ''}`} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {notifCount > 0 && (
-                  <span className="absolute top-1 right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 shadow">
+                  <span className="absolute top-1 right-1 min-w-[16px] h-[16px] flex items-center justify-center bg-blue-600 text-white text-[9px] font-bold rounded-full px-0.5 shadow">
                     {notifCount > 99 ? '99+' : notifCount}
                   </span>
                 )}
@@ -593,14 +600,9 @@ export default function AdminLayout({ children, immersive = false }) {
 
               {/* Dropdown notifications */}
               {notifDropdown && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-gray-700 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30">
-                    <div className="flex items-center gap-2">
-                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                      </svg>
-                      <span className="font-bold text-blue-700 dark:text-blue-200 text-sm">Notifications</span>
-                    </div>
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-50 border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                    <span className="font-bold text-gray-800 dark:text-gray-100 text-sm">Notifications</span>
                     {notifCount > 0 && (
                       <span className="px-2 py-0.5 bg-blue-600 text-white text-xs font-bold rounded-full">{notifCount}</span>
                     )}
@@ -617,10 +619,10 @@ export default function AdminLayout({ children, immersive = false }) {
                     {notifications.slice(0, 6).map(n => (
                       <li
                         key={n.id}
-                        className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors ${!n.is_read ? 'bg-orange-50/60 dark:bg-orange-900/10' : ''}`}
+                        className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${!n.is_read ? 'bg-blue-50/70 dark:bg-blue-900/10' : ''}`}
                         onClick={() => { setNotifDropdown(false); if (n.url) router.visit(n.url); }}
                       >
-                        <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${!n.is_read ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                        <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${!n.is_read ? 'bg-blue-600 dark:bg-blue-400' : 'bg-gray-300 dark:bg-gray-600'}`} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-800 dark:text-gray-100 line-clamp-2">{n.message}</p>
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
@@ -630,7 +632,7 @@ export default function AdminLayout({ children, immersive = false }) {
                       </li>
                     ))}
                   </ul>
-                  <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                  <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
                     <Link href="/activities" className="flex items-center justify-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline">
                       Voir toutes les activités
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
@@ -672,28 +674,31 @@ export default function AdminLayout({ children, immersive = false }) {
               )}
             </div>
 
-            {/* ─── Toggle Dark / Light — desktop uniquement, déplacé dans le profil sur mobile ─── */}
+            {/* ─── Toggle Dark / Light ─── */}
             <button
-              className="hidden md:flex items-center justify-center w-10 h-10 rounded-xl text-gray-500 dark:text-gray-300 active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
+              className="hidden md:flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-90 transition-all"
               onClick={() => setDarkMode(dm => !dm)}
               aria-label={darkMode ? 'Désactiver le mode sombre' : 'Activer le mode sombre'}
               title={darkMode ? 'Désactiver le mode sombre' : 'Activer le mode sombre'}
             >
               {darkMode ? (
-                <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-[18px] h-[18px] text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m8.66-13.66l-.71.71M4.05 19.95l-.71.71M21 12h-1M4 12H3m16.66 5.66l-.71-.71M4.05 4.05l-.71-.71M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5 text-gray-500 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
               )}
             </button>
 
-            {/* ─── Profil utilisateur ─── */}
+            {/* Séparateur visuel */}
+            <div className="hidden sm:block w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
+
+            {/* ─── Profil utilisateur — style Slack aux couleurs ProJA ─── */}
             <div className="relative" ref={profileRef}>
               <button
-                className="flex items-center gap-2 h-10 pl-1 pr-2 sm:pr-3 rounded-xl active:scale-95 active:bg-gray-100 dark:active:bg-gray-700 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                className="flex items-center gap-2 h-9 pl-1.5 pr-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:ring-offset-1"
                 onClick={() => { setProfileDropdown(d => !d); setNotifDropdown(false); }}
                 aria-label="Menu profil"
               >
@@ -701,39 +706,36 @@ export default function AdminLayout({ children, immersive = false }) {
                   <img
                     src={avatarUrl}
                     alt={userName}
-                    className="w-8 h-8 rounded-full border-2 border-blue-400 object-cover shadow-sm"
+                    className="w-7 h-7 rounded-full border-2 border-blue-500/40 object-cover shadow-sm"
                   />
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 border-2 border-white dark:border-gray-800 rounded-full"></span>
+                  <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 border-[1.5px] border-white dark:border-gray-900 rounded-full"></span>
                 </div>
-                <div className="hidden sm:flex flex-col items-start leading-tight max-w-[120px]">
-                  <span className="text-xs font-semibold text-gray-800 dark:text-gray-100 truncate w-full">{userName}</span>
-                  <span className="text-[10px] text-gray-400 dark:text-gray-500 capitalize">{isAdmin ? 'Admin' : 'Membre'}</span>
-                </div>
-                <svg className="w-3.5 h-3.5 text-gray-400 hidden sm:block flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <span className="hidden sm:block text-[13px] font-semibold text-gray-800 dark:text-gray-100 truncate max-w-[100px]">{userName}</span>
+                <svg className="w-3 h-3 text-gray-400 hidden sm:block flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
 
               {/* Dropdown profil */}
               {profileDropdown && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-gray-700 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-50 border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/10">
                     <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{userName}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{isAdmin ? '👑 Administrateur' : '👤 Membre'}</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium capitalize">{isAdmin ? '👑 Administrateur' : '👤 Membre'}</p>
                   </div>
 
                   <div className="py-1">
-                    <Link href="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                    <Link href="/profile" className="flex items-center gap-3 px-4 py-2 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                       <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                       Mon profil
                     </Link>
 
-                    {/* Toggle dark mode — visible uniquement sur mobile ici */}
+                    {/* Toggle dark mode — mobile */}
                     <button
                       onClick={() => setDarkMode(dm => !dm)}
-                      className="md:hidden w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                      className="md:hidden w-full flex items-center gap-3 px-4 py-2 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
                       {darkMode ? (
                         <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -747,7 +749,7 @@ export default function AdminLayout({ children, immersive = false }) {
                       {darkMode ? 'Mode clair' : 'Mode sombre'}
                     </button>
 
-                    <Link href="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                    <Link href="/profile" className="flex items-center gap-3 px-4 py-2 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                       <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -755,21 +757,21 @@ export default function AdminLayout({ children, immersive = false }) {
                       Paramètres
                     </Link>
                     {isAdmin && (
-                      <Link href="/admin/subscription-plans" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                      <Link href="/admin/subscription-plans" className="flex items-center gap-3 px-4 py-2 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                         <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
                         Gestion abonnements
-                        <span className="ml-auto text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full font-bold">Admin</span>
+                        <span className="ml-auto text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-bold">Admin</span>
                       </Link>
                     )}
-                    <Link href="/subscription/plans" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                    <Link href="/subscription/plans" className="flex items-center gap-3 px-4 py-2 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                       <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                       </svg>
                       Mon abonnement
                     </Link>
-                    <Link href="/remunerations" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">
+                    <Link href="/remunerations" className="flex items-center gap-3 px-4 py-2 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                       <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -780,7 +782,7 @@ export default function AdminLayout({ children, immersive = false }) {
                   <div className="border-t border-gray-100 dark:border-gray-700">
                     <button
                       onClick={handleLogout}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-[13px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
