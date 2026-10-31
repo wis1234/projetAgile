@@ -39,10 +39,10 @@ const Widget = ({ title, count, color, link, icon: Icon }) => {
 const QuickAccess = () => {
   const { t } = useTranslation();
   return (
-    <div className="bg-gradient-to-br from-[#0F1E36] to-[#1E3A8A] rounded-xl shadow-sm border border-[#1B2E4B] overflow-hidden">
+    <div className="bg-gradient-to-br from-blue-600 to-indigo-900 rounded-xl shadow-sm overflow-hidden">
       <div className="p-4 sm:p-5 text-white">
-        <h2 className="text-[13px] sm:text-sm font-semibold mb-3 sm:mb-4 flex items-center gap-2 uppercase tracking-widest text-blue-200/90">
-          <FaChartLine className="text-blue-300" /> {t('quick_access')}
+        <h2 className="text-[13px] sm:text-sm font-semibold mb-3 sm:mb-4 flex items-center gap-2 uppercase tracking-widest text-white/90">
+          <FaChartLine className="text-white/80" /> {t('quick_access')}
         </h2>
         <div className="space-y-1.5 sm:space-y-2">
           {[
