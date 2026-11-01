@@ -14,8 +14,8 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                // Police principale – style Slack / Linear
-                sans: ['Inter', 'Lato', 'Figtree', ...defaultTheme.fontFamily.sans],
+                // Lato is Slack's interface font.
+                sans: ['Lato', 'Figtree', ...defaultTheme.fontFamily.sans],
             },
             colors: {
                 // Charte ProJA – Bleu foncé signature + ergonomie Slack
