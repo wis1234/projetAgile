@@ -422,6 +422,21 @@ export default function EditSpreadsheet({
   const undo = useCallback(() => applyWorkbookHistory(undoStackRef, redoStackRef), [applyWorkbookHistory]);
   const redo = useCallback(() => applyWorkbookHistory(redoStackRef, undoStackRef), [applyWorkbookHistory]);
 
+  const handleSpreadsheetShortcuts = (event) => {
+    if (!(event.ctrlKey || event.metaKey)) return;
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+    if (event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      event.shiftKey ? redo() : undo();
+    } else if (event.key.toLowerCase() === 'y') {
+      event.preventDefault();
+      redo();
+    } else if (event.key.toLowerCase() === 'f') {
+      event.preventDefault();
+      document.getElementById('spreadsheet-search')?.focus();
+    }
+  };
+
   const loadVersionHistory = useCallback(async () => {
     setHistoryLoading(true);
     setHistoryError('');
@@ -570,21 +585,6 @@ export default function EditSpreadsheet({
       ArrowDown: [1, 0],
       ArrowLeft: [0, -1],
       ArrowRight: [0, 1],
-    };
-
-    const handleSpreadsheetShortcuts = (event) => {
-      if (!(event.ctrlKey || event.metaKey)) return;
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
-      if (event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        event.shiftKey ? redo() : undo();
-      } else if (event.key.toLowerCase() === 'y') {
-        event.preventDefault();
-        redo();
-      } else if (event.key.toLowerCase() === 'f') {
-        event.preventDefault();
-        document.getElementById('spreadsheet-search')?.focus();
-      }
     };
 
     if (moves[event.key]) {
