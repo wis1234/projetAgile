@@ -5,9 +5,11 @@ import {
   FaFileExcel, FaSave, FaDownload, FaUsers, FaArrowLeft,
   FaBold, FaItalic, FaStrikethrough, FaAlignLeft, FaAlignCenter, FaAlignRight,
   FaPlus, FaTrash, FaSearch, FaSpinner, FaTable,
-  FaUndo, FaRedo, FaHistory, FaUpload, FaTimes
+  FaUndo, FaRedo, FaHistory, FaUpload, FaTimes, FaChartBar
 } from 'react-icons/fa';
 import AccessPanel from '@/Components/Files/AccessPanel';
+import SheetChart from './SheetChart';
+import { createWorkbook } from './sheetEngine';
 
 const COLLAB_COLORS = [
   '#2563eb', '#16a34a', '#d97706', '#7c3aed',
@@ -22,30 +24,6 @@ const getColumnLetter = (colIdx) => {
     temp = Math.floor(temp / 26) - 1;
   }
   return letter;
-};
-
-const columnLetterToIndex = (colLetter) => {
-  let col = 0;
-  for (let i = 0; i < colLetter.length; i++) {
-    col = col * 26 + (colLetter.charCodeAt(i) - 64);
-  }
-  return col - 1;
-};
-
-const formatCellDisplay = (value, style = {}) => {
-  if (value === null || value === undefined || value === '') return '';
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) return value;
-  switch (style.numberFormat) {
-    case '0.00': return numericValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    case '0%': return `${(numericValue * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
-    case '$#,##0.00': return numericValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
-    case 'yyyy-mm-dd': {
-      const excelDate = new Date(Date.UTC(1899, 11, 30) + numericValue * 86400000);
-      return Number.isNaN(excelDate.getTime()) ? value : excelDate.toISOString().slice(0, 10);
-    }
-    default: return value;
-  }
 };
 
 const normalizeClipboardColor = (value) => {
@@ -153,77 +131,6 @@ const shiftCellStyles = (styles, sheetName, axis, index, delta) => Object.fromEn
   })
 );
 
-// Évalue les formules courantes sans quitter le tableur.
-const evaluateFormula = (rawVal, matrix, visited = new Set()) => {
-  if (typeof rawVal !== 'string' || !rawVal.startsWith('=')) {
-    return rawVal;
-  }
-
-  const formula = rawVal.substring(1).trim().toUpperCase();
-  const resolveCell = (row, col, seen = visited) => {
-    const key = `${row}_${col}`;
-    if (seen.has(key)) return '#REF!';
-    const value = matrix[row]?.[col] ?? '';
-    if (typeof value !== 'string' || !value.startsWith('=')) return value;
-    return evaluateFormula(value, matrix, new Set([...seen, key]));
-  };
-  const getRangeValues = (range) => {
-    const match = range.match(/^\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)$/);
-    if (!match) return null;
-    const startCol = columnLetterToIndex(match[1]);
-    const startRow = parseInt(match[2], 10) - 1;
-    const endCol = columnLetterToIndex(match[3]);
-    const endRow = parseInt(match[4], 10) - 1;
-    const values = [];
-    for (let row = Math.min(startRow, endRow); row <= Math.max(startRow, endRow); row++) {
-      for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
-        values.push(resolveCell(row, col));
-      }
-    }
-    return values;
-  };
-
-  try {
-    const functionMatch = formula.match(/^(SUM|AVERAGE|COUNT|COUNTA|MIN|MAX)\((.+)\)$/);
-    if (functionMatch) {
-      const values = getRangeValues(functionMatch[2]);
-      if (!values) return rawVal;
-      const numbers = values
-        .filter(value => value !== '' && value !== null && value !== undefined)
-        .map(Number)
-        .filter(Number.isFinite);
-      switch (functionMatch[1]) {
-        case 'SUM': return numbers.reduce((sum, value) => sum + value, 0);
-        case 'AVERAGE': return numbers.length ? Number((numbers.reduce((sum, value) => sum + value, 0) / numbers.length).toFixed(2)) : 0;
-        case 'COUNT': return numbers.length;
-        case 'COUNTA': return values.filter(value => value !== '' && value !== null && value !== undefined).length;
-        case 'MIN': return numbers.length ? Math.min(...numbers) : 0;
-        case 'MAX': return numbers.length ? Math.max(...numbers) : 0;
-        default: return rawVal;
-      }
-    }
-
-    const replaced = formula.replace(/\$?([A-Z]+)\$?(\d+)/g, (match, colLetters, rowNumber) => {
-      const c = columnLetterToIndex(colLetters);
-      const r = parseInt(rowNumber, 10) - 1;
-      const value = resolveCell(r, c);
-      const number = Number(value);
-      return Number.isFinite(number) ? number : 0;
-    });
-
-    if (/^[0-9+\-*/().\s]+$/.test(replaced)) {
-      const res = Function(`'use strict'; return (${replaced})`)();
-      return typeof res === 'number' && Number.isFinite(res)
-        ? (Number.isInteger(res) ? res : Number(res.toFixed(2)))
-        : '#VALEUR!';
-    }
-  } catch {
-    return '#VALEUR!';
-  }
-
-  return rawVal;
-};
-
 export default function EditSpreadsheet({
   file,
   auth,
@@ -250,6 +157,7 @@ export default function EditSpreadsheet({
       cellStyles: {},
       nativeStyles: {},
       sheetMetadata: {},
+      charts: [],
     };
   }, [file.content]);
 
@@ -262,6 +170,11 @@ export default function EditSpreadsheet({
   const [cellStyles, setCellStyles] = useState(initialData.cellStyles || {});
   const [nativeStyles, setNativeStyles] = useState(initialData.nativeStyles || {});
   const [sheetMetadata, setSheetMetadata] = useState(initialData.sheetMetadata || {});
+  const [charts, setCharts] = useState(initialData.charts || []);
+  const [chartDialogOpen, setChartDialogOpen] = useState(false);
+  const [chartRangeInput, setChartRangeInput] = useState('');
+  const [chartTypeInput, setChartTypeInput] = useState('bar');
+  const [chartTitleInput, setChartTitleInput] = useState('');
 
   // États de l'interface
   const [isSaving, setIsSaving] = useState(false);
@@ -290,13 +203,14 @@ export default function EditSpreadsheet({
     cellStyles: initialData.cellStyles || {},
     nativeStyles: initialData.nativeStyles || {},
     sheetMetadata: initialData.sheetMetadata || {},
+    charts: initialData.charts || [],
   });
   const undoStackRef = useRef([]);
   const redoStackRef = useRef([]);
 
   useEffect(() => {
-    workbookRef.current = { sheets, sheetNames, cellStyles, nativeStyles, sheetMetadata };
-  }, [sheets, sheetNames, cellStyles, nativeStyles, sheetMetadata]);
+    workbookRef.current = { sheets, sheetNames, cellStyles, nativeStyles, sheetMetadata, charts };
+  }, [sheets, sheetNames, cellStyles, nativeStyles, sheetMetadata, charts]);
 
   const currentMatrix = useMemo(() => {
     return sheets[activeSheet] || [];
@@ -307,6 +221,7 @@ export default function EditSpreadsheet({
     return Math.max(15, ...currentMatrix.map(r => r ? r.length : 0));
   }, [currentMatrix]);
   const activeSheetMetadata = sheetMetadata[activeSheet] || {};
+  const workbook = useMemo(() => createWorkbook({ sheets, sheetNames }), [sheets, sheetNames]);
 
   const cellCoord = `${getColumnLetter(selectedCell.col)}${selectedCell.row + 1}`;
   const rawCellValue = currentMatrix[selectedCell.row]?.[selectedCell.col] ?? '';
@@ -410,6 +325,9 @@ export default function EditSpreadsheet({
           delete next[data.oldName];
           return next;
         });
+        setCharts(prev => prev.map(chart => (
+          chart.sheet === data.oldName ? { ...chart, sheet: data.newName } : chart
+        )));
         setActiveSheet(prev => prev === data.oldName ? data.newName : prev);
       })
       .listenForWhisper('sheet-delete', (data) => {
@@ -432,6 +350,7 @@ export default function EditSpreadsheet({
           delete next[data.sheetName];
           return next;
         });
+        setCharts(prev => prev.filter(chart => chart.sheet !== data.sheetName));
       });
 
     return () => {
@@ -472,6 +391,7 @@ export default function EditSpreadsheet({
     currentCellStyles = workbookRef.current.cellStyles,
     currentNativeStyles = workbookRef.current.nativeStyles,
     currentSheetMetadata = workbookRef.current.sheetMetadata,
+    currentCharts = workbookRef.current.charts,
   ) => {
     if (isReadOnly) return;
     setIsSaving(true);
@@ -484,6 +404,7 @@ export default function EditSpreadsheet({
         cellStyles: currentCellStyles,
         nativeStyles: currentNativeStyles,
         sheetMetadata: currentSheetMetadata,
+        charts: currentCharts,
       });
 
       const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
@@ -502,7 +423,7 @@ export default function EditSpreadsheet({
     } finally {
       setIsSaving(false);
     }
-  }, [file.id, isReadOnly, cellStyles]);
+  }, [file.id, isReadOnly]);
 
   const commitWorkbook = useCallback((updates, { record = true, save = true } = {}) => {
     const previous = workbookRef.current;
@@ -517,6 +438,7 @@ export default function EditSpreadsheet({
     setCellStyles(next.cellStyles);
     setNativeStyles(next.nativeStyles);
     setSheetMetadata(next.sheetMetadata);
+    setCharts(next.charts);
 
     if (save) {
       clearTimeout(autoSaveTimerRef.current);
@@ -527,7 +449,8 @@ export default function EditSpreadsheet({
           next.sheetNames,
           next.cellStyles,
           next.nativeStyles,
-          next.sheetMetadata
+          next.sheetMetadata,
+          next.charts
         ),
         500
       );
@@ -545,12 +468,14 @@ export default function EditSpreadsheet({
     setCellStyles(target.cellStyles);
     setNativeStyles(target.nativeStyles);
     setSheetMetadata(target.sheetMetadata);
+    setCharts(target.charts);
     saveSpreadsheetData(
       target.sheets,
       target.sheetNames,
       target.cellStyles,
       target.nativeStyles,
-      target.sheetMetadata
+      target.sheetMetadata,
+      target.charts
     );
   }, [saveSpreadsheetData]);
 
@@ -596,9 +521,17 @@ export default function EditSpreadsheet({
   }, [file.id, loadVersionHistory]);
 
   const saveVersion = async () => {
-    const content = JSON.stringify(workbookRef.current);
+    const current = workbookRef.current;
+    const content = JSON.stringify(current);
     try {
-      const saved = await saveSpreadsheetData(sheets, sheetNames, cellStyles);
+      const saved = await saveSpreadsheetData(
+        current.sheets,
+        current.sheetNames,
+        current.cellStyles,
+        current.nativeStyles,
+        current.sheetMetadata,
+        current.charts
+      );
       if (!saved) throw new Error('La sauvegarde du classeur a échoué.');
       await createVersionSnapshot(content, 'Version manuelle', 'Enregistrement demandé par l’utilisateur');
       setSaveStatus('Version enregistrée');
@@ -653,6 +586,7 @@ export default function EditSpreadsheet({
         cellStyles: importedData.cellStyles || {},
         nativeStyles: importedData.nativeStyles || {},
         sheetMetadata: importedData.sheetMetadata || {},
+        charts: importedData.charts || [],
       }, { save: false });
       setActiveSheet(importedData.sheetNames[0]);
       setSelectedCell({ row: 0, col: 0 });
@@ -661,7 +595,8 @@ export default function EditSpreadsheet({
         importedData.sheetNames,
         importedData.cellStyles || {},
         importedData.nativeStyles || {},
-        importedData.sheetMetadata || {}
+        importedData.sheetMetadata || {},
+        importedData.charts || []
       );
       if (!saved) throw new Error('La sauvegarde du fichier importé a échoué.');
       setSaveStatus(`Importé : ${selectedFile.name}`);
@@ -903,11 +838,15 @@ export default function EditSpreadsheet({
       nextMetadata[newName] = nextMetadata[oldName];
       delete nextMetadata[oldName];
     }
+    const nextCharts = current.charts.map(chart => (
+      chart.sheet === oldName ? { ...chart, sheet: newName } : chart
+    ));
     commitWorkbook({
       sheets: nextSheets,
       sheetNames: nextNames,
       cellStyles: nextStyles,
       sheetMetadata: nextMetadata,
+      charts: nextCharts,
     });
     setActiveSheet(newName);
     channelRef.current?.whisper('sheet-rename', { oldName, newName });
@@ -925,11 +864,13 @@ export default function EditSpreadsheet({
     );
     const nextMetadata = { ...current.sheetMetadata };
     delete nextMetadata[activeSheet];
+    const nextCharts = current.charts.filter(chart => chart.sheet !== activeSheet);
     commitWorkbook({
       sheetNames: nextNames,
       sheets: nextSheets,
       cellStyles: nextStyles,
       sheetMetadata: nextMetadata,
+      charts: nextCharts,
     });
     setActiveSheet(nextNames[0]);
     channelRef.current?.whisper('sheet-delete', { sheetName: activeSheet });
@@ -939,7 +880,15 @@ export default function EditSpreadsheet({
   const exportToExcel = async () => {
     try {
       if (!isReadOnly) {
-        const saved = await saveSpreadsheetData(sheets, sheetNames, cellStyles);
+        const current = workbookRef.current;
+        const saved = await saveSpreadsheetData(
+          current.sheets,
+          current.sheetNames,
+          current.cellStyles,
+          current.nativeStyles,
+          current.sheetMetadata,
+          current.charts
+        );
         if (!saved) throw new Error('La sauvegarde du classeur a échoué.');
       }
 
@@ -950,18 +899,53 @@ export default function EditSpreadsheet({
     }
   };
 
+  const openChartDialog = () => {
+    const lastRow = Math.max(2, currentMatrix.length);
+    const lastColumn = Math.max(1, ...currentMatrix.map(row => row?.length || 0)) - 1;
+    setChartRangeInput(`A1:${getColumnLetter(Math.max(1, lastColumn))}${lastRow}`);
+    setChartTitleInput('');
+    setChartTypeInput('bar');
+    setChartDialogOpen(true);
+  };
+
+  const createChart = (event) => {
+    event.preventDefault();
+    const range = workbook.range(activeSheet, chartRangeInput.trim());
+    if (!range || range.values.length < 2 || (range.values[0]?.length || 0) < 2) {
+      window.alert('Sélectionnez une plage comprenant des en-têtes, des catégories et au moins une série numérique.');
+      return;
+    }
+
+    const chart = workbook.chartFromRange(range, {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type: chartTypeInput,
+      title: chartTitleInput.trim(),
+      sheet: activeSheet,
+      range: chartRangeInput.trim(),
+    });
+    if (!chart?.datasets?.some(dataset => dataset.data.some(value => value !== null))) {
+      window.alert('La plage choisie ne contient pas de valeurs numériques à représenter.');
+      return;
+    }
+
+    const { labels: _labels, datasets: _datasets, ...chartDefinition } = chart;
+    commitWorkbook({ charts: [...workbookRef.current.charts, chartDefinition] });
+    setChartDialogOpen(false);
+    setSidePanel('charts');
+  };
+
   // Statistiques de la feuille active
   const stats = useMemo(() => {
     let count = 0;
     let sum = 0;
     let numCount = 0;
 
-    currentMatrix.forEach(row => {
+    currentMatrix.forEach((row, rowIndex) => {
       if (!row) return;
-      row.forEach(cell => {
+      row.forEach((cell, colIndex) => {
         if (cell !== '' && cell !== null && cell !== undefined) {
           count++;
-          const evalVal = evaluateFormula(cell, currentMatrix);
+          const evalVal = workbook.get(activeSheet, `${getColumnLetter(colIndex)}${rowIndex + 1}`)?.value ?? cell;
           const num = Number(evalVal);
           if (!isNaN(num) && typeof evalVal !== 'boolean') {
             sum += num;
@@ -976,7 +960,7 @@ export default function EditSpreadsheet({
       sum: numCount > 0 ? (Number.isInteger(sum) ? sum : sum.toFixed(2)) : null,
       avg: numCount > 0 ? (sum / numCount).toFixed(2) : null,
     };
-  }, [currentMatrix]);
+  }, [activeSheet, currentMatrix, workbook]);
   const selectedCellStyle = cellStyles[`${activeSheet}!${selectedCell.row}_${selectedCell.col}`] || {};
   const previewData = useMemo(() => {
     if (!historyPreview) return null;
@@ -1287,6 +1271,18 @@ export default function EditSpreadsheet({
           <option value={100}>100%</option>
           <option value={125}>125%</option>
         </select>
+
+        <button
+          type="button"
+          onClick={() => isReadOnly
+            ? setSidePanel(sidePanel === 'charts' ? null : 'charts')
+            : openChartDialog()}
+          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-slate-700 hover:bg-slate-200"
+          title={isReadOnly ? 'Afficher les graphiques' : 'Créer un graphique à partir d’une plage'}
+        >
+          <FaChartBar className="text-emerald-700" />
+          Graphique
+        </button>
       </div>
 
       {/* ─── 3. FORMULA BAR ─── */}
@@ -1362,7 +1358,8 @@ export default function EditSpreadsheet({
                       const rawVal = row[cIdx] ?? '';
                       const isSelected = selectedCell.row === rIdx && selectedCell.col === cIdx;
                       const cellStyle = cellStyles[`${activeSheet}!${rIdx}_${cIdx}`] || {};
-                      const displayVal = formatCellDisplay(evaluateFormula(rawVal, currentMatrix), cellStyle);
+                      const address = `${getColumnLetter(cIdx)}${rIdx + 1}`;
+                      const displayVal = workbook.show(workbook.get(activeSheet, address), cellStyle);
                       const isSearching = searchTerm && String(displayVal).toLowerCase().includes(searchTerm.toLowerCase());
 
                       // Collaborateur distant ayant sélectionné cette cellule
@@ -1449,6 +1446,58 @@ export default function EditSpreadsheet({
             </tbody>
           </table>
         </div>
+
+        {sidePanel === 'charts' && (
+          <aside className="w-full max-w-xl border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800">Graphiques</h2>
+                <p className="text-[11px] text-slate-500">Mis à jour depuis les plages du classeur</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSidePanel(null)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Fermer les graphiques"
+              >
+                <FaTimes />
+              </button>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {charts.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-500">Aucun graphique. Créez-en un avec le bouton « Graphique ».</p>
+              ) : charts.map(chart => {
+                const range = workbook.range(chart.sheet, chart.range);
+                const chartData = workbook.chartFromRange(range, chart);
+                if (!chartData) return null;
+                return (
+                  <section key={chart.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-xs font-semibold text-slate-800">{chart.title || chart.range}</h3>
+                        <p className="text-[10px] text-slate-500">{chart.sheet}!{chart.range} · {chart.type}</p>
+                      </div>
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          onClick={() => commitWorkbook({
+                            charts: workbookRef.current.charts.filter(item => item.id !== chart.id),
+                          })}
+                          className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          title="Supprimer le graphique"
+                          aria-label="Supprimer le graphique"
+                        >
+                          <FaTrash />
+                        </button>
+                      )}
+                    </div>
+                    <SheetChart chart={chartData} height={260} />
+                  </section>
+                );
+              })}
+            </div>
+          </aside>
+        )}
 
         {/* Panneau de partage coulissant */}
         {sidePanel === 'access' && (
@@ -1620,6 +1669,71 @@ export default function EditSpreadsheet({
           )}
         </div>
       </div>
+
+      {chartDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <form
+            onSubmit={createChart}
+            className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-chart-title"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="create-chart-title" className="text-base font-semibold text-slate-900">Créer un graphique</h2>
+                <p className="mt-1 text-xs text-slate-500">La première colonne contient les catégories, la première ligne les séries.</p>
+              </div>
+              <button type="button" onClick={() => setChartDialogOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Fermer">
+                <FaTimes />
+              </button>
+            </div>
+
+            <label className="block text-xs font-medium text-slate-700">
+              Plage de données ({activeSheet})
+              <input
+                autoFocus
+                value={chartRangeInput}
+                onChange={event => setChartRangeInput(event.target.value)}
+                placeholder="A1:C6"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
+              />
+            </label>
+
+            <label className="block text-xs font-medium text-slate-700">
+              Type
+              <select
+                value={chartTypeInput}
+                onChange={event => setChartTypeInput(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
+              >
+                <option value="bar">Barres</option>
+                <option value="line">Courbes</option>
+                <option value="pie">Secteurs</option>
+              </select>
+            </label>
+
+            <label className="block text-xs font-medium text-slate-700">
+              Titre (facultatif)
+              <input
+                value={chartTitleInput}
+                onChange={event => setChartTitleInput(event.target.value)}
+                maxLength={100}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
+              />
+            </label>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setChartDialogOpen(false)} className="rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                Annuler
+              </button>
+              <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700">
+                <FaChartBar /> Créer le graphique
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

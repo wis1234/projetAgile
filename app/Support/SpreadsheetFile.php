@@ -4,6 +4,11 @@ namespace App\Support;
 
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Chart\Chart;
+use PhpOffice\PhpSpreadsheet\Chart\DataSeries;
+use PhpOffice\PhpSpreadsheet\Chart\DataSeriesValues;
+use PhpOffice\PhpSpreadsheet\Chart\Legend;
+use PhpOffice\PhpSpreadsheet\Chart\PlotArea;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
@@ -16,7 +21,11 @@ final class SpreadsheetFile
             return $contents;
         }
 
-        $workbook = IOFactory::load($path);
+        $reader = IOFactory::createReaderForFile($path);
+        if (method_exists($reader, 'setIncludeCharts')) {
+            $reader->setIncludeCharts(true);
+        }
+        $workbook = $reader->load($path);
         $sheets = [];
         $cellStyles = [];
         $nativeStyles = [];
@@ -157,12 +166,15 @@ final class SpreadsheetFile
             $sheets['Feuille 1'] = [];
         }
 
+        $charts = self::extractCharts($workbook);
+
         return json_encode([
             'sheets' => $sheets,
             'sheetNames' => $sheetNames,
             'cellStyles' => $cellStyles,
             'nativeStyles' => $nativeStyles,
             'sheetMetadata' => $sheetMetadata,
+            'charts' => $charts,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
@@ -238,6 +250,8 @@ final class SpreadsheetFile
             }
         }
 
+        self::addCharts($workbook, $data['charts'] ?? []);
+
         $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         $writerType = match ($extension) {
             'xls' => 'Xls',
@@ -258,6 +272,9 @@ final class SpreadsheetFile
             }
             if (method_exists($writer, 'setPreCalculateFormulas')) {
                 $writer->setPreCalculateFormulas(false);
+            }
+            if (method_exists($writer, 'setIncludeCharts')) {
+                $writer->setIncludeCharts(true);
             }
             $writer->save($temporaryPath);
             $result = file_get_contents($temporaryPath);
@@ -355,5 +372,189 @@ final class SpreadsheetFile
         }
 
         return $base;
+    }
+
+    private static function addCharts(Spreadsheet $workbook, array $charts): void
+    {
+        foreach ($charts as $index => $chartDefinition) {
+            $sheetName = $chartDefinition['sheet'] ?? null;
+            $range = $chartDefinition['range'] ?? null;
+            if (!is_string($sheetName) || !is_string($range)) {
+                continue;
+            }
+            $worksheet = $workbook->getSheetByName($sheetName);
+            if (!$worksheet || !preg_match('/^\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)$/i', $range, $matches)) {
+                continue;
+            }
+
+            $startColumn = Coordinate::columnIndexFromString(strtoupper($matches[1]));
+            $startRow = (int) $matches[2];
+            $endColumn = Coordinate::columnIndexFromString(strtoupper($matches[3]));
+            $endRow = (int) $matches[4];
+            if ($endColumn <= $startColumn || $endRow <= $startRow) {
+                continue;
+            }
+
+            $plotType = match ($chartDefinition['type'] ?? 'bar') {
+                'line' => DataSeries::TYPE_LINECHART,
+                'pie' => DataSeries::TYPE_PIECHART,
+                default => DataSeries::TYPE_BARCHART,
+            };
+            $chartType = $chartDefinition['type'] ?? 'bar';
+            $seriesLabels = [];
+            $categories = [];
+            $values = [];
+            $seriesCount = $chartType === 'pie' ? 1 : $endColumn - $startColumn;
+            $pointCount = $endRow - $startRow;
+            $quotedSheet = "'" . str_replace("'", "''", $sheetName) . "'!";
+            $firstDataRow = $startRow + 1;
+            $lastDataRow = $endRow;
+            $categoryColumn = Coordinate::stringFromColumnIndex($startColumn);
+            $categories[] = new DataSeriesValues(
+                DataSeriesValues::DATASERIES_TYPE_STRING,
+                $quotedSheet . '$' . $categoryColumn . '$' . $firstDataRow . ':$' . $categoryColumn . '$' . $lastDataRow,
+                null,
+                $pointCount
+            );
+
+            for ($seriesIndex = 0; $seriesIndex < $seriesCount; $seriesIndex++) {
+                $column = Coordinate::stringFromColumnIndex($startColumn + $seriesIndex + 1);
+                $seriesLabels[] = new DataSeriesValues(
+                    DataSeriesValues::DATASERIES_TYPE_STRING,
+                    $quotedSheet . '$' . $column . '$' . $startRow,
+                    null,
+                    1
+                );
+                $values[] = new DataSeriesValues(
+                    DataSeriesValues::DATASERIES_TYPE_NUMBER,
+                    $quotedSheet . '$' . $column . '$' . $firstDataRow . ':$' . $column . '$' . $lastDataRow,
+                    null,
+                    $pointCount
+                );
+            }
+
+            $series = new DataSeries(
+                $plotType,
+                $chartType === 'pie' ? DataSeries::GROUPING_STANDARD : DataSeries::GROUPING_CLUSTERED,
+                range(0, $seriesCount - 1),
+                $seriesLabels,
+                $categories,
+                $values
+            );
+            $chart = new Chart(
+                (string) ($chartDefinition['id'] ?? 'Chart ' . ($index + 1)),
+                !empty($chartDefinition['title']) ? new \PhpOffice\PhpSpreadsheet\Chart\Title($chartDefinition['title']) : null,
+                new Legend(Legend::POSITION_RIGHT, null, false),
+                new PlotArea(null, [$series])
+            );
+            $leftColumn = Coordinate::stringFromColumnIndex($endColumn + 2);
+            $topRow = 2 + (($index % 2) * 18);
+            $chart->setTopLeftPosition($leftColumn . $topRow);
+            $chart->setBottomRightPosition(
+                Coordinate::stringFromColumnIndex($endColumn + 12) . ($topRow + 16)
+            );
+            $worksheet->addChart($chart);
+        }
+    }
+
+    private static function extractCharts(Spreadsheet $workbook): array
+    {
+        $charts = [];
+        foreach ($workbook->getWorksheetIterator() as $worksheet) {
+            foreach ($worksheet->getChartCollection() as $chartIndex => $chart) {
+                $plotArea = $chart->getPlotArea();
+                if (!$plotArea) {
+                    continue;
+                }
+
+                foreach ($plotArea->getPlotGroup() as $groupIndex => $series) {
+                    $type = match ($series->getPlotType()) {
+                        DataSeries::TYPE_BARCHART => 'bar',
+                        DataSeries::TYPE_LINECHART => 'line',
+                        DataSeries::TYPE_PIECHART => 'pie',
+                        default => null,
+                    };
+                    if ($type === null) {
+                        continue;
+                    }
+
+                    $category = $series->getPlotCategoryByIndex(0);
+                    $categoryReference = $category ? self::parseChartReference($category->getDataSource()) : null;
+                    $valueReferences = [];
+                    foreach ($series->getPlotValues() as $plotValues) {
+                        $reference = self::parseChartReference($plotValues->getDataSource());
+                        if ($reference) {
+                            $valueReferences[] = $reference;
+                        }
+                    }
+                    $labelReferences = [];
+                    foreach ($series->getPlotLabels() as $plotLabel) {
+                        $reference = self::parseChartReference($plotLabel->getDataSource());
+                        if ($reference) {
+                            $labelReferences[] = $reference;
+                        }
+                    }
+                    if (!$categoryReference || !$valueReferences || !$labelReferences) {
+                        continue;
+                    }
+
+                    $sheet = $categoryReference['sheet'];
+                    if (array_filter(
+                        array_merge($valueReferences, $labelReferences),
+                        static fn (array $reference): bool => strcasecmp($reference['sheet'], $sheet) !== 0
+                    )) {
+                        continue;
+                    }
+
+                    $startColumn = Coordinate::columnIndexFromString($categoryReference['startColumn']);
+                    $endColumn = max(array_map(
+                        static fn (array $reference): int => Coordinate::columnIndexFromString($reference['endColumn']),
+                        $valueReferences
+                    ));
+                    $startRow = min(array_map(
+                        static fn (array $reference): int => $reference['startRow'],
+                        $labelReferences
+                    ));
+                    $endRow = max(array_map(
+                        static fn (array $reference): int => $reference['endRow'],
+                        $valueReferences
+                    ));
+                    if ($endColumn <= $startColumn || $endRow <= $startRow) {
+                        continue;
+                    }
+
+                    $title = $chart->getTitle()?->getCaptionText() ?? '';
+                    $charts[] = [
+                        'id' => 'imported-' . $worksheet->getTitle() . '-' . $chartIndex . '-' . $groupIndex,
+                        'type' => $type,
+                        'title' => $title,
+                        'sheet' => $sheet,
+                        'range' => Coordinate::stringFromColumnIndex($startColumn) . $startRow
+                            . ':' . Coordinate::stringFromColumnIndex($endColumn) . $endRow,
+                    ];
+                }
+            }
+        }
+
+        return $charts;
+    }
+
+    private static function parseChartReference(?string $source): ?array
+    {
+        if (!$source || !preg_match(
+            '/^(?:\'((?:[^\']|\'\')+)\'|([^!]+))!\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/i',
+            ltrim($source, '='),
+            $matches
+        )) {
+            return null;
+        }
+
+        return [
+            'sheet' => str_replace("''", "'", $matches[1] !== '' ? $matches[1] : trim($matches[2], "'")),
+            'startColumn' => strtoupper($matches[3]),
+            'startRow' => (int) $matches[4],
+            'endColumn' => strtoupper(($matches[5] ?? '') ?: $matches[3]),
+            'endRow' => (int) (($matches[6] ?? '') ?: $matches[4]),
+        ];
     }
 }
