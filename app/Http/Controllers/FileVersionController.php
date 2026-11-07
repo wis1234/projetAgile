@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 
 use App\Models\File;
 use App\Models\FileVersion;
+use App\Support\SpreadsheetFile;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
@@ -72,9 +73,14 @@ class FileVersionController extends Controller
         abort_if($version->file_id !== $file->id, 404);
 
         // Snapshot de l'état actuel avant écrasement
-        $currentContent = \Storage::disk('public')->get(
-            preg_replace('/^public\//', '', $file->file_path)
-        );
+        $path = preg_replace('/^public\//', '', $file->file_path);
+        $currentContent = \Storage::disk('public')->get($path);
+        if ($file->isSpreadsheet()) {
+            $currentContent = SpreadsheetFile::fromFile(
+                \Storage::disk('public')->path($path),
+                $currentContent
+            );
+        }
         $lastVersion = $file->versions()->max('version_number') ?? 0;
 
         FileVersion::create([
@@ -87,8 +93,10 @@ class FileVersionController extends Controller
         ]);
 
         // Écrire le contenu restauré sur disque
-        $path = preg_replace('/^public\//', '', $file->file_path);
-        \Storage::disk('public')->put($path, $version->content);
+        $restoredContent = $file->isSpreadsheet()
+            ? SpreadsheetFile::toFile($version->content, $file->name)
+            : $version->content;
+        \Storage::disk('public')->put($path, $restoredContent);
 
         $file->update([
             'size'             => \Storage::disk('public')->size($path),

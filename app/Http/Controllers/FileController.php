@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\File;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\SpreadsheetFile;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -876,14 +877,7 @@ public function editContent(File $file)
     }
 
     if ($isSpreadsheet) {
-        $decoded = json_decode($content, true);
-        if (!is_array($decoded) || !isset($decoded['sheets'])) {
-            $emptyRow = array_fill(0, 15, '');
-            $content = json_encode([
-                'sheets' => ['Feuille 1' => array_fill(0, 35, $emptyRow)],
-                'sheetNames' => ['Feuille 1']
-            ]);
-        }
+        $content = SpreadsheetFile::fromFile($filePath, $content);
     }
 
     $file->load(['lastModifiedBy:id,name', 'project.users', 'accesses.user:id,name,email,profile_photo_path']);
@@ -981,7 +975,10 @@ public function updateContent(Request $request, File $file)
     }
     $safeName = Str::slug(pathinfo($file->name, PATHINFO_FILENAME)) ?: 'document';
     $path = 'files/' . $file->project_id . '/' . $file->id . '-' . $safeName . ($extension !== '' ? '.' . $extension : '');
-    \Storage::disk('public')->put($path, $request->content);
+    $storedContent = $file->isSpreadsheet()
+        ? SpreadsheetFile::toFile($request->content, $file->name)
+        : $request->content;
+    \Storage::disk('public')->put($path, $storedContent);
 
     $file->update([
         'file_path'        => $path,
@@ -1041,7 +1038,10 @@ public function autoSaveContent(Request $request, File $file)
 
     // Même emplacement que updateContent() pour rester cohérent avec l'enregistrement manuel
     $path = 'files/' . $file->project_id . '/' . $file->name;
-    \Storage::disk('public')->put($path, $content);
+    $storedContent = $file->isSpreadsheet()
+        ? SpreadsheetFile::toFile($content, $file->name)
+        : $content;
+    \Storage::disk('public')->put($path, $storedContent);
 
     $file->update([
         'file_path'        => $path,
