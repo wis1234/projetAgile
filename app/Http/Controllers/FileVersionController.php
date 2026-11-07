@@ -21,7 +21,7 @@ class FileVersionController extends Controller
         $this->authorize('viewHistory', $file);
 
         $versions = $file->versions()
-            ->with('user:id,name,email,profile_photo_url')
+            ->with('user:id,name,email,profile_photo_path')
             ->select('id','file_id','user_id','label','summary','version_number','created_at')
             ->paginate(20);
 
@@ -36,7 +36,7 @@ class FileVersionController extends Controller
         abort_if($version->file_id !== $file->id, 404);
 
         return response()->json([
-            'version' => $version->load('user:id,name,profile_photo_url'),
+            'version' => $version->load('user:id,name,profile_photo_path'),
         ]);
     }
 
@@ -62,7 +62,7 @@ class FileVersionController extends Controller
             'version_number' => $lastVersion + 1,
         ]);
 
-        return response()->json(['version' => $version->load('user:id,name,profile_photo_url')], 201);
+        return response()->json(['version' => $version->load('user:id,name,profile_photo_path')], 201);
     }
 
     // POST /files/{file}/versions/{version}/restore — restaurer une version
