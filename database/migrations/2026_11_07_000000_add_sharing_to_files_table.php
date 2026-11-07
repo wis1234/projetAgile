@@ -11,14 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('files', function (Blueprint $table) {
-            if (!Schema::hasColumn('files', 'share_token')) {
-                $table->string('share_token', 64)->nullable()->unique()->after('password_hash');
-            }
-            if (!Schema::hasColumn('files', 'public_permission')) {
-                $table->string('public_permission', 20)->default('none')->after('share_token');
-            }
-        });
+        if (!Schema::hasColumn('files', 'share_token')) {
+            Schema::table('files', function (Blueprint $table) {
+                $table->string('share_token', 64)->nullable()->unique();
+            });
+        }
+
+        if (!Schema::hasColumn('files', 'public_permission')) {
+            Schema::table('files', function (Blueprint $table) {
+                $table->string('public_permission', 20)->default('none');
+            });
+        }
     }
 
     /**
