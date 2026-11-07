@@ -46,7 +46,6 @@ import DocMenus from '@/Components/Editor/DocMenus';
 import FindReplaceBar from '@/Components/Editor/FindReplaceBar';
 import CommentsPanel from '@/Components/Editor/CommentsPanel';
 import DocCallButton from '@/Components/Editor/DocCallButton';
-import AccessPanel from '@/Components/Files/AccessPanel';
 import { InsertionMark, DeletionMark, SuggestionMode, collectSuggestions, resolveSuggestion } from '@/Components/Editor/extensions/suggestion-mode';
 import '@/Components/Editor/editorStyles';
 
