@@ -8,6 +8,7 @@ export class Doc {
   destroy() {}
 }
 export const encodeStateAsUpdate = () => new Uint8Array();
+export const mergeUpdates = () => new Uint8Array();
 export const applyUpdate = () => {};
 export const encodeStateVector = () => new Uint8Array();
-export default { Doc, encodeStateAsUpdate, applyUpdate, encodeStateVector };
+export default { Doc, encodeStateAsUpdate, mergeUpdates, applyUpdate, encodeStateVector };

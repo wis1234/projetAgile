@@ -9,6 +9,7 @@ use App\Support\SpreadsheetFile;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Notifications\InternalNotification;
 use App\Notifications\UserActionMailNotification;
 use Illuminate\Support\Facades\Storage;
@@ -956,10 +957,18 @@ public function importSpreadsheet(Request $request, File $file)
     $contents = file_get_contents($path);
     abort_if($contents === false, 422, 'Impossible de lire le fichier importé.');
 
-    $content = SpreadsheetFile::fromFile(
-        $path,
-        $contents
-    );
+    try {
+        $content = SpreadsheetFile::fromFile($path, $contents);
+    } catch (\PhpOffice\PhpSpreadsheet\Exception $exception) {
+        Log::warning('Spreadsheet import rejected: unreadable workbook.', [
+            'file_id' => $file->id,
+            'exception' => $exception->getMessage(),
+        ]);
+
+        return response()->json([
+            'message' => 'Le fichier est endommagé ou son format de tableur n’est pas reconnu.',
+        ], 422);
+    }
 
     return response()->json(['content' => $content]);
 }

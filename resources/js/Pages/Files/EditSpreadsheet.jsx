@@ -529,7 +529,8 @@ export default function EditSpreadsheet({
     } catch (error) {
       console.error('Erreur lors de l’import du tableur:', error);
       setSaveStatus('Erreur d’importation');
-      window.alert(`Impossible d’importer ce fichier : ${error.message || 'format non pris en charge'}`);
+      const message = error.response?.data?.message || error.message || 'format non pris en charge';
+      window.alert(`Impossible d’importer ce fichier : ${message}`);
     } finally {
       setImporting(false);
     }

@@ -7,4 +7,9 @@ export class Awareness {
   setLocalStateField() {}
   getStates() { return new Map(); }
 }
+
+export const encodeAwarenessUpdate = () => new Uint8Array();
+export const applyAwarenessUpdate = () => {};
+export const removeAwarenessStates = () => {};
+
 export default { Awareness };
