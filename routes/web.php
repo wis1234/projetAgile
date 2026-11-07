@@ -435,6 +435,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/files/create-collaborative', [App\Http\Controllers\FileController::class, 'createCollaborative'])->name('files.create-collaborative');
     Route::get('files/{file}/preview', [App\Http\Controllers\FileController::class, 'previewPage'])->name('files.preview-page');
     Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])->name('files.edit-content');
+    Route::post('files/{file}/import', [App\Http\Controllers\FileController::class, 'importSpreadsheet'])->name('files.import');
+    Route::get('files/{file}/export-spreadsheet', [App\Http\Controllers\FileController::class, 'exportSpreadsheet'])->name('files.export-spreadsheet');
     Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])->name('files.update-content');
     Route::get('files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])->name('files.download');
     Route::post('files/download-multiple', [App\Http\Controllers\FileController::class, 'downloadMultiple'])->name('files.downloadMultiple');

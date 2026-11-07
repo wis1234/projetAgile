@@ -942,6 +942,49 @@ public function editContent(File $file)
     ]);
 }
 
+public function importSpreadsheet(Request $request, File $file)
+{
+    $this->authorize('update_colab', $file);
+
+    $validated = $request->validate([
+        'spreadsheet' => 'required|file|mimes:xlsx,xls,ods,csv,tsv|max:20480',
+    ]);
+
+    $uploadedFile = $validated['spreadsheet'];
+    $path = $uploadedFile->getRealPath();
+    abort_if($path === false, 422, 'Impossible de lire le fichier importé.');
+    $contents = file_get_contents($path);
+    abort_if($contents === false, 422, 'Impossible de lire le fichier importé.');
+
+    $content = SpreadsheetFile::fromFile(
+        $path,
+        $contents
+    );
+
+    return response()->json(['content' => $content]);
+}
+
+public function exportSpreadsheet(File $file)
+{
+    $this->authorize('view', $file);
+    abort_if($file->is_password_protected && !$file->isUnlockedForUser(auth()->user()), 403);
+
+    $path = preg_replace('/^public\//', '', $file->file_path);
+    abort_if(!$path || !Storage::disk('public')->exists($path), 404, 'Fichier non trouvé.');
+
+    $contents = Storage::disk('public')->get($path);
+    $content = SpreadsheetFile::fromFile(Storage::disk('public')->path($path), $contents);
+    $filename = pathinfo($file->name, PATHINFO_FILENAME) . '.xlsx';
+
+    return response()->streamDownload(
+        static function () use ($content, $filename) {
+            echo SpreadsheetFile::toFile($content, $filename);
+        },
+        $filename,
+        ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+    );
+}
+
 
 
 

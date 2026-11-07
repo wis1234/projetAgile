@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import axios from 'axios';
 import {
   FaFileExcel, FaSave, FaDownload, FaUsers, FaArrowLeft,
   FaBold, FaItalic, FaStrikethrough, FaAlignLeft, FaAlignCenter, FaAlignRight,
-  FaPlus, FaTrash, FaSearch, FaCheck, FaSpinner, FaTable, FaGlobe,
-  FaChevronDown, FaUndo, FaRedo, FaShare, FaEye, FaComment
+  FaPlus, FaTrash, FaSearch, FaSpinner, FaTable,
+  FaUndo, FaRedo, FaHistory, FaUpload, FaTimes
 } from 'react-icons/fa';
 import AccessPanel from '@/Components/Files/AccessPanel';
 
@@ -31,6 +31,35 @@ const columnLetterToIndex = (colLetter) => {
   }
   return col - 1;
 };
+
+const formatCellDisplay = (value, style = {}) => {
+  if (value === null || value === undefined || value === '') return '';
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return value;
+  switch (style.numberFormat) {
+    case '0.00': return numericValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    case '0%': return `${(numericValue * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
+    case '$#,##0.00': return numericValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+    case 'yyyy-mm-dd': {
+      const excelDate = new Date(Date.UTC(1899, 11, 30) + numericValue * 86400000);
+      return Number.isNaN(excelDate.getTime()) ? value : excelDate.toISOString().slice(0, 10);
+    }
+    default: return value;
+  }
+};
+
+const shiftCellStyles = (styles, sheetName, axis, index, delta) => Object.fromEntries(
+  Object.entries(styles).flatMap(([key, style]) => {
+    if (!key.startsWith(`${sheetName}!`)) return [[key, style]];
+    const coordinates = key.slice(sheetName.length + 1).split('_').map(Number);
+    const target = coordinates[axis];
+    if (delta < 0 && target === index) return [];
+    if ((delta > 0 && target >= index) || (delta < 0 && target > index)) {
+      coordinates[axis] += delta;
+    }
+    return [[`${sheetName}!${coordinates[0]}_${coordinates[1]}`, style]];
+  })
+);
 
 // Évalue les formules courantes sans quitter le tableur.
 const evaluateFormula = (rawVal, matrix, visited = new Set()) => {
@@ -141,9 +170,14 @@ export default function EditSpreadsheet({
   // États de l'interface
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('Enregistré');
-  const [sidePanel, setSidePanel] = useState(null); // 'access' | null
+  const [sidePanel, setSidePanel] = useState(null); // 'access' | 'history' | null
   const [searchTerm, setSearchTerm] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [historyVersions, setHistoryVersions] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [historyPreview, setHistoryPreview] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   // Collaborateurs en ligne et curseurs distants
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -153,6 +187,18 @@ export default function EditSpreadsheet({
   const autoSaveTimerRef = useRef(null);
   const formulaInputRef = useRef(null);
   const gridRef = useRef(null);
+  const importInputRef = useRef(null);
+  const workbookRef = useRef({
+    sheets: initialData.sheets,
+    sheetNames: initialData.sheetNames,
+    cellStyles: initialData.cellStyles || {},
+  });
+  const undoStackRef = useRef([]);
+  const redoStackRef = useRef([]);
+
+  useEffect(() => {
+    workbookRef.current = { sheets, sheetNames, cellStyles };
+  }, [sheets, sheetNames, cellStyles]);
 
   const currentMatrix = useMemo(() => {
     return sheets[activeSheet] || [];
@@ -322,65 +368,187 @@ export default function EditSpreadsheet({
       });
 
       const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-      await axios.put(`/files/${file.id}/content`, {
+      await axios.post(`/files/${file.id}/autosave`, {
         content: payload,
       }, {
         headers: { 'X-CSRF-TOKEN': csrf },
       });
 
       setSaveStatus('Modifications enregistrées');
+      return true;
     } catch (error) {
       console.error('Erreur lors de la sauvegarde du tableur:', error);
       setSaveStatus('Erreur de sauvegarde');
+      return false;
     } finally {
       setIsSaving(false);
     }
   }, [file.id, isReadOnly, cellStyles]);
 
+  const commitWorkbook = useCallback((updates, { record = true, save = true } = {}) => {
+    const previous = workbookRef.current;
+    const next = { ...previous, ...updates };
+    if (record) {
+      undoStackRef.current = [...undoStackRef.current, previous].slice(-50);
+      redoStackRef.current = [];
+    }
+    workbookRef.current = next;
+    setSheets(next.sheets);
+    setSheetNames(next.sheetNames);
+    setCellStyles(next.cellStyles);
+
+    if (save) {
+      clearTimeout(autoSaveTimerRef.current);
+      setSaveStatus('Modifications en attente…');
+      autoSaveTimerRef.current = setTimeout(
+        () => saveSpreadsheetData(next.sheets, next.sheetNames, next.cellStyles),
+        500
+      );
+    }
+    return next;
+  }, [saveSpreadsheetData]);
+
+  const applyWorkbookHistory = useCallback((from, to) => {
+    const target = from.current.pop();
+    if (!target) return;
+    to.current = [...to.current, workbookRef.current].slice(-50);
+    workbookRef.current = target;
+    setSheets(target.sheets);
+    setSheetNames(target.sheetNames);
+    setCellStyles(target.cellStyles);
+    saveSpreadsheetData(target.sheets, target.sheetNames, target.cellStyles);
+  }, [saveSpreadsheetData]);
+
+  const undo = useCallback(() => applyWorkbookHistory(undoStackRef, redoStackRef), [applyWorkbookHistory]);
+  const redo = useCallback(() => applyWorkbookHistory(redoStackRef, undoStackRef), [applyWorkbookHistory]);
+
+  const loadVersionHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const { data } = await axios.get(`/files/${file.id}/versions`);
+      setHistoryVersions(data.data ?? data);
+    } catch (error) {
+      console.error('Erreur lors du chargement de l’historique:', error);
+      setHistoryError('Impossible de charger l’historique des versions.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [file.id]);
+
+  useEffect(() => {
+    if (sidePanel === 'history') loadVersionHistory();
+  }, [sidePanel, loadVersionHistory]);
+
+  const createVersionSnapshot = useCallback(async (content, label, summary) => {
+    await axios.post(`/files/${file.id}/versions`, { content, label, summary });
+    await loadVersionHistory();
+  }, [file.id, loadVersionHistory]);
+
+  const saveVersion = async () => {
+    const content = JSON.stringify({ sheets, sheetNames, cellStyles });
+    try {
+      const saved = await saveSpreadsheetData(sheets, sheetNames, cellStyles);
+      if (!saved) throw new Error('La sauvegarde du classeur a échoué.');
+      await createVersionSnapshot(content, 'Version manuelle', 'Enregistrement demandé par l’utilisateur');
+      setSaveStatus('Version enregistrée');
+    } catch (error) {
+      console.error('Erreur lors de la création de la version:', error);
+      setSaveStatus('Erreur de sauvegarde');
+      window.alert('Impossible de créer cette version. Réessayez.');
+    }
+  };
+
+  const previewVersion = async (versionId) => {
+    setHistoryError('');
+    try {
+      const { data } = await axios.get(`/files/${file.id}/versions/${versionId}`);
+      setHistoryPreview(data.version);
+    } catch (error) {
+      console.error('Erreur lors du chargement de la version:', error);
+      setHistoryError('Impossible de charger cette version.');
+    }
+  };
+
+  const restoreVersion = async (version) => {
+    if (!window.confirm(`Restaurer la version ${version.version_number} ? L’état actuel sera conservé dans l’historique.`)) return;
+    try {
+      await axios.post(`/files/${file.id}/versions/${version.id}/restore`);
+      window.location.reload();
+    } catch (error) {
+      console.error('Erreur lors de la restauration de la version:', error);
+      window.alert('Impossible de restaurer cette version.');
+    }
+  };
+
+  const importSpreadsheet = async (event) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = '';
+    if (!selectedFile) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('spreadsheet', selectedFile);
+      const { data: response } = await axios.post(`/files/${file.id}/import`, formData);
+      const importedData = JSON.parse(response.content);
+      if (!importedData.sheets || !importedData.sheetNames?.length) {
+        throw new Error('Le fichier ne contient aucune feuille exploitable.');
+      }
+
+      const priorContent = JSON.stringify({ sheets, sheetNames, cellStyles });
+      await createVersionSnapshot(priorContent, 'Avant importation', `Avant l’import de ${selectedFile.name}`);
+      commitWorkbook({
+        sheets: importedData.sheets,
+        sheetNames: importedData.sheetNames,
+        cellStyles: importedData.cellStyles || {},
+      }, { save: false });
+      setActiveSheet(importedData.sheetNames[0]);
+      setSelectedCell({ row: 0, col: 0 });
+      const saved = await saveSpreadsheetData(
+        importedData.sheets,
+        importedData.sheetNames,
+        importedData.cellStyles || {}
+      );
+      if (!saved) throw new Error('La sauvegarde du fichier importé a échoué.');
+      setSaveStatus(`Importé : ${selectedFile.name}`);
+    } catch (error) {
+      console.error('Erreur lors de l’import du tableur:', error);
+      setSaveStatus('Erreur d’importation');
+      window.alert(`Impossible d’importer ce fichier : ${error.message || 'format non pris en charge'}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const updateSelectedCellStyle = useCallback((updates) => {
     if (isReadOnly) return;
     const key = `${activeSheet}!${selectedCell.row}_${selectedCell.col}`;
     const nextStyles = {
-      ...cellStyles,
-      [key]: { ...(cellStyles[key] || {}), ...updates },
+      ...workbookRef.current.cellStyles,
+      [key]: { ...(workbookRef.current.cellStyles[key] || {}), ...updates },
     };
-    setCellStyles(nextStyles);
-    setSaveStatus('Modifications en attente…');
+    commitWorkbook({ cellStyles: nextStyles });
     channelRef.current?.whisper('cell-style', {
       sheet: activeSheet,
       row: selectedCell.row,
       col: selectedCell.col,
       style: nextStyles[key],
     });
-    clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(
-      () => saveSpreadsheetData(sheets, sheetNames, nextStyles),
-      500
-    );
-  }, [activeSheet, cellStyles, isReadOnly, saveSpreadsheetData, selectedCell, sheets, sheetNames]);
+  }, [activeSheet, commitWorkbook, isReadOnly, selectedCell]);
 
   // Mise à jour de la cellule active
   const updateCellValue = useCallback((row, col, value) => {
     if (isReadOnly) return;
 
-    setSheets(prev => {
-      const matrix = prev[activeSheet] ? prev[activeSheet].map(r => [...r]) : [];
-      while (matrix.length <= row) matrix.push(Array.from({ length: currentCols }, () => ''));
-      matrix[row][col] = value;
-      const updated = { ...prev, [activeSheet]: matrix };
-
-      // Auto-save debounced
-      clearTimeout(autoSaveTimerRef.current);
-      setSaveStatus('Modifications en attente…');
-      autoSaveTimerRef.current = setTimeout(() => {
-        saveSpreadsheetData(updated, sheetNames);
-      }, 1500);
-
-      return updated;
-    });
+    const matrix = workbookRef.current.sheets[activeSheet]
+      ? workbookRef.current.sheets[activeSheet].map(r => [...r])
+      : [];
+    while (matrix.length <= row) matrix.push(Array.from({ length: currentCols }, () => ''));
+    matrix[row][col] = value;
+    commitWorkbook({ sheets: { ...workbookRef.current.sheets, [activeSheet]: matrix } });
 
     broadcastCellChange(row, col, value);
-  }, [activeSheet, currentCols, isReadOnly, sheetNames, saveSpreadsheetData, broadcastCellChange]);
+  }, [activeSheet, currentCols, isReadOnly, commitWorkbook, broadcastCellChange]);
 
   const handleCellClick = (row, col) => {
     setSelectedCell({ row, col });
@@ -402,6 +570,21 @@ export default function EditSpreadsheet({
       ArrowDown: [1, 0],
       ArrowLeft: [0, -1],
       ArrowRight: [0, 1],
+    };
+
+    const handleSpreadsheetShortcuts = (event) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        event.shiftKey ? redo() : undo();
+      } else if (event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        redo();
+      } else if (event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        document.getElementById('spreadsheet-search')?.focus();
+      }
     };
 
     if (moves[event.key]) {
@@ -442,25 +625,17 @@ export default function EditSpreadsheet({
     if (!values.length) return;
 
     const start = { ...selectedCell };
-    setSheets(prev => {
-      const matrix = prev[activeSheet] ? prev[activeSheet].map(row => [...row]) : [];
-      values.forEach((rowValues, rowOffset) => {
-        const rowIndex = start.row + rowOffset;
-        while (matrix.length <= rowIndex) matrix.push([]);
-        rowValues.forEach((value, colOffset) => {
-          matrix[rowIndex][start.col + colOffset] = value;
-        });
+    const matrix = workbookRef.current.sheets[activeSheet]
+      ? workbookRef.current.sheets[activeSheet].map(row => [...row])
+      : [];
+    values.forEach((rowValues, rowOffset) => {
+      const rowIndex = start.row + rowOffset;
+      while (matrix.length <= rowIndex) matrix.push([]);
+      rowValues.forEach((value, colOffset) => {
+        matrix[rowIndex][start.col + colOffset] = value;
       });
-
-      const updated = { ...prev, [activeSheet]: matrix };
-      clearTimeout(autoSaveTimerRef.current);
-      setSaveStatus('Modifications en attente…');
-      autoSaveTimerRef.current = setTimeout(
-        () => saveSpreadsheetData(updated, sheetNames),
-        500
-      );
-      return updated;
     });
+    commitWorkbook({ sheets: { ...workbookRef.current.sheets, [activeSheet]: matrix } });
 
     values.forEach((rowValues, rowOffset) => {
       rowValues.forEach((value, colOffset) => {
@@ -472,52 +647,47 @@ export default function EditSpreadsheet({
   // Ajout / Suppression de lignes et colonnes
   const addRow = () => {
     if (isReadOnly) return;
-    setSheets(prev => {
-      const matrix = prev[activeSheet] ? prev[activeSheet].map(r => [...r]) : [];
-      const newRow = Array.from({ length: currentCols }, () => '');
-      matrix.splice(selectedCell.row + 1, 0, newRow);
-      const updated = { ...prev, [activeSheet]: matrix };
-      saveSpreadsheetData(updated, sheetNames);
-      return updated;
+    const matrix = (workbookRef.current.sheets[activeSheet] || []).map(row => [...row]);
+    matrix.splice(selectedCell.row + 1, 0, Array.from({ length: currentCols }, () => ''));
+    commitWorkbook({
+      sheets: { ...workbookRef.current.sheets, [activeSheet]: matrix },
+      cellStyles: shiftCellStyles(workbookRef.current.cellStyles, activeSheet, 0, selectedCell.row + 1, 1),
     });
   };
 
   const deleteRow = () => {
     if (isReadOnly || currentMatrix.length <= 1) return;
-    setSheets(prev => {
-      const matrix = prev[activeSheet] ? prev[activeSheet].map(r => [...r]) : [];
-      matrix.splice(selectedCell.row, 1);
-      const updated = { ...prev, [activeSheet]: matrix };
-      saveSpreadsheetData(updated, sheetNames);
-      return updated;
+    const matrix = (workbookRef.current.sheets[activeSheet] || []).map(row => [...row]);
+    matrix.splice(selectedCell.row, 1);
+    commitWorkbook({
+      sheets: { ...workbookRef.current.sheets, [activeSheet]: matrix },
+      cellStyles: shiftCellStyles(workbookRef.current.cellStyles, activeSheet, 0, selectedCell.row, -1),
     });
   };
 
   const addColumn = () => {
     if (isReadOnly) return;
-    setSheets(prev => {
-      const matrix = prev[activeSheet] ? prev[activeSheet].map(r => {
-        const nextRow = [...r];
-        nextRow.splice(selectedCell.col + 1, 0, '');
-        return nextRow;
-      }) : [];
-      const updated = { ...prev, [activeSheet]: matrix };
-      saveSpreadsheetData(updated, sheetNames);
-      return updated;
+    const matrix = (workbookRef.current.sheets[activeSheet] || []).map(row => {
+      const nextRow = [...row];
+      nextRow.splice(selectedCell.col + 1, 0, '');
+      return nextRow;
+    });
+    commitWorkbook({
+      sheets: { ...workbookRef.current.sheets, [activeSheet]: matrix },
+      cellStyles: shiftCellStyles(workbookRef.current.cellStyles, activeSheet, 1, selectedCell.col + 1, 1),
     });
   };
 
   const deleteColumn = () => {
     if (isReadOnly || currentCols <= 1) return;
-    setSheets(prev => {
-      const matrix = prev[activeSheet] ? prev[activeSheet].map(r => {
-        const nextRow = [...r];
-        nextRow.splice(selectedCell.col, 1);
-        return nextRow;
-      }) : [];
-      const updated = { ...prev, [activeSheet]: matrix };
-      saveSpreadsheetData(updated, sheetNames);
-      return updated;
+    const matrix = (workbookRef.current.sheets[activeSheet] || []).map(row => {
+      const nextRow = [...row];
+      nextRow.splice(selectedCell.col, 1);
+      return nextRow;
+    });
+    commitWorkbook({
+      sheets: { ...workbookRef.current.sheets, [activeSheet]: matrix },
+      cellStyles: shiftCellStyles(workbookRef.current.cellStyles, activeSheet, 1, selectedCell.col, -1),
     });
   };
 
@@ -528,13 +698,11 @@ export default function EditSpreadsheet({
     while (sheetNames.includes(`Feuille ${number}`)) number += 1;
     const newName = `Feuille ${number}`;
     const newRows = Array.from({ length: 35 }, () => Array.from({ length: 15 }, () => ''));
-    const nextSheets = { ...sheets, [newName]: newRows };
-    const nextNames = [...sheetNames, newName];
+    const nextSheets = { ...workbookRef.current.sheets, [newName]: newRows };
+    const nextNames = [...workbookRef.current.sheetNames, newName];
 
-    setSheets(nextSheets);
-    setSheetNames(nextNames);
+    commitWorkbook({ sheets: nextSheets, sheetNames: nextNames });
     setActiveSheet(newName);
-    saveSpreadsheetData(nextSheets, nextNames);
 
     if (channelRef.current) {
       channelRef.current.whisper('sheet-add', { sheetName: newName });
@@ -555,64 +723,44 @@ export default function EditSpreadsheet({
       return;
     }
 
-    const nextSheets = { ...sheets };
+    const current = workbookRef.current;
+    const nextSheets = { ...current.sheets };
     nextSheets[newName] = nextSheets[oldName];
     delete nextSheets[oldName];
-    const nextNames = sheetNames.map(name => name === oldName ? newName : name);
-    const nextStyles = Object.fromEntries(Object.entries(cellStyles).map(([key, style]) => [
+    const nextNames = current.sheetNames.map(name => name === oldName ? newName : name);
+    const nextStyles = Object.fromEntries(Object.entries(current.cellStyles).map(([key, style]) => [
       key.startsWith(`${oldName}!`) ? `${newName}!${key.slice(oldName.length + 1)}` : key,
       style,
     ]));
-    setSheets(nextSheets);
-    setSheetNames(nextNames);
-    setCellStyles(nextStyles);
+    commitWorkbook({ sheets: nextSheets, sheetNames: nextNames, cellStyles: nextStyles });
     setActiveSheet(newName);
-    saveSpreadsheetData(nextSheets, nextNames, nextStyles);
     channelRef.current?.whisper('sheet-rename', { oldName, newName });
   };
 
   const deleteActiveSheet = () => {
     if (isReadOnly || sheetNames.length <= 1) return;
     if (!window.confirm(`Supprimer la feuille « ${activeSheet} » ?`)) return;
-    const nextNames = sheetNames.filter(name => name !== activeSheet);
-    const nextSheets = { ...sheets };
+    const current = workbookRef.current;
+    const nextNames = current.sheetNames.filter(name => name !== activeSheet);
+    const nextSheets = { ...current.sheets };
     delete nextSheets[activeSheet];
     const nextStyles = Object.fromEntries(
-      Object.entries(cellStyles).filter(([key]) => !key.startsWith(`${activeSheet}!`))
+      Object.entries(current.cellStyles).filter(([key]) => !key.startsWith(`${activeSheet}!`))
     );
-    setSheetNames(nextNames);
-    setSheets(nextSheets);
-    setCellStyles(nextStyles);
+    commitWorkbook({ sheetNames: nextNames, sheets: nextSheets, cellStyles: nextStyles });
     setActiveSheet(nextNames[0]);
-    saveSpreadsheetData(nextSheets, nextNames, nextStyles);
     channelRef.current?.whisper('sheet-delete', { sheetName: activeSheet });
   };
 
-  // Export Excel (.xlsx) avec SheetJS
+  // Exporter depuis le serveur pour conserver les styles du classeur.
   const exportToExcel = async () => {
     try {
-      let XLSX = window.XLSX;
-      if (!XLSX) XLSX = await import('xlsx');
+      if (!isReadOnly) {
+        const saved = await saveSpreadsheetData(sheets, sheetNames, cellStyles);
+        if (!saved) throw new Error('La sauvegarde du classeur a échoué.');
+      }
 
-      const wb = XLSX.utils.book_new();
-      sheetNames.forEach(sName => {
-        const matrix = sheets[sName] || [];
-        const ws = XLSX.utils.aoa_to_sheet(matrix.map(row =>
-          row.map(value => typeof value === 'string' && value.startsWith('=') ? null : value)
-        ));
-        matrix.forEach((row, rowIndex) => {
-          row.forEach((value, colIndex) => {
-            if (typeof value === 'string' && value.startsWith('=')) {
-              const address = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
-              ws[address] = { t: 'n', f: value.slice(1) };
-            }
-          });
-        });
-        XLSX.utils.book_append_sheet(wb, ws, sName);
-      });
-
-      const fileName = file.name.endsWith('.xlsx') ? file.name : `${file.name}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      window.location.assign(`/files/${file.id}/export-spreadsheet`);
     } catch (err) {
       console.error("Erreur lors de l'export Excel:", err);
       alert("Erreur lors de l'exportation du fichier Excel.");
@@ -647,17 +795,25 @@ export default function EditSpreadsheet({
     };
   }, [currentMatrix]);
   const selectedCellStyle = cellStyles[`${activeSheet}!${selectedCell.row}_${selectedCell.col}`] || {};
+  const previewData = useMemo(() => {
+    if (!historyPreview) return null;
+    try {
+      return JSON.parse(historyPreview.content);
+    } catch {
+      return null;
+    }
+  }, [historyPreview]);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900 text-slate-100 select-none overflow-hidden font-sans">
+    <div onKeyDown={handleSpreadsheetShortcuts} className="flex flex-col h-screen bg-white text-slate-800 select-none overflow-hidden font-sans">
       <Head title={`${file.name} - Tableur collaboratif ProJA`} />
 
       {/* ─── 1. TOP BAR GOOGLE SHEETS STYLE ─── */}
-      <div className="bg-slate-950 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shrink-0">
+      <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={() => window.history.back()}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition"
             title="Retour"
           >
             <FaArrowLeft className="text-sm" />
@@ -669,9 +825,9 @@ export default function EditSpreadsheet({
 
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-white truncate max-w-xs">{file.name}</span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-950 text-emerald-400 border border-emerald-800">
-                Excel Temps Réel
+              <span className="font-bold text-sm text-slate-800 truncate max-w-xs">{file.name}</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Tableur collaboratif
               </span>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-slate-400">
@@ -686,23 +842,43 @@ export default function EditSpreadsheet({
         <div className="hidden md:flex items-center relative max-w-xs w-full">
           <FaSearch className="absolute left-3 top-2.5 text-slate-500 text-xs" />
           <input
+            id="spreadsheet-search"
             type="text"
             placeholder="Rechercher dans les cellules…"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+            className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
           />
         </div>
 
         {/* Right: Collaborators & Actions */}
         <div className="flex items-center gap-2.5">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".xlsx,.xls,.ods,.csv,.tsv"
+            className="hidden"
+            onChange={importSpreadsheet}
+          />
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200 transition disabled:opacity-50"
+              title="Importer un classeur Excel, ODS ou CSV"
+            >
+              {importing ? <FaSpinner className="animate-spin text-xs" /> : <FaUpload className="text-xs text-emerald-700" />}
+              <span>Importer</span>
+            </button>
+          )}
           {/* Active Collaborators Online */}
           <div className="flex items-center -space-x-1.5 mr-2">
             {onlineUsers.map(u => (
               <div
                 key={u.id}
                 title={`En ligne : ${u.name}`}
-                className="w-7 h-7 rounded-full text-white text-[11px] font-bold flex items-center justify-center ring-2 ring-slate-950 shadow-sm cursor-default"
+                className="w-7 h-7 rounded-full text-white text-[11px] font-bold flex items-center justify-center ring-2 ring-white shadow-sm cursor-default"
                 style={{ backgroundColor: u.color || '#10b981' }}
               >
                 {(u.name || '?')[0].toUpperCase()}
@@ -713,10 +889,10 @@ export default function EditSpreadsheet({
           <button
             type="button"
             onClick={exportToExcel}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition"
             title="Télécharger au format .xlsx pour Microsoft Excel"
           >
-            <FaDownload className="text-[11px] text-emerald-400" />
+            <FaDownload className="text-[11px] text-emerald-700" />
             <span>Exporter XLSX</span>
           </button>
 
@@ -729,46 +905,80 @@ export default function EditSpreadsheet({
             <span>Partager</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              setHistoryPreview(null);
+              setSidePanel(sidePanel === 'history' ? null : 'history');
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200 transition"
+            title="Afficher l’historique des versions"
+          >
+            <FaHistory className="text-xs text-emerald-700" />
+            <span className="hidden lg:inline">Historique</span>
+          </button>
+
           {!isReadOnly && (
             <button
               type="button"
-              onClick={() => saveSpreadsheetData(sheets, sheetNames)}
+              onClick={saveVersion}
               disabled={isSaving}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-500/20 transition disabled:opacity-50"
             >
               {isSaving ? <FaSpinner className="animate-spin text-xs" /> : <FaSave className="text-xs" />}
-              <span className="hidden sm:inline">Sauvegarder</span>
+              <span className="hidden sm:inline">Créer une version</span>
             </button>
           )}
         </div>
       </div>
 
       {/* ─── 2. TOOLBAR (Formatting & Row/Col Actions) ─── */}
-      <div className="bg-slate-850 bg-slate-900 border-b border-slate-800 px-4 py-1.5 flex flex-wrap items-center gap-1 text-xs shrink-0">
+      <div className="bg-slate-100 bg-slate-50 border-b border-slate-200 px-4 py-1.5 flex flex-wrap items-center gap-1 text-xs shrink-0">
         <button
           onClick={addRow}
           disabled={isReadOnly}
-          className="px-2 py-1 rounded hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1 text-xs transition disabled:opacity-40"
+          className="px-2 py-1 rounded hover:bg-slate-100 text-slate-700 hover:text-slate-900 flex items-center gap-1 text-xs transition disabled:opacity-40"
           title="Ajouter une ligne"
         >
-          <FaPlus className="text-[10px] text-emerald-400" /> Ligne
+          <FaPlus className="text-[10px] text-emerald-700" /> Ligne
         </button>
 
         <button
           onClick={addColumn}
           disabled={isReadOnly}
-          className="px-2 py-1 rounded hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1 text-xs transition disabled:opacity-40"
+          className="px-2 py-1 rounded hover:bg-slate-100 text-slate-700 hover:text-slate-900 flex items-center gap-1 text-xs transition disabled:opacity-40"
           title="Ajouter une colonne"
         >
           <FaPlus className="text-[10px] text-blue-400" /> Colonne
         </button>
 
-        <div className="h-4 w-px bg-slate-700 mx-1.5" />
+        <button
+          type="button"
+          onClick={undo}
+          disabled={isReadOnly || undoStackRef.current.length === 0}
+          title="Annuler (Ctrl+Z)"
+          aria-label="Annuler"
+          className="p-1.5 rounded text-slate-700 hover:bg-slate-200 disabled:opacity-40"
+        >
+          <FaUndo />
+        </button>
+        <button
+          type="button"
+          onClick={redo}
+          disabled={isReadOnly || redoStackRef.current.length === 0}
+          title="Rétablir (Ctrl+Y)"
+          aria-label="Rétablir"
+          className="p-1.5 rounded text-slate-700 hover:bg-slate-200 disabled:opacity-40"
+        >
+          <FaRedo />
+        </button>
+
+        <div className="h-4 w-px bg-slate-200 mx-1.5" />
 
         <button
           onClick={deleteRow}
           disabled={isReadOnly}
-          className="px-2 py-1 rounded hover:bg-slate-800 text-slate-400 hover:text-red-400 flex items-center gap-1 text-xs transition disabled:opacity-40"
+          className="px-2 py-1 rounded hover:bg-slate-100 text-slate-400 hover:text-red-400 flex items-center gap-1 text-xs transition disabled:opacity-40"
           title="Supprimer la ligne sélectionnée"
         >
           <FaTrash className="text-[9px]" /> Ligne
@@ -777,13 +987,13 @@ export default function EditSpreadsheet({
         <button
           onClick={deleteColumn}
           disabled={isReadOnly}
-          className="px-2 py-1 rounded hover:bg-slate-800 text-slate-400 hover:text-red-400 flex items-center gap-1 text-xs transition disabled:opacity-40"
+          className="px-2 py-1 rounded hover:bg-slate-100 text-slate-400 hover:text-red-400 flex items-center gap-1 text-xs transition disabled:opacity-40"
           title="Supprimer la colonne sélectionnée"
         >
           <FaTrash className="text-[9px]" /> Colonne
         </button>
 
-        <div className="h-4 w-px bg-slate-700 mx-1.5" />
+        <div className="h-4 w-px bg-slate-200 mx-1.5" />
 
         <button
           type="button"
@@ -791,7 +1001,7 @@ export default function EditSpreadsheet({
           disabled={isReadOnly}
           aria-label="Mettre en gras"
           title="Gras"
-          className={`p-1.5 rounded transition disabled:opacity-40 ${selectedCellStyle.bold ? 'bg-emerald-900 text-emerald-300' : 'text-slate-300 hover:bg-slate-800'}`}
+          className={`p-1.5 rounded transition disabled:opacity-40 ${selectedCellStyle.bold ? 'bg-emerald-100 text-emerald-800' : 'text-slate-700 hover:bg-slate-100'}`}
         >
           <FaBold />
         </button>
@@ -801,9 +1011,19 @@ export default function EditSpreadsheet({
           disabled={isReadOnly}
           aria-label="Mettre en italique"
           title="Italique"
-          className={`p-1.5 rounded transition disabled:opacity-40 ${selectedCellStyle.italic ? 'bg-emerald-900 text-emerald-300' : 'text-slate-300 hover:bg-slate-800'}`}
+          className={`p-1.5 rounded transition disabled:opacity-40 ${selectedCellStyle.italic ? 'bg-emerald-100 text-emerald-800' : 'text-slate-700 hover:bg-slate-100'}`}
         >
           <FaItalic />
+        </button>
+        <button
+          type="button"
+          onClick={() => updateSelectedCellStyle({ strike: !selectedCellStyle.strike })}
+          disabled={isReadOnly}
+          aria-label="Barré"
+          title="Barré"
+          className={`p-1.5 rounded transition disabled:opacity-40 ${selectedCellStyle.strike ? 'bg-emerald-100 text-emerald-800' : 'text-slate-700 hover:bg-slate-200'}`}
+        >
+          <FaStrikethrough />
         </button>
         {[
           ['left', FaAlignLeft],
@@ -817,7 +1037,7 @@ export default function EditSpreadsheet({
             disabled={isReadOnly}
             aria-label={`Aligner ${alignment === 'left' ? 'à gauche' : alignment === 'right' ? 'à droite' : 'au centre'}`}
             title={`Alignement ${alignment}`}
-            className={`p-1.5 rounded transition disabled:opacity-40 ${selectedCellStyle.align === alignment ? 'bg-emerald-900 text-emerald-300' : 'text-slate-300 hover:bg-slate-800'}`}
+            className={`p-1.5 rounded transition disabled:opacity-40 ${selectedCellStyle.align === alignment ? 'bg-emerald-100 text-emerald-800' : 'text-slate-700 hover:bg-slate-100'}`}
           >
             <Icon />
           </button>
@@ -826,7 +1046,7 @@ export default function EditSpreadsheet({
           A
           <input
             type="color"
-            value={selectedCellStyle.color || '#cbd5e1'}
+            value={selectedCellStyle.color || '#1f2937'}
             onChange={event => updateSelectedCellStyle({ color: event.target.value })}
             disabled={isReadOnly}
             aria-label="Couleur du texte"
@@ -837,7 +1057,7 @@ export default function EditSpreadsheet({
           Fond
           <input
             type="color"
-            value={selectedCellStyle.bg || '#0f172a'}
+            value={selectedCellStyle.bg || '#ffffff'}
             onChange={event => updateSelectedCellStyle({ bg: event.target.value })}
             disabled={isReadOnly}
             aria-label="Couleur de fond"
@@ -845,12 +1065,40 @@ export default function EditSpreadsheet({
           />
         </label>
 
-        <div className="h-4 w-px bg-slate-700 mx-1.5" />
+        <div className="h-4 w-px bg-slate-200 mx-1.5" />
+
+        <select
+          value={selectedCellStyle.fontSize || 11}
+          onChange={event => updateSelectedCellStyle({ fontSize: Number(event.target.value) })}
+          disabled={isReadOnly}
+          aria-label="Taille de la police"
+          title="Taille de la police"
+          className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:outline-none"
+        >
+          {[10, 11, 12, 14, 16, 18, 24, 36].map(size => <option key={size} value={size}>{size}</option>)}
+        </select>
+
+        <select
+          value={selectedCellStyle.numberFormat || 'General'}
+          onChange={event => updateSelectedCellStyle({ numberFormat: event.target.value })}
+          disabled={isReadOnly}
+          aria-label="Format numérique"
+          title="Format numérique"
+          className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:outline-none"
+        >
+          <option value="General">Automatique</option>
+          <option value="0.00">Nombre (2 décimales)</option>
+          <option value="0%">Pourcentage</option>
+          <option value="$#,##0.00">Devise (USD)</option>
+          <option value="yyyy-mm-dd">Date</option>
+        </select>
+
+        <div className="h-4 w-px bg-slate-200 mx-1.5" />
 
         <select
           value={zoomLevel}
           onChange={e => setZoomLevel(Number(e.target.value))}
-          className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 focus:outline-none"
+          className="bg-slate-100 border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:outline-none"
         >
           <option value={80}>80%</option>
           <option value={100}>100%</option>
@@ -859,8 +1107,8 @@ export default function EditSpreadsheet({
       </div>
 
       {/* ─── 3. FORMULA BAR ─── */}
-      <div className="bg-slate-900 border-b border-slate-800 px-4 py-1.5 flex items-center gap-2 font-mono text-xs shrink-0">
-        <div className="w-14 py-1 px-2 bg-slate-950 border border-slate-700 rounded text-center text-emerald-400 font-bold shrink-0">
+      <div className="bg-slate-50 border-b border-slate-200 px-4 py-1.5 flex items-center gap-2 font-mono text-xs shrink-0">
+        <div className="w-14 py-1 px-2 bg-white border border-slate-200 rounded text-center text-emerald-700 font-bold shrink-0">
           {cellCoord}
         </div>
         <div className="text-slate-500 font-bold italic select-none">fx</div>
@@ -874,25 +1122,25 @@ export default function EditSpreadsheet({
             updateCellValue(selectedCell.row, selectedCell.col, e.target.value);
           }}
           placeholder="Entrez une valeur ou formule (ex: =SUM(A1:A5), =A1+B1)…"
-          className="flex-1 py-1 px-3 bg-slate-950 border border-slate-800 rounded text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+          className="flex-1 py-1 px-3 bg-white border border-slate-200 rounded text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
         />
       </div>
 
       {/* ─── 4. MAIN CONTENT AREA WITH SIDEBAR IF OPEN ─── */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* The Grid Table */}
-        <div ref={gridRef} className="flex-1 overflow-auto bg-slate-950 relative" style={{ zoom: `${zoomLevel}%` }} onPaste={handlePaste}>
+        <div ref={gridRef} className="flex-1 overflow-auto bg-white relative" style={{ zoom: `${zoomLevel}%` }} onPaste={handlePaste}>
           <table className="w-full border-collapse text-xs select-text">
             <thead>
-              <tr className="sticky top-0 z-20 shadow bg-slate-900">
-                <th className="w-12 h-7 min-w-12 bg-slate-800 border border-slate-700 text-slate-400 font-mono text-[10px] text-center sticky left-0 z-30">
+              <tr className="sticky top-0 z-20 shadow bg-slate-50">
+                <th className="w-12 h-7 min-w-12 bg-slate-100 border border-slate-200 text-slate-400 font-mono text-[10px] text-center sticky left-0 z-30">
                   #
                 </th>
                 {Array.from({ length: currentCols }).map((_, cIdx) => (
                   <th
                     key={cIdx}
-                    className={`h-7 px-3 border border-slate-700 font-semibold text-slate-300 min-w-[110px] text-center bg-slate-850 hover:bg-slate-800 transition ${
-                      selectedCell.col === cIdx ? 'bg-emerald-950/70 text-emerald-300 border-b-2 border-b-emerald-500' : ''
+                    className={`h-7 px-3 border border-slate-200 font-semibold text-slate-700 min-w-[110px] text-center bg-emerald-50 hover:bg-emerald-100 transition ${
+                      selectedCell.col === cIdx ? 'bg-emerald-100/70 text-emerald-800 border-b-2 border-b-emerald-500' : ''
                     }`}
                   >
                     {getColumnLetter(cIdx)}
@@ -909,13 +1157,13 @@ export default function EditSpreadsheet({
                 return (
                   <tr
                     key={rIdx}
-                    className={`hover:bg-slate-900/60 transition ${
-                      isRowSelected ? 'bg-slate-900/80' : rIdx % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900/30'
+                    className={`hover:bg-slate-50/60 transition ${
+                      isRowSelected ? 'bg-slate-50/80' : rIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
                     }`}
                   >
                     {/* Row header 1, 2, 3... */}
-                    <td className={`w-12 h-6 min-w-12 border border-slate-800 text-center font-mono text-[10px] sticky left-0 z-10 ${
-                      isRowSelected ? 'bg-emerald-950/60 text-emerald-400 font-bold border-r-2 border-r-emerald-500' : 'bg-slate-900 text-slate-500'
+                    <td className={`w-12 h-6 min-w-12 border border-slate-200 text-center font-mono text-[10px] sticky left-0 z-10 ${
+                      isRowSelected ? 'bg-emerald-100/60 text-emerald-700 font-bold border-r-2 border-r-emerald-500' : 'bg-slate-50 text-slate-500'
                     }`}>
                       {rIdx + 1}
                     </td>
@@ -924,7 +1172,8 @@ export default function EditSpreadsheet({
                     {Array.from({ length: currentCols }).map((_, cIdx) => {
                       const rawVal = row[cIdx] ?? '';
                       const isSelected = selectedCell.row === rIdx && selectedCell.col === cIdx;
-                      const displayVal = evaluateFormula(rawVal, currentMatrix);
+                      const cellStyle = cellStyles[`${activeSheet}!${rIdx}_${cIdx}`] || {};
+                      const displayVal = formatCellDisplay(evaluateFormula(rawVal, currentMatrix), cellStyle);
                       const isSearching = searchTerm && String(displayVal).toLowerCase().includes(searchTerm.toLowerCase());
 
                       // Collaborateur distant ayant sélectionné cette cellule
@@ -941,19 +1190,21 @@ export default function EditSpreadsheet({
                           onClick={() => handleCellClick(rIdx, cIdx)}
                           onDoubleClick={() => handleCellDoubleClick(rIdx, cIdx)}
                           onKeyDown={event => handleCellKeyDown(event, rIdx, cIdx)}
-                          className={`px-2.5 py-1.5 border border-slate-800/80 truncate max-w-[250px] cursor-cell transition-all relative font-mono ${
+                          className={`px-2.5 py-1.5 border border-slate-200/80 truncate max-w-[250px] cursor-cell transition-all relative font-mono ${
                             isSelected
-                              ? 'ring-2 ring-emerald-500 bg-emerald-950/40 text-white font-medium z-10'
+                              ? 'ring-2 ring-emerald-500 bg-emerald-50 text-slate-900 font-medium z-10'
                               : isSearching
                               ? 'bg-amber-500/30 text-amber-200 font-bold'
-                              : 'text-slate-300'
+                              : 'text-slate-700'
                           }`}
                           style={{
-                            ...(cellStyles[`${activeSheet}!${rIdx}_${cIdx}`]?.bold ? { fontWeight: 700 } : {}),
-                            ...(cellStyles[`${activeSheet}!${rIdx}_${cIdx}`]?.italic ? { fontStyle: 'italic' } : {}),
-                            ...(cellStyles[`${activeSheet}!${rIdx}_${cIdx}`]?.align ? { textAlign: cellStyles[`${activeSheet}!${rIdx}_${cIdx}`].align } : {}),
-                            ...(cellStyles[`${activeSheet}!${rIdx}_${cIdx}`]?.color ? { color: cellStyles[`${activeSheet}!${rIdx}_${cIdx}`].color } : {}),
-                            ...(cellStyles[`${activeSheet}!${rIdx}_${cIdx}`]?.bg ? { backgroundColor: cellStyles[`${activeSheet}!${rIdx}_${cIdx}`].bg } : {}),
+                            ...(cellStyle.bold ? { fontWeight: 700 } : {}),
+                            ...(cellStyle.italic ? { fontStyle: 'italic' } : {}),
+                            ...(cellStyle.strike ? { textDecoration: 'line-through' } : {}),
+                            ...(cellStyle.fontSize ? { fontSize: `${cellStyle.fontSize}px` } : {}),
+                            ...(cellStyle.align ? { textAlign: cellStyle.align } : {}),
+                            ...(cellStyle.color ? { color: cellStyle.color } : {}),
+                            ...(cellStyle.bg ? { backgroundColor: cellStyle.bg } : {}),
                             ...(remoteUser ? { outline: `2px solid ${remoteUser.color}`, outlineOffset: '-1px' } : {}),
                           }}
                           title={String(rawVal)}
@@ -981,7 +1232,7 @@ export default function EditSpreadsheet({
                                   setSelectedCell(prev => ({ ...prev, row: prev.row + 1 }));
                                 }
                               }}
-                              className="w-full bg-slate-900 text-white outline-none px-1 py-0.5 rounded"
+                              className="w-full bg-white text-slate-900 outline-none px-1 py-0.5 rounded"
                             />
                           ) : (
                             <span>{String(displayVal ?? '')}</span>
@@ -1007,10 +1258,111 @@ export default function EditSpreadsheet({
             onClose={() => setSidePanel(null)}
           />
         )}
+
+        {sidePanel === 'history' && (
+          <aside className="w-full max-w-sm border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800">
+                  {historyPreview ? `Version ${historyPreview.version_number}` : 'Historique des versions'}
+                </h2>
+                <p className="text-[11px] text-slate-500">Versions automatiques et enregistrées</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => historyPreview ? setHistoryPreview(null) : setSidePanel(null)}
+                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                aria-label={historyPreview ? 'Retour à l’historique' : 'Fermer l’historique'}
+              >
+                {historyPreview ? <FaArrowLeft /> : <FaTimes />}
+              </button>
+            </div>
+            {historyError && <p role="alert" className="m-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{historyError}</p>}
+            {historyLoading ? (
+              <div className="flex flex-1 items-center justify-center gap-2 text-sm text-slate-500">
+                <FaSpinner className="animate-spin" /> Chargement de l’historique…
+              </div>
+            ) : historyPreview ? (
+              <div className="flex-1 overflow-auto p-4">
+                <p className="mb-3 text-xs text-slate-600">
+                  {historyPreview.user?.name || 'Utilisateur'} · {new Date(historyPreview.created_at).toLocaleString()}
+                </p>
+                {previewData?.sheets && (
+                  <div className="mb-3 flex flex-wrap gap-1">
+                    {(previewData.sheetNames || Object.keys(previewData.sheets)).map(name => (
+                      <span key={name} className="rounded bg-emerald-50 px-2 py-1 text-[10px] text-emerald-800">{name}</span>
+                    ))}
+                  </div>
+                )}
+                {previewData?.sheets ? (
+                  <div className="overflow-auto rounded border border-slate-200">
+                    <table className="min-w-full border-collapse text-[10px]">
+                      <tbody>
+                        {(previewData.sheets[previewData.sheetNames?.[0]] || []).slice(0, 30).map((row, rowIndex) => (
+                          <tr key={rowIndex}>
+                            {row.slice(0, 8).map((value, colIndex) => (
+                              <td key={colIndex} className="max-w-32 truncate border border-slate-200 px-2 py-1 text-slate-700">{String(value ?? '')}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">Aperçu indisponible pour cette ancienne version.</p>
+                )}
+                {canManageAccess && (
+                  <button
+                    type="button"
+                    onClick={() => restoreVersion(historyPreview)}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                  >
+                    <FaUndo /> Restaurer cette version
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto">
+                {historyVersions.length === 0 && !historyError ? (
+                  <p className="p-6 text-center text-sm text-slate-500">Aucune version enregistrée pour le moment.</p>
+                ) : historyVersions.map((version, index) => (
+                  <div key={version.id} className="border-b border-slate-100 px-4 py-3 hover:bg-slate-50">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-800">
+                          {version.label || `Version ${version.version_number}`}
+                          {index === 0 && <span className="ml-2 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] text-emerald-700">Récente</span>}
+                        </p>
+                        <p className="mt-1 text-[11px] text-slate-500">{version.user?.name || 'Utilisateur'} · {new Date(version.created_at).toLocaleString()}</p>
+                        {version.summary && <p className="mt-1 text-[11px] text-slate-600">{version.summary}</p>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => previewVersion(version.id)}
+                        className="shrink-0 rounded px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50"
+                      >
+                        Aperçu
+                      </button>
+                    </div>
+                    {canManageAccess && (
+                      <button
+                        type="button"
+                        onClick={() => restoreVersion(version)}
+                        className="mt-2 text-[11px] font-medium text-slate-600 hover:text-emerald-700"
+                      >
+                        Restaurer
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </aside>
+        )}
       </div>
 
       {/* ─── 5. BOTTOM BAR (Tabs & Summary Statistics) ─── */}
-      <div className="bg-slate-950 border-t border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+      <div className="bg-white border-t border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
         {/* Sheet Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto">
           {sheetNames.map(name => {
@@ -1023,8 +1375,8 @@ export default function EditSpreadsheet({
                 title={isReadOnly ? name : `${name} — double-cliquez pour renommer`}
                 className={`px-3 py-1 rounded-t-lg font-medium text-xs flex items-center gap-1.5 transition border-b-2 ${
                   isActive
-                    ? 'bg-slate-800 text-emerald-400 border-emerald-500 shadow'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border-transparent'
+                    ? 'bg-slate-100 text-emerald-700 border-emerald-500 shadow'
+                    : 'bg-slate-50 text-slate-400 hover:text-slate-900 border-transparent'
                 }`}
               >
                 <FaTable className="text-[10px]" />
@@ -1037,7 +1389,7 @@ export default function EditSpreadsheet({
             <>
               <button
                 onClick={addNewSheet}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                className="p-1.5 text-slate-400 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition"
                 title="Ajouter une nouvelle feuille"
               >
                 <FaPlus className="text-xs" />
@@ -1045,7 +1397,7 @@ export default function EditSpreadsheet({
               <button
                 onClick={deleteActiveSheet}
                 disabled={sheetNames.length <= 1}
-                className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition disabled:opacity-40"
+                className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-100 transition disabled:opacity-40"
                 title="Supprimer la feuille active"
               >
                 <FaTrash className="text-[10px]" />
@@ -1055,12 +1407,12 @@ export default function EditSpreadsheet({
         </div>
 
         {/* Stats */}
-        <div className="flex items-center gap-4 text-[11px] text-slate-400 bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
-          <span>Valeurs : <strong className="text-slate-200">{stats.count}</strong></span>
+        <div className="flex items-center gap-4 text-[11px] text-slate-400 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">
+          <span>Valeurs : <strong className="text-slate-700">{stats.count}</strong></span>
           {stats.sum !== null && (
             <>
-              <span className="border-l border-slate-800 pl-3">Somme : <strong className="text-emerald-400">{stats.sum}</strong></span>
-              <span className="border-l border-slate-800 pl-3">Moyenne : <strong className="text-cyan-400">{stats.avg}</strong></span>
+              <span className="border-l border-slate-200 pl-3">Somme : <strong className="text-emerald-700">{stats.sum}</strong></span>
+              <span className="border-l border-slate-200 pl-3">Moyenne : <strong className="text-cyan-700">{stats.avg}</strong></span>
             </>
           )}
         </div>

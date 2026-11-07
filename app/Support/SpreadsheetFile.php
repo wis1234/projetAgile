@@ -46,6 +46,12 @@ final class SpreadsheetFile
                 if ($font->getItalic()) {
                     $cellStyle['italic'] = true;
                 }
+                if ($font->getStrikethrough()) {
+                    $cellStyle['strike'] = true;
+                }
+                if ($font->getSize() !== 11) {
+                    $cellStyle['fontSize'] = $font->getSize();
+                }
                 if ($alignment->getHorizontal() !== 'general') {
                     $horizontal = $alignment->getHorizontal();
                     $cellStyle['align'] = match ($horizontal) {
@@ -67,6 +73,11 @@ final class SpreadsheetFile
                 $fillColor = $fill->getStartColor()->getRGB();
                 if ($fill->getFillType() === Fill::FILL_SOLID && $fillColor && strtoupper($fillColor) !== 'FFFFFF') {
                     $cellStyle['bg'] = '#' . $fillColor;
+                }
+
+                $numberFormat = $style->getNumberFormat()->getFormatCode();
+                if ($numberFormat !== 'General') {
+                    $cellStyle['numberFormat'] = $numberFormat;
                 }
 
                 if ($cellStyle) {
@@ -122,9 +133,12 @@ final class SpreadsheetFile
                             'font' => array_filter([
                                 'bold' => $style['bold'] ?? null,
                                 'italic' => $style['italic'] ?? null,
+                                'strikethrough' => $style['strike'] ?? null,
+                                'size' => $style['fontSize'] ?? null,
                                 'color' => isset($style['color']) ? ['rgb' => ltrim($style['color'], '#')] : null,
                             ], static fn ($value) => $value !== null),
                             'alignment' => isset($style['align']) ? ['horizontal' => $style['align']] : [],
+                            'numberFormat' => isset($style['numberFormat']) ? ['formatCode' => $style['numberFormat']] : [],
                             'fill' => isset($style['bg']) ? [
                                 'fillType' => Fill::FILL_SOLID,
                                 'startColor' => ['rgb' => ltrim($style['bg'], '#')],
