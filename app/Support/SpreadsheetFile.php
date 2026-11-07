@@ -6,7 +6,6 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 final class SpreadsheetFile
 {
@@ -20,71 +19,136 @@ final class SpreadsheetFile
         $workbook = IOFactory::load($path);
         $sheets = [];
         $cellStyles = [];
+        $nativeStyles = [];
+        $sheetMetadata = [];
         $sheetNames = [];
 
         foreach ($workbook->getWorksheetIterator() as $worksheet) {
             $sheetName = $worksheet->getTitle();
             $sheetNames[] = $sheetName;
+            $sheetMetadata[$sheetName] = [
+                'mergedCells' => array_values($worksheet->getMergeCells()),
+                'freezePane' => $worksheet->getFreezePane(),
+                'columnDimensions' => [],
+                'rowDimensions' => [],
+            ];
             $sheets[$sheetName] = array_map(
                 static fn (array $row): array => array_map(
                     static fn ($value) => $value ?? '',
                     $row
                 ),
-                $worksheet->toArray(null, false, true, false)
+                $worksheet->toArray(null, false, false, false)
             );
+
+            foreach ($worksheet->getColumnDimensions() as $column => $dimension) {
+                $sheetMetadata[$sheetName]['columnDimensions'][$column] = [
+                    'width' => $dimension->getWidth(),
+                    'visible' => $dimension->getVisible(),
+                    'outlineLevel' => $dimension->getOutlineLevel(),
+                ];
+            }
+            foreach ($worksheet->getRowDimensions() as $row => $dimension) {
+                $sheetMetadata[$sheetName]['rowDimensions'][(string) ((int) $row - 1)] = [
+                    'height' => $dimension->getRowHeight(),
+                    'visible' => $dimension->getVisible(),
+                    'outlineLevel' => $dimension->getOutlineLevel(),
+                ];
+            }
 
             foreach ($worksheet->getCellCollection()->getCoordinates() as $coordinate) {
                 $style = $worksheet->getStyle($coordinate);
                 $font = $style->getFont();
                 $alignment = $style->getAlignment();
                 $fill = $style->getFill();
-                $cellStyle = [];
+                $borders = $style->getBorders();
+                $nativeStyle = [
+                    'font' => [
+                        'name' => $font->getName(),
+                        'latin' => $font->getLatin(),
+                        'eastAsian' => $font->getEastAsian(),
+                        'complexScript' => $font->getComplexScript(),
+                        'size' => $font->getSize(),
+                        'bold' => $font->getBold(),
+                        'italic' => $font->getItalic(),
+                        'underline' => $font->getUnderline(),
+                        'strikethrough' => $font->getStrikethrough(),
+                        'strikeType' => $font->getStrikeType(),
+                        'baseLine' => $font->getBaseLine(),
+                        'scheme' => $font->getScheme(),
+                        'color' => ['argb' => $font->getColor()->getARGB()],
+                        'superscript' => $font->getSuperscript(),
+                        'subscript' => $font->getSubscript(),
+                    ],
+                    'alignment' => [
+                        'horizontal' => $alignment->getHorizontal(),
+                        'vertical' => $alignment->getVertical(),
+                        'wrapText' => $alignment->getWrapText(),
+                        'shrinkToFit' => $alignment->getShrinkToFit(),
+                        'textRotation' => $alignment->getTextRotation(),
+                        'indent' => $alignment->getIndent(),
+                        'readOrder' => $alignment->getReadOrder(),
+                    ],
+                    'fill' => [
+                        'fillType' => $fill->getFillType(),
+                        'startColor' => ['argb' => $fill->getStartColor()->getARGB()],
+                        'endColor' => ['argb' => $fill->getEndColor()->getARGB()],
+                        'rotation' => $fill->getRotation(),
+                    ],
+                    'numberFormat' => ['formatCode' => $style->getNumberFormat()->getFormatCode()],
+                    'protection' => [
+                        'locked' => $style->getProtection()->getLocked(),
+                        'hidden' => $style->getProtection()->getHidden(),
+                    ],
+                ];
+                foreach (['left', 'right', 'top', 'bottom', 'diagonal'] as $side) {
+                    $border = $borders->{'get' . ucfirst($side)}();
+                    $nativeStyle['borders'][$side] = [
+                        'borderStyle' => $border->getBorderStyle(),
+                        'color' => ['argb' => $border->getColor()->getARGB()],
+                    ];
+                }
+                $nativeStyle['borders']['diagonalDirection'] = $borders->getDiagonalDirection();
 
-                if ($font->getBold()) {
-                    $cellStyle['bold'] = true;
-                }
-                if ($font->getItalic()) {
-                    $cellStyle['italic'] = true;
-                }
-                if ($font->getStrikethrough()) {
-                    $cellStyle['strike'] = true;
-                }
-                if ($font->getSize() !== 11) {
-                    $cellStyle['fontSize'] = $font->getSize();
-                }
-                if ($alignment->getHorizontal() !== 'general') {
-                    $horizontal = $alignment->getHorizontal();
-                    $cellStyle['align'] = match ($horizontal) {
-                        'left', 'center', 'right', 'justify' => $horizontal,
-                        'centerContinuous' => 'center',
-                        'distributed' => 'justify',
-                        default => null,
-                    };
-                    if ($cellStyle['align'] === null) {
-                        unset($cellStyle['align']);
+                $styleId = $style->getHashCode();
+                $nativeStyles[$styleId] ??= $nativeStyle;
+
+                $fontColor = self::toCssColor($font->getColor()->getARGB());
+                $fillColor = self::toCssColor($fill->getStartColor()->getARGB());
+                $cellStyle = [
+                    'nativeStyleId' => $styleId,
+                    'fontName' => $font->getName(),
+                    'fontSize' => $font->getSize(),
+                    'bold' => $font->getBold(),
+                    'italic' => $font->getItalic(),
+                    'underline' => $font->getUnderline(),
+                    'strike' => $font->getStrikethrough(),
+                    'color' => $fontColor,
+                    'fillType' => $fill->getFillType(),
+                    'bg' => $fill->getFillType() === 'solid' ? $fillColor : null,
+                    'align' => $alignment->getHorizontal(),
+                    'verticalAlign' => $alignment->getVertical(),
+                    'wrapText' => $alignment->getWrapText(),
+                    'shrinkToFit' => $alignment->getShrinkToFit(),
+                    'textRotation' => $alignment->getTextRotation(),
+                    'indent' => $alignment->getIndent(),
+                    'numberFormat' => $style->getNumberFormat()->getFormatCode(),
+                ];
+                foreach (['left', 'right', 'top', 'bottom'] as $side) {
+                    $border = $borders->{'get' . ucfirst($side)}();
+                    if ($border->getBorderStyle() !== 'none') {
+                        $cellStyle['border' . ucfirst($side)] = [
+                            'style' => $border->getBorderStyle(),
+                            'color' => self::toCssColor($border->getColor()->getARGB()),
+                        ];
                     }
                 }
 
-                $fontColor = $font->getColor()->getRGB();
-                if ($fontColor && strtoupper($fontColor) !== '000000') {
-                    $cellStyle['color'] = '#' . $fontColor;
-                }
-
-                $fillColor = $fill->getStartColor()->getRGB();
-                if ($fill->getFillType() === Fill::FILL_SOLID && $fillColor && strtoupper($fillColor) !== 'FFFFFF') {
-                    $cellStyle['bg'] = '#' . $fillColor;
-                }
-
-                $numberFormat = $style->getNumberFormat()->getFormatCode();
-                if ($numberFormat !== 'General') {
-                    $cellStyle['numberFormat'] = $numberFormat;
-                }
-
-                if ($cellStyle) {
-                    [$column, $row] = Coordinate::coordinateFromString($coordinate);
-                    $key = $sheetName . '!' . ((int) $row - 1) . '_' . (Coordinate::columnIndexFromString($column) - 1);
-                    $cellStyles[$key] = $cellStyle;
-                }
+                [$column, $row] = Coordinate::coordinateFromString($coordinate);
+                $key = $sheetName . '!' . ((int) $row - 1) . '_' . (Coordinate::columnIndexFromString($column) - 1);
+                $cellStyles[$key] = array_filter(
+                    $cellStyle,
+                    static fn ($value) => $value !== null
+                );
             }
         }
 
@@ -97,6 +161,8 @@ final class SpreadsheetFile
             'sheets' => $sheets,
             'sheetNames' => $sheetNames,
             'cellStyles' => $cellStyles,
+            'nativeStyles' => $nativeStyles,
+            'sheetMetadata' => $sheetMetadata,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
@@ -110,10 +176,43 @@ final class SpreadsheetFile
         $workbook = new Spreadsheet();
         $workbook->removeSheetByIndex(0);
         $cellStyles = $data['cellStyles'] ?? [];
+        $nativeStyles = $data['nativeStyles'] ?? [];
+        $sheetMetadata = $data['sheetMetadata'] ?? [];
 
         foreach ($data['sheetNames'] as $sheetName) {
             $worksheet = $workbook->createSheet();
             $worksheet->setTitle(substr((string) $sheetName, 0, 31));
+            $metadata = $sheetMetadata[$sheetName] ?? [];
+            foreach ($metadata['mergedCells'] ?? [] as $mergedCell) {
+                $worksheet->mergeCells($mergedCell);
+            }
+            if (!empty($metadata['freezePane'])) {
+                $worksheet->freezePane($metadata['freezePane']);
+            }
+            foreach ($metadata['columnDimensions'] ?? [] as $column => $dimension) {
+                $columnDimension = $worksheet->getColumnDimension($column);
+                if (isset($dimension['width']) && $dimension['width'] >= 0) {
+                    $columnDimension->setWidth($dimension['width']);
+                }
+                if (isset($dimension['visible'])) {
+                    $columnDimension->setVisible($dimension['visible']);
+                }
+                if (isset($dimension['outlineLevel'])) {
+                    $columnDimension->setOutlineLevel($dimension['outlineLevel']);
+                }
+            }
+            foreach ($metadata['rowDimensions'] ?? [] as $row => $dimension) {
+                $rowDimension = $worksheet->getRowDimension((int) $row + 1);
+                if (isset($dimension['height']) && $dimension['height'] >= 0) {
+                    $rowDimension->setRowHeight($dimension['height']);
+                }
+                if (isset($dimension['visible'])) {
+                    $rowDimension->setVisible($dimension['visible']);
+                }
+                if (isset($dimension['outlineLevel'])) {
+                    $rowDimension->setOutlineLevel($dimension['outlineLevel']);
+                }
+            }
             $matrix = $data['sheets'][$sheetName] ?? [];
 
             foreach ($matrix as $rowIndex => $row) {
@@ -129,21 +228,11 @@ final class SpreadsheetFile
 
                     $style = $cellStyles[$sheetName . '!' . $rowIndex . '_' . $columnIndex] ?? null;
                     if ($style) {
-                        $worksheet->getStyle($coordinate)->applyFromArray([
-                            'font' => array_filter([
-                                'bold' => $style['bold'] ?? null,
-                                'italic' => $style['italic'] ?? null,
-                                'strikethrough' => $style['strike'] ?? null,
-                                'size' => $style['fontSize'] ?? null,
-                                'color' => isset($style['color']) ? ['rgb' => ltrim($style['color'], '#')] : null,
-                            ], static fn ($value) => $value !== null),
-                            'alignment' => isset($style['align']) ? ['horizontal' => $style['align']] : [],
-                            'numberFormat' => isset($style['numberFormat']) ? ['formatCode' => $style['numberFormat']] : [],
-                            'fill' => isset($style['bg']) ? [
-                                'fillType' => Fill::FILL_SOLID,
-                                'startColor' => ['rgb' => ltrim($style['bg'], '#')],
-                            ] : [],
-                        ]);
+                        $nativeStyle = $nativeStyles[$style['nativeStyleId'] ?? ''] ?? [];
+                        $overrides = self::styleOverrides($style);
+                        $worksheet->getStyle($coordinate)->applyFromArray(
+                            self::mergeStyle($nativeStyle, $overrides)
+                        );
                     }
                 }
             }
@@ -182,5 +271,89 @@ final class SpreadsheetFile
             @unlink($temporaryPath);
             $workbook->disconnectWorksheets();
         }
+    }
+
+    private static function toCssColor(?string $argb): ?string
+    {
+        if (!$argb || strlen($argb) < 6) {
+            return null;
+        }
+
+        return '#' . substr($argb, -6);
+    }
+
+    private static function styleOverrides(array $style): array
+    {
+        $overrides = [];
+        $font = [];
+        foreach ([
+            'bold' => 'bold',
+            'italic' => 'italic',
+            'underline' => 'underline',
+            'strike' => 'strikethrough',
+            'fontSize' => 'size',
+            'fontName' => 'name',
+        ] as $key => $property) {
+            if (array_key_exists($key, $style)) {
+                $font[$property] = $style[$key];
+            }
+        }
+        if (isset($style['color'])) {
+            $font['color'] = ['rgb' => ltrim($style['color'], '#')];
+        }
+        if ($font) {
+            $overrides['font'] = $font;
+        }
+
+        $alignment = [];
+        foreach ([
+            'align' => 'horizontal',
+            'verticalAlign' => 'vertical',
+            'wrapText' => 'wrapText',
+            'shrinkToFit' => 'shrinkToFit',
+            'textRotation' => 'textRotation',
+            'indent' => 'indent',
+        ] as $key => $property) {
+            if (array_key_exists($key, $style)) {
+                $alignment[$property] = $style[$key];
+            }
+        }
+        if ($alignment) {
+            $overrides['alignment'] = $alignment;
+        }
+        if (isset($style['numberFormat'])) {
+            $overrides['numberFormat'] = ['formatCode' => $style['numberFormat']];
+        }
+        if (isset($style['bg'])) {
+            $overrides['fill'] = [
+                'fillType' => 'solid',
+                'startColor' => ['rgb' => ltrim($style['bg'], '#')],
+            ];
+        }
+        foreach (['left', 'right', 'top', 'bottom'] as $side) {
+            $key = 'border' . ucfirst($side);
+            if (isset($style[$key])) {
+                $overrides['borders'][$side] = [
+                    'borderStyle' => $style[$key]['style'] ?? 'thin',
+                    'color' => ['rgb' => ltrim($style[$key]['color'] ?? '#000000', '#')],
+                ];
+            }
+        }
+
+        return $overrides;
+    }
+
+    private static function mergeStyle(array $base, array $overrides): array
+    {
+        foreach ($overrides as $key => $value) {
+            if (is_array($value) && isset($base[$key]) && is_array($base[$key])
+                && !in_array($key, ['color', 'startColor', 'endColor'], true)) {
+                $base[$key] = self::mergeStyle($base[$key], $value);
+            } else {
+                $base[$key] = $value;
+            }
+        }
+
+        return $base;
     }
 }

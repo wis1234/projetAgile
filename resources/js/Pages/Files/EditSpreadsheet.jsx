@@ -48,6 +48,98 @@ const formatCellDisplay = (value, style = {}) => {
   }
 };
 
+const normalizeClipboardColor = (value) => {
+  if (!value) return null;
+  const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    const color = hex[1].length === 3
+      ? hex[1].split('').map(part => part + part).join('')
+      : hex[1];
+    return `#${color.toLowerCase()}`;
+  }
+  const rgb = value.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  return rgb ? `#${rgb.slice(1, 4).map(part => Number(part).toString(16).padStart(2, '0')).join('')}` : null;
+};
+
+const clipboardCellStyle = (cell) => {
+  const css = cell.style;
+  const result = {};
+  const fontWeight = Number.parseInt(css.fontWeight, 10);
+  if (css.fontWeight === 'bold' || fontWeight >= 600) result.bold = true;
+  if (css.fontStyle === 'italic') result.italic = true;
+  if (css.textDecorationLine?.includes('underline') || css.textDecoration?.includes('underline')) result.underline = 'single';
+  if (css.textDecorationLine?.includes('line-through') || css.textDecoration?.includes('line-through')) result.strike = true;
+
+  const fontSize = css.fontSize.match(/^([\d.]+)(pt|px)$/i);
+  if (fontSize) result.fontSize = Number(fontSize[1]) * (fontSize[2].toLowerCase() === 'px' ? 0.75 : 1);
+  const fontName = css.fontFamily.split(',')[0]?.trim().replace(/^['"]|['"]$/g, '');
+  if (fontName) result.fontName = fontName;
+
+  const color = normalizeClipboardColor(css.color);
+  const background = normalizeClipboardColor(css.backgroundColor || css.background);
+  if (color) result.color = color;
+  if (background && background !== '#ffffff') result.bg = background;
+  if (['left', 'center', 'right', 'justify'].includes(css.textAlign)) result.align = css.textAlign;
+  if (['top', 'bottom'].includes(css.verticalAlign)) result.verticalAlign = css.verticalAlign;
+  if (css.verticalAlign === 'middle') result.verticalAlign = 'center';
+  if (css.whiteSpace === 'pre-wrap' || css.whiteSpace === 'normal') result.wrapText = true;
+  if (css.whiteSpace === 'nowrap') result.wrapText = false;
+
+  const rawStyle = cell.getAttribute('style') || '';
+  const numberFormat = rawStyle.match(/mso-number-format\s*:\s*(['"]?)(.*?)\1(?:;|$)/i);
+  if (numberFormat?.[2]) result.numberFormat = numberFormat[2].trim();
+
+  for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+    const borderStyle = css[`border${side}Style`];
+    const borderColor = normalizeClipboardColor(css[`border${side}Color`]);
+    if (borderStyle && borderStyle !== 'none') {
+      result[`border${side}`] = { style: borderStyle, color: borderColor || '#000000' };
+    }
+  }
+
+  return result;
+};
+
+const parseClipboardHtml = (html) => {
+  if (!html || typeof DOMParser === 'undefined') return null;
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  const table = document.querySelector('table');
+  if (!table) return null;
+
+  const rows = [];
+  const styles = {};
+  const tableRows = [...table.querySelectorAll('tr')];
+  tableRows.forEach((tableRow, rowIndex) => {
+    if (!rows[rowIndex]) rows[rowIndex] = [];
+    let columnIndex = 0;
+    [...tableRow.children].filter(cell => ['TD', 'TH'].includes(cell.tagName)).forEach(cell => {
+      while (rows[rowIndex][columnIndex] !== undefined) columnIndex += 1;
+      const rowSpan = Math.max(1, Number(cell.rowSpan) || 1);
+      const colSpan = Math.max(1, Number(cell.colSpan) || 1);
+      let value = cell.getAttribute('data-formula') || cell.getAttribute('formula') || cell.getAttribute('x:f');
+      if (value && !value.startsWith('=')) value = `=${value}`;
+      if (!value) {
+        value = cell.getAttribute('data-value') ?? cell.getAttribute('x:num') ?? cell.textContent ?? '';
+        value = value.replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n');
+      }
+
+      const style = clipboardCellStyle(cell);
+      for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
+        const targetRow = rowIndex + rowOffset;
+        if (!rows[targetRow]) rows[targetRow] = [];
+        for (let colOffset = 0; colOffset < colSpan; colOffset += 1) {
+          const targetColumn = columnIndex + colOffset;
+          rows[targetRow][targetColumn] = rowOffset === 0 && colOffset === 0 ? value : '';
+          if (Object.keys(style).length) styles[`${targetRow}_${targetColumn}`] = style;
+        }
+      }
+      columnIndex += colSpan;
+    });
+  });
+
+  return rows.length ? { rows, styles } : null;
+};
+
 const shiftCellStyles = (styles, sheetName, axis, index, delta) => Object.fromEntries(
   Object.entries(styles).flatMap(([key, style]) => {
     if (!key.startsWith(`${sheetName}!`)) return [[key, style]];
@@ -156,6 +248,8 @@ export default function EditSpreadsheet({
       sheets: { 'Feuille 1': defaultRows },
       sheetNames: ['Feuille 1'],
       cellStyles: {},
+      nativeStyles: {},
+      sheetMetadata: {},
     };
   }, [file.content]);
 
@@ -166,6 +260,8 @@ export default function EditSpreadsheet({
   const [isEditingCell, setIsEditingCell] = useState(false);
   const [formulaInput, setFormulaInput] = useState('');
   const [cellStyles, setCellStyles] = useState(initialData.cellStyles || {});
+  const [nativeStyles, setNativeStyles] = useState(initialData.nativeStyles || {});
+  const [sheetMetadata, setSheetMetadata] = useState(initialData.sheetMetadata || {});
 
   // États de l'interface
   const [isSaving, setIsSaving] = useState(false);
@@ -192,13 +288,15 @@ export default function EditSpreadsheet({
     sheets: initialData.sheets,
     sheetNames: initialData.sheetNames,
     cellStyles: initialData.cellStyles || {},
+    nativeStyles: initialData.nativeStyles || {},
+    sheetMetadata: initialData.sheetMetadata || {},
   });
   const undoStackRef = useRef([]);
   const redoStackRef = useRef([]);
 
   useEffect(() => {
-    workbookRef.current = { sheets, sheetNames, cellStyles };
-  }, [sheets, sheetNames, cellStyles]);
+    workbookRef.current = { sheets, sheetNames, cellStyles, nativeStyles, sheetMetadata };
+  }, [sheets, sheetNames, cellStyles, nativeStyles, sheetMetadata]);
 
   const currentMatrix = useMemo(() => {
     return sheets[activeSheet] || [];
@@ -208,6 +306,7 @@ export default function EditSpreadsheet({
     if (!currentMatrix.length) return 15;
     return Math.max(15, ...currentMatrix.map(r => r ? r.length : 0));
   }, [currentMatrix]);
+  const activeSheetMetadata = sheetMetadata[activeSheet] || {};
 
   const cellCoord = `${getColumnLetter(selectedCell.col)}${selectedCell.row + 1}`;
   const rawCellValue = currentMatrix[selectedCell.row]?.[selectedCell.col] ?? '';
@@ -286,6 +385,7 @@ export default function EditSpreadsheet({
       .listenForWhisper('sheet-add', (data) => {
         if (!data || !data.sheetName) return;
         setSheetNames(prev => prev.includes(data.sheetName) ? prev : [...prev, data.sheetName]);
+        setSheetMetadata(prev => ({ ...prev, [data.sheetName]: prev[data.sheetName] || {} }));
         setSheets(prev => ({
           ...prev,
           [data.sheetName]: prev[data.sheetName] || Array.from({ length: 35 }, () => Array.from({ length: 15 }, () => '')),
@@ -304,6 +404,12 @@ export default function EditSpreadsheet({
           key.startsWith(`${data.oldName}!`) ? `${data.newName}!${key.slice(data.oldName.length + 1)}` : key,
           style,
         ])));
+        setSheetMetadata(prev => {
+          if (!prev[data.oldName]) return prev;
+          const next = { ...prev, [data.newName]: prev[data.oldName] };
+          delete next[data.oldName];
+          return next;
+        });
         setActiveSheet(prev => prev === data.oldName ? data.newName : prev);
       })
       .listenForWhisper('sheet-delete', (data) => {
@@ -321,6 +427,11 @@ export default function EditSpreadsheet({
         setCellStyles(prev => Object.fromEntries(
           Object.entries(prev).filter(([key]) => !key.startsWith(`${data.sheetName}!`))
         ));
+        setSheetMetadata(prev => {
+          const next = { ...prev };
+          delete next[data.sheetName];
+          return next;
+        });
       });
 
     return () => {
@@ -355,7 +466,13 @@ export default function EditSpreadsheet({
   }, [activeSheet, isReadOnly]);
 
   // Enregistrement sur le serveur
-  const saveSpreadsheetData = useCallback(async (currentSheets, currentSheetNames, currentCellStyles = cellStyles) => {
+  const saveSpreadsheetData = useCallback(async (
+    currentSheets,
+    currentSheetNames,
+    currentCellStyles = workbookRef.current.cellStyles,
+    currentNativeStyles = workbookRef.current.nativeStyles,
+    currentSheetMetadata = workbookRef.current.sheetMetadata,
+  ) => {
     if (isReadOnly) return;
     setIsSaving(true);
     setSaveStatus('Enregistrement…');
@@ -365,6 +482,8 @@ export default function EditSpreadsheet({
         sheets: currentSheets,
         sheetNames: currentSheetNames,
         cellStyles: currentCellStyles,
+        nativeStyles: currentNativeStyles,
+        sheetMetadata: currentSheetMetadata,
       });
 
       const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
@@ -396,12 +515,20 @@ export default function EditSpreadsheet({
     setSheets(next.sheets);
     setSheetNames(next.sheetNames);
     setCellStyles(next.cellStyles);
+    setNativeStyles(next.nativeStyles);
+    setSheetMetadata(next.sheetMetadata);
 
     if (save) {
       clearTimeout(autoSaveTimerRef.current);
       setSaveStatus('Modifications en attente…');
       autoSaveTimerRef.current = setTimeout(
-        () => saveSpreadsheetData(next.sheets, next.sheetNames, next.cellStyles),
+        () => saveSpreadsheetData(
+          next.sheets,
+          next.sheetNames,
+          next.cellStyles,
+          next.nativeStyles,
+          next.sheetMetadata
+        ),
         500
       );
     }
@@ -416,7 +543,15 @@ export default function EditSpreadsheet({
     setSheets(target.sheets);
     setSheetNames(target.sheetNames);
     setCellStyles(target.cellStyles);
-    saveSpreadsheetData(target.sheets, target.sheetNames, target.cellStyles);
+    setNativeStyles(target.nativeStyles);
+    setSheetMetadata(target.sheetMetadata);
+    saveSpreadsheetData(
+      target.sheets,
+      target.sheetNames,
+      target.cellStyles,
+      target.nativeStyles,
+      target.sheetMetadata
+    );
   }, [saveSpreadsheetData]);
 
   const undo = useCallback(() => applyWorkbookHistory(undoStackRef, redoStackRef), [applyWorkbookHistory]);
@@ -461,7 +596,7 @@ export default function EditSpreadsheet({
   }, [file.id, loadVersionHistory]);
 
   const saveVersion = async () => {
-    const content = JSON.stringify({ sheets, sheetNames, cellStyles });
+    const content = JSON.stringify(workbookRef.current);
     try {
       const saved = await saveSpreadsheetData(sheets, sheetNames, cellStyles);
       if (!saved) throw new Error('La sauvegarde du classeur a échoué.');
@@ -510,19 +645,23 @@ export default function EditSpreadsheet({
         throw new Error('Le fichier ne contient aucune feuille exploitable.');
       }
 
-      const priorContent = JSON.stringify({ sheets, sheetNames, cellStyles });
+      const priorContent = JSON.stringify(workbookRef.current);
       await createVersionSnapshot(priorContent, 'Avant importation', `Avant l’import de ${selectedFile.name}`);
       commitWorkbook({
         sheets: importedData.sheets,
         sheetNames: importedData.sheetNames,
         cellStyles: importedData.cellStyles || {},
+        nativeStyles: importedData.nativeStyles || {},
+        sheetMetadata: importedData.sheetMetadata || {},
       }, { save: false });
       setActiveSheet(importedData.sheetNames[0]);
       setSelectedCell({ row: 0, col: 0 });
       const saved = await saveSpreadsheetData(
         importedData.sheets,
         importedData.sheetNames,
-        importedData.cellStyles || {}
+        importedData.cellStyles || {},
+        importedData.nativeStyles || {},
+        importedData.sheetMetadata || {}
       );
       if (!saved) throw new Error('La sauvegarde du fichier importé a échoué.');
       setSaveStatus(`Importé : ${selectedFile.name}`);
@@ -620,27 +759,49 @@ export default function EditSpreadsheet({
     if (pastedText === undefined) return;
     event.preventDefault();
 
+    const clipboardHtml = event.clipboardData?.getData('text/html');
+    const htmlData = parseClipboardHtml(clipboardHtml);
     const rows = pastedText.replace(/\r/g, '').split('\n');
     if (rows[rows.length - 1] === '') rows.pop();
-    const values = rows.map(row => row.split('\t'));
+    const values = htmlData?.rows || rows.map(row => row.split('\t'));
     if (!values.length) return;
 
     const start = { ...selectedCell };
+    const current = workbookRef.current;
     const matrix = workbookRef.current.sheets[activeSheet]
       ? workbookRef.current.sheets[activeSheet].map(row => [...row])
       : [];
+    const nextStyles = { ...current.cellStyles };
     values.forEach((rowValues, rowOffset) => {
       const rowIndex = start.row + rowOffset;
       while (matrix.length <= rowIndex) matrix.push([]);
       rowValues.forEach((value, colOffset) => {
-        matrix[rowIndex][start.col + colOffset] = value;
+        const colIndex = start.col + colOffset;
+        matrix[rowIndex][colIndex] = value;
+        const pastedStyle = htmlData?.styles[`${rowOffset}_${colOffset}`];
+        if (pastedStyle) {
+          const key = `${activeSheet}!${rowIndex}_${colIndex}`;
+          nextStyles[key] = { ...pastedStyle };
+        }
       });
     });
-    commitWorkbook({ sheets: { ...workbookRef.current.sheets, [activeSheet]: matrix } });
+    commitWorkbook({
+      sheets: { ...current.sheets, [activeSheet]: matrix },
+      cellStyles: nextStyles,
+    });
 
     values.forEach((rowValues, rowOffset) => {
       rowValues.forEach((value, colOffset) => {
         broadcastCellChange(start.row + rowOffset, start.col + colOffset, value);
+        const pastedStyle = htmlData?.styles[`${rowOffset}_${colOffset}`];
+        if (pastedStyle) {
+          channelRef.current?.whisper('cell-style', {
+            sheet: activeSheet,
+            row: start.row + rowOffset,
+            col: start.col + colOffset,
+            style: pastedStyle,
+          });
+        }
       });
     });
   };
@@ -702,7 +863,11 @@ export default function EditSpreadsheet({
     const nextSheets = { ...workbookRef.current.sheets, [newName]: newRows };
     const nextNames = [...workbookRef.current.sheetNames, newName];
 
-    commitWorkbook({ sheets: nextSheets, sheetNames: nextNames });
+    commitWorkbook({
+      sheets: nextSheets,
+      sheetNames: nextNames,
+      sheetMetadata: { ...workbookRef.current.sheetMetadata, [newName]: {} },
+    });
     setActiveSheet(newName);
 
     if (channelRef.current) {
@@ -733,7 +898,17 @@ export default function EditSpreadsheet({
       key.startsWith(`${oldName}!`) ? `${newName}!${key.slice(oldName.length + 1)}` : key,
       style,
     ]));
-    commitWorkbook({ sheets: nextSheets, sheetNames: nextNames, cellStyles: nextStyles });
+    const nextMetadata = { ...current.sheetMetadata };
+    if (nextMetadata[oldName]) {
+      nextMetadata[newName] = nextMetadata[oldName];
+      delete nextMetadata[oldName];
+    }
+    commitWorkbook({
+      sheets: nextSheets,
+      sheetNames: nextNames,
+      cellStyles: nextStyles,
+      sheetMetadata: nextMetadata,
+    });
     setActiveSheet(newName);
     channelRef.current?.whisper('sheet-rename', { oldName, newName });
   };
@@ -748,7 +923,14 @@ export default function EditSpreadsheet({
     const nextStyles = Object.fromEntries(
       Object.entries(current.cellStyles).filter(([key]) => !key.startsWith(`${activeSheet}!`))
     );
-    commitWorkbook({ sheetNames: nextNames, sheets: nextSheets, cellStyles: nextStyles });
+    const nextMetadata = { ...current.sheetMetadata };
+    delete nextMetadata[activeSheet];
+    commitWorkbook({
+      sheetNames: nextNames,
+      sheets: nextSheets,
+      cellStyles: nextStyles,
+      sheetMetadata: nextMetadata,
+    });
     setActiveSheet(nextNames[0]);
     channelRef.current?.whisper('sheet-delete', { sheetName: activeSheet });
   };
@@ -1143,6 +1325,9 @@ export default function EditSpreadsheet({
                     className={`h-7 px-3 border border-slate-200 font-semibold text-slate-700 min-w-[110px] text-center bg-emerald-50 hover:bg-emerald-100 transition ${
                       selectedCell.col === cIdx ? 'bg-emerald-100/70 text-emerald-800 border-b-2 border-b-emerald-500' : ''
                     }`}
+                    style={activeSheetMetadata.columnDimensions?.[getColumnLetter(cIdx)]?.width > 0
+                      ? { width: `${activeSheetMetadata.columnDimensions[getColumnLetter(cIdx)].width * 7}px` }
+                      : undefined}
                   >
                     {getColumnLetter(cIdx)}
                   </th>
@@ -1161,6 +1346,9 @@ export default function EditSpreadsheet({
                     className={`hover:bg-slate-50/60 transition ${
                       isRowSelected ? 'bg-slate-50/80' : rIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
                     }`}
+                    style={activeSheetMetadata.rowDimensions?.[rIdx]?.height > 0
+                      ? { height: `${activeSheetMetadata.rowDimensions[rIdx].height * 4 / 3}px` }
+                      : undefined}
                   >
                     {/* Row header 1, 2, 3... */}
                     <td className={`w-12 h-6 min-w-12 border border-slate-200 text-center font-mono text-[10px] sticky left-0 z-10 ${
@@ -1201,11 +1389,25 @@ export default function EditSpreadsheet({
                           style={{
                             ...(cellStyle.bold ? { fontWeight: 700 } : {}),
                             ...(cellStyle.italic ? { fontStyle: 'italic' } : {}),
-                            ...(cellStyle.strike ? { textDecoration: 'line-through' } : {}),
-                            ...(cellStyle.fontSize ? { fontSize: `${cellStyle.fontSize}px` } : {}),
-                            ...(cellStyle.align ? { textAlign: cellStyle.align } : {}),
+                            ...(cellStyle.strike || (cellStyle.underline && cellStyle.underline !== 'none')
+                              ? { textDecoration: [cellStyle.underline && cellStyle.underline !== 'none' ? 'underline' : '', cellStyle.strike ? 'line-through' : ''].filter(Boolean).join(' ') }
+                              : {}),
+                            ...(cellStyle.fontSize ? { fontSize: `${cellStyle.fontSize * 4 / 3}px` } : {}),
+                            ...(cellStyle.fontName ? { fontFamily: cellStyle.fontName } : {}),
+                            ...(['left', 'center', 'right', 'justify'].includes(cellStyle.align) ? { textAlign: cellStyle.align } : {}),
+                            ...(cellStyle.verticalAlign ? { verticalAlign: cellStyle.verticalAlign === 'center' ? 'middle' : cellStyle.verticalAlign } : {}),
+                            ...(cellStyle.wrapText ? { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } : {}),
+                            ...(cellStyle.indent ? { paddingLeft: `${cellStyle.indent * 8}px` } : {}),
                             ...(cellStyle.color ? { color: cellStyle.color } : {}),
                             ...(cellStyle.bg ? { backgroundColor: cellStyle.bg } : {}),
+                            ...['Top', 'Right', 'Bottom', 'Left'].reduce((borders, side) => {
+                              const border = cellStyle[`border${side}`];
+                              if (border) {
+                                const lineStyle = ['dashed', 'dotted', 'double'].includes(border.style) ? border.style : 'solid';
+                                borders[`border${side.toLowerCase()}`] = `${lineStyle} 1px ${border.color || '#000000'}`;
+                              }
+                              return borders;
+                            }, {}),
                             ...(remoteUser ? { outline: `2px solid ${remoteUser.color}`, outlineOffset: '-1px' } : {}),
                           }}
                           title={String(rawVal)}
