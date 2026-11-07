@@ -13,6 +13,8 @@ import AudioPlayer from '@/Components/AudioPlayer';
 import StickerMessage from '@/Components/Stickers/StickerMessage';
 import StickerPack from '@/Components/Stickers/StickerPack';
 import DocCallButton from '@/Components/Editor/DocCallButton';
+import CreateCollaborativeModal from '@/Components/Files/CreateCollaborativeModal';
+import { FaFileWord, FaFileExcel, FaExternalLinkAlt } from 'react-icons/fa';
 
 // Composant de compte à rebours réutilisable
 const formatTimeUnit = (value, label) => (
@@ -1408,6 +1410,7 @@ const retryComment = async (failedComment) => {
   const [activeTab, setActiveTab] = useState('details');
   const activeTabRef = useRef(activeTab);
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
+  const [showAddFileModal, setShowAddFileModal] = useState(false);
   const [isFullscreenChat, setIsFullscreenChat] = useState(false);
 const [fullscreenVisible, setFullscreenVisible] = useState(false);
 
@@ -2884,13 +2887,15 @@ task.status !== 'done' &&
 
       {(!task.submitted_at || task.status === 'done') && (
         <div className={`relative ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}>
-          <Link
-            href={isDeadlinePassed ? '#' : `/files/create?task_id=${task.id}&project_id=${task.project_id}`}
-            className={`${isDeadlinePassed ? 'pointer-events-none' : ''} bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 text-sm`}
+          <button
+            type="button"
+            onClick={() => !isDeadlinePassed && setShowAddFileModal(true)}
+            disabled={isDeadlinePassed}
+            className={`${isDeadlinePassed ? 'pointer-events-none' : 'cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50'} bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3.5 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 text-sm shadow-sm`}
             title={isDeadlinePassed ? t('deadline_expired') : ''}
           >
             <FaFileUpload className="text-xs" /> {t('task_details.add_file')}
-          </Link>
+          </button>
 
           {isDeadlinePassed && (
             <div className="absolute -bottom-6 left-0 right-0 text-xs text-red-500 text-center">
@@ -2917,16 +2922,20 @@ task.status !== 'done' &&
 
           const isImage = file.type?.startsWith("image/");
           const isPDF = file.type === "application/pdf";
+          const isDocx = file.name?.toLowerCase().endsWith('.docx') || file.name?.toLowerCase().endsWith('.doc') || file.type?.includes('word');
+          const isExcel = file.name?.toLowerCase().endsWith('.xlsx') || file.name?.toLowerCase().endsWith('.xls') || file.name?.toLowerCase().endsWith('.csv') || file.type?.includes('spreadsheet') || file.type?.includes('excel');
+          const isEditable = isDocx || isExcel || file.type?.includes('html') || file.name?.toLowerCase().endsWith('.html') || file.name?.toLowerCase().endsWith('.txt');
+          const targetUrl = isEditable ? `/files/${file.id}/edit-content` : `/files/${file.id}`;
 
           return (
             <Link
               key={file.id}
-              href={`/files/${file.id}`}
-              className="group bg-gray-50 dark:bg-gray-900/40 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-md transition duration-200 flex flex-col"
+              href={targetUrl}
+              className="group bg-gray-50 dark:bg-gray-900/40 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-md transition duration-200 flex flex-col relative"
             >
 
               {/* PREVIEW */}
-              <div className="h-36 bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+              <div className="h-36 bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden relative">
                 {isImage ? (
                   <img
                     src={`/storage/${file.file_path.replace('public/', '')}`}
@@ -2935,8 +2944,25 @@ task.status !== 'done' &&
                   />
                 ) : isPDF ? (
                   <span className="text-red-500 text-2xl font-bold">PDF</span>
+                ) : isDocx ? (
+                  <div className="flex flex-col items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                    <FaFileWord className="text-4xl" />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider">Document Word</span>
+                  </div>
+                ) : isExcel ? (
+                  <div className="flex flex-col items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                    <FaFileExcel className="text-4xl" />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider">Tableur Excel</span>
+                  </div>
                 ) : (
                   <FaFileUpload className="text-2xl text-gray-300 dark:text-gray-600" />
+                )}
+
+                {isEditable && (
+                  <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 shadow-sm border border-slate-200/50 dark:border-slate-700/50 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Temps réel
+                  </span>
                 )}
               </div>
 
@@ -2957,6 +2983,18 @@ task.status !== 'done' &&
                   }`}>
                     {isUploadedByAssignedUser ? 'Traitement' : 'Ressources'}
                   </span>
+
+                  {isDocx && (
+                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                      DOCX
+                    </span>
+                  )}
+
+                  {isExcel && (
+                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                      EXCEL
+                    </span>
+                  )}
 
                   {file.dropbox_path && (
                     <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full bg-blue-600 text-white">
@@ -3016,6 +3054,14 @@ task.status !== 'done' &&
         </p>
       </div>
     )}
+
+    {/* Modal de création collaborative de fichier */}
+    <CreateCollaborativeModal
+      isOpen={showAddFileModal}
+      onClose={() => setShowAddFileModal(false)}
+      projectId={task.project_id}
+      taskId={task.id}
+    />
 
   </div>
 )}

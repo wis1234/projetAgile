@@ -224,6 +224,11 @@ public function index(Request $request)
      */
 public function store(Request $request)
     {
+        // Si création d'un document collaboratif direct (DOCX ou EXCEL)
+        if ($request->has('doc_type') || (!$request->hasFile('file') && $request->filled('doc_type'))) {
+            return $this->createCollaborative($request);
+        }
+
         $currentUser = auth()->user();
         $project = Project::findOrFail($request->project_id);
         if (!$currentUser->hasRole('admin') && !$project->users()->where('user_id', $currentUser->id)->exists()) {
@@ -419,6 +424,99 @@ foreach ($usersToNotify as $user) {
             return back()->withInput()
                 ->with('error', 'Une erreur est survenue lors de l\'upload du fichier : ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Crée un nouveau fichier collaboratif en direct (DOCX ou EXCEL)
+     */
+    public function createCollaborative(Request $request)
+    {
+        $currentUser = auth()->user();
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'doc_type'    => 'required|in:docx,excel',
+            'project_id'  => 'required|exists:projects,id',
+            'task_id'     => 'nullable|exists:tasks,id',
+            'description' => 'nullable|string',
+        ]);
+
+        $project = Project::findOrFail($validated['project_id']);
+        if (!$currentUser->hasRole('admin') && !$project->users()->where('user_id', $currentUser->id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Accès refusé au projet.'], 403);
+        }
+
+        if (!empty($validated['task_id'])) {
+            $relatedTask = \App\Models\Task::find($validated['task_id']);
+            if ($relatedTask && $relatedTask->submitted_at && $relatedTask->status !== 'done') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Impossible d\'ajouter un fichier : cette tâche est en attente de validation.',
+                ], 403);
+            }
+        }
+
+        $docType = $validated['doc_type'];
+        $cleanName = trim($validated['name']);
+
+        if ($docType === 'docx') {
+            $ext = '.docx';
+            $fileName = str_ends_with(strtolower($cleanName), '.docx') ? $cleanName : $cleanName . $ext;
+            $mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            $initialContent = "<h1>" . e($cleanName) . "</h1><p>Commencez à rédiger votre document collaboratif ici...</p>";
+        } else {
+            $ext = '.xlsx';
+            $fileName = str_ends_with(strtolower($cleanName), '.xlsx') ? $cleanName : $cleanName . $ext;
+            $mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            $emptyRow = array_fill(0, 15, '');
+            $grid = array_fill(0, 35, $emptyRow);
+            $initialContent = json_encode([
+                'sheets' => ['Feuille 1' => $grid],
+                'sheetNames' => ['Feuille 1']
+            ], JSON_PRETTY_PRINT);
+        }
+
+        $safeSlug = Str::slug(pathinfo($fileName, PATHINFO_FILENAME)) ?: 'document';
+        $storageFileName = time() . '-' . $safeSlug . $ext;
+        $relPath = 'files/' . $project->id . '/' . $storageFileName;
+        Storage::disk('public')->put($relPath, $initialContent);
+
+        $fileModel = File::create([
+            'name'              => $fileName,
+            'file_path'         => 'public/' . $relPath,
+            'type'              => $mime,
+            'size'              => Storage::disk('public')->size($relPath),
+            'user_id'           => $currentUser->id,
+            'project_id'        => $project->id,
+            'task_id'           => $validated['task_id'] ?? null,
+            'description'       => $validated['description'] ?? ($docType === 'docx' ? 'Document texte collaboratif' : 'Feuille de calcul collaborative'),
+            'status'            => 'active',
+            'last_modified_by'  => $currentUser->id,
+            'share_token'       => Str::random(32),
+            'public_permission' => 'none',
+        ]);
+
+        activity_log('create', 'Création fichier collaboratif ' . strtoupper($docType), $fileModel);
+
+        \App\Models\FileVersion::create([
+            'file_id'        => $fileModel->id,
+            'user_id'        => $currentUser->id,
+            'content'        => $initialContent,
+            'label'          => 'Création initiale',
+            'summary'        => 'Création du document collaboratif ' . strtoupper($docType),
+            'version_number' => 1,
+        ]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success'  => true,
+                'message'  => 'Document créé avec succès.',
+                'redirect' => route('files.edit-content', $fileModel->id),
+                'data'     => $fileModel,
+            ]);
+        }
+
+        return redirect()->route('files.edit-content', $fileModel->id)
+            ->with('success', 'Document créé avec succès.');
     }
 
     /**
@@ -740,10 +838,24 @@ public function editContent(File $file)
         ]);
     }
 
-    $editableTypes = ['text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json'];
-    $extension = pathinfo($file->name, PATHINFO_EXTENSION);
-    $isEditable = in_array($file->type, $editableTypes)
-        || in_array(strtolower($extension), ['txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'php']);
+    if (empty($file->share_token)) {
+        $file->update(['share_token' => Str::random(32)]);
+    }
+
+    $isSpreadsheet = $file->isSpreadsheet();
+    $editableTypes = [
+        'text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'text/csv',
+        'application/csv'
+    ];
+    $extension = strtolower(pathinfo($file->name, PATHINFO_EXTENSION));
+    $isEditable = $isSpreadsheet 
+        || in_array($file->type, $editableTypes)
+        || in_array($extension, ['txt', 'md', 'html', 'htm', 'css', 'js', 'json', 'xml', 'php', 'docx', 'doc', 'xlsx', 'xls', 'csv', 'ods', 'tsv']);
 
     if (!$isEditable) {
         return redirect()->back()->with('error', 'Ce type de fichier ne peut pas être édité directement.');
@@ -751,10 +863,28 @@ public function editContent(File $file)
 
     $filePath = storage_path('app/public/' . preg_replace('/^public\//', '', $file->file_path));
     if (!file_exists($filePath) || !is_readable($filePath)) {
-        return redirect()->back()->with('error', 'Impossible de charger le contenu du fichier.');
+        if ($isSpreadsheet) {
+            $emptyRow = array_fill(0, 15, '');
+            $content = json_encode(['sheets' => ['Feuille 1' => array_fill(0, 35, $emptyRow)], 'sheetNames' => ['Feuille 1']]);
+            Storage::disk('public')->put(preg_replace('/^public\//', '', $file->file_path), $content);
+        } else {
+            $content = "<h1>" . e($file->name) . "</h1><p>Commencez à collaborer en direct ici...</p>";
+            Storage::disk('public')->put(preg_replace('/^public\//', '', $file->file_path), $content);
+        }
+    } else {
+        $content = file_get_contents($filePath);
     }
 
-    $content = file_get_contents($filePath);
+    if ($isSpreadsheet) {
+        $decoded = json_decode($content, true);
+        if (!is_array($decoded) || !isset($decoded['sheets'])) {
+            $emptyRow = array_fill(0, 15, '');
+            $content = json_encode([
+                'sheets' => ['Feuille 1' => array_fill(0, 35, $emptyRow)],
+                'sheetNames' => ['Feuille 1']
+            ]);
+        }
+    }
 
     $file->load(['lastModifiedBy:id,name', 'project.users', 'accesses.user:id,name,email,profile_photo_path']);
 
@@ -789,24 +919,32 @@ public function editContent(File $file)
         ->limit(5)
         ->get();
 
-    return \Inertia\Inertia::render('Files/EditContent', [
+    $component = $isSpreadsheet ? 'Files/EditSpreadsheet' : 'Files/EditContent';
+
+    return \Inertia\Inertia::render($component, [
         'file' => array_merge($file->toArray(), [
-            'content'    => $content,
-            'is_editable'=> $isEditable,
-            'project'    => $file->project ? [
+            'content'           => $content,
+            'is_editable'       => $isEditable,
+            'is_spreadsheet'    => $isSpreadsheet,
+            'share_token'       => $file->share_token,
+            'share_url'         => $file->getShareUrl(),
+            'public_permission' => $file->public_permission ?? 'none',
+            'project'           => $file->project ? [
                 'id'    => $file->project->id,
                 'name'  => $file->project->name,
                 'users' => $projectMembers,
             ] : null,
         ]),
-        'lastModifiedBy'  => $file->lastModifiedBy ? [
+        'lastModifiedBy'    => $file->lastModifiedBy ? [
             'name'      => $file->lastModifiedBy->name,
             'timestamp' => $file->updated_at->toDateTimeString(),
         ] : null,
-        'myPermission'    => $myPermission,
-        'collaborators'   => $collaborators,
-        'recentVersions'  => $recentVersions,
-        'canManageAccess' => $file->canUser($currentUser, 'admin'),
+        'myPermission'      => $myPermission,
+        'collaborators'     => $collaborators,
+        'recentVersions'    => $recentVersions,
+        'canManageAccess'   => $file->canUser($currentUser, 'admin'),
+        'share_url'         => $file->getShareUrl(),
+        'public_permission' => $file->public_permission ?? 'none',
     ]);
 }
 

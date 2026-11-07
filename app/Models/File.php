@@ -7,15 +7,42 @@ use Illuminate\Support\Facades\Storage;
 
 class File extends Model
 {
-    protected $fillable = ['name',
-     'file_path', 'type', 'size', 'user_id',
-      'project_id',
-     'task_id', 'kanban_id', 'description',
-      'downloads', 'status', 'rejection_reason',
-       'dropbox_path', 'last_modified_by', 
-       'password_hash', 'is_password_protected',
-           'locked_by',
-    'locked_by_role','yjs_state'];
+    protected $fillable = [
+        'name',
+        'file_path', 'type', 'size', 'user_id',
+        'project_id',
+        'task_id', 'kanban_id', 'description',
+        'downloads', 'status', 'rejection_reason',
+        'dropbox_path', 'last_modified_by', 
+        'password_hash', 'is_password_protected',
+        'locked_by',
+        'locked_by_role', 'yjs_state',
+        'share_token', 'public_permission'
+    ];
+
+    /**
+     * Vérifie si ce fichier est une feuille de calcul (Excel / CSV / Sheets)
+     */
+    public function isSpreadsheet(): bool
+    {
+        $ext = strtolower(pathinfo($this->name, PATHINFO_EXTENSION));
+        $type = strtolower((string)$this->type);
+        return in_array($ext, ['xlsx', 'xls', 'csv', 'ods', 'tsv'])
+            || str_contains($type, 'spreadsheet')
+            || str_contains($type, 'excel')
+            || str_contains($type, 'csv');
+    }
+
+    /**
+     * URL de partage public / invité externe
+     */
+    public function getShareUrl(): ?string
+    {
+        if (empty($this->share_token)) {
+            return null;
+        }
+        return url('/shared-document/' . $this->share_token);
+    }
 
 
 
@@ -162,6 +189,13 @@ private function computeAccessFor(User $user): string
         $explicit = $access->effectivePermission();
         if (($rank[$explicit] ?? 0) > $rank[$level]) {
             $level = $explicit;
+        }
+    }
+
+    // Permission publique / lien de partage externe (view, comment, edit)
+    if (!empty($this->public_permission) && $this->public_permission !== 'none') {
+        if (($rank[$this->public_permission] ?? 0) > $rank[$level]) {
+            $level = $this->public_permission;
         }
     }
 

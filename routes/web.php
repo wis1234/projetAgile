@@ -432,6 +432,7 @@ Route::middleware('auth')->group(function () {
         ->name('projects.planning');
     
     // Gestion des fichiers
+    Route::post('/files/create-collaborative', [App\Http\Controllers\FileController::class, 'createCollaborative'])->name('files.create-collaborative');
     Route::get('files/{file}/preview', [App\Http\Controllers\FileController::class, 'previewPage'])->name('files.preview-page');
     Route::get('files/{file}/edit-content', [App\Http\Controllers\FileController::class, 'editContent'])->name('files.edit-content');
     Route::put('files/{file}/content', [App\Http\Controllers\FileController::class, 'updateContent'])->name('files.update-content');
@@ -446,9 +447,10 @@ Route::get('/files/{file}/versions/{version}',       [FileVersionController::cla
 Route::post('/files/{file}/versions',               [FileVersionController::class, 'store'])  ->name('file-versions.store');
 Route::post('/files/{file}/versions/{version}/restore', [FileVersionController::class, 'restore'])->name('file-versions.restore');
 
-// Accès
+// Accès & Partage
 Route::get('/files/{file}/access',                  [FileAccessController::class, 'index'])   ->name('file-access.index');
 Route::post('/files/{file}/access',                 [FileAccessController::class, 'store'])   ->name('file-access.store');
+Route::post('/files/{file}/public-share',           [FileAccessController::class, 'updatePublicShare'])->name('files.public-share');
 Route::delete('/files/{file}/access/{user}',        [FileAccessController::class, 'destroy']) ->name('file-access.destroy');
 
 
@@ -789,5 +791,8 @@ Route::get('storage/files/{filename}', [FileController::class, 'serveFile'])
 // Routes publiques ProJA Meet — accès invité externe (sans compte)
 Route::get('/meet/join/{token}', [App\Http\Controllers\LiveKitController::class, 'guestJoinPage'])->name('meet.guest.join');
 Route::post('/meet/join/{token}/token', [App\Http\Controllers\LiveKitController::class, 'guestToken'])->name('meet.guest.token');
+
+// Route publique document collaboratif — accès invité externe (sans compte)
+Route::match(['get', 'post'], '/shared-document/{token}', [App\Http\Controllers\FileAccessController::class, 'accessSharedDocument'])->name('files.shared');
 
 require __DIR__.'/auth.php';

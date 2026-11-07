@@ -47,6 +47,11 @@ if (!function_exists('is_file_editable')) {
             'text/x-markdown',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
             'application/msword', // .doc
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+            'application/vnd.ms-excel', // .xls
+            'text/csv',
+            'application/csv',
+            'application/vnd.oasis.opendocument.spreadsheet', // .ods
         ];
 
         // Liste des extensions éditables (au cas où le type MIME n'est pas fiable)
@@ -58,6 +63,7 @@ if (!function_exists('is_file_editable')) {
             'sql', 'ps1', 'bat', 'sh', 'bash', 'zsh', 'fish', 'ps1', 'cmd',
             'vue', 'svelte', 'handlebars', 'hbs', 'pug', 'jade', 'ejs', 'twig',
             'docx', 'doc', 'rtf',
+            'xlsx', 'xls', 'csv', 'ods', 'tsv',
         ];
 
         // Vérifier le type MIME

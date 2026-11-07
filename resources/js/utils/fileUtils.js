@@ -36,6 +36,12 @@ export const isFileEditable = (fileType, fileName) => {
     'text/x-sql',
     'text/markdown',
     'text/x-markdown',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'text/csv',
+    'application/csv',
   ];
 
   // Liste des extensions éditables (au cas où le type MIME n'est pas fiable)
@@ -45,7 +51,9 @@ export const isFileEditable = (fileType, fileName) => {
     'js', 'jsx', 'ts', 'tsx', 'coffee', 'mjs', 'cjs',
     'php', 'py', 'rb', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'swift', 'kt', 'scala',
     'sql', 'ps1', 'bat', 'sh', 'bash', 'zsh', 'fish', 'ps1', 'cmd',
-    'vue', 'svelte', 'handlebars', 'hbs', 'pug', 'jade', 'ejs', 'twig'
+    'vue', 'svelte', 'handlebars', 'hbs', 'pug', 'jade', 'ejs', 'twig',
+    'docx', 'doc', 'rtf',
+    'xlsx', 'xls', 'csv', 'ods', 'tsv'
   ];
 
   // Vérifier le type MIME
@@ -120,5 +128,9 @@ export const isNativeDocument = (file) => {
   if (!file) return false;
   const type = (file.type || '').toLowerCase();
   const ext = (file.name || '').split('.').pop().toLowerCase();
-  return type.includes('text/html') || ext === 'html' || ext === 'htm' || /^fichier de suivi/i.test(file.name || '');
+  return type.includes('text/html') || ext === 'html' || ext === 'htm' 
+    || ext === 'docx' || ext === 'doc'
+    || ext === 'xlsx' || ext === 'xls' || ext === 'csv'
+    || type.includes('spreadsheet') || type.includes('wordprocessingml')
+    || /^fichier de suivi/i.test(file.name || '');
 };
