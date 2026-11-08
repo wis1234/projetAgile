@@ -398,6 +398,8 @@ Route::middleware('auth')->group(function () {
     
     // Routes personnalisées pour les tâches
     Route::post('/tasks/{task}/submit-validation', [\App\Http\Controllers\TaskController::class, 'submitForValidation'])->name('tasks.submit-validation');
+    Route::post('/tasks/{task}/resources', [\App\Http\Controllers\TaskController::class, 'storeResource'])->name('tasks.resources.store');
+    Route::delete('/tasks/{task}/resources/{resource}', [\App\Http\Controllers\TaskController::class, 'destroyResource'])->name('tasks.resources.destroy');
     Route::post('/tasks/{task}/payment', [App\Http\Controllers\TaskController::class, 'savePaymentInfo'])->name('tasks.payment.save');
     
     // Route pour la mise en sourdine des membres du projet

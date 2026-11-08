@@ -583,6 +583,7 @@ HTML;
             'assignedUser:id,name,email,profile_photo_path',
             'assignedUsers:id,name,email,profile_photo_path',
             'files',
+            'resources.user:id,name',
             'comments.user'
         ]);
 
@@ -627,6 +628,42 @@ HTML;
             'projectManagers' => $projectManagers,
             'currentUserRole' => $currentUserRole
         ]);
+    }
+
+    public function storeResource(Request $request, Task $task)
+    {
+        $this->authorize('uploadFile', $task);
+
+        $validated = $request->validate([
+            'title' => 'nullable|string|max:255',
+            'url' => 'required|url:http,https|max:2048',
+        ]);
+
+        $url = trim($validated['url']);
+        $title = trim($validated['title'] ?? '');
+        if ($title === '') {
+            $host = parse_url($url, PHP_URL_HOST);
+            $title = $host ?: $url;
+        }
+
+        $task->resources()->create([
+            'user_id' => $request->user()->id,
+            'title' => $title,
+            'url' => $url,
+        ]);
+
+        return back()->with('success', 'Lien ajouté aux ressources de la tâche.');
+    }
+
+    public function destroyResource(Request $request, Task $task, \App\Models\TaskResource $resource)
+    {
+        $this->authorize('uploadFile', $task);
+
+        $taskResource = $task->resources()->findOrFail($resource->id);
+        abort_unless((int) $taskResource->user_id === (int) $request->user()->id, 403);
+        $taskResource->delete();
+
+        return back()->with('success', 'Lien retiré des ressources de la tâche.');
     }
 
     public function savePaymentInfo(Request $request, Task $task)

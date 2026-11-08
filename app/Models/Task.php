@@ -139,6 +139,11 @@ class Task extends Model
         return $this->hasMany(File::class);
     }
 
+    public function resources()
+    {
+        return $this->hasMany(TaskResource::class)->latest();
+    }
+
     public function deliverable()
     {
         return $this->belongsTo(File::class, 'deliverable_id');

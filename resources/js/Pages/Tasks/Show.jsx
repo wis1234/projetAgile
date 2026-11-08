@@ -14,7 +14,7 @@ import StickerMessage from '@/Components/Stickers/StickerMessage';
 import StickerPack from '@/Components/Stickers/StickerPack';
 import DocCallButton from '@/Components/Editor/DocCallButton';
 import CreateCollaborativeModal from '@/Components/Files/CreateCollaborativeModal';
-import { FaFileWord, FaFileExcel, FaExternalLinkAlt } from 'react-icons/fa';
+import { FaFileWord, FaFileExcel, FaExternalLinkAlt, FaLink } from 'react-icons/fa';
 
 // Composant de compte à rebours réutilisable
 const formatTimeUnit = (value, label) => (
@@ -1411,6 +1411,11 @@ const retryComment = async (failedComment) => {
   const activeTabRef = useRef(activeTab);
   const [showLiveKitCall, setShowLiveKitCall] = useState(false);
   const [showAddFileModal, setShowAddFileModal] = useState(false);
+  const [showAddLinkModal, setShowAddLinkModal] = useState(false);
+  const [resourceTitle, setResourceTitle] = useState('');
+  const [resourceUrl, setResourceUrl] = useState('');
+  const [resourceError, setResourceError] = useState('');
+  const [savingResource, setSavingResource] = useState(false);
   const [isFullscreenChat, setIsFullscreenChat] = useState(false);
 const [fullscreenVisible, setFullscreenVisible] = useState(false);
 
@@ -2878,9 +2883,9 @@ task.status !== 'done' &&
     <div className="flex justify-between items-center mb-6">
       <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
         <FaFileUpload className="text-blue-500" /> {t('task_details.resources')}
-        {task.files?.length > 0 && (
+        {(task.files?.length || 0) + (task.resources?.length || 0) > 0 && (
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
-            {task.files.length}
+            {(task.files?.length || 0) + (task.resources?.length || 0)}
           </span>
         )}
       </h3>
@@ -2895,6 +2900,18 @@ task.status !== 'done' &&
             title={isDeadlinePassed ? t('deadline_expired') : ''}
           >
             <FaFileUpload className="text-xs" /> {t('task_details.add_file')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setResourceError('');
+              setShowAddLinkModal(true);
+            }}
+            disabled={isDeadlinePassed}
+            className={`${isDeadlinePassed ? 'pointer-events-none' : 'cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50'} bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-3.5 py-2 rounded-lg font-medium flex items-center gap-2 transition duration-200 text-sm shadow-sm`}
+            title={isDeadlinePassed ? t('deadline_expired') : ''}
+          >
+            <FaLink className="text-xs" /> Ajouter un lien
           </button>
 
           {isDeadlinePassed && (
@@ -2911,6 +2928,60 @@ task.status !== 'done' &&
         </span>
       )}
     </div>
+
+    {task.resources?.length > 0 && (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+        {task.resources.map(resource => (
+          <div
+            key={resource.id}
+            className="flex items-center gap-3 rounded-xl border border-emerald-100 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/20 px-4 py-3"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
+              <FaLink />
+            </span>
+            <div className="min-w-0 flex-1">
+              <a
+                href={resource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block truncate text-sm font-semibold text-gray-800 hover:text-emerald-700 dark:text-gray-100 dark:hover:text-emerald-300"
+                title={resource.title}
+              >
+                {resource.title}
+              </a>
+              <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                {resource.user?.name ? `Ajouté par ${resource.user.name}` : resource.url}
+              </p>
+            </div>
+            <a
+              href={resource.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-lg p-2 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
+              aria-label={`Ouvrir ${resource.title}`}
+              title="Ouvrir le lien"
+            >
+              <FaExternalLinkAlt className="text-xs" />
+            </a>
+            {resource.user_id === auth.user.id && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Retirer ce lien des ressources de la tâche ?')) {
+                    router.delete(`/tasks/${task.id}/resources/${resource.id}`, { preserveScroll: true });
+                  }
+                }}
+                className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                aria-label={`Retirer ${resource.title}`}
+                title="Retirer ce lien"
+              >
+                <FaTrash className="text-xs" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
 
     {/* FILES */}
     {task.files && task.files.length > 0 ? (
@@ -3044,7 +3115,7 @@ task.status !== 'done' &&
         })}
 
       </div>
-    ) : (
+    ) : !task.resources?.length ? (
       <div className="text-center py-12">
         <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
           <FaFileUpload className="h-5 w-5 text-gray-400 dark:text-gray-500" />
@@ -3053,7 +3124,7 @@ task.status !== 'done' &&
           Aucun fichier rattaché à cette tâche.
         </p>
       </div>
-    )}
+    ) : null}
 
     {/* Modal de création collaborative de fichier */}
     <CreateCollaborativeModal
@@ -3062,6 +3133,105 @@ task.status !== 'done' &&
       projectId={task.project_id}
       taskId={task.id}
     />
+
+    {showAddLinkModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+        <form
+          onSubmit={event => {
+            event.preventDefault();
+            setResourceError('');
+            setSavingResource(true);
+            router.post(`/tasks/${task.id}/resources`, {
+              title: resourceTitle,
+              url: resourceUrl,
+            }, {
+              preserveScroll: true,
+              onSuccess: () => {
+                setShowAddLinkModal(false);
+                setResourceTitle('');
+                setResourceUrl('');
+              },
+              onError: errors => setResourceError(errors.url || errors.title || 'Impossible d’ajouter ce lien.'),
+              onFinish: () => setSavingResource(false),
+            });
+          }}
+          className="w-full max-w-lg space-y-5 rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
+                <FaLink className="text-emerald-600" /> Ajouter un lien ressource
+              </h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Ajoutez un document, une page web ou toute autre ressource accessible par lien.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAddLinkModal(false)}
+              className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Fermer"
+            >
+              <FaTimes />
+            </button>
+          </div>
+
+          {resourceError && (
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+              {resourceError}
+            </p>
+          )}
+
+          <div>
+            <label htmlFor="task-resource-url" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              URL <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="task-resource-url"
+              type="url"
+              required
+              autoFocus
+              value={resourceUrl}
+              onChange={event => setResourceUrl(event.target.value)}
+              placeholder="https://exemple.com/document"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="task-resource-title" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Nom de la ressource <span className="text-gray-400">(facultatif)</span>
+            </label>
+            <input
+              id="task-resource-title"
+              type="text"
+              maxLength={255}
+              value={resourceTitle}
+              onChange={event => setResourceTitle(event.target.value)}
+              placeholder="Ex. Cahier des charges"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setShowAddLinkModal(false)}
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={savingResource || !resourceUrl.trim()}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {savingResource ? 'Ajout…' : 'Ajouter le lien'}
+            </button>
+          </div>
+        </form>
+      </div>
+    )}
 
   </div>
 )}
