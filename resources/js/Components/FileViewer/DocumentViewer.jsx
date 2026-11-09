@@ -12,7 +12,7 @@ const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [viewMode, setViewMode] = useState('docs'); // 'docs' (JS parsed HTML) | 'embed' (MS Office / Google Docs Iframe)
+  const [viewMode, setViewMode] = useState('embed');
   const docContainerRef = useRef(null);
 
   // Load and parse Word / Text Document
@@ -267,7 +267,7 @@ const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
               </a>
             </div>
             <iframe
-              src={googleDocsViewerUrl}
+              src={officeViewerUrl}
               className="w-full flex-1 border-none min-h-[600px] bg-white"
               title="Office Web Viewer"
             />

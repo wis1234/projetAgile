@@ -36,8 +36,6 @@ export const isFileEditable = (fileType, fileName) => {
     'text/x-sql',
     'text/markdown',
     'text/x-markdown',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/msword',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/vnd.ms-excel',
     'text/csv',
@@ -52,7 +50,6 @@ export const isFileEditable = (fileType, fileName) => {
     'php', 'py', 'rb', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'swift', 'kt', 'scala',
     'sql', 'ps1', 'bat', 'sh', 'bash', 'zsh', 'fish', 'ps1', 'cmd',
     'vue', 'svelte', 'handlebars', 'hbs', 'pug', 'jade', 'ejs', 'twig',
-    'docx', 'doc', 'rtf',
     'xlsx', 'xls', 'csv', 'ods', 'tsv'
   ];
 
@@ -128,9 +125,8 @@ export const isNativeDocument = (file) => {
   if (!file) return false;
   const type = (file.type || '').toLowerCase();
   const ext = (file.name || '').split('.').pop().toLowerCase();
-  return type.includes('text/html') || ext === 'html' || ext === 'htm' 
-    || ext === 'docx' || ext === 'doc'
+  return type.includes('text/html') || ext === 'html' || ext === 'htm'
     || ext === 'xlsx' || ext === 'xls' || ext === 'csv'
-    || type.includes('spreadsheet') || type.includes('wordprocessingml')
+    || type.includes('spreadsheet')
     || /^fichier de suivi/i.test(file.name || '');
 };

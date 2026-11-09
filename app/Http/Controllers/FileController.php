@@ -779,13 +779,7 @@ public function download(File $file)
 public function previewPage(File $file)
 {
     $currentUser = auth()->user();
-
-    if (
-        !$currentUser->hasRole('admin') &&
-        (!$file->project || !$file->project->users()->where('user_id', $currentUser->id)->exists())
-    ) {
-        abort(403, 'Vous n\'êtes pas autorisé à visualiser ce fichier.');
-    }
+    $this->authorize('view', $file);
 
     if ($file->is_password_protected && !$file->isUnlockedForUser($currentUser)) {
         activity_log(
@@ -798,9 +792,26 @@ public function previewPage(File $file)
     }
 
     $file->load(['project:id,name', 'user:id,name', 'task:id,title']);
+    $storagePath = preg_replace('/^public\//', '', $file->file_path);
+    $previewContent = null;
+    $extension = strtolower(pathinfo($file->name, PATHINFO_EXTENSION));
+
+    if (in_array($extension, ['doc', 'docx', 'odt', 'rtf'], true)
+        && Storage::disk('public')->exists($storagePath)) {
+        $storedContent = Storage::disk('public')->get($storagePath);
+        $isOfficeDocument = str_starts_with($storedContent, "PK\x03\x04");
+        if (!$isOfficeDocument && mb_check_encoding($storedContent, 'UTF-8')
+            && preg_match('/^\s*(?:<!doctype\s+html|<html\b|<(?:h[1-6]|p|div|section|article)\b)/i', $storedContent)) {
+            $previewContent = $storedContent;
+        }
+    }
 
     return Inertia::render('Files/Preview', [
-        'file' => $file,
+        'file' => array_merge($file->toArray(), [
+            'preview_url' => Storage::disk('public')->url($storagePath),
+            'preview_content' => $previewContent,
+            'is_unlocked' => true,
+        ]),
     ]);
 }
 
@@ -813,7 +824,7 @@ public function previewPage(File $file)
 public function editContent(File $file)
 {
     $this->authorize('view', $file);
-     $file->load(['project.users', 'task.project']); // ← ajoute cette ligne
+    $file->load(['project.users', 'task.project']);
 
     $currentUser  = auth()->user();
     $myPermission = $file->accessFor($currentUser);
@@ -840,32 +851,33 @@ public function editContent(File $file)
         ]);
     }
 
+    $extension = strtolower(pathinfo($file->name, PATHINFO_EXTENSION));
+    $isWordDocument = in_array($extension, ['doc', 'docx', 'odt', 'rtf'], true)
+        || str_contains(strtolower((string) $file->type), 'word');
+    if ($isWordDocument) {
+        return redirect()->route('files.preview-page', $file->id);
+    }
+
     if (empty($file->share_token)) {
         $file->update(['share_token' => Str::random(32)]);
     }
 
-    $extension = strtolower(pathinfo($file->name, PATHINFO_EXTENSION));
     $isSpreadsheet = $file->isSpreadsheet();
-    $isLegacyWordDocument = $extension === 'doc' || strtolower((string) $file->type) === 'application/msword';
     $editableTypes = [
         'text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.ms-excel',
         'text/csv',
         'application/csv'
     ];
-    $isEditable = !$isLegacyWordDocument && (
+    $isEditable = (
         $isSpreadsheet
         || in_array($file->type, $editableTypes)
-        || in_array($extension, ['txt', 'md', 'html', 'htm', 'css', 'js', 'json', 'xml', 'php', 'docx', 'xlsx', 'xls', 'csv', 'ods', 'tsv'])
+        || in_array($extension, ['txt', 'md', 'html', 'htm', 'css', 'js', 'json', 'xml', 'php', 'xlsx', 'xls', 'csv', 'ods', 'tsv'])
     );
 
     if (!$isEditable) {
-        $message = $isLegacyWordDocument
-            ? 'Les anciens fichiers Word (.doc) ne peuvent pas être édités ici. Convertissez-les en .docx, puis importez-les à nouveau.'
-            : 'Ce type de fichier ne peut pas être édité directement.';
-        return redirect()->back()->with('error', $message);
+        return redirect()->back()->with('error', 'Ce type de fichier ne peut pas être édité directement.');
     }
 
     $filePath = storage_path('app/public/' . preg_replace('/^public\//', '', $file->file_path));
@@ -880,7 +892,7 @@ public function editContent(File $file)
         }
     } else {
         try {
-            $content = $this->readEditableFileContent($filePath, $extension);
+            $content = $this->readEditableFileContent($filePath);
         } catch (\Throwable $exception) {
             Log::warning('Unable to decode editable file content', [
                 'file_id' => $file->id,
@@ -958,30 +970,11 @@ public function editContent(File $file)
     ]);
 }
 
-private function readEditableFileContent(string $path, string $extension): string
+private function readEditableFileContent(string $path): string
 {
     $content = file_get_contents($path);
     if ($content === false) {
         throw new \RuntimeException('Unable to read file from storage.');
-    }
-
-    if ($extension === 'docx' && str_starts_with($content, "PK\x03\x04")) {
-        $document = \PhpOffice\PhpWord\IOFactory::load($path, 'Word2007');
-        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($document, 'HTML');
-        ob_start();
-        try {
-            $writer->save('php://output');
-            $html = ob_get_contents();
-        } finally {
-            ob_end_clean();
-        }
-        if (!is_string($html) || $html === '') {
-            throw new \RuntimeException('Unable to convert DOCX file to HTML.');
-        }
-
-        return mb_check_encoding($html, 'UTF-8')
-            ? $html
-            : mb_convert_encoding($html, 'UTF-8', 'Windows-1252');
     }
 
     if (!mb_check_encoding($content, 'UTF-8')) {

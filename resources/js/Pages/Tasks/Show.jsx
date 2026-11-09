@@ -2995,8 +2995,11 @@ task.status !== 'done' &&
           const isPDF = file.type === "application/pdf";
           const isDocx = file.name?.toLowerCase().endsWith('.docx') || file.name?.toLowerCase().endsWith('.doc') || file.type?.includes('word');
           const isExcel = file.name?.toLowerCase().endsWith('.xlsx') || file.name?.toLowerCase().endsWith('.xls') || file.name?.toLowerCase().endsWith('.csv') || file.type?.includes('spreadsheet') || file.type?.includes('excel');
-          const isEditable = isDocx || isExcel || file.type?.includes('html') || file.name?.toLowerCase().endsWith('.html') || file.name?.toLowerCase().endsWith('.txt');
-          const targetUrl = isEditable ? `/files/${file.id}/edit-content` : `/files/${file.id}`;
+          const isWord = isDocx || file.type?.toLowerCase().includes('word');
+          const isEditable = !isWord && (isExcel || file.type?.includes('html') || file.name?.toLowerCase().endsWith('.html') || file.name?.toLowerCase().endsWith('.txt'));
+          const targetUrl = isWord
+            ? `/files/${file.id}/preview`
+            : isEditable ? `/files/${file.id}/edit-content` : `/files/${file.id}`;
 
           return (
             <Link

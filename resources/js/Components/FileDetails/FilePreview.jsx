@@ -127,7 +127,7 @@ const FileThumbnail = ({ file, fileUrl, onOpenPreview }) => {
 
 // ─── Composant principal ────────────────────────────────────────────────────
 const FilePreview = ({ file, canManageFile = false, onDelete, onShare, onDownload, isUnlocked = true }) => {
-  const fileUrl = `/storage/${file.file_path}`;
+  const fileUrl = file.preview_url || `/storage/${String(file.file_path || '').replace(/^public\//, '')}`;
   const isImage = file.type?.startsWith('image/');
   const isEditable = isFileEditable(file.type, file.name);
   const isPdf = isPdfFile(file.type, file.name);

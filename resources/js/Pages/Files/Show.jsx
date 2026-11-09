@@ -449,7 +449,9 @@ const Show = ({ file, auth, canManageFile, canBypassLock, isUnlocked: initialUnl
 
   const isFileOwner     = currentFile.user_id === currentUser?.id;
   const canEditContent  = isFileEditable(currentFile.type, currentFile.name);
-  const isCollabFile    = isOfficeOrDocFile(currentFile.type, currentFile.name);
+  const isWordDocument  = /\.(doc|docx|odt|rtf)$/i.test(currentFile.name || '')
+    || /word|wordprocessingml/.test((currentFile.type || '').toLowerCase());
+  const isCollabFile    = isOfficeOrDocFile(currentFile.type, currentFile.name) && !isWordDocument;
   // Only managers/admins OR the file owner can activate collaborative edit mode
   const canToggleEdit   = canManageFile || isFileOwner;
 

@@ -59,14 +59,26 @@ const GenericViewer = ({ fileUrl, fileName, downloadUrl, isLocked }) => (
 
 // ─── Page principale Preview ────────────────────────────────────────────────
 export default function Preview({ file }) {
-  const fileUrl     = `/storage/${file.file_path}`;
+  const fileUrl     = file.preview_url || `/storage/${String(file.file_path || '').replace(/^public\//, '')}`;
   const downloadUrl = route('files.download', file.id);
   const isImage     = file.type?.startsWith('image/');
   const isPdf       = isPdfFile(file.type, file.name);
   const isOffice    = isOfficeOrDocFile(file.type, file.name);
   const isLocked    = file.is_password_protected && !file.is_unlocked;
+  const isNativeWordDocument = typeof file.preview_content === 'string';
 
   const renderViewer = () => {
+    if (isNativeWordDocument) {
+      return (
+        <iframe
+          srcDoc={`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:Arial,sans-serif;line-height:1.6;margin:40px auto;max-width:900px;padding:0 24px;color:#1f2937}img{max-width:100%;height:auto}table{max-width:100%;border-collapse:collapse}</style></head><body>${file.preview_content}</body></html>`}
+          sandbox=""
+          className="w-full flex-1 rounded-xl border-0 bg-white shadow-2xl"
+          style={{ minHeight: '80vh' }}
+          title={`Lecture seule — ${file.name}`}
+        />
+      );
+    }
     if (isImage)  return <ImageViewer fileUrl={fileUrl} fileName={file.name} />;
     if (isPdf)    return <PdfViewer   fileUrl={fileUrl} fileName={file.name} />;
     if (isOffice) return <GoogleStylePreviewer file={file} fileUrl={fileUrl} className="flex-1 w-full" />;
