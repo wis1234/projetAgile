@@ -844,23 +844,28 @@ public function editContent(File $file)
         $file->update(['share_token' => Str::random(32)]);
     }
 
+    $extension = strtolower(pathinfo($file->name, PATHINFO_EXTENSION));
     $isSpreadsheet = $file->isSpreadsheet();
+    $isLegacyWordDocument = $extension === 'doc' || strtolower((string) $file->type) === 'application/msword';
     $editableTypes = [
         'text/plain', 'text/html', 'text/css', 'application/javascript', 'application/json',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/msword',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.ms-excel',
         'text/csv',
         'application/csv'
     ];
-    $extension = strtolower(pathinfo($file->name, PATHINFO_EXTENSION));
-    $isEditable = $isSpreadsheet 
+    $isEditable = !$isLegacyWordDocument && (
+        $isSpreadsheet
         || in_array($file->type, $editableTypes)
-        || in_array($extension, ['txt', 'md', 'html', 'htm', 'css', 'js', 'json', 'xml', 'php', 'docx', 'doc', 'xlsx', 'xls', 'csv', 'ods', 'tsv']);
+        || in_array($extension, ['txt', 'md', 'html', 'htm', 'css', 'js', 'json', 'xml', 'php', 'docx', 'xlsx', 'xls', 'csv', 'ods', 'tsv'])
+    );
 
     if (!$isEditable) {
-        return redirect()->back()->with('error', 'Ce type de fichier ne peut pas être édité directement.');
+        $message = $isLegacyWordDocument
+            ? 'Les anciens fichiers Word (.doc) ne peuvent pas être édités ici. Convertissez-les en .docx, puis importez-les à nouveau.'
+            : 'Ce type de fichier ne peut pas être édité directement.';
+        return redirect()->back()->with('error', $message);
     }
 
     $filePath = storage_path('app/public/' . preg_replace('/^public\//', '', $file->file_path));
@@ -874,7 +879,17 @@ public function editContent(File $file)
             Storage::disk('public')->put(preg_replace('/^public\//', '', $file->file_path), $content);
         }
     } else {
-        $content = file_get_contents($filePath);
+        try {
+            $content = $this->readEditableFileContent($filePath, $extension);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to decode editable file content', [
+                'file_id' => $file->id,
+                'extension' => $extension,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return redirect()->back()->with('error', 'Impossible de lire ce document. Vérifiez que le fichier est valide et réessayez.');
+        }
     }
 
     if ($isSpreadsheet) {
@@ -941,6 +956,39 @@ public function editContent(File $file)
         'share_url'         => $file->getShareUrl(),
         'public_permission' => $file->public_permission ?? 'none',
     ]);
+}
+
+private function readEditableFileContent(string $path, string $extension): string
+{
+    $content = file_get_contents($path);
+    if ($content === false) {
+        throw new \RuntimeException('Unable to read file from storage.');
+    }
+
+    if ($extension === 'docx' && str_starts_with($content, "PK\x03\x04")) {
+        $document = \PhpOffice\PhpWord\IOFactory::load($path, 'Word2007');
+        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($document, 'HTML');
+        ob_start();
+        try {
+            $writer->save('php://output');
+            $html = ob_get_contents();
+        } finally {
+            ob_end_clean();
+        }
+        if (!is_string($html) || $html === '') {
+            throw new \RuntimeException('Unable to convert DOCX file to HTML.');
+        }
+
+        return mb_check_encoding($html, 'UTF-8')
+            ? $html
+            : mb_convert_encoding($html, 'UTF-8', 'Windows-1252');
+    }
+
+    if (!mb_check_encoding($content, 'UTF-8')) {
+        $content = mb_convert_encoding($content, 'UTF-8', 'Windows-1252');
+    }
+
+    return $content;
 }
 
 public function importSpreadsheet(Request $request, File $file)
