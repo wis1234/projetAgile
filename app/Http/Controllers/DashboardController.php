@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Models\File;
 use App\Models\Activity;
+use App\Models\ProjectAnnouncement;
 use App\Models\Recruitment; 
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -244,6 +245,28 @@ class DashboardController extends Controller
                 ];
             });
 
+        $announcements = ProjectAnnouncement::query()
+            ->whereHas('project.users', function ($query) use ($user) {
+                $query->where('users.id', $user->id)
+                    ->where(function ($membership) {
+                        $membership->whereNull('project_user.is_muted')
+                            ->orWhere('project_user.is_muted', false);
+                    });
+            })
+            ->with(['project:id,name', 'author:id,name'])
+            ->latest()
+            ->take(10)
+            ->get()
+            ->map(fn (ProjectAnnouncement $announcement) => [
+                'id' => $announcement->id,
+                'title' => $announcement->title,
+                'body' => $announcement->body,
+                'created_at' => $announcement->created_at?->diffForHumans(),
+                'project_id' => $announcement->project->id,
+                'project_name' => $announcement->project->name,
+                'author' => $announcement->author?->name,
+            ]);
+
         return Inertia::render('Dashboard', [
             'stats' => $stats,
             'activityByDay' => $activityByDay,
@@ -251,6 +274,7 @@ class DashboardController extends Controller
             'topUsers' => $topUsers,
             'recentProjects' => $recentProjects,
             'recentFiles' => $recentFiles,
+            'announcements' => $announcements,
         ]);
     }
 

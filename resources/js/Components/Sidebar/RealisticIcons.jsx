@@ -161,6 +161,21 @@ export const DiscussionsIcon = ({ className = 'w-6 h-6' }) => (
   </svg>
 );
 
+export const AnnouncementsIcon = ({ className = 'w-6 h-6' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="announcement-horn" x1="5" y1="8" x2="27" y2="24" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#93C5FD" />
+        <stop offset="1" stopColor="#2563EB" />
+      </linearGradient>
+    </defs>
+    <path d="M5 13C5 11.9 5.9 11 7 11H11L25 5V27L11 21H7C5.9 21 5 20.1 5 19V13Z" fill="url(#announcement-horn)" fillOpacity="0.35" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    <path d="M11 11V21L25 27V5L11 11Z" fill="url(#announcement-horn)" fillOpacity="0.75" stroke="#BFDBFE" strokeWidth="1.2" strokeLinejoin="round" />
+    <path d="M8 21L10.5 28H15L12.5 21" fill="#60A5FA" stroke="#BFDBFE" strokeWidth="1.2" strokeLinejoin="round" />
+    <path d="M27 11C29 13 29 19 27 21" stroke="#DBEAFE" strokeWidth="1.6" strokeLinecap="round" />
+  </svg>
+);
+
 export const MembersIcon = ({ className = 'w-6 h-6' }) => (
   <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -345,6 +360,7 @@ export const getRealisticIcon = (href, className = 'w-5 h-5') => {
   if (path.startsWith('/tasks')) return <TasksIcon className={className} />;
   if (path.startsWith('/kanban')) return <KanbanIcon className={className} />;
   if (path.startsWith('/discussions')) return <DiscussionsIcon className={className} />;
+  if (path.startsWith('/announcements')) return <AnnouncementsIcon className={className} />;
   if (path.startsWith('/project-users')) return <MembersIcon className={className} />;
   if (path.startsWith('/users')) return <UsersIcon className={className} />;
   if (path.startsWith('/files')) return <FilesIcon className={className} />;

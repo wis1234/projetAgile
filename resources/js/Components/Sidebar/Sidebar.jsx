@@ -48,7 +48,7 @@ const POLES = [
     tag: 'Collab',
     accentColor: 'from-purple-500 to-pink-600',
     icon: (cls) => <DiscussionsIcon className={cls} />,
-    hrefs: ['/discussions', '/project-users', '/users'],
+    hrefs: ['/discussions', '/announcements', '/project-users', '/users'],
   },
   {
     key: 'skills',
@@ -102,7 +102,7 @@ const GROUPS_CONFIG = [
     poleKey: 'team',
     label: 'Communication & Équipe',
     icon: (cls) => <DiscussionsIcon className={cls} />,
-    hrefs: ['/discussions', '/project-users', '/users'],
+    hrefs: ['/discussions', '/announcements', '/project-users', '/users'],
   },
   {
     key: 'skills',

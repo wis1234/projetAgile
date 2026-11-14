@@ -263,6 +263,14 @@ Route::middleware('auth')->group(function () {
     // Tableau de bord et profil
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/', [App\Http\Controllers\DashboardController::class, 'index']);
+    Route::get('/announcements', [\App\Http\Controllers\ProjectAnnouncementController::class, 'index'])
+        ->name('project-announcements.index');
+    Route::post('/projects/{project}/announcements', [\App\Http\Controllers\ProjectAnnouncementController::class, 'store'])
+        ->name('projects.announcements.store');
+    Route::put('/projects/{project}/announcements/{announcement}', [\App\Http\Controllers\ProjectAnnouncementController::class, 'update'])
+        ->name('projects.announcements.update');
+    Route::delete('/projects/{project}/announcements/{announcement}', [\App\Http\Controllers\ProjectAnnouncementController::class, 'destroy'])
+        ->name('projects.announcements.destroy');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile/photo', [ProfileController::class, 'destroyPhoto'])->name('profile.photo.destroy');

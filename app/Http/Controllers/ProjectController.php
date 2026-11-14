@@ -313,6 +313,18 @@ class ProjectController extends Controller
             ->limit(5)
             ->get();
 
+        $announcements = $project->announcements()
+            ->with('author:id,name')
+            ->latest()
+            ->get()
+            ->map(fn ($announcement) => [
+                'id' => $announcement->id,
+                'title' => $announcement->title,
+                'body' => $announcement->body,
+                'created_at' => $announcement->created_at?->diffForHumans(),
+                'author' => $announcement->author?->name,
+            ]);
+
         $finalStats = array_merge($baseStats, [
             'activitiesByUser'  => $activitiesByUser,
             'commentsCount'     => $commentsCount,
@@ -329,6 +341,8 @@ class ProjectController extends Controller
             'tasks'    => $tasks,
             'sprints'  => $sprints,
             'quizzes'  => $quizzes,
+            'announcements' => $announcements,
+            'canManageAnnouncements' => $project->userCanManageAnnouncements($currentUser),
             'auth'     => [
                 'user' => array_merge($authUser, [
                     'roles' => $currentUser->getRoleNames()->toArray()

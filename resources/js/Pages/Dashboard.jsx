@@ -3,7 +3,7 @@ import AdminLayout from '../Layouts/AdminLayout';
 import { Link } from '@inertiajs/react';
 import { Line, Pie } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
-import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaChevronLeft, FaChevronRight, FaDownload, FaUserPlus } from 'react-icons/fa';
+import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaBullhorn, FaChevronLeft, FaChevronRight, FaDownload, FaUserPlus } from 'react-icons/fa';
 import RecruitmentCard from '@/Components/RecruitmentCard';
 import { useTranslation } from 'react-i18next';
 
@@ -173,7 +173,7 @@ const StatusBadge = ({ status, count }) => {
   );
 };
 
-export default function Dashboard({ auth, stats = {}, activityByDay = [], recentActivities = [], topUsers = [], recentProjects = [], recentFiles = [] }) {
+export default function Dashboard({ auth, stats = {}, activityByDay = [], recentActivities = [], topUsers = [], recentProjects = [], recentFiles = [], announcements = [] }) {
   const { t } = useTranslation();
   const isAdmin = auth?.user?.roles?.includes('admin');
 
@@ -225,6 +225,12 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
     widget.link
   );
   const tickerItems = [
+    ...announcements.map((announcement) => ({
+      icon: FaBullhorn,
+      label: `COMMUNIQUÉ · ${announcement.project_name}`,
+      value: `${announcement.title} — ${announcement.body}`,
+      href: `/projects/${announcement.project_id}#announcements`,
+    })),
     {
       icon: FaTasks,
       label: 'Suivi des tâches',

@@ -9,7 +9,7 @@ import {
   FaChevronDown, FaChevronUp, FaFileAlt, FaFilePdf, FaFileWord, FaTrash, FaChartLine, FaCommentDots,
   FaCheckCircle, FaClock, FaPlay, FaChartBar, FaCrown, FaUser, FaShieldAlt,
   FaPlus, FaGlobe, FaExternalLinkAlt, FaQuestionCircle, FaArrowUp, FaArrowDown,
-  FaEquals, FaExclamationTriangle, FaSpinner, FaListUl, FaVideo, FaDoorOpen, FaTimes, FaLock, FaCog, FaChevronRight
+  FaEquals, FaExclamationTriangle, FaSpinner, FaListUl, FaVideo, FaDoorOpen, FaTimes, FaLock, FaCog, FaChevronRight, FaBullhorn
 } from 'react-icons/fa';
 import { Line, Bar } from 'react-chartjs-2';
 import 'chart.js/auto';
@@ -336,9 +336,9 @@ const CommentStatsModal = ({ show, onClose, commentsByMember = [] }) => {
 };
 
 // ── Composant principal ─────────────────────────────────────────────────────
-function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp, stats = {} }) {
+function Show({ project, tasks = [], sprints = [], quizzes = [], announcements = [], canManageAnnouncements = false, auth: authProp, stats = {} }) {
   const { t, i18n } = useTranslation();
-  const { flash = {}, auth: authFromPage } = usePage().props;
+  const { flash = {}, auth: authFromPage, errors = {} } = usePage().props;
   const auth = authProp || authFromPage || {};
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -360,6 +360,8 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
   }, []);
   const [callActive, setCallActive] = useState(false);
   const [showCommentStatsModal, setShowCommentStatsModal] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '' });
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState(null);
 
   const [isCallInitiator, setIsCallInitiator] = useState(false);
 
@@ -495,6 +497,38 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
         setConsentErrors(errors);
       },
     });
+  };
+
+  const resetAnnouncementForm = () => {
+    setAnnouncementForm({ title: '', body: '' });
+    setEditingAnnouncementId(null);
+  };
+
+  const handleAnnouncementSubmit = (event) => {
+    event.preventDefault();
+    const options = {
+      preserveScroll: true,
+      onSuccess: resetAnnouncementForm,
+    };
+
+    if (editingAnnouncementId) {
+      router.put(
+        route('projects.announcements.update', [project.id, editingAnnouncementId]),
+        announcementForm,
+        options
+      );
+      return;
+    }
+
+    router.post(route('projects.announcements.store', project.id), announcementForm, options);
+  };
+
+  const handleAnnouncementDelete = (announcementId) => {
+    if (!window.confirm('Supprimer ce communiqué ?')) return;
+    router.delete(
+      route('projects.announcements.destroy', [project.id, announcementId]),
+      { preserveScroll: true }
+    );
   };
 
   // Démarre l'appel en n'appelant QUE les membres sélectionnés dans la modale.
@@ -683,6 +717,133 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], auth: authProp,
             </div>
           </div>
         </div>
+
+        <section
+          id="announcements"
+          className="scroll-mt-24 rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-5 shadow-lg shadow-blue-900/5 dark:border-blue-900/50 dark:from-blue-950/40 dark:via-gray-800 dark:to-indigo-950/30 sm:p-6"
+        >
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25">
+                <FaBullhorn className="text-lg" />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Communiqués du projet</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Informations réservées aux membres de {project.name}
+                </p>
+              </div>
+            </div>
+            <Link
+              href={route('project-announcements.index')}
+              className="text-sm font-semibold text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
+            >
+              Tous mes communiqués <FaChevronRight className="ml-1 inline h-3 w-3" />
+            </Link>
+          </div>
+
+          {canManageAnnouncements && (
+            <form onSubmit={handleAnnouncementSubmit} className="mb-6 rounded-2xl border border-blue-100 bg-white/90 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/80 sm:p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  {editingAnnouncementId ? 'Modifier le communiqué' : 'Rédiger un communiqué'}
+                </h3>
+                {editingAnnouncementId && (
+                  <button type="button" onClick={resetAnnouncementForm} className="text-sm font-medium text-gray-500 hover:text-gray-800 dark:hover:text-white">
+                    Annuler
+                  </button>
+                )}
+              </div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="announcement-title">
+                Titre
+              </label>
+              <input
+                id="announcement-title"
+                value={announcementForm.title}
+                onChange={(event) => setAnnouncementForm((current) => ({ ...current, title: event.target.value }))}
+                maxLength={180}
+                required
+                className="mb-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                placeholder="Ex. Réunion d'équipe vendredi"
+              />
+              {errors.title && <p className="mb-2 text-xs text-red-600">{errors.title}</p>}
+              <label className="mb-1.5 mt-3 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="announcement-body">
+                Message
+              </label>
+              <textarea
+                id="announcement-body"
+                value={announcementForm.body}
+                onChange={(event) => setAnnouncementForm((current) => ({ ...current, body: event.target.value }))}
+                maxLength={10000}
+                required
+                rows={3}
+                className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                placeholder="Partagez une information importante avec les membres du projet…"
+              />
+              {errors.body && <p className="mt-1 text-xs text-red-600">{errors.body}</p>}
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                >
+                  <FaBullhorn className="text-xs" />
+                  {editingAnnouncementId ? 'Enregistrer' : 'Publier et notifier les membres'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="space-y-3">
+            {announcements.length ? announcements.map((announcement) => (
+              <article key={announcement.id} className="rounded-2xl border border-white bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+                        Communiqué
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{announcement.created_at}</span>
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white">{announcement.title}</h3>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600 dark:text-gray-300">{announcement.body}</p>
+                    <p className="mt-3 text-xs font-medium text-gray-400 dark:text-gray-500">
+                      Publié par {announcement.author || 'un membre du projet'}
+                    </p>
+                  </div>
+                  {canManageAnnouncements && (
+                    <div className="flex flex-shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAnnouncementId(announcement.id);
+                          setAnnouncementForm({ title: announcement.title, body: announcement.body });
+                          document.getElementById('announcements')?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        aria-label="Modifier le communiqué"
+                        className="rounded-lg p-2 text-gray-500 transition hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAnnouncementDelete(announcement.id)}
+                        aria-label="Supprimer le communiqué"
+                        className="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </article>
+            )) : (
+              <div className="rounded-2xl border border-dashed border-blue-200 px-4 py-8 text-center dark:border-gray-700">
+                <FaBullhorn className="mx-auto mb-2 text-xl text-blue-300 dark:text-blue-500" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">Aucun communiqué pour le moment.</p>
+              </div>
+            )}
+          </div>
+        </section>
 
 
         {/* Grille 2 colonnes */}

@@ -183,6 +183,11 @@ class Project extends Model
     public function messages() {
         return $this->hasMany(Message::class);
     }
+    public function announcements(): HasMany
+    {
+        return $this->hasMany(ProjectAnnouncement::class);
+    }
+
     public function auditLogs() {
         return $this->hasMany(AuditLog::class);
     }
@@ -216,6 +221,19 @@ class Project extends Model
         }
 
         return $this->managers()->where('users.id', $user->id)->exists();
+    }
+
+    public function userCanManageAnnouncements($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasRole('admin')
+            || $this->users()
+                ->where('users.id', $user->id)
+                ->wherePivotIn('role', ['manager', 'admin'])
+                ->exists();
     }
 
     public function quizCumuls(): HasMany
