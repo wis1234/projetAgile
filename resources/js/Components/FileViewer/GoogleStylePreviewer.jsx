@@ -20,11 +20,12 @@ export const isOfficeOrDocFile = (fileType = '', fileName = '') => {
          type.includes('powerpoint') || type.includes('presentation') || type.includes('csv');
 };
 
-const GoogleStylePreviewer = ({ file, fileUrl, className = '' }) => {
+const GoogleStylePreviewer = ({ file, fileUrl, downloadUrl = null, className = '' }) => {
   const [useGoogleEmbed, setUseGoogleEmbed] = useState(false);
   const fileName = file?.name || file?.filename || 'Fichier';
   const fileType = file?.type || file?.mime_type || '';
   const targetUrl = fileUrl || `/storage/${file?.file_path || file?.path}`;
+  const effectiveDownloadUrl = downloadUrl || (file?.id ? (typeof route === 'function' ? route('files.download', file.id) : `/files/${file.id}/download`) : targetUrl);
   const ext = fileName.split('.').pop()?.toLowerCase();
 
   const isExcelOrCsv = ['xlsx', 'xls', 'csv', 'ods', 'tsv'].includes(ext) || fileType.includes('spreadsheet') || fileType.includes('excel') || fileType.includes('csv');
@@ -61,7 +62,15 @@ const GoogleStylePreviewer = ({ file, fileUrl, className = '' }) => {
   }
 
   if (isWordOrDoc) {
-    return <DocumentViewer fileUrl={targetUrl} fileName={fileName} fileType={fileType} />;
+    return (
+      <DocumentViewer
+        fileUrl={targetUrl}
+        fileName={fileName}
+        fileType={fileType}
+        downloadUrl={effectiveDownloadUrl}
+        file={file}
+      />
+    );
   }
 
   if (isPowerPoint) {

@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FaFileWord, FaSearch, FaDownload, FaExpand, FaCompress,
-  FaPrint, FaEye, FaFileAlt, FaInfoCircle, FaSync
+  FaPrint, FaEye, FaFileAlt, FaInfoCircle, FaSync, FaExclamationTriangle
 } from 'react-icons/fa';
 
-const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
+const isLocalhost = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname === '[::1]' ||
+  window.location.hostname.endsWith('.local')
+);
+
+const DocumentViewer = ({ fileUrl, fileName, fileType, downloadUrl = null, file = null }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [htmlContent, setHtmlContent] = useState('');
@@ -12,8 +19,10 @@ const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [viewMode, setViewMode] = useState('embed');
+  const [viewMode, setViewMode] = useState('docs'); // 'docs' (Rendu interactif) | 'embed' (Office Web)
   const docContainerRef = useRef(null);
+
+  const effectiveDownloadUrl = downloadUrl || fileUrl || (file?.id ? `/files/${file.id}/download` : '#');
 
   // Load and parse Word / Text Document
   useEffect(() => {
@@ -23,38 +32,74 @@ const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
 
     const loadDocument = async () => {
       try {
-        const response = await fetch(fileUrl);
-        if (!response.ok) throw new Error('Impossible d\'accéder au fichier document.');
+        const lowerName = (fileName || '').toLowerCase();
+        const isDocx = lowerName.endsWith('.docx');
+        const isDoc = lowerName.endsWith('.doc');
+        const isTxtOrMd = lowerName.endsWith('.txt') || lowerName.endsWith('.md');
 
-        const isDocx = fileName?.toLowerCase().endsWith('.docx');
-        const isTxtOrMd = fileName?.toLowerCase().endsWith('.txt') || fileName?.toLowerCase().endsWith('.md');
+        // Fetch document buffer with fallback
+        let response = null;
+        try {
+          response = await fetch(fileUrl);
+          if (!response.ok && effectiveDownloadUrl && effectiveDownloadUrl !== fileUrl) {
+            response = await fetch(effectiveDownloadUrl);
+          }
+        } catch (fetchErr) {
+          if (effectiveDownloadUrl && effectiveDownloadUrl !== fileUrl) {
+            response = await fetch(effectiveDownloadUrl);
+          } else {
+            throw fetchErr;
+          }
+        }
+
+        if (!response || !response.ok) {
+          throw new Error('Impossible d\'accéder au fichier document (erreur HTTP ' + (response?.status || 'réseau') + ').');
+        }
 
         if (isDocx) {
           // Dynamic import of mammoth.js for DOCX -> HTML conversion
           let mammothLib = window.mammoth;
           if (!mammothLib) {
             try {
-              mammothLib = await import('mammoth');
+              const imported = await import('mammoth');
+              mammothLib = imported.default || imported;
             } catch (e) {
-              console.warn('Mammoth.js non disponible, fallback vers le lecteur standard.', e);
+              console.warn('Mammoth.js import direct échoué, tentative alternative...', e);
             }
           }
 
-          if (mammothLib) {
+          const convertToHtmlFn = mammothLib?.convertToHtml || mammothLib?.default?.convertToHtml;
+
+          if (convertToHtmlFn) {
             const arrayBuffer = await response.arrayBuffer();
-            const result = await mammothLib.convertToHtml({ arrayBuffer });
+            const options = {};
+            
+            // Si support d'images embarquées dans le document
+            const imgHelper = mammothLib.images || mammothLib.default?.images;
+            if (imgHelper?.imgElement) {
+              options.convertImage = imgHelper.imgElement((image) =>
+                image.read('base64').then((imageBuffer) => ({
+                  src: `data:${image.contentType};base64,${imageBuffer}`,
+                }))
+              );
+            }
+
+            const result = await convertToHtmlFn.call(mammothLib, { arrayBuffer }, options);
             
             if (isMounted) {
               setHtmlContent(result.value || '<p class="text-gray-500 italic">Document vide.</p>');
-              // Strip HTML tags for word count
               const tempDiv = document.createElement('div');
-              tempDiv.innerHTML = result.value;
+              tempDiv.innerHTML = result.value || '';
               setTextContent(tempDiv.textContent || tempDiv.innerText || '');
+              setViewMode('docs');
               setLoading(false);
             }
           } else {
-            // Fallback to embed mode if mammoth isn't loaded
+            // Fallback si mammoth non résolu
             if (isMounted) {
+              if (isLocalhost) {
+                setError('Le moteur de lecture DOCX n\'a pas pu être chargé dans cet environnement.');
+              }
               setViewMode('embed');
               setLoading(false);
             }
@@ -62,27 +107,34 @@ const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
         } else if (isTxtOrMd) {
           const text = await response.text();
           if (isMounted) {
-            // Simple markdown-ish line formatting
             const formatted = text
               .split('\n')
               .map(line => `<p class="mb-3">${line.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`)
               .join('');
             setHtmlContent(formatted);
             setTextContent(text);
+            setViewMode('docs');
+            setLoading(false);
+          }
+        } else if (isDoc) {
+          // Format hérité .doc (Word 97-2003 binaire)
+          if (isMounted) {
+            if (isLocalhost) {
+              setError('Le format .doc (Word 97-2003) ne peut pas être prévisualisé directement en local. Veuillez le convertir en .docx ou le télécharger.');
+            }
+            setViewMode('embed');
             setLoading(false);
           }
         } else {
-          // Legacy .doc or other formats -> fallback to iframe view mode
           if (isMounted) {
             setViewMode('embed');
             setLoading(false);
           }
         }
       } catch (err) {
-        console.error('Erreur de traitement du document:', err);
+        console.error('Erreur de traitement du document Word:', err);
         if (isMounted) {
-          setError('Erreur lors du traitement du document Word. Vous pouvez basculer vers l\'aperçu Office Viewer ou le télécharger.');
-          setViewMode('embed');
+          setError(err.message || 'Erreur lors du traitement du document Word.');
           setLoading(false);
         }
       }
@@ -93,7 +145,7 @@ const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
     return () => {
       isMounted = false;
     };
-  }, [fileUrl, fileName, fileType]);
+  }, [fileUrl, fileName, fileType, effectiveDownloadUrl]);
 
   // Calculate statistics (word count, character count, reading time)
   const docStats = useMemo(() => {
@@ -221,7 +273,7 @@ const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
           )}
 
           <a
-            href={fileUrl}
+            href={effectiveDownloadUrl}
             download
             className="p-2 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition-colors"
             title="Télécharger le document"
@@ -241,7 +293,30 @@ const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
 
       {/* ── Main Document View Stage ───────────────────────────────── */}
       <div className="flex-1 overflow-auto bg-slate-950 p-6 md:p-10 flex justify-center items-start">
-        {viewMode === 'docs' ? (
+        {error && !htmlContent ? (
+          <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-2xl max-w-lg mx-auto text-white shadow-xl">
+            <FaExclamationTriangle className="mx-auto text-amber-400 text-4xl mb-4" />
+            <h3 className="text-base font-semibold text-slate-100 mb-2">Impossible de prévisualiser ce document</h3>
+            <p className="text-xs text-slate-400 leading-relaxed mb-6">{error}</p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <a
+                href={effectiveDownloadUrl}
+                download
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow transition-colors"
+              >
+                <FaDownload /> Télécharger le document
+              </a>
+              {!isLocalhost && (
+                <button
+                  onClick={() => setViewMode('embed')}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                >
+                  Essayer la vue Office Web
+                </button>
+              )}
+            </div>
+          </div>
+        ) : viewMode === 'docs' ? (
           <div
             ref={docContainerRef}
             style={{ zoom: `${zoomLevel}%` }}
@@ -266,6 +341,14 @@ const DocumentViewer = ({ fileUrl, fileName, fileType }) => {
                 Ouvrir dans une nouvelle fenêtre <FaEye />
               </a>
             </div>
+            {isLocalhost && (
+              <div className="p-3 bg-amber-950/60 border-b border-amber-800/60 text-xs text-amber-200 flex items-center gap-2">
+                <FaInfoCircle className="text-amber-400 shrink-0" />
+                <span>
+                  Office Web Viewer nécessite une URL publique pour charger le fichier. En local (localhost), utilisez le <strong>Rendu Interactif</strong> ou téléchargez le fichier.
+                </span>
+              </div>
+            )}
             <iframe
               src={officeViewerUrl}
               className="w-full flex-1 border-none min-h-[600px] bg-white"

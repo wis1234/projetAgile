@@ -81,7 +81,7 @@ export default function Preview({ file }) {
     }
     if (isImage)  return <ImageViewer fileUrl={fileUrl} fileName={file.name} />;
     if (isPdf)    return <PdfViewer   fileUrl={fileUrl} fileName={file.name} />;
-    if (isOffice) return <GoogleStylePreviewer file={file} fileUrl={fileUrl} className="flex-1 w-full" />;
+    if (isOffice) return <GoogleStylePreviewer file={file} fileUrl={fileUrl} downloadUrl={downloadUrl} className="flex-1 w-full" />;
     return <GenericViewer fileUrl={fileUrl} fileName={file.name} downloadUrl={downloadUrl} isLocked={isLocked} />;
   };
 
