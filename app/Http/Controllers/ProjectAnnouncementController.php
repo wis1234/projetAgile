@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\ProjectAnnouncement;
 use App\Notifications\ProjaNotification;
+use App\Notifications\ProjectAnnouncementEmailNotification;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -47,19 +48,25 @@ class ProjectAnnouncementController extends Controller
         ]);
 
         $projectUrl = route('projects.show', $project).'#announcements';
+        $authorName = $request->user()->name;
         $project->users()
             ->where(function ($query) {
                 $query->whereNull('project_user.is_muted')
                     ->orWhere('project_user.is_muted', false);
             })
             ->get()
-            ->each(function ($member) use ($announcement, $project, $projectUrl) {
+            ->each(function ($member) use ($announcement, $project, $projectUrl, $authorName) {
                 $member->notify(new ProjaNotification(
                     'Nouveau communiqué dans '.$project->name,
                     'Un nouveau communiqué a été publié. Ouvrez le projet pour le consulter.',
                     $projectUrl,
                     '/logo-proja.png',
                     'project-announcement-'.$announcement->id,
+                ));
+                $member->notify(new ProjectAnnouncementEmailNotification(
+                    $announcement,
+                    $project,
+                    $authorName,
                 ));
             });
 

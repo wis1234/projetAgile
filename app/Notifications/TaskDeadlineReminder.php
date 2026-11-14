@@ -54,11 +54,10 @@ class TaskDeadlineReminder extends Notification implements ShouldQueue
 
         return (new MailMessage)
             ->subject($subject)
-            ->markdown('emails.task-deadline-reminder', [
+            ->view('emails.task-deadline-reminder', [
                 'task' => $this->task,
                 'notifiable' => $notifiable,
-                'greeting' => 'Bonjour ' . $notifiable->name . ' !',
-                'timeLeft' => $timeLeftString
+                'timeLeft' => $timeLeftString,
             ]);
     }
     public function toArray($notifiable)

@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectAnnouncement;
 use App\Models\User;
 use App\Notifications\ProjaNotification;
+use App\Notifications\ProjectAnnouncementEmailNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -32,6 +33,8 @@ class ProjectAnnouncementsTest extends TestCase
         $this->assertSame('Réunion de lancement', $announcement->title);
         Notification::assertSentTo($manager, ProjaNotification::class);
         Notification::assertSentTo($member, ProjaNotification::class);
+        Notification::assertSentTo($manager, ProjectAnnouncementEmailNotification::class);
+        Notification::assertSentTo($member, ProjectAnnouncementEmailNotification::class);
     }
 
     public function test_project_collaborator_cannot_publish_or_manage_announcements(): void
