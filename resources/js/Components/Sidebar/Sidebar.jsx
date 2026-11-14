@@ -30,7 +30,7 @@ const POLES = [
     tag: 'Agile',
     accentColor: 'from-blue-500 to-indigo-600',
     icon: (cls) => <ProjectsIcon className={cls} />,
-    hrefs: ['/projects', '/sprints', '/tasks', '/kanban'],
+    hrefs: ['/projects', '/sprints', '/tasks', '/kanban', '/files'],
   },
   {
     key: 'team',
@@ -39,7 +39,7 @@ const POLES = [
     tag: 'Collab',
     accentColor: 'from-purple-500 to-pink-600',
     icon: (cls) => <DiscussionsIcon className={cls} />,
-    hrefs: ['/discussions', '/project-users', '/users', '/files'],
+    hrefs: ['/discussions', '/project-users', '/users'],
   },
   {
     key: 'pilotage',
@@ -88,14 +88,14 @@ const GROUPS_CONFIG = [
     poleKey: 'workspace',
     label: 'Projets & Agilité',
     icon: (cls) => <ProjectsIcon className={cls} />,
-    hrefs: ['/projects', '/sprints', '/tasks', '/kanban'],
+    hrefs: ['/projects', '/sprints', '/tasks', '/kanban', '/files'],
   },
   {
     key: 'team',
     poleKey: 'team',
     label: 'Communication & Équipe',
     icon: (cls) => <DiscussionsIcon className={cls} />,
-    hrefs: ['/discussions', '/project-users', '/users', '/files'],
+    hrefs: ['/discussions', '/project-users', '/users'],
   },
   {
     key: 'pilotage',
@@ -176,7 +176,7 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
 
   // Pôle sélectionné dans le rail (par défaut le pôle actif ou 'all' pour tout voir)
   const [selectedPole, setSelectedPole] = useState(activePoleFromUrl);
-  const [viewMode, setViewMode] = useState('filtered'); // 'filtered' (pôle choisi) ou 'all' (toutes les sections)
+  const [viewMode, setViewMode] = useState('all'); // 'filtered' (pôle choisi) ou 'all' (toutes les sections)
   const [tip, setTip] = useState(null);
 
   // Synchroniser le pôle quand la page active change
@@ -309,6 +309,23 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
               </svg>
             </Link>
 
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              aria-label={collapsed ? 'Étendre le volet de navigation' : 'Réduire le volet'}
+              title={collapsed ? 'Étendre le panneau (Ctrl+B)' : 'Réduire le panneau (Ctrl+B)'}
+              className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all outline-none"
+            >
+              <svg
+                className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180 text-blue-300' : 'text-white/60'}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
             {/* Séparateur discret */}
             <div className="w-8 h-px bg-white/15 my-1" />
           </div>
@@ -389,13 +406,13 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
               ].join(' ')}
             >
               {viewMode === 'all' && (
-                <span className="absolute left-0 w-1 h-8 rounded-r-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                <span className="absolute left-0 w-1 h-8 rounded-r-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
               )}
               <span
                 className={[
                   'flex h-9 w-9 items-center justify-center rounded-xl transition-all',
                   viewMode === 'all'
-                    ? 'bg-emerald-600/30 ring-1 ring-emerald-400/50 text-emerald-300'
+                    ? 'bg-blue-600/30 ring-1 ring-blue-400/50 text-blue-300'
                     : 'hover:bg-white/10 text-blue-200/60 group-hover:text-white',
                 ].join(' ')}
               >
@@ -432,23 +449,6 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
               />
             </div>
 
-            {/* Bouton réduire / étendre le panneau secondaire (PC) */}
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              aria-label={collapsed ? 'Étendre le volet de navigation' : 'Réduire le volet'}
-              title={collapsed ? 'Étendre le panneau (Ctrl+B)' : 'Réduire le panneau (Ctrl+B)'}
-              className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all outline-none"
-            >
-              <svg
-                className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180 text-blue-300' : 'text-white/60'}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
           </div>
         </div>
 
