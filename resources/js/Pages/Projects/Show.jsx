@@ -336,7 +336,7 @@ const CommentStatsModal = ({ show, onClose, commentsByMember = [] }) => {
 };
 
 // ── Composant principal ─────────────────────────────────────────────────────
-function Show({ project, tasks = [], sprints = [], quizzes = [], announcements = [], canManageAnnouncements = false, auth: authProp, stats = {} }) {
+function Show({ project, tasks = [], sprints = [], quizzes = [], canManageAnnouncements = false, auth: authProp, stats = {} }) {
   const { t, i18n } = useTranslation();
   const { flash = {}, auth: authFromPage, errors = {} } = usePage().props;
   const auth = authProp || authFromPage || {};
@@ -360,8 +360,8 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], announcements =
   }, []);
   const [callActive, setCallActive] = useState(false);
   const [showCommentStatsModal, setShowCommentStatsModal] = useState(false);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '' });
-  const [editingAnnouncementId, setEditingAnnouncementId] = useState(null);
 
   const [isCallInitiator, setIsCallInitiator] = useState(false);
 
@@ -501,34 +501,18 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], announcements =
 
   const resetAnnouncementForm = () => {
     setAnnouncementForm({ title: '', body: '' });
-    setEditingAnnouncementId(null);
   };
 
   const handleAnnouncementSubmit = (event) => {
     event.preventDefault();
     const options = {
       preserveScroll: true,
-      onSuccess: resetAnnouncementForm,
+      onSuccess: () => {
+        resetAnnouncementForm();
+        setShowAnnouncementModal(false);
+      },
     };
-
-    if (editingAnnouncementId) {
-      router.put(
-        route('projects.announcements.update', [project.id, editingAnnouncementId]),
-        announcementForm,
-        options
-      );
-      return;
-    }
-
     router.post(route('projects.announcements.store', project.id), announcementForm, options);
-  };
-
-  const handleAnnouncementDelete = (announcementId) => {
-    if (!window.confirm('Supprimer ce communiqué ?')) return;
-    router.delete(
-      route('projects.announcements.destroy', [project.id, announcementId]),
-      { preserveScroll: true }
-    );
   };
 
   // Démarre l'appel en n'appelant QUE les membres sélectionnés dans la modale.
@@ -717,126 +701,26 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], announcements =
             </div>
           </div>
 
-          <section
-            id="announcements"
-            className="scroll-mt-24 flex min-w-0 flex-col rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 shadow-sm dark:border-blue-900/50 dark:from-blue-950/40 dark:via-gray-800 dark:to-indigo-950/30"
-          >
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
-                  <FaBullhorn />
-                </span>
-                <div className="min-w-0">
-                  <h2 className="truncate text-sm font-bold text-gray-900 dark:text-white">Communiqués</h2>
-                  <p className="truncate text-xs text-gray-500 dark:text-gray-400">{project.name}</p>
-                </div>
-              </div>
-              <Link
-                href={route('project-announcements.index')}
-                className="flex-shrink-0 text-xs font-semibold text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
+          {canManageAnnouncements && (
+            <section
+              id="announcements"
+              className="flex min-w-0 flex-col items-center justify-center rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-5 text-center shadow-sm dark:border-blue-900/50 dark:from-blue-950/40 dark:via-gray-800 dark:to-indigo-950/30"
+            >
+              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
+                <FaBullhorn />
+              </span>
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white">Communiqués</h2>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Informer les membres du projet</p>
+              <button
+                type="button"
+                onClick={() => setShowAnnouncementModal(true)}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
               >
-                Tout voir <FaChevronRight className="ml-0.5 inline h-2.5 w-2.5" />
-              </Link>
-            </div>
-
-            {canManageAnnouncements && (
-              <form onSubmit={handleAnnouncementSubmit} className="mb-3 rounded-xl border border-blue-100 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/80">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-xs font-semibold text-gray-900 dark:text-white">
-                    {editingAnnouncementId ? 'Modifier le communiqué' : 'Nouveau communiqué'}
-                  </h3>
-                  {editingAnnouncementId && (
-                    <button type="button" onClick={resetAnnouncementForm} className="text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-white">
-                      Annuler
-                    </button>
-                  )}
-                </div>
-                <label className="sr-only" htmlFor="announcement-title">Titre</label>
-                <input
-                  id="announcement-title"
-                  value={announcementForm.title}
-                  onChange={(event) => setAnnouncementForm((current) => ({ ...current, title: event.target.value }))}
-                  maxLength={180}
-                  required
-                  className="mb-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  placeholder="Titre du communiqué"
-                />
-                {errors.title && <p className="mb-2 text-xs text-red-600">{errors.title}</p>}
-                <label className="sr-only" htmlFor="announcement-body">Message</label>
-                <textarea
-                  id="announcement-body"
-                  value={announcementForm.body}
-                  onChange={(event) => setAnnouncementForm((current) => ({ ...current, body: event.target.value }))}
-                  maxLength={10000}
-                  required
-                  rows={2}
-                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  placeholder="Votre message aux membres…"
-                />
-                {errors.body && <p className="mt-1 text-xs text-red-600">{errors.body}</p>}
-                <div className="mt-2 flex justify-end">
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                  >
-                    <FaBullhorn />
-                    {editingAnnouncementId ? 'Enregistrer' : 'Publier'}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            <div className="max-h-64 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {announcements.length ? announcements.map((announcement) => (
-                <article key={announcement.id} className="rounded-xl border border-white bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/80">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
-                          Communiqué
-                        </span>
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400">{announcement.created_at}</span>
-                      </div>
-                      <h3 className="break-words text-sm font-bold text-gray-900 dark:text-white">{announcement.title}</h3>
-                      <p className="mt-1 max-h-16 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-gray-600 dark:text-gray-300">{announcement.body}</p>
-                      <p className="mt-2 truncate text-[10px] font-medium text-gray-400 dark:text-gray-500">
-                        Publié par {announcement.author || 'un membre du projet'}
-                      </p>
-                    </div>
-                    {canManageAnnouncements && (
-                      <div className="flex flex-shrink-0 items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingAnnouncementId(announcement.id);
-                            setAnnouncementForm({ title: announcement.title, body: announcement.body });
-                            document.getElementById('announcements')?.scrollIntoView({ behavior: 'smooth' });
-                          }}
-                          aria-label="Modifier le communiqué"
-                          className="rounded-lg p-1.5 text-gray-500 transition hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAnnouncementDelete(announcement.id)}
-                          aria-label="Supprimer le communiqué"
-                          className="rounded-lg p-1.5 text-gray-500 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-300"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </article>
-              )) : (
-                <div className="rounded-xl border border-dashed border-blue-200 px-3 py-6 text-center dark:border-gray-700">
-                  <FaBullhorn className="mx-auto mb-2 text-lg text-blue-300 dark:text-blue-500" />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Aucun communiqué pour le moment.</p>
-                </div>
-              )}
-            </div>
-          </section>
+                <FaPlus className="text-xs" />
+                Créer un communiqué
+              </button>
+            </section>
+          )}
         </div>
 
         {/* Grille 2 colonnes */}
@@ -1291,6 +1175,90 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], announcements =
         onClose={() => setShowCommentStatsModal(false)}
         commentsByMember={stats.commentsByMember || []}
       />
+
+      <Modal
+        show={showAnnouncementModal}
+        onClose={() => {
+          setShowAnnouncementModal(false);
+          resetAnnouncementForm();
+        }}
+        maxWidth="lg"
+      >
+        <form onSubmit={handleAnnouncementSubmit}>
+          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-700">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
+              <FaBullhorn className="text-blue-600 dark:text-blue-400" />
+              Créer un communiqué
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAnnouncementModal(false);
+                resetAnnouncementForm();
+              }}
+              className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
+              aria-label="Fermer"
+            >
+              <FaTimes />
+            </button>
+          </div>
+          <div className="space-y-4 p-6">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Le communiqué sera partagé avec les membres de {project.name}.
+            </p>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="announcement-title">
+                Titre
+              </label>
+              <input
+                id="announcement-title"
+                value={announcementForm.title}
+                onChange={(event) => setAnnouncementForm((current) => ({ ...current, title: event.target.value }))}
+                maxLength={180}
+                required
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                placeholder="Ex. Réunion d'équipe vendredi"
+              />
+              {errors.title && <p className="mt-1 text-xs text-red-600">{errors.title}</p>}
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="announcement-body">
+                Message
+              </label>
+              <textarea
+                id="announcement-body"
+                value={announcementForm.body}
+                onChange={(event) => setAnnouncementForm((current) => ({ ...current, body: event.target.value }))}
+                maxLength={10000}
+                required
+                rows={5}
+                className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                placeholder="Partagez une information importante avec les membres du projet…"
+              />
+              {errors.body && <p className="mt-1 text-xs text-red-600">{errors.body}</p>}
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAnnouncementModal(false);
+                resetAnnouncementForm();
+              }}
+              className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+            >
+              <FaBullhorn className="text-xs" />
+              Publier et notifier les membres
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Modal Zoom : héberge le composant complet, inchangé fonctionnellement */}
       <Modal show={showZoomModal} onClose={() => setShowZoomModal(false)} maxWidth="2xl">
