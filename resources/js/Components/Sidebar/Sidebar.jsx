@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { FaHome } from 'react-icons/fa';
 import {
+  HomeIcon,
   ProjectsIcon,
   SprintsIcon,
   TasksIcon,
@@ -29,7 +29,7 @@ const POLES = [
     fullTitle: 'Pilotage & Accueil',
     tag: 'Live',
     accentColor: 'from-emerald-500 to-teal-600',
-    icon: (cls) => <FaHome className={cls} />,
+    icon: (cls) => <HomeIcon className={cls} />,
     hrefs: ['/dashboard', '/activities'],
   },
   {
@@ -87,7 +87,7 @@ const GROUPS_CONFIG = [
     key: 'pilotage',
     poleKey: 'pilotage',
     label: 'Pilotage & Accueil',
-    icon: (cls) => <FaHome className={cls} />,
+    icon: (cls) => <HomeIcon className={cls} />,
     hrefs: ['/dashboard', '/activities'],
   },
   {
@@ -314,23 +314,6 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
             <div className="w-8 h-px bg-white/15 my-1" />
           </div>
 
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Étendre le volet de navigation' : 'Réduire le volet'}
-            title={collapsed ? 'Étendre le panneau (Ctrl+B)' : 'Réduire le panneau (Ctrl+B)'}
-            className="absolute right-1 top-2 hidden h-8 w-8 items-center justify-center rounded-lg bg-white text-[#1e3a8a] shadow-md transition hover:bg-blue-50 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-blue-200 md:flex"
-          >
-            <svg
-              className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-
           {/* Centre du Rail : Boutons des grands pôles Slack */}
           <nav className="flex-1 w-full flex flex-col items-center gap-1.5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-1">
             {POLES.map((pole) => {
@@ -453,12 +436,30 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
           </div>
         </div>
 
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Étendre le volet de navigation' : 'Réduire le volet'}
+          title={collapsed ? 'Étendre le panneau (Ctrl+B)' : 'Réduire le panneau (Ctrl+B)'}
+          className="absolute right-2 top-2 z-30 hidden h-9 w-9 items-center justify-center rounded-xl bg-white text-[#1e3a8a] shadow-lg ring-1 ring-blue-950/10 transition hover:bg-blue-50 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-blue-200 md:flex"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}
+        >
+          <svg
+            className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
         {/* ════════════════════════════════════════════════════════════════
             COLONNE 2 : PANNEAU SECONDAIRE DÉTAILLÉ (Menu & Sous-groupes)
         ════════════════════════════════════════════════════════════════ */}
         <div
           className={[
-            'flex-1 flex flex-col bg-gradient-to-b from-[#2563eb] via-[#1d4ed8] to-[#1e40af] dark:from-[#1e40af] dark:via-[#1e3a8a] dark:to-[#172554]',
+            'flex-1 flex flex-col bg-[#1e3a8a] dark:bg-[#172554]',
             'transition-[width,opacity] duration-300 ease-in-out',
             collapsed ? 'md:w-0 md:opacity-0 md:overflow-hidden md:pointer-events-none' : 'w-full opacity-100',
           ].join(' ')}

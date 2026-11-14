@@ -34,6 +34,26 @@ export const DashboardIcon = ({ className = 'w-6 h-6' }) => (
   </svg>
 );
 
+export const HomeIcon = ({ className = 'w-6 h-6' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="home-roof" x1="5" y1="5" x2="27" y2="19" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#93C5FD" />
+        <stop offset="1" stopColor="#2563EB" />
+      </linearGradient>
+      <linearGradient id="home-wall" x1="8" y1="13" x2="24" y2="29" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#DBEAFE" />
+        <stop offset="1" stopColor="#60A5FA" />
+      </linearGradient>
+    </defs>
+    <path d="M4 14.5L16 4L28 14.5" stroke="url(#home-roof)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M7.5 13.5V26C7.5 27.1 8.4 28 9.5 28H22.5C23.6 28 24.5 27.1 24.5 26V13.5L16 6.2L7.5 13.5Z" fill="url(#home-wall)" fillOpacity="0.35" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    <path d="M13 28V19C13 17.9 13.9 17 15 17H17C18.1 17 19 17.9 19 19V28" fill="#BFDBFE" stroke="#DBEAFE" strokeWidth="1.2" />
+    <rect x="9.5" y="15.5" width="2.5" height="3.5" rx="0.7" fill="#DBEAFE" />
+    <rect x="20" y="15.5" width="2.5" height="3.5" rx="0.7" fill="#DBEAFE" />
+  </svg>
+);
+
 export const ProjectsIcon = ({ className = 'w-6 h-6' }) => (
   <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
