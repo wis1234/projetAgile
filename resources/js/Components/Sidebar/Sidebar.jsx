@@ -293,16 +293,16 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
             COLONNE 1 : RAIL SLACK (Icônes principales & Profil)
         ════════════════════════════════════════════════════════════════ */}
         <div
-          className="relative w-[4.25rem] flex-shrink-0 flex flex-col items-center justify-between py-3 bg-[#1e3a8a] dark:bg-[#172554] border-r border-white/15 z-20 select-none"
+          className="relative w-[4.25rem] flex-shrink-0 flex flex-col items-center justify-between pt-1 pb-3 bg-[#1e3a8a] dark:bg-[#172554] border-r border-white/15 z-20 select-none"
         >
           {/* Haut du Rail : Logo Workspace ProJA */}
-          <div className="flex flex-col items-center gap-2 pt-9">
+          <div className={`flex w-full flex-col items-center gap-2 ${collapsed ? 'md:flex-row md:justify-between md:px-1' : ''}`}>
             <Link
               href="/dashboard"
               onClick={onClose}
               onMouseEnter={(e) => showTip(e, 'ProJA Workspace')}
               onMouseLeave={hideTip}
-              className="group relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 shadow-lg shadow-blue-950/30 ring-1 ring-white/50 transition-transform hover:scale-105 active:scale-95"
+              className={`group relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 shadow-lg shadow-blue-950/30 ring-1 ring-white/50 transition-transform hover:scale-105 active:scale-95 ${collapsed ? 'md:h-8 md:w-8' : ''}`}
             >
               <img
                 src="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png"
@@ -311,7 +311,7 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
               />
             </Link>
             {/* Séparateur discret */}
-            <div className="w-8 h-px bg-white/15 my-1" />
+            <div className={`w-8 h-px bg-white/15 my-1 ${collapsed ? 'md:hidden' : ''}`} />
           </div>
 
           {/* Centre du Rail : Boutons des grands pôles Slack */}
@@ -441,8 +441,8 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
           onClick={onToggleCollapse}
           aria-label={collapsed ? 'Étendre le volet de navigation' : 'Réduire le volet'}
           title={collapsed ? 'Étendre le panneau (Ctrl+B)' : 'Réduire le panneau (Ctrl+B)'}
-          className="absolute right-2 top-2 z-30 hidden h-9 w-9 items-center justify-center rounded-xl bg-white text-[#1e3a8a] shadow-lg ring-1 ring-blue-950/10 transition hover:bg-blue-50 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-blue-200 md:flex"
-          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}
+          className={`absolute right-2 top-1 z-30 hidden items-center justify-center rounded-xl bg-white text-[#1e3a8a] shadow-lg ring-1 ring-blue-950/10 transition hover:bg-blue-50 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-blue-200 md:flex ${collapsed ? 'h-7 w-7' : 'h-9 w-9'}`}
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.25rem)' }}
         >
           <svg
             className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
