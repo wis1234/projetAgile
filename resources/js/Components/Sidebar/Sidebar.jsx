@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link, usePage } from '@inertiajs/react';
+import { FaHome } from 'react-icons/fa';
 import {
-  DashboardIcon,
   ProjectsIcon,
   SprintsIcon,
   TasksIcon,
@@ -29,7 +29,7 @@ const POLES = [
     fullTitle: 'Pilotage & Accueil',
     tag: 'Live',
     accentColor: 'from-emerald-500 to-teal-600',
-    icon: (cls) => <DashboardIcon className={cls} />,
+    icon: (cls) => <FaHome className={cls} />,
     hrefs: ['/dashboard', '/activities'],
   },
   {
@@ -87,7 +87,7 @@ const GROUPS_CONFIG = [
     key: 'pilotage',
     poleKey: 'pilotage',
     label: 'Pilotage & Accueil',
-    icon: (cls) => <DashboardIcon className={cls} />,
+    icon: (cls) => <FaHome className={cls} />,
     hrefs: ['/dashboard', '/activities'],
   },
   {
@@ -293,42 +293,43 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
             COLONNE 1 : RAIL SLACK (Icônes principales & Profil)
         ════════════════════════════════════════════════════════════════ */}
         <div
-          className="w-[4.25rem] flex-shrink-0 flex flex-col items-center justify-between py-3 bg-[#1d4ed8] dark:bg-[#1e40af] border-r border-white/15 z-20 select-none"
+          className="relative w-[4.25rem] flex-shrink-0 flex flex-col items-center justify-between py-3 bg-[#1e3a8a] dark:bg-[#172554] border-r border-white/15 z-20 select-none"
         >
           {/* Haut du Rail : Logo Workspace ProJA */}
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-2 pt-9">
             <Link
               href="/dashboard"
               onClick={onClose}
               onMouseEnter={(e) => showTip(e, 'ProJA Workspace')}
               onMouseLeave={hideTip}
-              className="group relative flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 text-white font-extrabold shadow-lg shadow-blue-600/30 ring-1 ring-white/30 transition-transform hover:scale-105 active:scale-95"
+              className="group relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 shadow-lg shadow-blue-950/30 ring-1 ring-white/50 transition-transform hover:scale-105 active:scale-95"
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
+              <img
+                src="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png"
+                alt="ProJA"
+                className="h-full w-full object-contain"
+              />
             </Link>
-
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              aria-label={collapsed ? 'Étendre le volet de navigation' : 'Réduire le volet'}
-              title={collapsed ? 'Étendre le panneau (Ctrl+B)' : 'Réduire le panneau (Ctrl+B)'}
-              className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all outline-none"
-            >
-              <svg
-                className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180 text-blue-300' : 'text-white/60'}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-
             {/* Séparateur discret */}
             <div className="w-8 h-px bg-white/15 my-1" />
           </div>
+
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? 'Étendre le volet de navigation' : 'Réduire le volet'}
+            title={collapsed ? 'Étendre le panneau (Ctrl+B)' : 'Réduire le panneau (Ctrl+B)'}
+            className="absolute right-1 top-2 hidden h-8 w-8 items-center justify-center rounded-lg bg-white text-[#1e3a8a] shadow-md transition hover:bg-blue-50 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-blue-200 md:flex"
+          >
+            <svg
+              className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
 
           {/* Centre du Rail : Boutons des grands pôles Slack */}
           <nav className="flex-1 w-full flex flex-col items-center gap-1.5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-1">
