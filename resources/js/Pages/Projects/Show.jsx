@@ -599,34 +599,31 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], canManageAnnoun
           </div>
         )}
 
-{/* En-tête projet + Appels & réunions, côte à côte (empilés sur mobile) */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-
-          {/* Carte gauche : identité du projet */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm flex flex-col justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                <FaProjectDiagram className="text-white text-xl" />
-              </div>
+        <header className="overflow-hidden rounded-3xl bg-gradient-to-r from-blue-950 via-blue-800 to-blue-700 p-5 text-white shadow-xl shadow-blue-900/15 sm:p-7">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
+                <FaProjectDiagram className="text-xl text-blue-100" />
+              </span>
               <div className="min-w-0">
-                <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white truncate">{project.name}</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
-                  <FaCalendarAlt className="text-xs flex-shrink-0" />
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-blue-200">Projet</p>
+                <h1 className="break-words text-2xl font-extrabold tracking-tight sm:text-3xl">{project.name}</h1>
+                <p className="mt-1 flex items-center gap-2 text-sm text-blue-100">
+                  <FaCalendarAlt className="flex-shrink-0 text-xs" />
                   {new Date(project.created_at).toLocaleDateString(i18n.language, { day: '2-digit', month: 'long', year: 'numeric' })}
                 </p>
               </div>
             </div>
-            <div className="mt-5">
-              <Link
-                href="/projects"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl font-medium transition"
-              >
-                <FaArrowLeft className="text-sm" /> {t('back_to_projects')}
-              </Link>
-            </div>
+            <Link
+              href="/projects"
+              className="inline-flex flex-shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20 sm:self-center"
+            >
+              <FaArrowLeft className="text-xs" /> {t('back_to_projects')}
+            </Link>
           </div>
+        </header>
 
-          {/* Carte droite : Appels & réunions (Zoom + ProJA Meet) */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm flex flex-col gap-4">
             <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
               Appels & réunions
@@ -701,26 +698,35 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], canManageAnnoun
             </div>
           </div>
 
-          {canManageAnnouncements && (
-            <section
-              id="announcements"
-              className="flex min-w-0 flex-col items-center justify-center rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-5 text-center shadow-sm dark:border-blue-900/50 dark:from-blue-950/40 dark:via-gray-800 dark:to-indigo-950/30"
-            >
-              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
-                <FaBullhorn />
-              </span>
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white">Communiqués</h2>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Informer les membres du projet</p>
+          <section
+            id="announcements"
+            className="flex min-w-0 flex-col items-center justify-center rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-5 text-center shadow-sm dark:border-blue-900/50 dark:from-blue-950/40 dark:via-gray-800 dark:to-indigo-950/30"
+          >
+            <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
+              <FaBullhorn />
+            </span>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Communiqués</h2>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Informations des membres du projet</p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Link
+                href={`/announcements?project_id=${project.id}`}
+                className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-blue-800 dark:bg-gray-800 dark:text-blue-300 dark:hover:bg-gray-700 dark:focus:ring-offset-gray-800"
+              >
+                <FaEye className="text-xs" />
+                Voir les communiqués
+              </Link>
+              {canManageAnnouncements && (
               <button
                 type="button"
                 onClick={() => setShowAnnouncementModal(true)}
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
               >
                 <FaPlus className="text-xs" />
                 Créer un communiqué
               </button>
-            </section>
-          )}
+              )}
+            </div>
+          </section>
         </div>
 
         {/* Grille 2 colonnes */}

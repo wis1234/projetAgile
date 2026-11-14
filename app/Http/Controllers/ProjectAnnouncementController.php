@@ -14,8 +14,27 @@ class ProjectAnnouncementController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $projectFilter = null;
+
+        if ($request->filled('project_id')) {
+            $validated = $request->validate([
+                'project_id' => ['required', 'integer', 'min:1'],
+            ]);
+
+            $projectFilter = Project::query()
+                ->whereKey($validated['project_id'])
+                ->whereHas('users', function ($query) use ($user) {
+                    $query->where('users.id', $user->id)
+                        ->where(function ($membership) {
+                            $membership->whereNull('project_user.is_muted')
+                                ->orWhere('project_user.is_muted', false);
+                        });
+                })
+                ->firstOrFail();
+        }
 
         $announcements = ProjectAnnouncement::query()
+            ->when($projectFilter, fn ($query) => $query->where('project_id', $projectFilter->id))
             ->whereHas('project.users', function ($query) use ($user) {
                 $query->where('users.id', $user->id)
                     ->where(function ($membership) {
@@ -30,6 +49,10 @@ class ProjectAnnouncementController extends Controller
 
         return Inertia::render('Announcements/Index', [
             'announcements' => $announcements,
+            'projectFilter' => $projectFilter ? [
+                'id' => $projectFilter->id,
+                'name' => $projectFilter->name,
+            ] : null,
         ]);
     }
 

@@ -4,7 +4,7 @@ import { FaArrowLeft, FaBullhorn, FaChevronRight } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import AdminLayout from '@/Layouts/AdminLayout';
 
-function AnnouncementsIndex({ announcements }) {
+function AnnouncementsIndex({ announcements, projectFilter = null }) {
   const { t } = useTranslation();
   const items = announcements?.data || [];
 
@@ -25,8 +25,18 @@ function AnnouncementsIndex({ announcements }) {
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-200">ProJA · Communication</p>
           <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">{t('announcements')}</h1>
           <p className="mt-2 max-w-2xl text-sm text-blue-100">
-            Communiqués publiés dans les projets dont vous êtes membre.
+            {projectFilter
+              ? `Communiqués publiés dans le projet ${projectFilter.name}.`
+              : 'Communiqués publiés dans les projets dont vous êtes membre.'}
           </p>
+          {projectFilter && (
+            <Link
+              href="/announcements"
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+            >
+              <FaBullhorn className="text-xs" /> Voir tous les communiqués
+            </Link>
+          )}
         </header>
 
         <div className="space-y-4">
