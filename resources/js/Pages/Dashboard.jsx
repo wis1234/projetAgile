@@ -1,519 +1,584 @@
-import React from 'react';
-import AdminLayout from '../Layouts/AdminLayout';
-import { Link } from '@inertiajs/react';
-import { Line, Pie } from 'react-chartjs-2';
-import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
-import { FaChartLine, FaUsers, FaTasks, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload, FaUserPlus } from 'react-icons/fa';
-import RecruitmentCard from '@/Components/RecruitmentCard';
-import { motion } from 'framer-motion';
+import React, { memo, useEffect, useMemo, useState } from 'react';
+import { Head, Link } from '@inertiajs/react';
+import { Line, Doughnut } from 'react-chartjs-2';
+import {
+  Chart, CategoryScale, LinearScale, PointElement, LineElement,
+  Tooltip, ArcElement, Filler,
+} from 'chart.js';
+import {
+  FaTasks, FaUsers, FaProjectDiagram, FaFileAlt, FaChevronRight, FaDownload,
+  FaUserPlus, FaPlus, FaFilePdf, FaFileImage, FaFileWord, FaFileExcel, FaFileArchive,
+} from 'react-icons/fa';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import AdminLayout from '../Layouts/AdminLayout';
+import RecruitmentCard from '@/Components/RecruitmentCard';
 
-Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler);
+Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, ArcElement, Filler);
 
-// ── Widget stat (même forme que SummaryCard de la page Projets) ─────────────
+/* ─────────────────────────────────────────────────────────────
+   Design tokens
+   Une seule couleur d'accent (indigo), neutres ardoise, rayons cohérents.
+   Police : Plus Jakarta Sans (titres + texte), chiffres tabulaires.
+   ───────────────────────────────────────────────────────────── */
 
-const Widget = ({ title, count, color, link, icon: Icon }) => {
-  const { t } = useTranslation();
+const FONT_HREF =
+  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
 
-  const content = (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-5 border border-gray-100 dark:border-gray-700 flex items-center gap-3 sm:gap-4 hover:shadow-md hover:border-gray-200 dark:hover:border-gray-600 active:scale-[0.98] transition-all duration-150 min-w-0 group">
-      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0 ${color} shadow-sm`}>
-        <Icon className="text-base sm:text-lg text-white" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white leading-tight tabular-nums">{count ?? 0}</p>
-        <p className="text-[12px] font-medium text-gray-500 dark:text-gray-400 mt-0.5 truncate tracking-wide">{title}</p>
-      </div>
-    </div>
+const STATUS = {
+  todo:        { key: 'status_todo',        def: 'À faire',    hex: '#6366f1', bar: 'bg-indigo-500' },
+  in_progress: { key: 'status_in_progress', def: 'En cours',   hex: '#f59e0b', bar: 'bg-amber-500' },
+  done:        { key: 'status_done',        def: 'Terminées',  hex: '#10b981', bar: 'bg-emerald-500' },
+  en_attente:  { key: 'status_pending',     def: 'En attente', hex: '#94a3b8', bar: 'bg-slate-400' },
+};
+const STATUS_ORDER = ['todo', 'in_progress', 'done', 'en_attente'];
+
+const TONES = {
+  indigo: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300',
+  sky:    'bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300',
+  violet: 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-300',
+  amber:  'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300',
+};
+
+const FILE_ICONS = {
+  pdf: [FaFilePdf, 'text-rose-500 bg-rose-50 dark:bg-rose-500/10'],
+  doc: [FaFileWord, 'text-sky-600 bg-sky-50 dark:bg-sky-500/10'],
+  docx: [FaFileWord, 'text-sky-600 bg-sky-50 dark:bg-sky-500/10'],
+  xls: [FaFileExcel, 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10'],
+  xlsx: [FaFileExcel, 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10'],
+  csv: [FaFileExcel, 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10'],
+  png: [FaFileImage, 'text-violet-500 bg-violet-50 dark:bg-violet-500/10'],
+  jpg: [FaFileImage, 'text-violet-500 bg-violet-50 dark:bg-violet-500/10'],
+  jpeg: [FaFileImage, 'text-violet-500 bg-violet-50 dark:bg-violet-500/10'],
+  webp: [FaFileImage, 'text-violet-500 bg-violet-50 dark:bg-violet-500/10'],
+  zip: [FaFileArchive, 'text-amber-600 bg-amber-50 dark:bg-amber-500/10'],
+  rar: [FaFileArchive, 'text-amber-600 bg-amber-50 dark:bg-amber-500/10'],
+};
+const FILE_FALLBACK = [FaFileAlt, 'text-slate-500 bg-slate-100 dark:bg-slate-700/50'];
+const fileIcon = (name = '') => FILE_ICONS[name.split('.').pop()?.toLowerCase()] || FILE_FALLBACK;
+
+const focusRing =
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950';
+
+/* ─────────────────────────────────────────────────────────────
+   Hooks utilitaires
+   ───────────────────────────────────────────────────────────── */
+
+function useIsDark() {
+  const [dark, setDark] = useState(
+    () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
   );
+  useEffect(() => {
+    const el = document.documentElement;
+    const obs = new MutationObserver(() => setDark(el.classList.contains('dark')));
+    obs.observe(el, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+  return dark;
+}
 
-  return link ? (
-    <Link href={link} className="block rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 h-full min-w-0">
-      {content}
+/* ─────────────────────────────────────────────────────────────
+   Briques UI (mémoïsées)
+   ───────────────────────────────────────────────────────────── */
+
+const Card = memo(function Card({ title, action, children, className = '' }) {
+  return (
+    <section
+      className={`rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-900 min-w-0 ${className}`}
+    >
+      {(title || action) && (
+        <header className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-[15px] font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h2>
+          {action}
+        </header>
+      )}
+      {children}
+    </section>
+  );
+});
+
+const SeeAll = memo(function SeeAll({ href, label }) {
+  return (
+    <Link
+      href={href}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-md text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200 ${focusRing}`}
+    >
+      {label} <FaChevronRight className="h-2.5 w-2.5" />
     </Link>
-  ) : content;
-};
-
-// ── Accès rapide ──────────────────────────────────────────────────────────────
-
-const QuickAccess = () => {
-  const { t } = useTranslation();
-  return (
-    <div className="bg-gradient-to-br from-blue-600 to-indigo-900 rounded-xl shadow-sm overflow-hidden">
-      <div className="p-4 sm:p-5 text-white">
-        <h2 className="text-[13px] sm:text-sm font-semibold mb-3 sm:mb-4 flex items-center gap-2 uppercase tracking-widest text-white/90">
-          <FaChartLine className="text-white/80" /> {t('quick_access')}
-        </h2>
-        <div className="space-y-1.5 sm:space-y-2">
-          {[
-            { icon: <FaTasks />, label: t('new_task'), link: '/tasks/create' },
-            { icon: <FaProjectDiagram />, label: t('new_project'), link: '/projects/create' },
-            { icon: <FaUsers />, label: t('add_member'), link: '/users/create' },
-            { icon: <FaFileAlt />, label: t('import_file'), link: '/files/upload' },
-            { icon: <FaUserPlus />, label: t('recruitment_offers'), link: '/recruitment' },
-          ].map((item, index) => (
-            <Link
-              key={index}
-              href={item.link}
-              className="flex items-center p-2.5 sm:p-3 rounded-lg bg-white/10 hover:bg-white/20 active:scale-[0.98] transition-all min-w-0 group"
-            >
-              <span className="mr-3 flex-shrink-0 text-blue-200 group-hover:text-white">{item.icon}</span>
-              <span className="font-medium text-[13px] sm:text-sm truncate min-w-0">{item.label}</span>
-              <FaChevronRight className="ml-auto h-3 w-3 text-blue-200/60 group-hover:text-white group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-            </Link>
-          ))}
-        </div>
-      </div>
-    </div>
   );
-};
+});
 
-// ── Badge statut (répartition des tâches) ───────────────────────────────────
+const Avatar = memo(function Avatar({ user, size = 'h-9 w-9', text = 'text-sm' }) {
+  const name = user?.name || '?';
+  return user?.avatar ? (
+    <img
+      src={user.avatar}
+      alt={name}
+      loading="lazy"
+      decoding="async"
+      className={`${size} shrink-0 rounded-full object-cover ring-2 ring-white dark:ring-slate-900`}
+    />
+  ) : (
+    <span
+      aria-hidden="true"
+      className={`${size} ${text} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 font-semibold text-indigo-700 ring-2 ring-white dark:from-indigo-500/20 dark:to-slate-700 dark:text-indigo-200 dark:ring-slate-900`}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
+  );
+});
 
-const StatusBadge = ({ status, count }) => {
-  const { t } = useTranslation();
-  const statusConfig = {
-    todo: { label: t('status_todo'), color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-    in_progress: { label: t('status_in_progress'), color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-    done: { label: t('status_done'), color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-    en_attente: { label: t('status_pending'), color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' },
-  };
-
-  const config = statusConfig[status] || { label: status, color: 'bg-gray-100 text-gray-800' };
-
+const StatCard = memo(function StatCard({ title, count, tone, link, icon: Icon }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-2 min-w-0">
-      <span className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${config.color}`}>
-        {config.label}
+    <Link
+      href={link}
+      className={`group flex min-w-0 items-center gap-4 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 ${focusRing}`}
+    >
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${TONES[tone]}`}>
+        <Icon className="text-lg" />
       </span>
-      <span className="font-medium text-sm flex-shrink-0">{count}</span>
-    </div>
+      <span className="min-w-0">
+        <span className="block text-2xl font-bold leading-none tabular-nums text-slate-900 dark:text-white">
+          {count}
+        </span>
+        <span className="mt-1.5 block truncate text-xs font-medium text-slate-500 dark:text-slate-400">{title}</span>
+      </span>
+      <FaChevronRight className="ml-auto h-3 w-3 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500 dark:text-slate-600" />
+    </Link>
   );
+});
+
+const QuickAction = memo(function QuickAction({ href, icon: Icon, label, primary }) {
+  return (
+    <Link
+      href={href}
+      className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-semibold transition active:scale-[0.97] ${focusRing} ${
+        primary
+          ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100'
+          : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+      }`}
+    >
+      <Icon className="h-3 w-3" /> {label}
+    </Link>
+  );
+});
+
+const Empty = ({ children }) => (
+  <p className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">{children}</p>
+);
+
+/* ─────────────────────────────────────────────────────────────
+   Plugin Chart.js : total au centre du donut
+   ───────────────────────────────────────────────────────────── */
+
+const centerText = {
+  id: 'centerText',
+  afterDraw(chart, _args, opts) {
+    const { ctx, chartArea } = chart;
+    if (!chartArea || opts?.value == null) return;
+    const cx = (chartArea.left + chartArea.right) / 2;
+    const cy = (chartArea.top + chartArea.bottom) / 2;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = opts.color;
+    ctx.font = '700 28px "Plus Jakarta Sans", system-ui, sans-serif';
+    ctx.fillText(String(opts.value), cx, cy - 8);
+    ctx.fillStyle = opts.subColor;
+    ctx.font = '500 11px "Plus Jakarta Sans", system-ui, sans-serif';
+    ctx.fillText(opts.label, cx, cy + 14);
+    ctx.restore();
+  },
 };
 
-export default function Dashboard({ auth, stats = {}, activityByDay = [], recentActivities = [], topUsers = [], recentProjects = [], recentFiles = [] }) {
-  const { t } = useTranslation();
+/* ─────────────────────────────────────────────────────────────
+   Page
+   ───────────────────────────────────────────────────────────── */
+
+const EMPTY_STATUS = { todo: 0, in_progress: 0, done: 0, en_attente: 0 };
+
+export default function Dashboard({
+  auth,
+  stats = {},
+  activityByDay = [],
+  recentActivities = [],
+  topUsers = [],
+  recentProjects = [],
+  recentFiles = [],
+}) {
+  const { t, i18n } = useTranslation();
+  const reduceMotion = useReducedMotion();
+  const dark = useIsDark();
+  const locale = i18n.language || 'fr';
   const isAdmin = auth?.user?.roles?.includes('admin');
+  const tasksByStatus = { ...EMPTY_STATUS, ...(stats.tasksByStatus || {}) };
 
-  const tasksByStatus = stats.tasksByStatus || {
-    todo: 0,
-    in_progress: 0,
-    done: 0,
-    en_attente: 0
-  };
+  /* En-tête */
+  const today = useMemo(
+    () => new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()),
+    [locale]
+  );
+  const firstName = auth?.user?.name?.split(' ')[0];
 
-  const statsData = [
-    {
-      title: t('tasks'),
-      count: stats.tasks || 0,
-      color: 'bg-indigo-500',
-      link: '/tasks',
-      icon: FaTasks,
-      show: true
-    },
-    {
-      title: t('projects'),
-      count: stats.projects || 0,
-      color: 'bg-blue-500',
-      link: '/projects',
-      icon: FaProjectDiagram,
-      show: true
-    },
-    {
-      title: t('team_members'),
-      count: stats.members || 0,
-      color: 'bg-purple-500',
-      link: '/users',
-      icon: FaUsers,
-      show: isAdmin
-    },
-    {
-      title: t('files'),
-      count: stats.files || 0,
-      color: 'bg-amber-500',
-      link: '/files',
-      icon: FaFileAlt,
-      show: true
-    },
-  ];
-
-  const visibleWidgets = statsData.filter(widget =>
-    widget.show !== false &&
-    (widget.count > 0 || widget.count === 0) &&
-    widget.link
+  /* Widgets */
+  const widgets = useMemo(
+    () =>
+      [
+        { title: t('tasks'), count: stats.tasks ?? 0, tone: 'indigo', link: '/tasks', icon: FaTasks, show: true },
+        { title: t('projects'), count: stats.projects ?? 0, tone: 'sky', link: '/projects', icon: FaProjectDiagram, show: true },
+        { title: t('team_members'), count: stats.members ?? 0, tone: 'violet', link: '/users', icon: FaUsers, show: isAdmin },
+        { title: t('files'), count: stats.files ?? 0, tone: 'amber', link: '/files', icon: FaFileAlt, show: true },
+      ].filter((w) => w.show),
+    [t, stats.tasks, stats.projects, stats.members, stats.files, isAdmin]
   );
 
-  const activityChartData = {
-    labels: activityByDay.map(a => new Date(a.day).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })),
-    datasets: [
-      {
-        label: 'Activités',
-        data: activityByDay.map(a => a.count),
-        borderColor: 'rgba(99, 102, 241, 0.8)',
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-        tension: 0.3,
-        fill: true,
-      },
-    ],
-  };
+  /* Palette des graphiques (clair / sombre) */
+  const tick = dark ? '#94a3b8' : '#64748b';
+  const grid = dark ? 'rgba(148,163,184,0.12)' : 'rgba(15,23,42,0.05)';
 
-  const tasksByStatusData = {
-    labels: ['À faire', 'En cours', 'Terminées', 'En attente'],
-    datasets: [
-      {
-        data: [
-          tasksByStatus.todo || 0,
-          tasksByStatus.in_progress || 0,
-          tasksByStatus.done || 0,
-          tasksByStatus.en_attente || 0
-        ],
-        backgroundColor: [
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(245, 158, 11, 0.8)',
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(156, 163, 175, 0.8)'
-        ],
-        borderWidth: 0,
+  /* Courbe d'activité */
+  const activityChart = useMemo(
+    () => ({
+      labels: activityByDay.map((a) =>
+        new Date(a.day).toLocaleDateString(locale, { day: 'numeric', month: 'short' })
+      ),
+      datasets: [
+        {
+          label: t('activities', { defaultValue: 'Activités' }),
+          data: activityByDay.map((a) => a.count),
+          borderColor: '#6366f1',
+          borderWidth: 2,
+          tension: 0.35,
+          fill: true,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#6366f1',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
+          backgroundColor: (ctx) => {
+            const { chart } = ctx;
+            if (!chart.chartArea) return 'rgba(99,102,241,0.1)';
+            const g = chart.ctx.createLinearGradient(0, chart.chartArea.top, 0, chart.chartArea.bottom);
+            g.addColorStop(0, 'rgba(99,102,241,0.28)');
+            g.addColorStop(1, 'rgba(99,102,241,0)');
+            return g;
+          },
+        },
+      ],
+    }),
+    [activityByDay, locale, t]
+  );
+
+  const activityOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          padding: 10,
+          cornerRadius: 8,
+          displayColors: false,
+        },
       },
-    ],
-  };
+      scales: {
+        y: {
+          beginAtZero: true,
+          border: { display: false },
+          grid: { color: grid },
+          ticks: { stepSize: 1, color: tick, font: { size: 11 }, padding: 8 },
+        },
+        x: {
+          border: { display: false },
+          grid: { display: false },
+          ticks: { color: tick, font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+        },
+      },
+    }),
+    [grid, tick]
+  );
+
+  /* Donut des tâches */
+  const totalTasks = STATUS_ORDER.reduce((sum, k) => sum + (tasksByStatus[k] || 0), 0);
+
+  const donutData = useMemo(
+    () => ({
+      labels: STATUS_ORDER.map((k) => t(STATUS[k].key, { defaultValue: STATUS[k].def })),
+      datasets: [
+        {
+          data: STATUS_ORDER.map((k) => tasksByStatus[k] || 0),
+          backgroundColor: STATUS_ORDER.map((k) => STATUS[k].hex),
+          borderWidth: 3,
+          borderColor: dark ? '#0f172a' : '#ffffff',
+          hoverOffset: 4,
+          borderRadius: 4,
+        },
+      ],
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, dark, tasksByStatus.todo, tasksByStatus.in_progress, tasksByStatus.done, tasksByStatus.en_attente]
+  );
+
+  const donutOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '74%',
+      plugins: {
+        legend: { display: false },
+        centerText: {
+          value: totalTasks,
+          label: t('tasks'),
+          color: dark ? '#f8fafc' : '#0f172a',
+          subColor: tick,
+        },
+      },
+    }),
+    [totalTasks, dark, tick, t]
+  );
+
+  /* Entrée de page : un seul mouvement orchestré */
+  const enter = reduceMotion
+    ? {}
+    : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.35, ease: 'easeOut' } };
 
   return (
-    <div className="w-full min-h-screen bg-[#F8F8F8] dark:bg-gray-950">
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-7 space-y-5">
+    <>
+      <Head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href={FONT_HREF} />
+      </Head>
 
-        {/* En-tête – style Slack (titre compact, police Inter) */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-              {t('dashboard')}
-            </h1>
-            <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-0.5">
-              {t('dashboard_subtitle')}
-            </p>
-          </div>
-          <div className="w-full sm:w-60 flex-shrink-0 min-w-0">
-            <RecruitmentCard />
-          </div>
-        </div>
+      <div
+        className="min-h-screen w-full bg-slate-50 dark:bg-slate-950"
+        style={{ fontFamily: '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif' }}
+      >
+        <motion.div {...enter} className="mx-auto max-w-screen-2xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
 
-        {/* Widgets stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {visibleWidgets.map((widget, index) => (
-            <Widget
-              key={index}
-              title={widget.title}
-              count={widget.count}
-              color={widget.color}
-              link={widget.link}
-              icon={widget.icon}
-            />
-          ))}
-        </div>
-
-        {/* Graphique d'activité et membres actifs */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-4 sm:mb-6">{t('recent_activity')}</h2>
-            <div className="h-52 sm:h-64">
-              <Line
-                data={activityChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      display: false,
-                    },
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      grid: {
-                        color: 'rgba(0, 0, 0, 0.05)',
-                      },
-                      ticks: {
-                        stepSize: 1,
-                        font: { size: 10 },
-                      },
-                    },
-                    x: {
-                      grid: {
-                        display: false,
-                      },
-                      ticks: {
-                        font: { size: 10 },
-                        maxRotation: 45,
-                        minRotation: 0,
-                        autoSkip: true,
-                        maxTicksLimit: 8,
-                      },
-                    },
-                  },
-                }}
-              />
+          {/* ── En-tête ───────────────────────────────────────── */}
+          <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[13px] font-medium capitalize text-slate-500 dark:text-slate-400">{today}</p>
+              <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                {firstName
+                  ? t('welcome_back', { defaultValue: 'Bon retour, {{name}}', name: firstName })
+                  : t('dashboard')}
+              </h1>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('dashboard_subtitle')}</p>
             </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-4 sm:mb-6">{t('active_team_members')}</h2>
-            <div className="space-y-4">
-              {topUsers && topUsers.length > 0 ? (
-                topUsers.map((user, index) => (
-                  <div key={user.id} className="flex items-center justify-between gap-2 min-w-0">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="relative flex-shrink-0">
-                        {user.avatar ? (
-                          <img
-                            src={user.avatar}
-                            alt={user.name}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                            <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">
-                              {user.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{user.count} activités</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400 flex-shrink-0">
-                      #{index + 1}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                  {t('no_recent_user_activity')}
-                </p>
-              )}
+            <div className="w-full min-w-0 shrink-0 sm:w-64">
+              <RecruitmentCard />
             </div>
-          </div>
-        </div>
+          </header>
 
-        {/* Répartition des tâches */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-4 sm:mb-6">Répartition des tâches</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div className="h-52 sm:h-64 min-w-0">
-              <Pie
-                data={tasksByStatusData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      position: 'bottom',
-                      labels: {
-                        color: '#6B7280',
-                        boxWidth: 12,
-                        padding: 12,
-                        font: {
-                          size: 11,
-                        },
-                      },
-                    },
-                  },
-                }}
-              />
-            </div>
-            <div className="mt-2 md:mt-6 space-y-1 sm:space-y-2 min-w-0">
-              <StatusBadge status="todo" count={tasksByStatus.todo || 0} />
-              <StatusBadge status="in_progress" count={tasksByStatus.in_progress || 0} />
-              <StatusBadge status="done" count={tasksByStatus.done || 0} />
-              <StatusBadge status="en_attente" count={tasksByStatus.en_attente || 0} />
-            </div>
-          </div>
-        </div>
+          {/* ── Accès rapide ──────────────────────────────────── */}
+          <nav
+            aria-label={t('quick_access')}
+            className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <QuickAction primary href="/tasks/create" icon={FaPlus} label={t('new_task')} />
+            <QuickAction href="/projects/create" icon={FaProjectDiagram} label={t('new_project')} />
+            <QuickAction href="/users/create" icon={FaUsers} label={t('add_member')} />
+            <QuickAction href="/files/upload" icon={FaFileAlt} label={t('import_file')} />
+            <QuickAction href="/recruitment" icon={FaUserPlus} label={t('recruitment_offers')} />
+          </nav>
 
-        {/* Projets récents */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6 flex-wrap">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">{t('recent_projects')}</h2>
-            <Link
-              href="/projects"
-              className="text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center flex-shrink-0"
-            >
-              {t('view_all_projects')} <FaChevronRight className="ml-1 h-3 w-3" />
-            </Link>
+          {/* ── Stats ─────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {widgets.map((w) => (
+              <StatCard key={w.link} {...w} />
+            ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {recentProjects && recentProjects.length > 0 ? (
-              recentProjects.map((project) => (
-                <Link
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  className="group border border-gray-100 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 active:scale-[0.98] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-0"
-                >
-                  <div className="p-4 min-w-0">
-                    <div className="flex justify-between items-start gap-2 mb-2 flex-wrap">
-                      <h3 className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors min-w-0 truncate">
-                        {project.name}
-                      </h3>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-nowrap flex-shrink-0">
-                        {project.status}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">
-                      {project.description || 'Aucune description'}
-                    </p>
-                    <div className="flex items-center justify-between gap-2 text-sm flex-wrap">
-                      <div className="flex items-center min-w-0">
-                        {project.manager.avatar ? (
-                          <img
-                            src={project.manager.avatar}
-                            alt={project.manager.name}
-                            className="w-6 h-6 rounded-full mr-2 flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-2 flex-shrink-0">
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {project.manager.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                        <span className="text-gray-600 dark:text-gray-300 truncate">{project.manager.name}</span>
-                      </div>
-                      <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0">
-                        {project.task_count} {t('tasks')}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 px-4 py-2 text-right">
-                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400 group-hover:text-blue-800 dark:group-hover:text-blue-300 inline-flex items-center gap-1">
-                      {t('view_project')} <FaChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
-                    </span>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-8 text-gray-400">
-                <p>{t('no_recent_projects')}</p>
+          {/* ── Activité + membres actifs ─────────────────────── */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <Card title={t('recent_activity')} className="lg:col-span-2">
+              <div className="h-60 sm:h-72">
+                <Line data={activityChart} options={activityOptions} />
               </div>
-            )}
-          </div>
-        </div>
+            </Card>
 
-        {/* Fichiers récents */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6 flex-wrap">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">{t('recent_files')}</h2>
-            <Link
-              href="/files"
-              className="text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center flex-shrink-0"
+            <Card title={t('active_team_members')}>
+              {topUsers.length ? (
+                <ul className="space-y-3.5">
+                  {topUsers.map((u, i) => (
+                    <li key={u.id} className="flex min-w-0 items-center gap-3">
+                      <span className="relative shrink-0">
+                        <Avatar user={u} size="h-10 w-10" />
+                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-900 dark:text-white">{u.name}</span>
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">
+                          {u.count} {t('activities', { defaultValue: 'activités' })}
+                        </span>
+                      </span>
+                      <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                        #{i + 1}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Empty>{t('no_recent_user_activity')}</Empty>
+              )}
+            </Card>
+          </div>
+
+          {/* ── Tâches + projets récents ──────────────────────── */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <Card title={t('tasks_distribution', { defaultValue: 'Répartition des tâches' })}>
+              <div className="mx-auto h-48 w-48">
+                <Doughnut data={donutData} options={donutOptions} plugins={[centerText]} />
+              </div>
+              <ul className="mt-5 space-y-3">
+                {STATUS_ORDER.map((k) => {
+                  const count = tasksByStatus[k] || 0;
+                  const pct = totalTasks ? Math.round((count / totalTasks) * 100) : 0;
+                  return (
+                    <li key={k}>
+                      <div className="mb-1.5 flex items-center justify-between text-[13px]">
+                        <span className="font-medium text-slate-700 dark:text-slate-200">
+                          {t(STATUS[k].key, { defaultValue: STATUS[k].def })}
+                        </span>
+                        <span className="tabular-nums text-slate-500 dark:text-slate-400">
+                          <b className="font-semibold text-slate-900 dark:text-white">{count}</b> · {pct}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div className={`h-full rounded-full ${STATUS[k].bar}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+
+            <Card
+              title={t('recent_projects')}
+              action={<SeeAll href="/projects" label={t('view_all_projects')} />}
+              className="lg:col-span-2"
             >
-              {t('view_all_files')} <FaChevronRight className="ml-1 h-3 w-3" />
-            </Link>
-          </div>
-
-          <div className="space-y-2 sm:space-y-3">
-            {recentFiles && recentFiles.length > 0 ? (
-              recentFiles.map((file) => (
-                <Link
-                  key={file.id}
-                  href={`/files/${file.id}`}
-                  className="group flex items-center justify-between gap-2 p-2.5 sm:p-3 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.99] rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-0"
-                >
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
-                      <FaFileAlt className="text-blue-500 dark:text-blue-400" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate transition-colors">
-                        {file.name}
+              {recentProjects.length ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {recentProjects.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/projects/${p.id}`}
+                      className={`group flex min-w-0 flex-col rounded-xl border border-slate-200/80 p-4 transition hover:border-indigo-300 hover:shadow-md dark:border-slate-800 dark:hover:border-indigo-500/50 ${focusRing}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="min-w-0 truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-300">
+                          {p.name}
+                        </h3>
+                        <span className="shrink-0 whitespace-nowrap rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                          {p.status}
+                        </span>
+                      </div>
+                      <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-[13px] leading-5 text-slate-500 dark:text-slate-400">
+                        {p.description || t('no_description', { defaultValue: 'Aucune description' })}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {file.size} • {file.created_at}
-                      </p>
-                    </div>
-                  </div>
-                  <a
-                    href={file.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-2 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 flex-shrink-0 transition-colors"
-                    title="Télécharger"
-                  >
-                    <FaDownload />
-                  </a>
-                </Link>
-              ))
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                {t('no_recent_files')}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Activités récentes */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 sm:p-5 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6 flex-wrap">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">{t('recent_activities')}</h2>
-            <Link
-              href="/activities"
-              className="text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center flex-shrink-0"
-            >
-              {t('view_all_activities')} <FaChevronRight className="ml-1 h-3 w-3" />
-            </Link>
+                      <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Avatar user={p.manager} size="h-6 w-6" text="text-[10px]" />
+                          <span className="truncate text-slate-600 dark:text-slate-300">{p.manager?.name}</span>
+                        </span>
+                        <span className="shrink-0 font-medium tabular-nums text-slate-500 dark:text-slate-400">
+                          {p.task_count} {t('tasks')}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <Empty>{t('no_recent_projects')}</Empty>
+              )}
+            </Card>
           </div>
 
-          <div className="space-y-3 sm:space-y-4">
-            {recentActivities && recentActivities.length > 0 ? (
-              recentActivities.map((activity) => {
-                const ActivityWrapper = activity.url ? Link : 'div';
-                const wrapperProps = activity.url
-                  ? { href: activity.url, className: 'group flex items-start space-x-3 p-2 -mx-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-[0.99] transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-0' }
-                  : { className: 'flex items-start space-x-3 p-2 -mx-2 min-w-0' };
-
-                return (
-                  <ActivityWrapper key={activity.id} {...wrapperProps}>
-                    <div className="flex-shrink-0">
-                      {activity.user?.avatar ? (
-                        <img
-                          src={activity.user.avatar}
-                          alt={activity.user.name}
-                          className="w-8 h-8 rounded-full"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                          <span className="text-gray-500 dark:text-gray-400 text-xs font-medium">
-                            {activity.user?.name?.charAt(0)?.toUpperCase() || '?'}
+          {/* ── Fichiers + activités récentes ─────────────────── */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card title={t('recent_files')} action={<SeeAll href="/files" label={t('view_all_files')} />}>
+              {recentFiles.length ? (
+                <ul className="-mx-2 space-y-0.5">
+                  {recentFiles.map((f) => {
+                    const [Icon, tone] = fileIcon(f.name);
+                    return (
+                      <li key={f.id} className="group flex min-w-0 items-center gap-1 rounded-xl transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                        <Link href={`/files/${f.id}`} className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 ${focusRing}`}>
+                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tone}`}>
+                            <Icon className="text-base" />
                           </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm text-gray-800 dark:text-gray-200 break-words ${activity.url ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors' : ''}`}>
-                        <span className="font-medium">{activity.user?.name || t('unknown_user')}</span>
-                        {' '}{activity.description}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {activity.created_at}
-                      </p>
-                    </div>
-                  </ActivityWrapper>
-                );
-              })
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                {t('no_recent_activity')}
-              </p>
-            )}
-          </div>
-        </div>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-slate-900 dark:text-white">{f.name}</span>
+                            <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                              {f.size} • {f.created_at}
+                            </span>
+                          </span>
+                        </Link>
+                        <a
+                          href={f.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={t('download', { defaultValue: 'Télécharger' })}
+                          aria-label={t('download', { defaultValue: 'Télécharger' })}
+                          className={`mr-1 shrink-0 rounded-full p-2.5 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300 ${focusRing}`}
+                        >
+                          <FaDownload className="h-3.5 w-3.5" />
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <Empty>{t('no_recent_files')}</Empty>
+              )}
+            </Card>
 
+            <Card title={t('recent_activities')} action={<SeeAll href="/activities" label={t('view_all_activities')} />}>
+              {recentActivities.length ? (
+                <ol className="relative space-y-1 before:absolute before:bottom-3 before:left-[1.1rem] before:top-3 before:w-px before:bg-slate-200 dark:before:bg-slate-800">
+                  {recentActivities.map((a) => {
+                    const Wrapper = a.url ? Link : 'div';
+                    return (
+                      <li key={a.id} className="relative">
+                        <Wrapper
+                          {...(a.url ? { href: a.url } : {})}
+                          className={`group -mx-2 flex min-w-0 items-start gap-3 rounded-xl p-2 transition-colors ${
+                            a.url ? `hover:bg-slate-50 dark:hover:bg-slate-800/60 ${focusRing}` : ''
+                          }`}
+                        >
+                          <Avatar user={a.user} size="h-8 w-8" text="text-xs" />
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={`block break-words text-sm leading-5 text-slate-700 dark:text-slate-200 ${
+                                a.url ? 'transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300' : ''
+                              }`}
+                            >
+                              <b className="font-semibold text-slate-900 dark:text-white">
+                                {a.user?.name || t('unknown_user')}
+                              </b>{' '}
+                              {a.description}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-slate-400 dark:text-slate-500">{a.created_at}</span>
+                          </span>
+                        </Wrapper>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <Empty>{t('no_recent_activity')}</Empty>
+              )}
+            </Card>
+          </div>
+        </motion.div>
       </div>
-    </div>
+    </>
   );
 }
 
-Dashboard.layout = page => <AdminLayout children={page} />;
+Dashboard.layout = (page) => <AdminLayout children={page} />;
