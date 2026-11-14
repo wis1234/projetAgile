@@ -165,7 +165,7 @@ export default function AdminLayout({ children, immersive = false }) {
   useEffect(() => {
     try { localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0'); } catch { /* stockage indisponible */ }
     // Les pages plein écran (chat, loader) s'alignent sur cette largeur via var(--sidebar-w)
-    document.documentElement.style.setProperty('--sidebar-w', collapsed ? '4.5rem' : '16rem');
+    document.documentElement.style.setProperty('--sidebar-w', collapsed ? '4.25rem' : '18rem');
   }, [collapsed]);
   useEffect(() => {
     const open = () => setSidebarOpen(true);
@@ -507,7 +507,7 @@ export default function AdminLayout({ children, immersive = false }) {
       )}
 
       {/* Main content */}
-      <div className={`flex-1 flex flex-col min-h-screen ml-0 ${collapsed ? 'md:ml-[4.5rem]' : 'md:ml-64'} transition-[margin] duration-300 motion-reduce:transition-none min-w-0`}>
+      <div className={`flex-1 flex flex-col min-h-screen ml-0 ${collapsed ? 'md:ml-[4.25rem]' : 'md:ml-72'} transition-[margin] duration-300 motion-reduce:transition-none min-w-0`}>
         {/* ═══════════════════════════════════════════════════════════
             HEADER — allégé sur mobile (pattern app native)
         ═══════════════════════════════════════════════════════════ */}
@@ -515,7 +515,7 @@ export default function AdminLayout({ children, immersive = false }) {
         <header
           className={[
             'fixed top-0 left-0 right-0 z-40',
-            collapsed ? 'md:left-[4.5rem]' : 'md:left-64',
+            collapsed ? 'md:left-[4.25rem]' : 'md:left-72',
             // Style header Slack : blanc pur, ombre fine, très propre
             'bg-white dark:bg-gray-900',
             'border-b border-gray-200/80 dark:border-gray-700/60',
