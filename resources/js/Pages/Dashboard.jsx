@@ -237,7 +237,7 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
       label: `COMMUNIQUÉ · ${announcement.project_name}`,
       title: announcement.title,
       description: announcement.body,
-      href: `/projects/${announcement.project_id}#announcements`,
+      href: `/announcements?project_id=${announcement.project_id}`,
     })),
     {
       icon: FaTasks,
