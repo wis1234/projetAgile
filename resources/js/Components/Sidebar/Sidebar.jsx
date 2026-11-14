@@ -24,6 +24,15 @@ import {
  */
 const POLES = [
   {
+    key: 'pilotage',
+    label: 'Accueil',
+    fullTitle: 'Pilotage & Accueil',
+    tag: 'Live',
+    accentColor: 'from-emerald-500 to-teal-600',
+    icon: (cls) => <DashboardIcon className={cls} />,
+    hrefs: ['/dashboard', '/activities'],
+  },
+  {
     key: 'workspace',
     label: 'Projets',
     fullTitle: 'Projets & Agilité',
@@ -40,15 +49,6 @@ const POLES = [
     accentColor: 'from-purple-500 to-pink-600',
     icon: (cls) => <DiscussionsIcon className={cls} />,
     hrefs: ['/discussions', '/project-users', '/users'],
-  },
-  {
-    key: 'pilotage',
-    label: 'Accueil',
-    fullTitle: 'Pilotage & Accueil',
-    tag: 'Live',
-    accentColor: 'from-emerald-500 to-teal-600',
-    icon: (cls) => <DashboardIcon className={cls} />,
-    hrefs: ['/dashboard', '/activities'],
   },
   {
     key: 'skills',
@@ -84,6 +84,13 @@ const POLES = [
  */
 const GROUPS_CONFIG = [
   {
+    key: 'pilotage',
+    poleKey: 'pilotage',
+    label: 'Pilotage & Accueil',
+    icon: (cls) => <DashboardIcon className={cls} />,
+    hrefs: ['/dashboard', '/activities'],
+  },
+  {
     key: 'workspace',
     poleKey: 'workspace',
     label: 'Projets & Agilité',
@@ -96,13 +103,6 @@ const GROUPS_CONFIG = [
     label: 'Communication & Équipe',
     icon: (cls) => <DiscussionsIcon className={cls} />,
     hrefs: ['/discussions', '/project-users', '/users'],
-  },
-  {
-    key: 'pilotage',
-    poleKey: 'pilotage',
-    label: 'Pilotage & Accueil',
-    icon: (cls) => <DashboardIcon className={cls} />,
-    hrefs: ['/dashboard', '/activities'],
   },
   {
     key: 'skills',
@@ -293,7 +293,7 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
             COLONNE 1 : RAIL SLACK (Icônes principales & Profil)
         ════════════════════════════════════════════════════════════════ */}
         <div
-          className="w-[4.25rem] flex-shrink-0 flex flex-col items-center justify-between py-3 bg-[#0a0e1c] dark:bg-[#070913] border-r border-white/10 z-20 select-none"
+          className="w-[4.25rem] flex-shrink-0 flex flex-col items-center justify-between py-3 bg-[#1d4ed8] dark:bg-[#1e40af] border-r border-white/15 z-20 select-none"
         >
           {/* Haut du Rail : Logo Workspace ProJA */}
           <div className="flex flex-col items-center gap-2">
@@ -444,7 +444,7 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
                 }}
               />
               <span
-                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-[#0a0e1c] shadow-sm"
+                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-[#1d4ed8] shadow-sm"
                 title="En ligne"
               />
             </div>
@@ -457,13 +457,13 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
         ════════════════════════════════════════════════════════════════ */}
         <div
           className={[
-            'flex-1 flex flex-col bg-gradient-to-b from-[#12182c] via-[#0f1426] to-[#0b0e1b] dark:from-gray-900 dark:to-gray-950',
+            'flex-1 flex flex-col bg-gradient-to-b from-[#2563eb] via-[#1d4ed8] to-[#1e40af] dark:from-[#1e40af] dark:via-[#1e3a8a] dark:to-[#172554]',
             'transition-[width,opacity] duration-300 ease-in-out',
             collapsed ? 'md:w-0 md:opacity-0 md:overflow-hidden md:pointer-events-none' : 'w-full opacity-100',
           ].join(' ')}
         >
           {/* Header du panneau secondaire */}
-          <div className="flex-shrink-0 flex items-center justify-between px-4 h-16 border-b border-white/10 bg-black/20">
+          <div className="flex-shrink-0 flex items-center justify-between px-4 h-16 border-b border-white/15 bg-blue-900/15">
             <div className="min-w-0 flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="text-[15px] font-bold text-white tracking-tight truncate">
@@ -519,7 +519,7 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
 
           {/* Pied du panneau secondaire */}
           <div
-            className="flex-shrink-0 border-t border-white/10 px-4 py-3 bg-black/25 flex items-center justify-between text-[11px] text-white/50"
+            className="flex-shrink-0 border-t border-white/15 px-4 py-3 bg-blue-950/20 flex items-center justify-between text-[11px] text-white/70"
             style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.75rem)' }}
           >
             <span className="font-medium text-white/60">ProJA v2.3.1</span>
