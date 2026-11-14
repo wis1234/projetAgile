@@ -616,7 +616,7 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], announcements =
         )}
 
 {/* En-tête projet + Appels & réunions, côte à côte (empilés sur mobile) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
 
           {/* Carte gauche : identité du projet */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm flex flex-col justify-between">
@@ -716,135 +716,128 @@ function Show({ project, tasks = [], sprints = [], quizzes = [], announcements =
               </div>
             </div>
           </div>
-        </div>
 
-        <section
-          id="announcements"
-          className="scroll-mt-24 rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-5 shadow-lg shadow-blue-900/5 dark:border-blue-900/50 dark:from-blue-950/40 dark:via-gray-800 dark:to-indigo-950/30 sm:p-6"
-        >
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25">
-                <FaBullhorn className="text-lg" />
-              </span>
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Communiqués du projet</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Informations réservées aux membres de {project.name}
-                </p>
+          <section
+            id="announcements"
+            className="scroll-mt-24 flex min-w-0 flex-col rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 shadow-sm dark:border-blue-900/50 dark:from-blue-950/40 dark:via-gray-800 dark:to-indigo-950/30"
+          >
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
+                  <FaBullhorn />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-bold text-gray-900 dark:text-white">Communiqués</h2>
+                  <p className="truncate text-xs text-gray-500 dark:text-gray-400">{project.name}</p>
+                </div>
               </div>
+              <Link
+                href={route('project-announcements.index')}
+                className="flex-shrink-0 text-xs font-semibold text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
+              >
+                Tout voir <FaChevronRight className="ml-0.5 inline h-2.5 w-2.5" />
+              </Link>
             </div>
-            <Link
-              href={route('project-announcements.index')}
-              className="text-sm font-semibold text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
-            >
-              Tous mes communiqués <FaChevronRight className="ml-1 inline h-3 w-3" />
-            </Link>
-          </div>
 
-          {canManageAnnouncements && (
-            <form onSubmit={handleAnnouncementSubmit} className="mb-6 rounded-2xl border border-blue-100 bg-white/90 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/80 sm:p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {editingAnnouncementId ? 'Modifier le communiqué' : 'Rédiger un communiqué'}
-                </h3>
-                {editingAnnouncementId && (
-                  <button type="button" onClick={resetAnnouncementForm} className="text-sm font-medium text-gray-500 hover:text-gray-800 dark:hover:text-white">
-                    Annuler
-                  </button>
-                )}
-              </div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="announcement-title">
-                Titre
-              </label>
-              <input
-                id="announcement-title"
-                value={announcementForm.title}
-                onChange={(event) => setAnnouncementForm((current) => ({ ...current, title: event.target.value }))}
-                maxLength={180}
-                required
-                className="mb-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                placeholder="Ex. Réunion d'équipe vendredi"
-              />
-              {errors.title && <p className="mb-2 text-xs text-red-600">{errors.title}</p>}
-              <label className="mb-1.5 mt-3 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="announcement-body">
-                Message
-              </label>
-              <textarea
-                id="announcement-body"
-                value={announcementForm.body}
-                onChange={(event) => setAnnouncementForm((current) => ({ ...current, body: event.target.value }))}
-                maxLength={10000}
-                required
-                rows={3}
-                className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                placeholder="Partagez une information importante avec les membres du projet…"
-              />
-              {errors.body && <p className="mt-1 text-xs text-red-600">{errors.body}</p>}
-              <div className="mt-3 flex justify-end">
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                >
-                  <FaBullhorn className="text-xs" />
-                  {editingAnnouncementId ? 'Enregistrer' : 'Publier et notifier les membres'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="space-y-3">
-            {announcements.length ? announcements.map((announcement) => (
-              <article key={announcement.id} className="rounded-2xl border border-white bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
-                        Communiqué
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">{announcement.created_at}</span>
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900 dark:text-white">{announcement.title}</h3>
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600 dark:text-gray-300">{announcement.body}</p>
-                    <p className="mt-3 text-xs font-medium text-gray-400 dark:text-gray-500">
-                      Publié par {announcement.author || 'un membre du projet'}
-                    </p>
-                  </div>
-                  {canManageAnnouncements && (
-                    <div className="flex flex-shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingAnnouncementId(announcement.id);
-                          setAnnouncementForm({ title: announcement.title, body: announcement.body });
-                          document.getElementById('announcements')?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        aria-label="Modifier le communiqué"
-                        className="rounded-lg p-2 text-gray-500 transition hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
-                      >
-                        <FaEdit />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAnnouncementDelete(announcement.id)}
-                        aria-label="Supprimer le communiqué"
-                        className="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-300"
-                      >
-                        <FaTrash />
-                      </button>
-                    </div>
+            {canManageAnnouncements && (
+              <form onSubmit={handleAnnouncementSubmit} className="mb-3 rounded-xl border border-blue-100 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/80">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-semibold text-gray-900 dark:text-white">
+                    {editingAnnouncementId ? 'Modifier le communiqué' : 'Nouveau communiqué'}
+                  </h3>
+                  {editingAnnouncementId && (
+                    <button type="button" onClick={resetAnnouncementForm} className="text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-white">
+                      Annuler
+                    </button>
                   )}
                 </div>
-              </article>
-            )) : (
-              <div className="rounded-2xl border border-dashed border-blue-200 px-4 py-8 text-center dark:border-gray-700">
-                <FaBullhorn className="mx-auto mb-2 text-xl text-blue-300 dark:text-blue-500" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">Aucun communiqué pour le moment.</p>
-              </div>
+                <label className="sr-only" htmlFor="announcement-title">Titre</label>
+                <input
+                  id="announcement-title"
+                  value={announcementForm.title}
+                  onChange={(event) => setAnnouncementForm((current) => ({ ...current, title: event.target.value }))}
+                  maxLength={180}
+                  required
+                  className="mb-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Titre du communiqué"
+                />
+                {errors.title && <p className="mb-2 text-xs text-red-600">{errors.title}</p>}
+                <label className="sr-only" htmlFor="announcement-body">Message</label>
+                <textarea
+                  id="announcement-body"
+                  value={announcementForm.body}
+                  onChange={(event) => setAnnouncementForm((current) => ({ ...current, body: event.target.value }))}
+                  maxLength={10000}
+                  required
+                  rows={2}
+                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Votre message aux membres…"
+                />
+                {errors.body && <p className="mt-1 text-xs text-red-600">{errors.body}</p>}
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                  >
+                    <FaBullhorn />
+                    {editingAnnouncementId ? 'Enregistrer' : 'Publier'}
+                  </button>
+                </div>
+              </form>
             )}
-          </div>
-        </section>
 
+            <div className="max-h-64 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              {announcements.length ? announcements.map((announcement) => (
+                <article key={announcement.id} className="rounded-xl border border-white bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/80">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+                          Communiqué
+                        </span>
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400">{announcement.created_at}</span>
+                      </div>
+                      <h3 className="break-words text-sm font-bold text-gray-900 dark:text-white">{announcement.title}</h3>
+                      <p className="mt-1 max-h-16 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-gray-600 dark:text-gray-300">{announcement.body}</p>
+                      <p className="mt-2 truncate text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                        Publié par {announcement.author || 'un membre du projet'}
+                      </p>
+                    </div>
+                    {canManageAnnouncements && (
+                      <div className="flex flex-shrink-0 items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAnnouncementId(announcement.id);
+                            setAnnouncementForm({ title: announcement.title, body: announcement.body });
+                            document.getElementById('announcements')?.scrollIntoView({ behavior: 'smooth' });
+                          }}
+                          aria-label="Modifier le communiqué"
+                          className="rounded-lg p-1.5 text-gray-500 transition hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAnnouncementDelete(announcement.id)}
+                          aria-label="Supprimer le communiqué"
+                          className="rounded-lg p-1.5 text-gray-500 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              )) : (
+                <div className="rounded-xl border border-dashed border-blue-200 px-3 py-6 text-center dark:border-gray-700">
+                  <FaBullhorn className="mx-auto mb-2 text-lg text-blue-300 dark:text-blue-500" />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Aucun communiqué pour le moment.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
 
         {/* Grille 2 colonnes */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

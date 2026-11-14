@@ -66,7 +66,7 @@ const InformationTicker = ({ items }) => {
           tabIndex={0}
           aria-label="Faites défiler les informations"
         >
-          {items.map(({ icon: Icon, label, value, href }, index) => {
+          {items.map(({ icon: Icon, label, value, title, description, href }, index) => {
             const content = (
               <>
                 <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/10 text-blue-100">
@@ -74,7 +74,14 @@ const InformationTicker = ({ items }) => {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[10px] font-semibold uppercase tracking-wider text-blue-200">{label}</span>
-                  <span className="mt-0.5 block truncate text-sm font-semibold text-white">{value}</span>
+                  {title ? (
+                    <>
+                      <span className="mt-0.5 block truncate text-sm font-bold text-white motion-safe:animate-pulse">{title}</span>
+                      <span className="block truncate text-xs text-blue-100/80">{description}</span>
+                    </>
+                  ) : (
+                    <span className="mt-0.5 block truncate text-sm font-semibold text-white">{value}</span>
+                  )}
                 </span>
                 <FaChevronRight className="h-3 w-3 flex-shrink-0 text-blue-200/70" />
               </>
@@ -228,7 +235,8 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
     ...announcements.map((announcement) => ({
       icon: FaBullhorn,
       label: `COMMUNIQUÉ · ${announcement.project_name}`,
-      value: `${announcement.title} — ${announcement.body}`,
+      title: announcement.title,
+      description: announcement.body,
       href: `/projects/${announcement.project_id}#announcements`,
     })),
     {
