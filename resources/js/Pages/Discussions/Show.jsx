@@ -1783,4 +1783,4 @@ export default function Show({ task, projectMembers = [], headerLeftSlot = null 
   );
 }
 
-Show.layout = (page) => <AdminLayout children={page} />;
+Show.layout = (page) => <AdminLayout immersive children={page} />;

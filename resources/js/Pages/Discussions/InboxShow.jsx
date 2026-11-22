@@ -13,4 +13,4 @@ export default function InboxShow({ contactId }) {
   );
 }
 
-InboxShow.layout = (page) => <AdminLayout children={page} />;
+InboxShow.layout = (page) => <AdminLayout immersive children={page} />;
