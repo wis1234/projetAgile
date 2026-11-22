@@ -714,11 +714,19 @@ HTML;
         // Send notification email to user
         $user = $payment->user;
         $subject = 'Paiement validé pour la tâche: ' . $task->title;
-        $message = 'Bonjour ' . $user->name . ',<br>Votre paiement pour la tâche <b>' . $task->title . '</b> a été validé.';
+        $message = 'Le paiement associé à cette tâche a été validé. Consultez votre espace ProJA pour retrouver les informations liées à cette opération.';
         $actionUrl = url('/tasks/' . $task->id);
-        $actionText = 'Voir la tâche';
+        $actionText = 'Consulter la tâche';
         $user->notify(new UserActionMailNotification($subject, $message, $actionUrl, $actionText, [
             'task_id' => $task->id,
+            'email_header_title' => 'Confirmation de paiement',
+            'email_badges' => [
+                ['label' => 'Validé', 'color' => '#059669'],
+            ],
+            'email_meta_items' => [
+                ['icon' => '📝', 'label' => 'Tâche concernée', 'value' => $task->title],
+                ['icon' => '📅', 'label' => 'Date de validation', 'value' => now()->format('d/m/Y à H:i')],
+            ],
             'preference_key' => 'payment_updates',
         ]));
 

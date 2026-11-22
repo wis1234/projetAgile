@@ -94,6 +94,7 @@
             border: 1px solid #e2e8f0;
             font-size: 14px;
             color: #475569;
+            white-space: pre-line;
         }
 
         .btn-container { text-align: center; margin: 22px 0 6px; }

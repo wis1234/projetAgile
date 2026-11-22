@@ -163,8 +163,11 @@ class FedapayPayoutService
             $w->status = Withdrawal::STATUS_COMPLETED;
             $w->processed_at = now();
             $w->save();
-            $this->notify($w, 'Retrait effectué',
-                "Votre retrait <b>{$w->reference}</b> de <b>" . number_format($w->amount, 0, ',', ' ') . " FCFA</b> a été envoyé sur le {$w->phone_number}.");
+            $this->notify(
+                $w,
+                'Votre retrait a été effectué',
+                'Le transfert a été confirmé par l’opérateur. Vous trouverez le récapitulatif de l’opération ci-dessous.'
+            );
         } elseif (in_array($s, ['failed', 'declined', 'canceled', 'cancelled', 'refused', 'error'], true)) {
             $this->fail($w, $reason ?: "L'opérateur a refusé le transfert.");
         } else {
@@ -178,19 +181,61 @@ class FedapayPayoutService
             return;
         }
         $w->update(['status' => Withdrawal::STATUS_FAILED, 'failure_reason' => $reason, 'processed_at' => now()]);
-        $this->notify($w, 'Retrait échoué',
-            "Votre retrait <b>{$w->reference}</b> de <b>" . number_format($w->amount, 0, ',', ' ') . " FCFA</b> n'a pas abouti : {$reason}<br>Le montant a été remis dans votre solde disponible.");
+        $this->notify(
+            $w,
+            'Votre retrait n’a pas abouti',
+            "Le transfert n’a pas pu être effectué. Motif communiqué : {$reason}\n\nLe montant a été remis dans votre solde disponible."
+        );
     }
 
     private function notify(Withdrawal $w, string $subject, string $message): void
     {
         try {
             $user = $w->user ?? User::find($w->user_id);
-            $user?->notify(new UserActionMailNotification($subject, $message, url('/remunerations'), 'Voir mes gains', [
+            if (!$user) {
+                Log::warning('Withdrawal notification skipped: user not found', ['withdrawal' => $w->id]);
+                return;
+            }
+
+            $method = [
+                'mtn' => 'MTN MoMo',
+                'moov' => 'Moov Money',
+                'celtis' => 'Celtiis Cash',
+            ][$w->method] ?? ucfirst($w->method);
+            $amount = (float) $w->amount;
+            $fee = (float) $w->fee;
+            $phone = $w->toPayload()['phone_masked'];
+            $status = $w->status === Withdrawal::STATUS_COMPLETED ? 'Effectué' : 'Échoué';
+            $statusColor = $w->status === Withdrawal::STATUS_COMPLETED ? '#059669' : '#DC2626';
+            $metaItems = [
+                ['icon' => '🔖', 'label' => 'Référence', 'value' => $w->reference],
+                ['icon' => '💰', 'label' => 'Montant demandé', 'value' => self::formatAmount($amount)],
+                ['icon' => '📱', 'label' => 'Opérateur', 'value' => $method],
+                ['icon' => '📞', 'label' => 'Numéro bénéficiaire', 'value' => $phone],
+                ['icon' => '📅', 'label' => 'Date de la demande', 'value' => $w->created_at?->format('d/m/Y à H:i') ?? 'Non disponible'],
+                ['icon' => '🕒', 'label' => 'Date de traitement', 'value' => $w->processed_at?->format('d/m/Y à H:i') ?? 'Non disponible'],
+                ['icon' => '✅', 'label' => 'Montant transféré', 'value' => self::formatAmount(max(0, $amount - $fee))],
+            ];
+
+            if ($fee > 0) {
+                $metaItems[] = ['icon' => '🧾', 'label' => 'Frais', 'value' => self::formatAmount($fee)];
+            }
+
+            $user->notify(new UserActionMailNotification($subject, $message, url('/remunerations'), 'Consulter mes retraits', [
+                'email_header_title' => 'Suivi de votre retrait',
+                'email_badges' => [
+                    ['label' => $status, 'color' => $statusColor],
+                ],
+                'email_meta_items' => $metaItems,
                 'preference_key' => 'payment_updates',
             ]));
         } catch (\Throwable $e) {
             Log::warning('Withdrawal notification failed', ['error' => $e->getMessage()]);
         }
+    }
+
+    private static function formatAmount(float $amount): string
+    {
+        return number_format($amount, 0, ',', ' ') . ' FCFA';
     }
 }
