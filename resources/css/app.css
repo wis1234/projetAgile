@@ -44,10 +44,87 @@ html {
 body {
   overflow-x: hidden;
   overflow-y: auto;
-  /* Fond propre comme Slack */
-  @apply bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100;
+  /* Fond immersif ProJA */
+  background-color: #eceff6;
+  @apply text-slate-800 dark:text-slate-100;
   /* Transition couleur fluide */
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dark body {
+  background-color: #03050f;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   AMBIENT BACKGROUND STYLES (Fond immersif ProJA Dashboard)
+   ───────────────────────────────────────────────────────────── */
+.pj-par {
+  position: absolute;
+  will-change: transform;
+}
+.pj-orb {
+  border-radius: 9999px;
+  filter: blur(90px);
+  animation: pj-float 38s ease-in-out infinite;
+}
+.pj-ring {
+  border-radius: 9999px;
+  border: 1px solid rgba(59,130,246,.16);
+  animation: pj-spin 90s linear infinite;
+}
+.pj-square {
+  border: 1px solid rgba(99,102,241,.18);
+  animation: pj-spin 70s linear infinite reverse;
+  border-radius: 22%;
+}
+.dark .pj-ring { border-color: rgba(125,211,252,.09); }
+.dark .pj-square { border-color: rgba(129,140,248,.12); }
+.pj-particle {
+  position: absolute;
+  border-radius: 9999px;
+  animation: pj-drift ease-in-out infinite;
+}
+.pj-grid {
+  background-image: linear-gradient(rgba(71,85,105,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(71,85,105,.08) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 30%, transparent 100%);
+}
+.dark .pj-grid {
+  background-image: linear-gradient(rgba(148,163,184,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.05) 1px, transparent 1px);
+}
+
+@keyframes pj-float {
+  0%,100% { transform: translate3d(0,0,0) scale(1); }
+  50% { transform: translate3d(50px,-35px,0) scale(1.12); }
+}
+@keyframes pj-drift {
+  0%,100% { transform: translate3d(0,0,0); opacity: .12; }
+  50% { transform: translate3d(14px,-46px,0); opacity: .75; }
+}
+@keyframes pj-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pj-pulse-dot {
+  0%,100% { box-shadow: 0 0 0 0 rgba(59,130,246,.5); }
+  70% { box-shadow: 0 0 0 8px rgba(59,130,246,0); }
+}
+.pj-live { animation: pj-pulse-dot 2.4s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pj-orb, .pj-ring, .pj-square, .pj-particle, .pj-live { animation: none !important; }
+}
+
+/* Transparence des conteneurs pleine page pour révéler l'arrière-plan immersif */
+.pj-ambient-root > div > div:first-child[class*="min-h-"],
+.pj-ambient-root > div > div:first-child[class*="bg-gray-"],
+.pj-ambient-root > div > div:first-child[class*="bg-white"],
+.pj-ambient-root > div > div:first-child[class*="bg-\[#"],
+.pj-ambient-root > div > .min-h-screen[class*="bg-"],
+.pj-ambient-root > div > .w-full[class*="bg-gray-"],
+.pj-ambient-root > div > .w-full[class*="bg-white"],
+.pj-ambient-root > div > .w-full[class*="min-h-"] {
+  background-color: transparent !important;
 }
 
 /* ─── Transitions de navigation Inertia — ultra-fluide ─── */

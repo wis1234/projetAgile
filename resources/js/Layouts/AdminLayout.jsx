@@ -11,6 +11,7 @@ import MobileBottomNav from '@/Components/MobileBottomNav';
 import AssistantLauncher from '@/Components/Assistant/AssistantLauncher';
 import Sidebar from '@/Components/Sidebar/Sidebar';
 import LanguageSwitcherSidebar from '@/Components/LanguageSwitcherSidebar';
+import AmbientBackground from '@/Components/AmbientBackground';
 import PushNotificationManager, { unregisterDeviceToken } from '@/Components/PushNotificationManager';
 
 const INCOMING_CALL_SOUND =
@@ -425,12 +426,6 @@ export default function AdminLayout({ children, immersive = false }) {
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
 
-  useEffect(() => {
-    document.body.classList.add('bg-white');
-    return () => {
-      document.body.classList.remove('bg-white');
-    };
-  }, []);
 
   // Load language preference from localStorage on component mount
   useEffect(() => {
@@ -484,7 +479,8 @@ export default function AdminLayout({ children, immersive = false }) {
   const avatarUrl = user?.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0D8ABC&color=fff`;
 
   return (
-    <div className="flex min-h-screen bg-white dark:bg-gray-900">
+    <div className="relative isolate flex min-h-screen bg-[#eceff6] dark:bg-[#03050f] text-slate-800 dark:text-slate-100 overflow-x-hidden">
+      <AmbientBackground />
       <ErrorBoundary>
         <PushNotificationManager />
       </ErrorBoundary>
@@ -519,11 +515,11 @@ export default function AdminLayout({ children, immersive = false }) {
           className={[
             'fixed top-0 left-0 right-0 z-40',
             collapsed ? 'md:left-[4.25rem]' : 'md:left-72',
-            // Style header Slack : blanc pur, ombre fine, très propre
-            'bg-white dark:bg-gray-900',
-            'border-b border-gray-200/80 dark:border-gray-700/60',
+            // Style header immersif : verre dépoli fluide, ombre fine, très propre
+            'bg-white/80 dark:bg-[#060b1f]/80 backdrop-blur-md',
+            'border-b border-slate-200/70 dark:border-white/10',
             'flex items-center justify-between px-3 sm:px-6',
-            'shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]',
+            'shadow-xs dark:shadow-none',
             'transition-[left] duration-300 motion-reduce:transition-none',
           ].join(' ')}
           style={{
@@ -830,7 +826,7 @@ export default function AdminLayout({ children, immersive = false }) {
 
         {/* Page content */}
         <main
-          className="flex-1 w-full h-full min-w-0 transition-colors bg-white dark:bg-gray-900 flex flex-col"
+          className="pj-ambient-root relative z-10 flex-1 w-full h-full min-w-0 flex flex-col bg-transparent"
           style={{
             paddingTop: immersive ? 'env(safe-area-inset-top, 0px)' : 'calc(4rem + env(safe-area-inset-top, 0px))',
             paddingBottom: immersive ? 0 : 'calc(4.5rem + env(safe-area-inset-bottom, 0px))',
@@ -840,7 +836,7 @@ export default function AdminLayout({ children, immersive = false }) {
             {children}
           </div>
           {!immersive && (
-            <footer className="mt-auto border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <footer className="mt-auto border-t border-slate-200/70 bg-white/70 dark:border-white/10 dark:bg-[#060b1f]/70 backdrop-blur-md">
               <GlobalFooter />
             </footer>
           )}

@@ -6,6 +6,7 @@ import { Link, usePage } from '@inertiajs/react';
 import GlobalFooter from '@/Components/GlobalFooter';
 import { useState } from 'react';
 import PushNotificationManager from '@/Components/PushNotificationManager';
+import AmbientBackground from '@/Components/AmbientBackground';
 
 
 
@@ -16,10 +17,11 @@ export default function AuthenticatedLayout({ header, children }) {
         useState(false);
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
-                    <PushNotificationManager />
+        <div className="relative isolate min-h-screen bg-[#eceff6] dark:bg-[#03050f] text-slate-800 dark:text-slate-100 transition-colors">
+            <AmbientBackground />
+            <PushNotificationManager />
 
-            <nav className="border-b border-gray-100 bg-white">
+            <nav className="relative z-10 border-b border-slate-200/70 dark:border-white/10 bg-white/80 dark:bg-[#060b1f]/80 backdrop-blur-md">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 justify-between">
                         <div className="flex">

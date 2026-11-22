@@ -285,69 +285,8 @@ const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
 }));
 
 const AmbientBackground = memo(function AmbientBackground() {
-  return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Fond clair */}
-      <div
-        className="absolute inset-0 block dark:hidden"
-        style={{
-          background:
-            'radial-gradient(1100px 650px at 10% -5%, rgba(59,130,246,.16), transparent 60%),' +
-            'radial-gradient(900px 600px at 95% 8%, rgba(99,102,241,.13), transparent 60%),' +
-            'radial-gradient(800px 700px at 50% 100%, rgba(6,182,212,.09), transparent 65%),' +
-            'linear-gradient(180deg, #eceff6 0%, #e6eaf3 50%, #e9edf6 100%)',
-        }}
-      />
-      {/* Fond sombre */}
-      <div
-        className="absolute inset-0 hidden dark:block"
-        style={{
-          background:
-            'radial-gradient(1200px 700px at 12% -5%, rgba(37,99,235,.28), transparent 60%),' +
-            'radial-gradient(900px 600px at 95% 8%, rgba(99,102,241,.24), transparent 60%),' +
-            'radial-gradient(800px 700px at 50% 100%, rgba(8,145,178,.16), transparent 65%),' +
-            'linear-gradient(180deg, #03050f 0%, #060b1f 45%, #04061a 100%)',
-        }}
-      />
-      <div className="pj-grid absolute inset-0" />
-
-      <div className="pj-par" style={{ top: '2%', left: '-8%', '--k': -0.07 }}>
-        <div className="pj-orb h-[26rem] w-[26rem] bg-blue-400/30 dark:bg-blue-600/25" />
-      </div>
-      <div className="pj-par" style={{ top: '14%', right: '-10%', '--k': -0.12 }}>
-        <div className="pj-orb h-[30rem] w-[30rem] bg-indigo-300/30 dark:bg-indigo-500/20" style={{ animationDelay: '-12s' }} />
-      </div>
-      <div className="pj-par" style={{ top: '52%', left: '25%', '--k': -0.05 }}>
-        <div className="pj-orb h-[28rem] w-[28rem] bg-cyan-300/25 dark:bg-cyan-500/10" style={{ animationDelay: '-24s' }} />
-      </div>
-
-      <div className="pj-par hidden md:block" style={{ top: '9%', right: '8%', '--k': -0.16 }}>
-        <div className="pj-ring h-56 w-56" />
-      </div>
-      <div className="pj-par hidden md:block" style={{ top: '38%', left: '4%', '--k': -0.1 }}>
-        <div className="pj-square h-32 w-32" />
-      </div>
-
-      <div className="absolute inset-0 opacity-50 dark:opacity-100">
-        {PARTICLES.map((p, i) => (
-          <span
-            key={i}
-            className="pj-particle"
-            style={{
-              left: p.left,
-              top: p.top,
-              width: p.size,
-              height: p.size,
-              background: p.color,
-              boxShadow: `0 0 10px 2px ${p.color}55`,
-              animationDuration: p.duration,
-              animationDelay: p.delay,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
+  // L'arrière-plan immersif est désormais globalisé dans AdminLayout pour toutes les pages de ProJA
+  return null;
 });
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -815,10 +754,9 @@ export default function Dashboard({ auth, stats = {}, activityByDay = [], recent
   return (
     <div
       ref={rootRef}
-      className="pj-root relative isolate min-h-screen w-full overflow-hidden bg-[#e8ebf2] text-slate-700 dark:bg-[#040716] dark:text-slate-200"
+      className="pj-root relative isolate min-h-screen w-full overflow-hidden bg-transparent text-slate-700 dark:text-slate-200"
     >
       <style>{DASHBOARD_CSS}</style>
-      <AmbientBackground />
 
       <div className="relative z-10 mx-auto max-w-screen-2xl space-y-6 px-4 py-7 sm:px-6 lg:px-8 lg:py-9">
 
