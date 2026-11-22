@@ -1,188 +1,49 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import {
-  HomeIcon,
-  ProjectsIcon,
-  SprintsIcon,
-  TasksIcon,
-  KanbanIcon,
-  DiscussionsIcon,
-  MembersIcon,
-  UsersIcon,
-  FilesIcon,
-  ActivitiesIcon,
-  QuizzesIcon,
-  RecruitmentIcon,
-  SubscriptionsIcon,
-  RemunerationsIcon,
-  AdminIcon,
-  getRealisticIcon,
-} from './RealisticIcons';
+import { getRealisticIcon } from './RealisticIcons';
 
 /**
- * Pôles principaux pour le rail gauche Slack ProJA
+ * Groupes logiques pour un menu latéral pur, élégant et réaliste
  */
-const POLES = [
+const SECTIONS_CONFIG = [
   {
     key: 'pilotage',
-    label: 'Accueil',
-    fullTitle: 'Pilotage & Accueil',
-    tag: 'Live',
-    accentColor: 'from-emerald-500 to-teal-600',
-    icon: (cls) => <HomeIcon className={cls} />,
+    label: 'Pilotage',
     hrefs: ['/dashboard', '/activities'],
   },
   {
     key: 'workspace',
-    label: 'Projets',
-    fullTitle: 'Projets & Agilité',
-    tag: 'Agile',
-    accentColor: 'from-blue-500 to-indigo-600',
-    icon: (cls) => <ProjectsIcon className={cls} />,
-    hrefs: ['/projects', '/sprints', '/tasks', '/kanban', '/files'],
-  },
-  {
-    key: 'team',
-    label: 'Équipe',
-    fullTitle: 'Collaboration & Équipe',
-    tag: 'Collab',
-    accentColor: 'from-purple-500 to-pink-600',
-    icon: (cls) => <DiscussionsIcon className={cls} />,
-    hrefs: ['/discussions', '/announcements', '/project-users', '/users'],
-  },
-  {
-    key: 'skills',
-    label: 'Quiz',
-    fullTitle: 'Évaluations & Quiz',
-    tag: 'Test',
-    accentColor: 'from-red-500 to-rose-600',
-    icon: (cls) => <QuizzesIcon className={cls} />,
-    hrefs: ['/quizzes'],
-  },
-  {
-    key: 'management',
-    label: 'Gestion',
-    fullTitle: 'Ressources & Gestion',
-    tag: 'RH',
-    accentColor: 'from-amber-500 to-orange-600',
-    icon: (cls) => <RecruitmentIcon className={cls} />,
-    hrefs: ['/recruitment', '/remunerations', '/subscription/plans'],
-  },
-  {
-    key: 'admin',
-    label: 'Admin',
-    fullTitle: 'Administration Système',
-    tag: 'Admin',
-    accentColor: 'from-violet-600 to-indigo-800',
-    icon: (cls) => <AdminIcon className={cls} />,
-    hrefs: ['/assistant/admin'],
-  },
-];
-
-/**
- * Groupage complet et logique des sous-sections pour le panneau secondaire
- */
-const GROUPS_CONFIG = [
-  {
-    key: 'pilotage',
-    poleKey: 'pilotage',
-    label: 'Pilotage & Accueil',
-    icon: (cls) => <HomeIcon className={cls} />,
-    hrefs: ['/dashboard', '/activities'],
-  },
-  {
-    key: 'workspace',
-    poleKey: 'workspace',
     label: 'Projets & Agilité',
-    icon: (cls) => <ProjectsIcon className={cls} />,
     hrefs: ['/projects', '/sprints', '/tasks', '/kanban', '/files'],
   },
   {
     key: 'team',
-    poleKey: 'team',
-    label: 'Communication & Équipe',
-    icon: (cls) => <DiscussionsIcon className={cls} />,
+    label: 'Collaboration',
     hrefs: ['/discussions', '/announcements', '/project-users', '/users'],
   },
   {
-    key: 'skills',
-    poleKey: 'skills',
-    label: 'Évaluations',
-    icon: (cls) => <QuizzesIcon className={cls} />,
-    hrefs: ['/quizzes'],
-  },
-  {
     key: 'management',
-    poleKey: 'management',
-    label: 'Gestion & RH',
-    icon: (cls) => <RecruitmentIcon className={cls} />,
-    hrefs: ['/recruitment', '/remunerations', '/subscription/plans'],
+    label: 'Gestion & Évaluations',
+    hrefs: ['/quizzes', '/recruitment', '/remunerations', '/subscription/plans'],
   },
   {
     key: 'admin',
-    poleKey: 'admin',
     label: 'Administration',
-    icon: (cls) => <AdminIcon className={cls} />,
     hrefs: ['/assistant/admin'],
   },
 ];
 
-function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClose, t }) {
+function Sidebar({ links = [], isLinkActive, collapsed, onToggleCollapse, open, onClose, t = (k) => k }) {
   const { auth } = usePage().props;
   const user = auth?.user || auth;
   const userName = user?.name || 'Utilisateur';
+  const userRole = user?.role || (user?.is_admin ? 'Admin' : 'Membre');
   const avatarUrl =
     user?.profile_photo_url ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0D8ABC&color=fff`;
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=2563EB&color=fff`;
 
-  // Construire les sections réelles en fonction des liens autorisés/disponibles
-  const sections = useMemo(() => {
-    const used = new Set();
-    const result = GROUPS_CONFIG.map((group) => {
-      const items = group.hrefs
-        .map((href) => links.find((l) => l.href === href))
-        .filter(Boolean);
-      items.forEach((i) => used.add(i.href));
-      return {
-        key: group.key,
-        poleKey: group.poleKey,
-        label: group.label,
-        icon: group.icon,
-        items,
-      };
-    }).filter((s) => s.items.length > 0);
-
-    const rest = links.filter((l) => !used.has(l.href));
-    if (rest.length > 0) {
-      result.push({
-        key: 'other',
-        poleKey: 'workspace',
-        label: 'Autres modules',
-        icon: (cls) => <ProjectsIcon className={cls} />,
-        items: rest,
-      });
-    }
-    return result;
-  }, [links]);
-
-  // Déterminer quel pôle correspond à la page active courante
-  const activePoleFromUrl = useMemo(() => {
-    for (const pole of POLES) {
-      const match = links.some((l) => pole.hrefs.includes(l.href) && isLinkActive(l));
-      if (match) return pole.key;
-    }
-    return 'workspace';
-  }, [links, isLinkActive]);
-
-  // Pôle sélectionné dans le rail (par défaut le pôle actif ou 'all' pour tout voir)
-  const [selectedPole, setSelectedPole] = useState(activePoleFromUrl);
-  const [viewMode, setViewMode] = useState('all'); // 'filtered' (pôle choisi) ou 'all' (toutes les sections)
-  const [tip, setTip] = useState(null);
-
-  // Synchroniser le pôle quand la page active change
-  useEffect(() => {
-    setSelectedPole(activePoleFromUrl);
-  }, [activePoleFromUrl]);
+  const [tooltip, setTooltip] = useState(null);
+  const asideRef = useRef(null);
 
   // Fermeture sur Échap (mobile)
   useEffect(() => {
@@ -192,354 +53,306 @@ function Sidebar({ links, isLinkActive, collapsed, onToggleCollapse, open, onClo
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  const showTip = (e, label) => {
+  // Organisation ordonnée des sections en fonction des liens autorisés/disponibles
+  const sections = useMemo(() => {
+    const used = new Set();
+    const result = SECTIONS_CONFIG.map((group) => {
+      const items = group.hrefs
+        .map((href) => links.find((l) => l.href === href))
+        .filter(Boolean);
+      items.forEach((i) => used.add(i.href));
+      return {
+        key: group.key,
+        label: group.label,
+        items,
+      };
+    }).filter((s) => s.items.length > 0);
+
+    // Liens non classifiés
+    const rest = links.filter((l) => !used.has(l.href));
+    if (rest.length > 0) {
+      result.push({
+        key: 'other',
+        label: 'Autres',
+        items: rest,
+      });
+    }
+    return result;
+  }, [links]);
+
+  const showTooltip = (e, label) => {
+    if (!collapsed) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    setTip({ label, top: rect.top + rect.height / 2, left: rect.right + 10 });
+    setTooltip({
+      label,
+      top: rect.top + rect.height / 2,
+      left: rect.right + 12,
+    });
   };
-  const hideTip = () => setTip(null);
 
-  // Gestion du clic sur un pôle dans le rail
-  const handlePoleClick = useCallback(
-    (poleKey) => {
-      setSelectedPole(poleKey);
-      setViewMode('filtered');
-      if (collapsed) {
-        onToggleCollapse(); // Déplie le panneau secondaire pour afficher le détail
-      }
-    },
-    [collapsed, onToggleCollapse]
-  );
+  const hideTooltip = () => setTooltip(null);
 
-  // Filtrage des sections à afficher dans la colonne 2
-  const visibleSections = useMemo(() => {
-    if (viewMode === 'all') return sections;
-    const filtered = sections.filter((s) => s.poleKey === selectedPole);
-    return filtered.length > 0 ? filtered : sections;
-  }, [sections, viewMode, selectedPole]);
+  // Rendu de l'icône : propre, nette et proportionnée
+  const renderIcon = (link, active) => {
+    const iconClass = `w-5 h-5 flex-shrink-0 transition-colors duration-150 ${
+      active
+        ? 'text-blue-600 dark:text-blue-400'
+        : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-400 dark:group-hover:text-slate-200'
+    }`;
 
-  // Pôle actuellement mis en avant
-  const currentPoleInfo = useMemo(() => {
-    return POLES.find((p) => p.key === selectedPole) || POLES[0];
-  }, [selectedPole]);
+    if (link.icon && React.isValidElement(link.icon)) {
+      return React.cloneElement(link.icon, {
+        className: iconClass,
+      });
+    }
 
-  // Rendu d'un lien dans le panneau secondaire avec icône réaliste
-  const renderItem = (link) => {
-    const active = isLinkActive(link);
-    const label = t(link.label);
-    const RealisticIconComp = getRealisticIcon(link.href, 'w-5 h-5 flex-shrink-0');
-
-    return (
-      <Link
-        key={link.href}
-        href={link.href}
-        onClick={onClose}
-        aria-current={active ? 'page' : undefined}
-        aria-label={label}
-        className={[
-          'group relative flex h-10 items-center gap-3 rounded-xl px-3 text-[13.5px] font-medium outline-none',
-          'transition-all duration-150 motion-reduce:transition-none select-none',
-          'focus-visible:ring-2 focus-visible:ring-blue-400',
-          active
-            ? 'bg-white text-blue-900 font-bold shadow-md shadow-black/25 dark:bg-blue-600 dark:text-white'
-            : 'text-blue-100/80 hover:bg-white/10 hover:text-white active:scale-[0.99]',
-        ].join(' ')}
-      >
-        {/* Indicateur lumineux gauche */}
-        {active && (
-          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-blue-600 dark:bg-white" />
-        )}
-
-        {/* Icône réaliste */}
-        <span
-          className={`flex h-6 w-6 flex-shrink-0 items-center justify-center transition-transform duration-150 group-hover:scale-110 ${
-            active ? 'scale-105' : 'opacity-90 group-hover:opacity-100'
-          }`}
-        >
-          {RealisticIconComp}
-        </span>
-
-        {/* Libellé */}
-        <span className="truncate tracking-tight flex-1">{label}</span>
-
-        {/* Badge actif discret style Slack */}
-        {active && (
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-white flex-shrink-0 animate-pulse" />
-        )}
-      </Link>
-    );
+    return getRealisticIcon(link.href, iconClass);
   };
 
   return (
     <>
       {/* ══════════════════════════════════════════════════════════════════
-          ASIDE DOUBLE-COLONNE TYPE SLACK (ProJA)
-          - Colonne 1 : Rail d'icônes principal gauche (68px)
-          - Colonne 2 : Panneau secondaire de navigation détaillée (220px)
-          - Total déployé : 288px (18rem / w-72)
-          - Total replié : 68px (4.25rem / w-[4.25rem])
+          MENU LATÉRAL UNIFIÉ — DESIGN PUR ET RÉALISTE (ProJA)
+          - Déployé : 288px (18rem / w-72)
+          - Replié : 68px (4.25rem / w-[4.25rem])
       ══════════════════════════════════════════════════════════════════ */}
       <aside
-        aria-label="Navigation principale Slack ProJA"
+        ref={asideRef}
+        aria-label="Navigation principale"
         className={[
-          'fixed inset-y-0 left-0 z-50 flex text-white shadow-2xl',
-          'transition-[width,transform] duration-300 ease-in-out motion-reduce:transition-none',
-          'md:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex flex-col',
+          'bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800/80',
+          'shadow-sm dark:shadow-none',
+          'transition-[width,transform] duration-250 ease-in-out motion-reduce:transition-none',
+          'md:translate-x-0 select-none',
           open ? 'translate-x-0' : '-translate-x-full',
           collapsed ? 'md:w-[4.25rem] w-72' : 'md:w-72 w-80',
         ].join(' ')}
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        {/* ════════════════════════════════════════════════════════════════
-            COLONNE 1 : RAIL SLACK (Icônes principales & Profil)
-        ════════════════════════════════════════════════════════════════ */}
+        {/* ── En-tête : Logo & Workspace ProJA ── */}
         <div
-          className="relative w-[4.25rem] flex-shrink-0 flex flex-col items-center justify-between pt-1 pb-3 bg-[#1e3a8a] dark:bg-[#172554] border-r border-white/15 z-20 select-none"
+          className={[
+            'flex h-16 flex-shrink-0 items-center border-b border-slate-100 dark:border-slate-800/60',
+            collapsed ? 'justify-center px-2' : 'justify-between px-4',
+          ].join(' ')}
         >
-          {/* Haut du Rail : Logo Workspace ProJA */}
-          <div className={`flex w-full flex-col items-center gap-2 ${collapsed ? 'md:flex-row md:justify-between md:px-1' : ''}`}>
-            <Link
-              href="/dashboard"
-              onClick={onClose}
-              onMouseEnter={(e) => showTip(e, 'ProJA Workspace')}
-              onMouseLeave={hideTip}
-              className={`group relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 shadow-lg shadow-blue-950/30 ring-1 ring-white/50 transition-transform hover:scale-105 active:scale-95 ${collapsed ? 'md:h-8 md:w-8' : ''}`}
-            >
+          <Link
+            href="/dashboard"
+            onClick={onClose}
+            className="flex items-center gap-3 overflow-hidden rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            title="ProJA Workspace"
+          >
+            {/* Logo de l'application */}
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 shadow-sm shadow-blue-500/20 text-white font-bold text-base">
               <img
                 src="https://proja.kemtcenter.org/storage/public/task_comments/images/proja-logo.png"
-                alt="ProJA"
-                className="h-full w-full object-contain"
+                alt="Logo ProJA"
+                className="h-7 w-7 object-contain"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
               />
-            </Link>
-            {/* Séparateur discret */}
-            <div className={`w-8 h-px bg-white/15 my-1 ${collapsed ? 'md:hidden' : ''}`} />
-          </div>
+            </div>
 
-          {/* Centre du Rail : Boutons des grands pôles Slack */}
-          <nav className="flex-1 w-full flex flex-col items-center gap-1.5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-1">
-            {POLES.map((pole) => {
-              // Vérifie si ce pôle est disponible dans les liens de l'utilisateur
-              const isAvailable = pole.hrefs.some((href) => links.some((l) => l.href === href));
-              if (!isAvailable) return null;
-
-              const isSelected = selectedPole === pole.key && viewMode === 'filtered';
-              const hasActiveChild = pole.hrefs.some((href) => {
-                const link = links.find((l) => l.href === href);
-                return link ? isLinkActive(link) : false;
-              });
-
-              return (
-                <button
-                  key={pole.key}
-                  type="button"
-                  onClick={() => handlePoleClick(pole.key)}
-                  onMouseEnter={(e) => showTip(e, pole.fullTitle)}
-                  onMouseLeave={hideTip}
-                  aria-label={pole.fullTitle}
-                  className={[
-                    'group relative flex flex-col items-center justify-center w-full py-1.5 px-1 outline-none transition-all duration-150',
-                    isSelected ? 'text-white' : 'text-blue-100/70 hover:text-white',
-                  ].join(' ')}
-                >
-                  {/* Barre d'activation verticale Slack sur le bord gauche */}
-                  {(isSelected || hasActiveChild) && (
-                    <span
-                      className={[
-                        'absolute left-0 w-1 rounded-r-full transition-all duration-200',
-                        isSelected ? 'h-8 bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'h-4 bg-white/40',
-                      ].join(' ')}
-                    />
-                  )}
-
-                  {/* Boîte d'icône */}
-                  <span
-                    className={[
-                      'flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-150',
-                      isSelected
-                        ? 'bg-blue-600/30 text-white shadow-inner ring-1 ring-blue-400/50 scale-105'
-                        : 'hover:bg-white/10 group-hover:scale-105',
-                    ].join(' ')}
-                  >
-                    {pole.icon('w-6 h-6')}
+            {/* Titre & sous-titre (masqués en mode replié) */}
+            {!collapsed && (
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white truncate">
+                    ProJA
                   </span>
-
-                  {/* Micro-libellé sous l'icône style Slack moderne */}
-                  <span
-                    className={`mt-1 text-[10px] font-semibold tracking-tight transition-colors ${
-                      isSelected ? 'text-blue-200 font-bold' : 'text-white/60 group-hover:text-white'
-                    }`}
-                  >
-                    {pole.label}
+                  <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                    Agile
                   </span>
-                </button>
-              );
-            })}
+                </div>
+                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 truncate">
+                  Espace de travail
+                </span>
+              </div>
+            )}
+          </Link>
 
-            {/* Bouton "Tous les modules" */}
+          {/* Bouton de réduction / expansion (desktop) */}
+          {!collapsed && (
             <button
               type="button"
-              onClick={() => {
-                setViewMode('all');
-                if (collapsed) onToggleCollapse();
-              }}
-              onMouseEnter={(e) => showTip(e, 'Vue d’ensemble (Tous les modules)')}
-              onMouseLeave={hideTip}
-              aria-label="Tous les modules"
-              className={[
-                'group relative flex flex-col items-center justify-center w-full py-1.5 px-1 mt-1 outline-none transition-all',
-                viewMode === 'all' ? 'text-white' : 'text-blue-100/60 hover:text-white',
-              ].join(' ')}
+              onClick={onToggleCollapse}
+              aria-label="Réduire le menu latéral (Ctrl+B)"
+              title="Réduire le menu (Ctrl+B)"
+              className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
             >
-              {viewMode === 'all' && (
-                <span className="absolute left-0 w-1 h-8 rounded-r-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
-              )}
-              <span
-                className={[
-                  'flex h-9 w-9 items-center justify-center rounded-xl transition-all',
-                  viewMode === 'all'
-                    ? 'bg-blue-600/30 ring-1 ring-blue-400/50 text-blue-300'
-                    : 'hover:bg-white/10 text-blue-200/60 group-hover:text-white',
-                ].join(' ')}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                </svg>
-              </span>
-              <span className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-white/50 group-hover:text-white">
-                Tous
-              </span>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
             </button>
-          </nav>
+          )}
 
-          {/* Bas du Rail : Avatar utilisateur & Réduire/Étendre */}
-          <div className="flex flex-col items-center gap-2 pt-2 border-t border-white/10 w-full">
-            {/* Avatar avec statut de présence Slack (vert en ligne) */}
-            <div
-              className="relative cursor-pointer group"
-              onMouseEnter={(e) => showTip(e, `${userName} · En ligne`)}
-              onMouseLeave={hideTip}
+          {/* Bouton fermer sur mobile */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer le menu"
+            className="flex md:hidden h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Bouton déplier si en mode replié sur desktop */}
+        {collapsed && (
+          <div className="hidden md:flex justify-center pt-2 pb-1 border-b border-slate-100 dark:border-slate-800/40">
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              aria-label="Agrandir le menu latéral (Ctrl+B)"
+              title="Agrandir le menu (Ctrl+B)"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
             >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* ── Navigation principale avec défilement fluide ── */}
+        <nav
+          onScroll={hideTooltip}
+          className={[
+            'flex-1 overflow-y-auto px-3 py-3 space-y-5',
+            '[scrollbar-width:thin] [scrollbar-color:rgba(156,163,175,0.3)_transparent]',
+          ].join(' ')}
+        >
+          {sections.map((section) => (
+            <div key={section.key} className="space-y-1">
+              {/* Titre de section (masqué en mode replié) */}
+              {!collapsed ? (
+                <div className="px-2.5 pb-1 pt-1 text-[11px] font-semibold tracking-wider text-slate-400 dark:text-slate-400 uppercase">
+                  {section.label}
+                </div>
+              ) : (
+                <div className="h-px bg-slate-100 dark:bg-slate-800/80 my-2 mx-1" />
+              )}
+
+              {/* Liens de la section */}
+              <div className="space-y-0.5">
+                {section.items.map((link) => {
+                  const active = isLinkActive(link);
+                  const rawLabel = link.label ? t(link.label) : '';
+
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={onClose}
+                      onMouseEnter={(e) => showTooltip(e, rawLabel)}
+                      onMouseLeave={hideTooltip}
+                      aria-current={active ? 'page' : undefined}
+                      aria-label={rawLabel}
+                      className={[
+                        'group relative flex items-center rounded-xl text-[13.5px] font-medium outline-none transition-all duration-150',
+                        'focus-visible:ring-2 focus-visible:ring-blue-500',
+                        collapsed
+                          ? 'h-10 w-10 mx-auto justify-center'
+                          : 'h-9 px-3 gap-3 justify-start',
+                        active
+                          ? 'bg-blue-50 text-blue-700 font-semibold dark:bg-blue-600/15 dark:text-blue-400 shadow-sm'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white',
+                      ].join(' ')}
+                    >
+                      {/* Indicateur actif discret en mode déployé */}
+                      {active && !collapsed && (
+                        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-blue-600 dark:bg-blue-400" />
+                      )}
+
+                      {/* Icône nette */}
+                      {renderIcon(link, active)}
+
+                      {/* Libellé */}
+                      {!collapsed && (
+                        <span className="truncate tracking-tight flex-1 text-left">
+                          {rawLabel}
+                        </span>
+                      )}
+
+                      {/* Point indicateur actif subtil */}
+                      {active && !collapsed && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 flex-shrink-0" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* ── Pied de page : Profil utilisateur et raccourci ── */}
+        <div
+          className={[
+            'flex-shrink-0 border-t border-slate-100 dark:border-slate-800/60 p-3 bg-slate-50/50 dark:bg-slate-900/40',
+            collapsed ? 'flex flex-col items-center gap-2' : 'flex items-center justify-between',
+          ].join(' ')}
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.75rem)' }}
+        >
+          <div
+            className="flex items-center gap-3 min-w-0"
+            onMouseEnter={(e) => showTooltip(e, `${userName} (${userRole})`)}
+            onMouseLeave={hideTooltip}
+          >
+            {/* Avatar avec badge de présence */}
+            <div className="relative flex-shrink-0">
               <img
                 src={avatarUrl}
                 alt={userName}
-                className="w-9 h-9 rounded-xl object-cover ring-2 ring-white/20 group-hover:ring-blue-400 transition-all shadow-md"
+                className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
                 onError={(e) => {
                   e.target.onerror = null;
-                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0D8ABC&color=fff`;
+                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=2563EB&color=fff`;
                 }}
               />
               <span
-                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-[#1d4ed8] shadow-sm"
+                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900"
                 title="En ligne"
               />
             </div>
 
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          aria-label={collapsed ? 'Étendre le volet de navigation' : 'Réduire le volet'}
-          title={collapsed ? 'Étendre le panneau (Ctrl+B)' : 'Réduire le panneau (Ctrl+B)'}
-          className={`absolute right-2 top-1 z-30 hidden items-center justify-center rounded-xl bg-white text-[#1e3a8a] shadow-lg ring-1 ring-blue-950/10 transition hover:bg-blue-50 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-blue-200 md:flex ${collapsed ? 'h-7 w-7' : 'h-9 w-9'}`}
-          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.25rem)' }}
-        >
-          <svg
-            className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-
-        {/* ════════════════════════════════════════════════════════════════
-            COLONNE 2 : PANNEAU SECONDAIRE DÉTAILLÉ (Menu & Sous-groupes)
-        ════════════════════════════════════════════════════════════════ */}
-        <div
-          className={[
-            'flex-1 flex flex-col bg-[#1e3a8a] dark:bg-[#172554]',
-            'transition-[width,opacity] duration-300 ease-in-out',
-            collapsed ? 'md:w-0 md:opacity-0 md:overflow-hidden md:pointer-events-none' : 'w-full opacity-100',
-          ].join(' ')}
-        >
-          {/* Header du panneau secondaire */}
-          <div className="flex-shrink-0 flex items-center justify-between px-4 h-16 border-b border-white/15 bg-blue-900/15">
-            <div className="min-w-0 flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="text-[15px] font-bold text-white tracking-tight truncate">
-                  ProJA
+            {/* Informations utilisateur */}
+            {!collapsed && (
+              <div className="flex flex-col min-w-0">
+                <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {userName}
                 </span>
-                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-blue-500/20 text-blue-300 ring-1 ring-blue-400/30 uppercase tracking-wider">
-                  {viewMode === 'all' ? 'Complet' : currentPoleInfo.tag}
+                <span className="text-[11px] text-slate-400 dark:text-slate-400 truncate">
+                  {userRole}
                 </span>
               </div>
-              <span className="text-[11px] text-blue-100/60 truncate font-medium">
-                {viewMode === 'all' ? 'Tous les espaces de travail' : currentPoleInfo.fullTitle}
-              </span>
-            </div>
+            )}
+          </div>
 
-            {/* Bouton fermer (mobile) */}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Fermer le menu"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 transition hover:bg-white/10 hover:text-white active:scale-90 md:hidden"
+          {/* Raccourci clavier discret */}
+          {!collapsed && (
+            <kbd
+              title="Raccourci pour réduire / agrandir le volet"
+              className="hidden lg:inline-block text-[10px] font-medium text-slate-400 dark:text-slate-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 shadow-2xs"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Navigation avec groupage soigné */}
-          <nav
-            onScroll={hideTip}
-            className="flex-1 overflow-y-auto px-3 py-3 space-y-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.2)_transparent]"
-          >
-            {visibleSections.map((section, idx) => (
-              <div key={section.key} className="space-y-1">
-                {/* En-tête de groupe Slack avec puce colorée */}
-                <div className="flex items-center justify-between px-2.5 pb-1 pt-1.5 select-none">
-                  <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-blue-200/60">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400/80" />
-                    {section.label}
-                  </span>
-                  <span className="text-[10px] text-white/30 font-medium">
-                    {section.items.length}
-                  </span>
-                </div>
-
-                {/* Liste des éléments du groupe */}
-                <div className="space-y-[3px]">
-                  {section.items.map(renderItem)}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          {/* Pied du panneau secondaire */}
-          <div
-            className="flex-shrink-0 border-t border-white/15 px-4 py-3 bg-blue-950/20 flex items-center justify-between text-[11px] text-white/70"
-            style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.75rem)' }}
-          >
-            <span className="font-medium text-white/60">ProJA v2.3.1</span>
-            <span className="text-[10px] text-blue-200/50 bg-white/5 px-2 py-0.5 rounded">
-              Ctrl + B
-            </span>
-          </div>
+              Ctrl+B
+            </kbd>
+          )}
         </div>
       </aside>
 
-      {/* Infobulle flottante Slack Tooltip */}
-      {tip && (
+      {/* ── Tooltip flottant haute fidélité (en mode replié) ── */}
+      {tooltip && collapsed && (
         <div
           role="tooltip"
-          className="pointer-events-none fixed z-[70] hidden whitespace-nowrap rounded-lg bg-gray-950 px-3 py-1.5 text-xs font-semibold text-white shadow-2xl ring-1 ring-white/20 md:block animate-in fade-in duration-100"
-          style={{ left: tip.left, top: tip.top, transform: 'translateY(-50%)' }}
+          className="pointer-events-none fixed z-[70] hidden md:block whitespace-nowrap rounded-md bg-slate-900 dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-white shadow-lg ring-1 ring-white/10 animate-in fade-in duration-100"
+          style={{ left: tooltip.left, top: tooltip.top, transform: 'translateY(-50%)' }}
         >
-          {tip.label}
+          {tooltip.label}
         </div>
       )}
     </>
