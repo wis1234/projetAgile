@@ -263,11 +263,20 @@ class RemunerationController extends Controller
         );
         
         $walletService = app(\App\Services\WalletService::class);
+        $withdrawalRows = \App\Models\Withdrawal::where('user_id', $user->id)
+            ->latest('id')
+            ->limit(21)
+            ->get();
+        $withdrawalsHasMore = $withdrawalRows->count() > 20;
 
         return Inertia::render('Remunerations/Index', [
             'wallet' => $walletService->summary($user->id),
-            'withdrawals' => \App\Models\Withdrawal::where('user_id', $user->id)->latest()->limit(30)->get()
+            'withdrawals' => $withdrawalRows->take(20)
                 ->map(fn ($w) => $w->toPayload())->values(),
+            'withdrawalsHasMore' => $withdrawalsHasMore,
+            'pendingWithdrawalsCount' => \App\Models\Withdrawal::where('user_id', $user->id)
+                ->whereIn('status', [\App\Models\Withdrawal::STATUS_PENDING, \App\Models\Withdrawal::STATUS_PROCESSING])
+                ->count(),
             'payoutDefaults' => [
                 'phone' => optional(\App\Models\TaskPayment::where('user_id', $user->id)->latest()->first())->phone_number,
                 'method' => optional(\App\Models\TaskPayment::where('user_id', $user->id)->latest()->first())->payment_method,

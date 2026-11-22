@@ -6,14 +6,42 @@ use App\Jobs\ProcessWithdrawal;
 use App\Models\Withdrawal;
 use App\Services\FedapayPayoutService;
 use App\Services\WalletService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class WithdrawalController extends Controller
 {
+    private const HISTORY_PAGE_SIZE = 20;
+
     public function __construct(private WalletService $wallet)
     {
+    }
+
+    /** Charge les retraits plus anciens que le curseur fourni pour l'historique progressif. */
+    public function history(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'before' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $query = Withdrawal::where('user_id', $request->user()->id)
+            ->when(
+                !empty($validated['before']),
+                fn ($query) => $query->where('id', '<', $validated['before'])
+            )
+            ->orderByDesc('id');
+
+        $rows = $query->limit(self::HISTORY_PAGE_SIZE + 1)->get();
+        $hasMore = $rows->count() > self::HISTORY_PAGE_SIZE;
+
+        return response()->json([
+            'withdrawals' => $rows->take(self::HISTORY_PAGE_SIZE)
+                ->map(fn (Withdrawal $withdrawal) => $withdrawal->toPayload())
+                ->values(),
+            'has_more' => $hasMore,
+        ]);
     }
 
     /** Demande de retrait : valide, retient le montant (transaction + verrou) puis envoie à Fedapay. */

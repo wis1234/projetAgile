@@ -15,12 +15,12 @@ import {
   FaFileAlt
 } from 'react-icons/fa';
 
-export default function RemunerationIndex({ remunerations, filters, stats, wallet, withdrawals = [], payoutDefaults = {} }) {
+export default function RemunerationIndex({ remunerations, filters, stats, wallet, withdrawals = [], withdrawalsHasMore = false, pendingWithdrawalsCount = null, payoutDefaults = {} }) {
   const { auth } = usePage().props;
   const isAdmin = auth.user.roles?.includes('admin');
   const [tab, setTab] = useState(() => (typeof window !== 'undefined' && window.location.hash === '#retraits' ? 'withdrawals' : 'earnings'));
   const { flash = {} } = usePage().props;
-  const pendingWithdrawals = withdrawals.filter((w) => ['pending', 'processing'].includes(w.status)).length;
+  const pendingWithdrawals = pendingWithdrawalsCount ?? withdrawals.filter((w) => ['pending', 'processing'].includes(w.status)).length;
   const [params, setParams] = useState({
     search: filters.search || '',
     status: filters.status || '',
@@ -99,7 +99,7 @@ export default function RemunerationIndex({ remunerations, filters, stats, walle
         {tab === 'withdrawals' ? (
           <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-6">
             <h2 className="mb-1 text-base font-bold text-gray-900 dark:text-white">Historique des retraits</h2>
-            <WithdrawalHistory withdrawals={withdrawals} />
+            <WithdrawalHistory withdrawals={withdrawals} hasMore={withdrawalsHasMore} />
           </div>
         ) : (
         <>

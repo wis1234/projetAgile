@@ -617,6 +617,8 @@ Route::middleware(['auth'])->prefix('assistant')->group(function () {
 
 // Retraits (payouts Fedapay)
 Route::middleware(['auth'])->group(function () {
+    Route::get('/api/withdrawals/history', [\App\Http\Controllers\WithdrawalController::class, 'history'])
+        ->name('withdrawals.history');
     Route::post('/withdrawals', [\App\Http\Controllers\WithdrawalController::class, 'store'])
         ->middleware('throttle:6,1')->name('withdrawals.store');
     Route::post('/withdrawals/{withdrawal}/cancel', [\App\Http\Controllers\WithdrawalController::class, 'cancel'])

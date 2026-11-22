@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, useForm } from '@inertiajs/react';
 import { FaWallet, FaArrowDown, FaClock, FaCheckCircle, FaTimesCircle, FaSpinner, FaTimes, FaMobileAlt, FaExclamationCircle } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
@@ -163,16 +163,72 @@ function WithdrawModal({ show, onClose, wallet, defaults }) {
 }
 
 /** Historique des retraits, avec annulation tant que la demande n'est pas partie. */
-export function WithdrawalHistory({ withdrawals = [] }) {
+export function WithdrawalHistory({ withdrawals = [], hasMore = false }) {
   const [busy, setBusy] = useState(null);
+  const [items, setItems] = useState(withdrawals);
+  const [moreAvailable, setMoreAvailable] = useState(hasMore);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const sentinelRef = useRef(null);
+  const busyRef = useRef(false);
   const OP = { mtn: 'MTN MoMo', moov: 'Moov Money', celtis: 'Celtis Cash' };
+
+  useEffect(() => {
+    setItems(withdrawals);
+    setMoreAvailable(hasMore);
+  }, [withdrawals, hasMore]);
+
+  const loadMore = useCallback(async () => {
+    if (!moreAvailable || busyRef.current || items.length === 0) return;
+
+    busyRef.current = true;
+    setLoadingMore(true);
+    setLoadError('');
+    try {
+      const oldestId = items[items.length - 1].id;
+      const response = await fetch(`/api/withdrawals/history?before=${encodeURIComponent(oldestId)}`, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || 'Impossible de charger les anciens retraits.');
+      }
+
+      const result = await response.json();
+      const older = Array.isArray(result.withdrawals) ? result.withdrawals : [];
+      setItems((current) => {
+        const known = new Set(current.map((withdrawal) => withdrawal.id));
+        return [...current, ...older.filter((withdrawal) => !known.has(withdrawal.id))];
+      });
+      setMoreAvailable(Boolean(result.has_more));
+    } catch (error) {
+      setLoadError(error.message || 'Impossible de charger les anciens retraits.');
+    } finally {
+      busyRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [items, moreAvailable]);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !moreAvailable) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMore(); },
+      { rootMargin: '300px 0px' }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [items.length, loadMore, moreAvailable]);
+
   const cancel = (w) => {
     if (!window.confirm('Annuler cette demande de retrait ?')) return;
     setBusy(w.id);
     router.post(route('withdrawals.cancel', w.id), {}, { preserveScroll: true, onFinish: () => setBusy(null) });
   };
 
-  if (!withdrawals.length) {
+  if (!items.length) {
     return (
       <div className="py-10 text-center">
         <FaWallet className="mx-auto text-3xl text-gray-300 dark:text-gray-600" />
@@ -184,7 +240,7 @@ export function WithdrawalHistory({ withdrawals = [] }) {
 
   return (
     <ul className="divide-y divide-gray-100 dark:divide-gray-700/70">
-      {withdrawals.map((w) => {
+      {items.map((w) => {
         const st = WITHDRAWAL_STATUS[w.status] || WITHDRAWAL_STATUS.pending;
         const Icon = st.icon;
         return (
@@ -207,6 +263,14 @@ export function WithdrawalHistory({ withdrawals = [] }) {
           </li>
         );
       })}
+      {moreAvailable && <li ref={sentinelRef} className="h-px list-none" aria-hidden="true" />}
+      {loadingMore && <li className="flex list-none justify-center py-4"><FaSpinner className="animate-spin text-blue-600" aria-label="Chargement des anciens retraits" /></li>}
+      {loadError && (
+        <li className="flex list-none flex-wrap items-center justify-center gap-3 py-4 text-sm text-red-600 dark:text-red-400">
+          <span>{loadError}</span>
+          <button type="button" onClick={loadMore} disabled={loadingMore} className="font-semibold underline disabled:opacity-50">Réessayer</button>
+        </li>
+      )}
     </ul>
   );
 }
