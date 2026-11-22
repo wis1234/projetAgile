@@ -316,10 +316,10 @@ export default function InboxThread({ contactId, variant = 'web', onBack }) {
 
   const root = mobile
     ? 'flex h-full flex-col bg-slate-100 dark:bg-slate-950'
-    : 'fixed bottom-0 left-0 right-0 top-0 z-[45] flex flex-col bg-slate-100 dark:bg-slate-950 md:left-[var(--sidebar-w,16rem)]';
+    : 'fixed bottom-0 left-0 right-0 top-0 z-[45] flex flex-col overflow-y-auto overscroll-contain bg-slate-100 dark:bg-slate-950 md:left-[var(--sidebar-w,16rem)]';
 
   return (
-    <div className={root}>
+    <div className={root} ref={mobile ? undefined : scrollRef} onScroll={mobile ? undefined : onScroll}>
       {/* ── En-tête ── */}
       <header className="flex flex-shrink-0 items-center gap-2 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 px-2 py-2.5 text-white shadow-md sm:px-4" style={{ paddingTop: mobile ? 'max(0.625rem, env(safe-area-inset-top))' : undefined }}>
         <button type="button" onClick={goBack} aria-label="Retour" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full hover:bg-white/15 active:scale-90">
@@ -337,9 +337,9 @@ export default function InboxThread({ contactId, variant = 'web', onBack }) {
 
       {/* ── Fil ── */}
       <div
-        ref={scrollRef}
-        onScroll={onScroll}
-        className="relative flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-6"
+        ref={mobile ? scrollRef : undefined}
+        onScroll={mobile ? onScroll : undefined}
+        className={`relative px-3 py-3 sm:px-6 ${mobile ? 'flex-1 overflow-y-auto overscroll-contain' : 'min-h-[50vh]'}`}
         style={{ backgroundImage: 'radial-gradient(rgba(100,116,139,.12) 1px, transparent 1px)', backgroundSize: '18px 18px' }}
       >
         {loading ? (
@@ -386,7 +386,7 @@ export default function InboxThread({ contactId, variant = 'web', onBack }) {
       </div>
 
       {/* ── Zone de saisie ── */}
-      <footer className="flex-shrink-0 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" style={{ paddingBottom: mobile ? 'env(safe-area-inset-bottom)' : undefined }}>
+      <footer className={`flex-shrink-0 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 ${mobile ? '' : 'sticky bottom-0 z-10'}`} style={{ paddingBottom: mobile ? 'env(safe-area-inset-bottom)' : undefined }}>
         {error && messages.length > 0 && (
           <div className="mx-3 mt-2 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
             <FaExclamationCircle className="flex-shrink-0" /><span className="flex-1">{error}</span>

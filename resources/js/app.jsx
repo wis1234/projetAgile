@@ -21,6 +21,21 @@ import { useEffect } from 'react';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Proja';
 
+if (typeof window !== 'undefined') {
+    let savedMode = null;
+    try {
+        savedMode = window.localStorage.getItem('darkMode');
+    } catch {
+        // Fall back to the system preference when browser storage is unavailable.
+    }
+
+    const darkMode = savedMode === null
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        : savedMode === 'true';
+    document.documentElement.classList.toggle('dark', darkMode);
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+}
+
 function AppWithCsrfErrorModal({ children }) {
     useEffect(() => {
         document.documentElement.classList.toggle('native-mobile-app', isNativeApp());

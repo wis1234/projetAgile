@@ -186,9 +186,13 @@ export default function AdminLayout({ children, immersive = false }) {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      const savedMode = localStorage.getItem('darkMode');
-      if (savedMode !== null) {
-        return savedMode === 'true';
+      try {
+        const savedMode = localStorage.getItem('darkMode');
+        if (savedMode !== null) {
+          return savedMode === 'true';
+        }
+      } catch {
+        // Fall back to the system preference when browser storage is unavailable.
       }
       return window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
@@ -263,7 +267,11 @@ export default function AdminLayout({ children, immersive = false }) {
       document.documentElement.classList.remove('dark');
       document.documentElement.setAttribute('data-theme', 'light');
     }
-    localStorage.setItem('darkMode', darkMode);
+    try {
+      localStorage.setItem('darkMode', darkMode);
+    } catch {
+      // The selected theme remains active for the current page.
+    }
   }, [darkMode]);
 
   // Écouter les changements de préférence système

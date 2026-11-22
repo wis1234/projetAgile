@@ -39,14 +39,21 @@ export default function MobileMoreIndex() {
   const user = auth?.user || auth || {};
   const candidateOnly = Boolean(auth?.user?.quiz_candidate_only);
   const [q, setQ] = useState('');
-  const [dark, setDark] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('darkMode') === 'true' : false));
+  const [dark, setDark] = useState(() => (typeof window !== 'undefined' ? document.documentElement.classList.contains('dark') : false));
 
   const label = (i) => t(i.label) || i.fb;
   const groups = useMemo(() => GROUPS
     .map((g) => ({ ...g, items: g.items.filter((i) => (!candidateOnly || i.href === '/quizzes') && (!q || label(i).toLowerCase().includes(q.toLowerCase()))) }))
     .filter((g) => g.items.length), [q, candidateOnly, t]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleDark = () => { const next = !dark; setDark(next); document.documentElement.classList.toggle('dark', next); localStorage.setItem('darkMode', String(next)); nativeFeedback.tap?.(); };
+  const toggleDark = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light');
+    try { localStorage.setItem('darkMode', String(next)); } catch { /* The theme remains active for this page. */ }
+    nativeFeedback.tap?.();
+  };
   const logout = async () => { try { await unregisterDeviceToken(); } catch { /* ne bloque jamais la déconnexion */ } router.post('/logout'); };
 
   return (
