@@ -19,6 +19,7 @@ use App\Services\Quiz\QuizSubmissionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class QuizController extends Controller
@@ -245,6 +246,42 @@ class QuizController extends Controller
 
         return redirect()->route('projects.quizzes.show', [$project->id, $quiz->id])
             ->with('success', 'Quiz mis à jour avec succès !');
+    }
+
+    public function duplicate(Project $project, Quiz $quiz)
+    {
+        $this->authorize('manage', [Quiz::class, $project]);
+
+        $copy = DB::transaction(function () use ($project, $quiz) {
+            $copy = $quiz->replicate([
+                'public_token',
+                'deliberation_opened_at',
+                'validated_at',
+                'validated_fingerprint',
+            ]);
+            $copy->title = Str::limit($quiz->title, 247, '') . ' (copie)';
+            $copy->project_id = $project->id;
+            $copy->created_by = Auth::id();
+            $copy->is_active = false;
+            $copy->is_draft = true;
+            $copy->allow_public_access = false;
+            $copy->restricted_to_candidates = false;
+            $copy->deliberation_status = Quiz::DELIBERATION_NONE;
+            $copy->save();
+
+            foreach ($quiz->questions as $question) {
+                $copy->questions()->save($question->replicate());
+            }
+
+            return $copy;
+        });
+
+        if (function_exists('activity_log')) {
+            activity_log('create', "Quiz '{$quiz->title}' dupliqué en '{$copy->title}'", $copy);
+        }
+
+        return redirect()->route('projects.quizzes.edit', [$project->id, $copy->id])
+            ->with('success', 'Quiz dupliqué avec toutes ses questions. Vous pouvez maintenant le modifier.');
     }
 
     public function destroy(Project $project, Quiz $quiz)

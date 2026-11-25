@@ -32,6 +32,58 @@ class QuizActionsDoNotErrorTest extends QuizHttpTestCase
         $this->assertNull(Quiz::find($quiz->id));
     }
 
+    public function test_a_manager_can_duplicate_a_quiz_and_all_its_questions_as_a_draft(): void
+    {
+        $quiz = $this->makeQuiz([
+            $this->qcm() + ['option_c' => 'C', 'option_d' => 'D', 'ai_rubric' => 'Rubrique QCM'],
+            $this->written('Question rédigée') + ['ai_rubric' => 'Rubrique écrite'],
+        ], 'Quiz original');
+        $quiz->update([
+            'public_token' => 'token-original',
+            'allow_public_access' => true,
+            'restricted_to_candidates' => true,
+            'deliberation_status' => Quiz::DELIBERATION_VALIDATED,
+        ]);
+        $originalQuestions = $quiz->questions->map(fn ($question) => $question->only([
+            'question_text', 'question_type', 'option_a', 'option_b', 'option_c', 'option_d',
+            'correct_answer', 'ai_rubric', 'order',
+        ]))->all();
+
+        $response = $this->actingAs($this->manager1)
+            ->post($this->quizUrl($quiz, '/duplicate'))
+            ->assertRedirect();
+
+        $copy = Quiz::where('title', 'Quiz original (copie)')->firstOrFail();
+        $response->assertRedirect(route('projects.quizzes.edit', [$this->project->id, $copy->id]));
+
+        $this->assertNotSame($quiz->id, $copy->id);
+        $this->assertSame($this->manager1->id, $copy->created_by);
+        $this->assertTrue($copy->is_draft);
+        $this->assertFalse($copy->is_active);
+        $this->assertFalse($copy->allow_public_access);
+        $this->assertFalse($copy->restricted_to_candidates);
+        $this->assertNull($copy->public_token);
+        $this->assertSame(Quiz::DELIBERATION_NONE, $copy->deliberation_status);
+        $this->assertSame(
+            $originalQuestions,
+            $copy->questions->map(fn ($question) => $question->only([
+                'question_text', 'question_type', 'option_a', 'option_b', 'option_c', 'option_d',
+                'correct_answer', 'ai_rubric', 'order',
+            ]))->all()
+        );
+    }
+
+    public function test_a_non_manager_cannot_duplicate_a_quiz(): void
+    {
+        $quiz = $this->makeQuiz([$this->qcm()]);
+
+        $this->actingAs($this->candidate)
+            ->post($this->quizUrl($quiz, '/duplicate'))
+            ->assertForbidden();
+
+        $this->assertSame(1, Quiz::count());
+    }
+
     public function test_submit_grade_deliberate_and_cumulate(): void
     {
         $quiz = $this->makeQuiz([$this->qcm(), $this->written()]);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, router } from '@inertiajs/react';
-import { FaClock, FaQuestionCircle, FaPlay, FaEdit, FaTrash, FaCheckCircle, FaTrophy, FaLock, FaShareAlt, FaCopy, FaCheck, FaPenFancy, FaFileSignature, FaShieldAlt } from 'react-icons/fa';
+import { FaClock, FaQuestionCircle, FaPlay, FaEdit, FaTrash, FaCheckCircle, FaTrophy, FaLock, FaShareAlt, FaCopy, FaCheck, FaPenFancy, FaFileSignature, FaShieldAlt, FaClone } from 'react-icons/fa';
 import ScoreBadge from '@/Components/Quiz/ScoreBadge';
 
 export default function QuizCard({ quiz, project, canManage }) {
@@ -22,6 +22,10 @@ export default function QuizCard({ quiz, project, canManage }) {
     if (confirm(`Êtes-vous sûr de vouloir supprimer le quiz "${quiz.title}" ?`)) {
       router.delete(route('projects.quizzes.destroy', [project.id, quiz.id]));
     }
+  };
+
+  const handleDuplicate = () => {
+    router.post(route('projects.quizzes.duplicate', [project.id, quiz.id]));
   };
 
   const handleTogglePublic = () => {
@@ -174,6 +178,15 @@ export default function QuizCard({ quiz, project, canManage }) {
 
         {canManage && (
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleDuplicate}
+              className="p-2 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 rounded-lg transition"
+              title="Dupliquer"
+              aria-label={`Dupliquer le quiz ${quiz.title}`}
+            >
+              <FaClone />
+            </button>
             <Link
               href={route('projects.quizzes.edit', [project.id, quiz.id])}
               className="p-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 rounded-lg transition"

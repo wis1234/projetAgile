@@ -333,6 +333,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [\App\Http\Controllers\QuizController::class, 'store'])->name('store');
         Route::get('/{quiz}', [\App\Http\Controllers\QuizController::class, 'show'])->name('show');
         Route::get('/{quiz}/edit', [\App\Http\Controllers\QuizController::class, 'edit'])->name('edit');
+        Route::post('/{quiz}/duplicate', [\App\Http\Controllers\QuizController::class, 'duplicate'])->name('duplicate');
         Route::put('/{quiz}', [\App\Http\Controllers\QuizController::class, 'update'])->name('update');
         Route::delete('/{quiz}', [\App\Http\Controllers\QuizController::class, 'destroy'])->name('destroy');
         Route::post('/{quiz}/launch', [\App\Http\Controllers\QuizController::class, 'launch'])->name('launch');
