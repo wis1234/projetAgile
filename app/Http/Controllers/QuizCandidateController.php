@@ -75,29 +75,22 @@ class QuizCandidateController extends Controller
     }
 
     /**
-     * Liste paginée et cherchable des membres du projet éligibles (ni responsables, ni déjà
-     * membres du quiz), pour l'import en masse avec exclusion manuelle côté interface.
+     * Liste paginée des comptes ProJA vérifiés qui ne sont pas encore inscrits à ce quiz.
      */
     public function importable(Request $request, Project $project, Quiz $quiz): JsonResponse
     {
         $this->authorize('manage', [Quiz::class, $project]);
 
-        $term = trim((string) $request->query('q', ''));
+        $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
         $perPage = min(50, max(5, (int) $request->query('per_page', 20)));
 
-        $already = $quiz->candidates()->pluck('user_id');
+        $query = $this->registeredUsersQuery($request, $quiz);
 
-        $query = $project->users()
-            ->wherePivot('role', '!=', 'manager')
-            ->wherePivot('is_muted', false)
-            ->whereNotIn('users.id', $already)
-            ->when($term !== '', function ($q) use ($term) {
-                $like = '%' . addcslashes($term, '%_\\') . '%';
-                $q->where(fn ($w) => $w->where('name', 'like', $like)->orWhere('email', 'like', $like));
-            })
-            ->orderBy('name');
-
-        $page = $query->paginate($perPage, ['users.id', 'name', 'email', 'profile_photo_path'], 'page')
+        $page = $query->paginate($perPage, ['id', 'name', 'email', 'profile_photo_path', 'created_at'], 'page')
             ->withQueryString();
 
         return response()->json([
@@ -106,44 +99,63 @@ class QuizCandidateController extends Controller
                 'name' => $u->name,
                 'email' => $u->email,
                 'photo' => $u->profile_photo_url,
+                'registered_at' => $u->created_at?->toDateString(),
             ]),
             'current_page' => $page->currentPage(),
             'last_page' => $page->lastPage(),
             'per_page' => $page->perPage(),
-            // Total réellement éligible (hors responsables, hors déjà-membres, hors filtre courant) :
-            // sert à afficher « Tout sélectionner (N) » sans devoir charger toutes les pages.
             'total' => $page->total(),
         ]);
     }
 
     /**
-     * Inscrit en masse les membres éligibles du projet (hors responsables, hors muets, hors déjà
-     * membres), à l'exception de ceux explicitement décochés dans l'interface d'import.
-     *
-     * @param  list<int>  $exceptUserIds  Identifiants décochés par le responsable avant l'import.
+     * Inscrit au quiz les utilisateurs sélectionnés ou tous ceux qui correspondent aux filtres.
      */
     public function addMembers(Request $request, Project $project, Quiz $quiz)
     {
         $this->authorize('manage', [Quiz::class, $project]);
 
         $data = $request->validate([
-            'except_user_ids' => ['sometimes', 'array'],
+            'all' => ['required', 'boolean'],
+            'user_ids' => ['exclude_if:all,true', 'required_if:all,false', 'array', 'min:1', 'max:2000'],
+            'user_ids.*' => ['integer', 'distinct', Rule::exists('users', 'id')],
+            'except_user_ids' => ['exclude_unless:all,true', 'sometimes', 'array'],
             'except_user_ids.*' => ['integer'],
+            'q' => ['nullable', 'string', 'max:255'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
-        $except = $data['except_user_ids'] ?? [];
 
-        $ids = $project->users()
-            ->wherePivot('role', '!=', 'manager')
-            ->wherePivot('is_muted', false)
-            ->when($except, fn ($q) => $q->whereNotIn('users.id', $except))
-            ->pluck('users.id')
-            ->all();
+        $query = $this->registeredUsersQuery($request, $quiz);
+        if ($data['all']) {
+            $except = $data['except_user_ids'] ?? [];
+            $ids = $query->when($except, fn ($q) => $q->whereNotIn('id', $except))->pluck('id')->all();
+        } else {
+            $ids = $query->whereIn('id', $data['user_ids'])->pluck('id')->all();
+        }
 
         if (! $ids) {
-            return back()->with('error', 'Aucun membre à ajouter : soit le projet n\'en a pas, soit tous ont été exclus ou sont déjà membres du quiz.');
+            return back()->with('error', 'Aucun utilisateur sélectionné ne peut être ajouté à ce quiz.');
         }
 
         return $this->enrol($quiz, $ids);
+    }
+
+    private function registeredUsersQuery(Request $request, Quiz $quiz)
+    {
+        $term = trim((string) $request->input('q', ''));
+        $already = $quiz->candidates()->pluck('user_id');
+
+        return User::query()
+            ->whereNotNull('email_verified_at')
+            ->whereNotIn('id', $already)
+            ->when($term !== '', function ($query) use ($term) {
+                $like = '%' . addcslashes($term, '%_\\') . '%';
+                $query->where(fn ($users) => $users->where('name', 'like', $like)->orWhere('email', 'like', $like));
+            })
+            ->when($request->input('date_from'), fn ($query, $date) => $query->whereDate('created_at', '>=', $date))
+            ->when($request->input('date_to'), fn ($query, $date) => $query->whereDate('created_at', '<=', $date))
+            ->orderBy('name');
     }
 
     /**

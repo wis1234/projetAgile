@@ -6,21 +6,19 @@ import Avatar from '@/Components/Quiz/Avatar';
 import toast from '@/lib/toast';
 
 /**
- * Import en masse des membres du projet vers un quiz.
- *
- * Principe : par défaut, TOUS les membres éligibles (hors responsables, hors muets, hors déjà
- * membres) sont sélectionnés — le compteur « Tout sélectionner (N) » vient du serveur, pas d'une
- * page chargée. Décocher une personne l'ajoute à une liste d'exclusion, conservée en naviguant
- * d'une page à l'autre ou en filtrant. L'ajout final envoie uniquement cette liste d'exclusion :
- * l'opération reste rapide même avec des centaines de membres, sans jamais tout charger d'un coup.
+ * Import en masse d'utilisateurs ProJA vers un quiz, avec filtres et sélection paginée.
  */
 export default function ImportMembersModal({ project, quiz, open, onClose }) {
   const [query, setQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [allSelected, setAllSelected] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
   const [excluded, setExcluded] = useState(() => new Set());
   const [submitting, setSubmitting] = useState(false);
   const requestId = useRef(0);
@@ -29,14 +27,25 @@ export default function ImportMembersModal({ project, quiz, open, onClose }) {
   useEffect(() => {
     if (!open) return undefined;
     setPage(1);
-  }, [open, query]);
+    setAllSelected(false);
+    setSelected(new Set());
+    setExcluded(new Set());
+  }, [open, query, dateFrom, dateTo]);
 
   useEffect(() => {
     if (!open) return undefined;
     const current = ++requestId.current;
     setLoading(true);
     axios
-      .get(route('projects.quizzes.candidates.importable', routeArgs), { params: { q: query.trim(), page, per_page: 20 } })
+      .get(route('projects.quizzes.candidates.importable', routeArgs), {
+        params: {
+          q: query.trim(),
+          date_from: dateFrom || undefined,
+          date_to: dateTo || undefined,
+          page,
+          per_page: 20,
+        },
+      })
       .then(({ data }) => {
         if (current !== requestId.current) return;
         setRows(data.data);
@@ -50,33 +59,44 @@ export default function ImportMembersModal({ project, quiz, open, onClose }) {
         if (current === requestId.current) setLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, query, page]);
+  }, [open, query, dateFrom, dateTo, page]);
 
   if (!open) return null;
 
-  const selectedCount = Math.max(0, total - excluded.size);
-  const toggle = (id) =>
-    setExcluded((set) => {
+  const selectedCount = allSelected ? Math.max(0, total - excluded.size) : selected.size;
+  const toggle = (id) => {
+    if (allSelected) {
+      setExcluded((set) => {
+        const next = new Set(set);
+        next.has(id) ? next.delete(id) : next.add(id);
+        return next;
+      });
+      return;
+    }
+
+    setSelected((set) => {
       const next = new Set(set);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  const excludeAllOnPage = () => setExcluded((set) => new Set([...set, ...rows.map((r) => r.id)]));
-  const includeAllOnPage = () => setExcluded((set) => {
-    const next = new Set(set);
-    rows.forEach((r) => next.delete(r.id));
-    return next;
-  });
-  const allPageExcluded = rows.length > 0 && rows.every((r) => excluded.has(r.id));
+  };
 
   const submit = () => {
     if (selectedCount <= 0) {
-      toast.warning('Sélectionnez au moins un membre à ajouter.');
+      toast.warning('Sélectionnez au moins un utilisateur à ajouter.');
       return;
     }
     router.post(
       route('projects.quizzes.candidates.members', routeArgs),
-      { except_user_ids: Array.from(excluded) },
+      allSelected
+        ? {
+            all: true,
+            except_user_ids: Array.from(excluded),
+            q: query.trim(),
+            date_from: dateFrom || null,
+            date_to: dateTo || null,
+          }
+        : { all: false, user_ids: Array.from(selected) },
       {
         preserveScroll: true,
         onStart: () => setSubmitting(true),
@@ -93,10 +113,12 @@ export default function ImportMembersModal({ project, quiz, open, onClose }) {
           } else if (page.props.flash?.error) {
             toast.error(page.props.flash.error);
           }
+          setAllSelected(false);
+          setSelected(new Set());
           setExcluded(new Set());
           onClose();
         },
-        onError: () => toast.error("L'import a échoué. Réessayez."),
+        onError: () => toast.error("L'ajout des utilisateurs a échoué. Réessayez."),
         onFinish: () => setSubmitting(false),
       }
     );
@@ -108,7 +130,7 @@ export default function ImportMembersModal({ project, quiz, open, onClose }) {
       <div className="relative w-full sm:max-w-lg bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
           <h3 id="import-members-title" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <FaUsers className="text-purple-600" /> Importer des membres du projet
+          <FaUsers className="text-purple-600" /> Utilisateurs inscrits sur ProJA
           </h3>
           <button type="button" onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Fermer">
             <FaTimes />
@@ -125,14 +147,43 @@ export default function ImportMembersModal({ project, quiz, open, onClose }) {
               className="w-full pl-10 rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:border-purple-500 focus:ring-purple-500"
             />
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+              Inscrit à partir du
+              <input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs"
+              />
+            </label>
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+              Inscrit jusqu'au
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs"
+              />
+            </label>
+          </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-purple-700 dark:text-purple-300">{selectedCount} / {total} sélectionné(s)</span>
+            <span className="font-semibold text-purple-700 dark:text-purple-300">
+              {selectedCount} / {total} sélectionné(s)
+            </span>
             <button
               type="button"
-              onClick={allPageExcluded ? includeAllOnPage : excludeAllOnPage}
+              onClick={() => {
+                setAllSelected(!allSelected);
+                setSelected(new Set());
+                setExcluded(new Set());
+              }}
+              disabled={total === 0 || loading}
               className="font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
             >
-              {allPageExcluded ? 'Tout cocher sur cette page' : 'Tout décocher sur cette page'}
+              {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
             </button>
           </div>
         </div>
@@ -143,11 +194,11 @@ export default function ImportMembersModal({ project, quiz, open, onClose }) {
           )}
           {!loading && rows.length === 0 && (
             <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-10">
-              {total === 0 ? "Tous les membres éligibles du projet sont déjà membres de ce quiz." : 'Aucun membre ne correspond à ce filtre.'}
+              Aucun utilisateur vérifié ne correspond à ce filtre ou n'est déjà membre de ce quiz.
             </p>
           )}
           {!loading && rows.map((u) => {
-            const checked = !excluded.has(u.id);
+            const checked = allSelected ? !excluded.has(u.id) : selected.has(u.id);
             return (
               <label key={u.id} className="flex items-center gap-3 px-5 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
                 <input
@@ -160,6 +211,7 @@ export default function ImportMembersModal({ project, quiz, open, onClose }) {
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-gray-900 dark:text-white truncate">{u.name}</span>
                   <span className="block text-xs text-gray-500 truncate">{u.email}</span>
+                  {u.registered_at && <span className="block text-[10px] text-gray-400">Inscrit le {u.registered_at}</span>}
                 </span>
               </label>
             );
@@ -188,7 +240,7 @@ export default function ImportMembersModal({ project, quiz, open, onClose }) {
             disabled={submitting || selectedCount <= 0}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition disabled:opacity-50"
           >
-            {submitting ? <FaSpinner className="animate-spin" /> : <FaCheck />} Ajouter {selectedCount} membre(s)
+            {submitting ? <FaSpinner className="animate-spin" /> : <FaCheck />} Ajouter {selectedCount} utilisateur(s) au quiz
           </button>
         </div>
       </div>

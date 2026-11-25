@@ -168,13 +168,49 @@ class QuizCandidatesTest extends QuizHttpTestCase
         $this->assertSame(0, $draft->candidates()->count());
     }
 
-    public function test_add_all_project_members_skips_managers(): void
+    public function test_managers_can_select_all_registered_users_or_filter_them_by_signup_date(): void
     {
         $quiz = $this->makeQuiz([$this->qcm()]);
+        $inRange = User::factory()->create(['name' => 'Dans la période']);
+        $excluded = User::factory()->create(['name' => 'Exclu de la période']);
+        $outsideRange = User::factory()->create(['name' => 'Hors période']);
+        $inRange->forceFill(['created_at' => '2025-06-15 12:00:00'])->save();
+        $excluded->forceFill(['created_at' => '2025-08-20 12:00:00'])->save();
+        $outsideRange->forceFill(['created_at' => '2024-06-15 12:00:00'])->save();
+        $unverified = User::factory()->create(['email_verified_at' => null]);
+        $unverified->forceFill(['created_at' => '2025-03-10 12:00:00'])->save();
 
-        $this->actingAs($this->manager1)->post($this->quizUrl($quiz, '/candidates/members'))->assertSessionHas('success');
+        $this->actingAs($this->manager1)
+            ->getJson($this->quizUrl($quiz, '/candidates/importable?date_from=2025-01-01&date_to=2025-12-31'))
+            ->assertOk()
+            ->assertJsonPath('total', 2)
+            ->assertJsonCount(2, 'data');
 
-        $this->assertSame([$this->candidate->id], $quiz->candidates()->pluck('user_id')->all());
+        $this->actingAs($this->manager1)->post($this->quizUrl($quiz, '/candidates/members'), [
+            'all' => true,
+            'date_from' => '2025-01-01',
+            'date_to' => '2025-12-31',
+            'except_user_ids' => [$excluded->id],
+        ])->assertSessionHas('success');
+
+        $this->assertSame([$inRange->id], $quiz->candidates()->pluck('user_id')->all());
+        $this->assertFalse($quiz->candidates()->where('user_id', $outsideRange->id)->exists());
+        $this->assertFalse($quiz->candidates()->where('user_id', $unverified->id)->exists());
+    }
+
+    public function test_managers_can_add_only_the_individually_selected_registered_users(): void
+    {
+        $quiz = $this->makeQuiz([$this->qcm()]);
+        $selected = User::factory()->create();
+        $notSelected = User::factory()->create();
+
+        $this->actingAs($this->manager1)->post($this->quizUrl($quiz, '/candidates/members'), [
+            'all' => false,
+            'user_ids' => [$selected->id],
+        ])->assertSessionHas('success');
+
+        $this->assertSame([$selected->id], $quiz->candidates()->pluck('user_id')->all());
+        $this->assertFalse($quiz->candidates()->where('user_id', $notSelected->id)->exists());
     }
 
     public function test_manager_sees_the_roster_with_progress_and_drafts_stay_hidden_from_members(): void
